@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/app_info/launch_args.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -51,7 +52,7 @@ class WindowNotifier extends _$WindowNotifier with AppLogger {
     final position = ref.read(Preferences.windowPosition);
     final isWindowVisible = position != null && await checkWindowVisivility(position, size);
     loggy.debug("window state. position: ${isWindowVisible ? position : "centered"}");
-    final silentStart = ref.read(Preferences.silentStart);
+    final silentStart = ref.read(Preferences.silentStart) || LaunchArgs.atLogin;
     loggy.debug("window state. silent start: ${silentStart ? "Enabled" : "Disabled"}");
 
     await windowManager.waitUntilReadyToShow(

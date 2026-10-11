@@ -12,9 +12,8 @@ AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppName}
 DefaultDirName={autopf}\{#AppName}
 DisableProgramGroupPage=yes
-; installs for the current user without asking for admin rights; the admin choice is still offered
-PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+; admin rights: the sign-in task that starts A-VPN runs with highest privileges, so TUN needs no UAC prompt
+PrivilegesRequired=admin
 OutputDir=..\..\..\build\windows\installer
 OutputBaseFilename=A-VPN-Setup-{#AppVersion}
 SetupIconFile=..\..\runner\resources\app_icon.ico
@@ -43,20 +42,19 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#BuildDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "autostart.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
-[Registry]
-; the same entry the app's own "start at login" switch writes (launch_at_startup: value name = app name,
-; data = exe path), so that switch shows the right state
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; ValueData: "{app}\{#AppExe}"; Tasks: autostart; Flags: uninsdeletevalue
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"; ValueType: binary; ValueName: "{#AppName}"; ValueData: "02 00 00 00 00 00 00 00 00 00 00 00"; Tasks: autostart; Flags: uninsdeletevalue
-
 [Run]
+; start at sign-in through a scheduled task (also clears the Run-key entry older versions wrote)
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\autostart.ps1"" -Enable"; Flags: runhidden waituntilterminated; Tasks: autostart
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\autostart.ps1"" -Disable"; Flags: runhidden waituntilterminated; Tasks: not autostart
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\autostart.ps1"" -Disable"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveAutostart"
 ; stops the VPN service the app may have started, so its files can be removed
 Filename: "{app}\HiddifyCli.exe"; Parameters: "tunnel exit"; Flags: runhidden skipifdoesntexist; RunOnceId: "StopTunnel"

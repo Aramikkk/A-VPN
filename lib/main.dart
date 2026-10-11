@@ -7,9 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_driver/driver_extension.dart';
 import 'package:hiddify/bootstrap.dart';
+import 'package:hiddify/core/app_info/launch_args.dart';
 import 'package:hiddify/core/model/environment.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  LaunchArgs.parse(args);
+
   // Debug builds that ask for it: lets an external client tap, type and scroll
   // the app. Behind a flag because the extension installs a TestTextInput that
   // takes over the text input channel — with it on, no field in the app accepts

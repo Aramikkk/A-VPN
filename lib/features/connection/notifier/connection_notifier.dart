@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:hiddify/core/app_info/launch_args.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -85,7 +86,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     final activeProfile = await ref.read(activeProfileProvider.future);
     final shouldRestore = shouldRestoreConnectionOnStartup(
       isDesktop: PlatformUtils.isDesktop,
-      startedByUser: startedByUser,
+      // started by the sign-in task: A-VPN is there to connect
+      startedByUser: startedByUser || LaunchArgs.atLogin,
       hasActiveProfile: activeProfile != null,
     );
     if (!shouldRestore) {
