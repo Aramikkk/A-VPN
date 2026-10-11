@@ -108,7 +108,12 @@ class AppBasedRouting extends _$AppBasedRouting with AppLogger {
     // the region or the mode changed while the list loaded, and that change already settled auto selection
     if (ref.read(ConfigOptions.region) != region || ref.read(Preferences.perAppProxyMode) != mode) return;
     if (result == AutoSelectionResult.success) {
-      await ref.read(appProxyDataSourceProvider).applyAutoSelection(autoList: list!, mode: mode);
+      final installed = (await InstalledApps.getInstalledApps(false)).map((e) => e.packageName).toSet();
+      final autoList = expandAutoList({
+        ...list!,
+        if (region == Region.ru && mode == AppProxyMode.exclude) ...russianAppsOutsideRu,
+      }, installed);
+      await ref.read(appProxyDataSourceProvider).applyAutoSelection(autoList: autoList, mode: mode);
       await ref.read(Preferences.autoAppsSelectionRegion.notifier).update(region);
       await ref.read(Preferences.autoAppsSelectionLastUpdate.notifier).update(DateTime.now());
     } else if (result == AutoSelectionResult.notFound) {
@@ -127,3 +132,25 @@ class AppBasedRouting extends _$AppBasedRouting with AppLogger {
   Future<void> _loading(Future<void> Function() operation) =>
       ref.read(autoSelectionLoadingProvider.notifier).doAsync(operation);
 }
+
+/// Popular Russian apps whose package names don't start with "ru." (the Russian bypass list is just "ru.*").
+const russianAppsOutsideRu = {
+  'com.idamob.tinkoff.android', // T-Bank
+  'com.vkontakte.android',
+  'com.vk.vkvideo',
+  'com.vk.im',
+  'com.wildberries.ru',
+  'com.avito.android',
+  'com.yandex.*',
+  'com.mail.*',
+};
+
+/// The region lists may hold patterns such as "ru.*". The app list matches exact package names only, so a
+/// pattern is turned into the installed packages it covers; plain names are kept as they are.
+Set<String> expandAutoList(Set<String> list, Set<String> installed) => {
+  for (final entry in list)
+    if (entry.endsWith('*'))
+      ...installed.where((pkg) => pkg.startsWith(entry.substring(0, entry.length - 1)))
+    else
+      entry,
+};
