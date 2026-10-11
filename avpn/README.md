@@ -73,7 +73,7 @@ cp ./hiddify/build/windows/installer/A-VPN-Setup-5.0.0.exe ./A-VPN/windows/
 
 **Раздача** — `lan_sharing.dart`: прокси на порту 12334 для устройств в точке доступа.
 
-**Интерфейс** — `lib/features/home/widget/avpn_home_body.dart` (главная в стиле INCY), `lib/features/stats/widget/side_bar_stats_overview.dart` (статистика: сайдбар на ПК, вкладка «Скорость» на телефоне с графиком), `lib/core/theme/` (темы: `ara_accent.dart` — A-VPN/Windows 11/Аврора/Закат/Лагуна/Неон; на ПК шрифт Segoe UI Variable). Иконки — `avpn/scripts/make_icon.py`.
+**Интерфейс** — `lib/features/home/widget/avpn_home_body.dart` (главная в стиле INCY), `lib/features/stats/widget/side_bar_stats_overview.dart` (статистика: сайдбар на ПК, вкладка «Статистика» на телефоне с графиком скорости, пингом/потерями — `connection_quality.dart`, замер через локальный прокси раз в 2 с, — и активными соединениями), `lib/core/theme/` (темы: `ara_accent.dart` — A-VPN/Windows 11/Аврора/Закат/Лагуна/Неон; на ПК шрифт Segoe UI Variable). Иконки — `avpn/scripts/make_icon.py`.
 
 **Автозапуск**
 - Android: `bg/BootReceiver.kt` + «Автоподключение» при запуске приложения.
@@ -83,6 +83,7 @@ cp ./hiddify/build/windows/installer/A-VPN-Setup-5.0.0.exe ./A-VPN/windows/
 1. `v2/config/builder.go` — `prependInputRouteRules`: правила из профиля идут сразу после sniff/hijack-dns (нужно для режима «Сервер»).
 2. `url-test-timeout` — таймаут пинга из настроек.
 3. `v2/hcore/vpn_traffic.go` — трафик «через VPN» в SystemInfo как неизвестные поля 100/101 (protoc на ПК нет; Dart читает в `lib/features/stats/model/vpn_traffic.dart`).
+5. `hiddify-sing-box/daemon/started_service.go` — время начала сессии не сбрасывается при перезагрузке конфигурации (смена сети/сервера); отдаётся в SystemInfo полем 102 (таймер на главной).
 4. `hiddify-sing-box/protocol/group/balancer/lowest_delay.go` — допуск (tolerance): сервер не меняется, пока другой не быстрее на 150 мс или текущий не умер; `balancer-keep-connections` не рвёт соединения. Включено только на ПК (`config_option_repository.dart`).
 
 ## Подводные камни

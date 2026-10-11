@@ -3,6 +3,7 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
+import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -35,6 +36,7 @@ class SideBarStatsOverview extends ConsumerWidget {
     final share = vpn == null || total == 0 ? null : (vpn / total).clamp(0.0, 1.0);
     final onSpeed = gradient != null ? theme.araLook.onGradient : scheme.onPrimaryContainer;
     final history = large ? ref.watch(speedHistoryProvider) : const <({int down, int up})>[];
+    final quality = large ? ref.watch(connectionQualityProvider) : const <int?>[];
 
     final vpnTile = _Tile(
       icon: Icons.shield_rounded,
@@ -94,6 +96,7 @@ class SideBarStatsOverview extends ConsumerWidget {
               ],
             ),
           ),
+          if (large) ...[const Gap(10), _QualityCard(samples: quality)],
           const Gap(10),
           _Tile(
             icon: Icons.data_usage_rounded,
@@ -118,6 +121,15 @@ class SideBarStatsOverview extends ConsumerWidget {
             vpnTile,
             const Gap(8),
             directTile,
+          ],
+          if (large) ...[
+            const Gap(8),
+            _Tile(
+              icon: Icons.lan_rounded,
+              title: t.avpn.statsConnections,
+              value: '${stats.connectionsIn}',
+              detail: '',
+            ),
           ],
         ],
       ),
@@ -336,4 +348,114 @@ class _SpeedGraph extends CustomPainter {
 
   @override
   bool shouldRepaint(_SpeedGraph old) => old.samples != samples || old.color != color;
+}
+
+/// Ping through the VPN and packet loss over the last minute: the values, and a bar per probe (lost ones red).
+class _QualityCard extends ConsumerWidget {
+  const _QualityCard({required this.samples});
+
+  final List<int?> samples;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final summary = summarize(samples);
+    final loss = summary.loss;
+    final lossColor = loss == null || loss == 0
+        ? theme.araLook.fastPing
+        : (loss < 5 ? Colors.orange.shade600 : scheme.error);
+    Widget value(String label, String text, Color color) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Caption(label, color: scheme.onSurfaceVariant),
+          const Gap(4),
+          Text(
+            text,
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              value(
+                t.avpn.statsPing,
+                summary.ping == null ? '—' : '${summary.ping} ms',
+                summary.ping == null ? scheme.onSurfaceVariant : scheme.primary,
+              ),
+              value(
+                t.avpn.statsLoss,
+                loss == null ? '—' : '${loss.toStringAsFixed(loss < 10 && loss > 0 ? 1 : 0)}%',
+                lossColor,
+              ),
+            ],
+          ),
+          const Gap(10),
+          SizedBox(
+            height: 56,
+            child: CustomPaint(
+              painter: _PingBars(
+                samples,
+                ok: scheme.primary,
+                lost: scheme.error,
+                track: scheme.outlineVariant.withValues(alpha: .5),
+              ),
+            ),
+          ),
+          const Gap(6),
+          Text(
+            samples.isEmpty ? t.avpn.statsNoData : t.avpn.statsPingHistory,
+            style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One bar per probe, height by ping (scaled to the slowest answer); a lost probe is a full-height red bar.
+class _PingBars extends CustomPainter {
+  _PingBars(this.samples, {required this.ok, required this.lost, required this.track});
+
+  final List<int?> samples;
+  final Color ok;
+  final Color lost;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const slots = ConnectionQuality.length;
+    final slot = size.width / slots;
+    final barWidth = slot * .62;
+    final peak = samples.whereType<int>().fold<int>(50, (m, v) => v > m ? v : m);
+    final offset = slots - samples.length;
+    for (var i = 0; i < slots; i++) {
+      final x = i * slot + (slot - barWidth) / 2;
+      final rect = RRect.fromRectAndRadius(Rect.fromLTWH(x, 0, barWidth, size.height), const Radius.circular(2));
+      canvas.drawRRect(rect, Paint()..color = track);
+      if (i < offset) continue;
+      final sample = samples[i - offset];
+      final height = sample == null ? size.height : (size.height * (sample / peak)).clamp(3.0, size.height);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height - height, barWidth, height), const Radius.circular(2)),
+        Paint()..color = sample == null ? lost : ok,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PingBars old) => old.samples != samples || old.ok != ok;
 }

@@ -552,7 +552,8 @@ class _ConnectionCard extends HookConsumerWidget {
     final stats = ref.watch(statsNotifierProvider).valueOrNull;
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
 
-    // how long the tunnel has been up, ticking every second while connected
+    // how long the tunnel has been up, ticking every second while connected: from the core's session start, so
+    // reopening the app doesn't restart the count (the local start is only the fallback for an older core)
     final since = useState<DateTime?>(null);
     final now = useState(DateTime.now());
     useEffect(() {
@@ -630,7 +631,7 @@ class _ConnectionCard extends HookConsumerWidget {
                       const Spacer(),
                       Icon(Icons.schedule_rounded, size: 14, color: scheme.onSurfaceVariant),
                       Text(
-                        ' ${_duration(now.value.difference(since.value ?? now.value))}',
+                        ' ${_duration(now.value.difference(stats?.sessionStartedAt ?? since.value ?? now.value))}',
                         style: theme.textTheme.bodySmall,
                       ),
                     ],

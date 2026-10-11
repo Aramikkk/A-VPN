@@ -49,8 +49,13 @@
     "accentLagoon": "Lagoon",
     "accentNeon": "Neon",
     "accentAcid": "A-VPN",
-    "speedTab": "Speed",
-    "speedHistory": "Last minute"
+    "speedTab": "Statistics",
+    "speedHistory": "Last minute",
+    "statsPing": "Ping",
+    "statsLoss": "Loss",
+    "statsConnections": "Active connections",
+    "statsPingHistory": "Ping to the server, last minute",
+    "statsNoData": "no data"
   },
   "common": {
     "appTitle": "A-VPN",

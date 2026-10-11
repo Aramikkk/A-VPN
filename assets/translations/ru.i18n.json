@@ -49,8 +49,13 @@
     "accentLagoon": "Лагуна",
     "accentNeon": "Неон",
     "accentAcid": "A-VPN",
-    "speedTab": "Скорость",
-    "speedHistory": "Последняя минута"
+    "speedTab": "Статистика",
+    "speedHistory": "Последняя минута",
+    "statsPing": "Пинг",
+    "statsLoss": "Потери",
+    "statsConnections": "Активные соединения",
+    "statsPingHistory": "Пинг до сервера за минуту",
+    "statsNoData": "нет данных"
   },
   "common": {
     "appTitle": "A-VPN",
