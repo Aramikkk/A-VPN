@@ -52,13 +52,10 @@ class AutoStartNotifier extends _$AutoStartNotifier with InfraLogger {
   /// (it does when the task started it).
   Future<void> _runTaskScript(String flag) async {
     final script = _taskScript.path.replaceAll("'", "''");
-    final result = await Process.run('powershell', [
-      '-NoProfile',
-      '-Command',
-      "Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
-              "-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"$script\"','$flag'"
-          .toString(),
-    ]);
+    final command =
+        "Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList "
+        "'-NoProfile','-ExecutionPolicy','Bypass','-File','\"$script\"','$flag'";
+    final result = await Process.run('powershell', ['-NoProfile', '-Command', command]);
     if (result.exitCode != 0) loggy.warning("autostart script $flag failed: ${result.stderr}");
   }
 

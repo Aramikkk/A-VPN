@@ -28,3 +28,47 @@ class ConnectionButtonTheme extends ThemeExtension<ConnectionButtonTheme> {
     );
   }
 }
+
+/// A-VPN's accent gradient and the colour for a fast ping. On the desktop a Windows 11 blue gradient; on the
+/// phone none (flat acid green) and the scheme's primary for a fast ping.
+class AraLook extends ThemeExtension<AraLook> {
+  const AraLook({this.gradient, required this.fastPing});
+
+  final Gradient? gradient;
+  final Color fastPing;
+
+  static const windowsLight = AraLook(
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF0050A8), Color(0xFF0A7BD8), Color(0xFF46B0F2)],
+    ),
+    fastPing: Color(0xFF0F7B0F),
+  );
+
+  static const windowsDark = AraLook(
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF0B3F8C), Color(0xFF1269C7), Color(0xFF3FA9F5)],
+    ),
+    fastPing: Color(0xFF6CCB5F),
+  );
+
+  @override
+  AraLook copyWith({Gradient? gradient, Color? fastPing}) =>
+      AraLook(gradient: gradient ?? this.gradient, fastPing: fastPing ?? this.fastPing);
+
+  @override
+  AraLook lerp(covariant ThemeExtension<AraLook>? other, double t) {
+    if (other is! AraLook) return this;
+    return AraLook(
+      gradient: Gradient.lerp(gradient, other.gradient, t),
+      fastPing: Color.lerp(fastPing, other.fastPing, t)!,
+    );
+  }
+}
+
+extension AraLookOf on ThemeData {
+  AraLook get araLook => extension<AraLook>() ?? AraLook(fastPing: colorScheme.primary);
+}

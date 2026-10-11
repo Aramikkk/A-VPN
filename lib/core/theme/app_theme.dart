@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 
 class AppTheme {
   AppTheme(this.mode, this.fontFamily);
@@ -11,6 +12,7 @@ class AppTheme {
   /// Light: white backgrounds and a deeper A-VPN green (the acid green doesn't read on white), whatever the
   /// wallpaper colours.
   ThemeData lightTheme(ColorScheme? lightColorScheme) {
+    if (PlatformUtils.isDesktop) return _windowsTheme(Brightness.light);
     const white = Colors.white;
     final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF9EFF1F)).copyWith(
       primary: const Color(0xFF3B8A00),
@@ -40,6 +42,7 @@ class AppTheme {
 
   ThemeData darkTheme(ColorScheme? darkColorScheme) {
     // the app's dark look is OLED black, also when the phone's dark mode picks it
+    if (PlatformUtils.isDesktop) return _windowsTheme(Brightness.dark);
     if (mode != AppThemeMode.dark) return _oledTheme();
     final ColorScheme scheme =
         darkColorScheme ?? ColorScheme.fromSeed(seedColor: const Color(0xFF293CA0), brightness: Brightness.dark);
@@ -82,6 +85,52 @@ class AppTheme {
       dialogTheme: DialogThemeData(backgroundColor: scheme.surfaceContainer),
       fontFamily: fontFamily,
       extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
+    );
+  }
+
+  /// Windows 11 look for the desktop: the Mica-grey window, white (or dark grey) cards, the Windows accent blue
+  /// and a blue gradient for the highlights.
+  ThemeData _windowsTheme(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    final background = dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3);
+    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF0078D4), brightness: brightness).copyWith(
+      primary: dark ? const Color(0xFF60CDFF) : const Color(0xFF005FB8),
+      onPrimary: dark ? const Color(0xFF00243A) : Colors.white,
+      primaryContainer: dark ? const Color(0xFF0B3F70) : const Color(0xFFCCE4F7),
+      onPrimaryContainer: dark ? const Color(0xFFCDEBFF) : const Color(0xFF002A4D),
+      secondary: dark ? const Color(0xFF99D9FF) : const Color(0xFF0A6CC2),
+      tertiary: dark ? const Color(0xFF9FB8FF) : const Color(0xFF3A5BC7),
+      surface: background,
+      surfaceDim: dark ? const Color(0xFF1A1A1A) : const Color(0xFFEBEBEB),
+      surfaceBright: dark ? const Color(0xFF383838) : Colors.white,
+      surfaceContainerLowest: dark ? const Color(0xFF1C1C1C) : Colors.white,
+      surfaceContainerLow: dark ? const Color(0xFF2B2B2B) : const Color(0xFFFBFBFB),
+      surfaceContainer: dark ? const Color(0xFF2D2D2D) : const Color(0xFFF9F9F9),
+      surfaceContainerHigh: dark ? const Color(0xFF323232) : Colors.white,
+      surfaceContainerHighest: dark ? const Color(0xFF3A3A3A) : const Color(0xFFEFEFEF),
+      outlineVariant: dark ? const Color(0xFF3D3D3D) : const Color(0xFFE5E5E5),
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: background,
+      canvasColor: background,
+      appBarTheme: AppBarTheme(backgroundColor: background, surfaceTintColor: Colors.transparent),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: background,
+        indicatorColor: scheme.primary.withValues(alpha: .18),
+      ),
+      navigationBarTheme: NavigationBarThemeData(backgroundColor: background, surfaceTintColor: Colors.transparent),
+      dialogTheme: DialogThemeData(backgroundColor: scheme.surfaceContainerLow),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.onPrimary : null),
+        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.primary : null),
+      ),
+      fontFamily: fontFamily,
+      extensions: <ThemeExtension<dynamic>>{
+        ConnectionButtonTheme.light,
+        if (dark) AraLook.windowsDark else AraLook.windowsLight,
+      },
     );
   }
 

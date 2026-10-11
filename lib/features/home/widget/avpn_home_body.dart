@@ -8,6 +8,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
@@ -332,7 +333,7 @@ class _Delay extends ConsumerWidget {
     // yellow and orange need darker shades to read on the light theme's white
     final dark = Theme.of(context).brightness == Brightness.dark;
     final color = switch (delay) {
-      <= 100 => scheme.primary,
+      <= 100 => Theme.of(context).araLook.fastPing,
       <= 150 => dark ? Colors.yellow.shade400 : Colors.amber.shade800,
       <= 250 => dark ? Colors.orange.shade400 : Colors.deepOrange.shade600,
       <= 500 => dark ? Colors.redAccent.shade200 : Colors.red.shade700,
@@ -584,7 +585,8 @@ class _ConnectionCard extends HookConsumerWidget {
       await ref.read(connectionNotifierProvider.notifier).toggleConnection();
     }
 
-    return _Card(
+    final gradient = theme.araLook.gradient;
+    final card = _Card(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
@@ -628,6 +630,12 @@ class _ConnectionCard extends HookConsumerWidget {
         ],
       ),
     );
+    if (gradient == null || !connected) return card;
+    // desktop, connected: the card gets a thin outline in the accent gradient
+    return DecoratedBox(
+      decoration: BoxDecoration(gradient: gradient, borderRadius: BorderRadius.circular(26)),
+      child: Padding(padding: const EdgeInsets.all(2), child: card),
+    );
   }
 }
 
@@ -647,10 +655,11 @@ class _InitialBadge extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: scheme.primary,
+        gradient: Theme.of(context).araLook.gradient,
       ),
       child: Text(
         letter,
-        style: TextStyle(color: scheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: -.5),
+        style: TextStyle(color: Theme.of(context).araLook.gradient != null ? Colors.white : scheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: -.5),
       ),
     );
   }
@@ -690,6 +699,8 @@ class _RoundButton extends StatelessWidget {
 ({String? flag, String title}) serverName(OutboundInfo server) {
   var name = server.tagDisplay.isNotEmpty ? server.tagDisplay : server.tag;
   name = name.replaceAll('§hide§', '').replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '').trim();
+  // the provider calls its regular servers "Доступ"; A-VPN shows them as Sigma (Sigma Gate)
+  name = name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ');
   final runes = name.runes.toList();
   for (var i = 0; i + 1 < runes.length; i++) {
     final a = runes[i] - 0x1F1E6;
