@@ -111,7 +111,10 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                               ? const Expanded(
                                   child: Align(
                                     alignment: Alignment.bottomCenter,
-                                    child: SizedBox(width: 220, child: SideBarStatsOverview()),
+                                    // scrolls when the window is too short for the whole panel
+                                    child: SingleChildScrollView(
+                                      child: SizedBox(width: 220, child: SideBarStatsOverview()),
+                                    ),
                                   ),
                                 )
                               : null,
@@ -143,7 +146,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 
   List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
     ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
-    ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab),
+    if (isMobileBreakpoint) ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab),
     if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
     ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
     if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),

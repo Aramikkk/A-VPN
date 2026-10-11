@@ -51,11 +51,11 @@ final loadingConfig = RoutingConfig(
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
     ? ['home', 'speed', 'settings'][index]
-    : ['home', 'speed', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
+    : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
 
 int getIndexOfBranch(bool isMobileBreakpoint, bool showProfilesAction, String name) => isMobileBreakpoint
     ? ['home', 'speed', 'settings'].indexOf(name)
-    : ['home', 'speed', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'].indexOf(name);
+    : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'].indexOf(name);
 
 @Riverpod(keepAlive: true)
 class RoutingConfigNotifier extends _$RoutingConfigNotifier {
@@ -150,8 +150,9 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 ),
               ],
             ),
-            // the Statistics tab, right after Home
-            StatefulShellBranch(
+            // the phone's Statistics tab, right after Home (the desktop shows it all in the sidebar)
+            if (isMobileBreakpoint)
+              StatefulShellBranch(
                 routes: <GoRoute>[
                   GoRoute(
                     name: 'speed',

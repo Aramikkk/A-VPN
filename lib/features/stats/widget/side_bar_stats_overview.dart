@@ -35,8 +35,8 @@ class SideBarStatsOverview extends ConsumerWidget {
     final direct = vpn == null ? null : (total - vpn).clamp(0, total);
     final share = vpn == null || total == 0 ? null : (vpn / total).clamp(0.0, 1.0);
     final onSpeed = gradient != null ? theme.araLook.onGradient : scheme.onPrimaryContainer;
-    final history = large ? ref.watch(speedHistoryProvider) : const <({int down, int up})>[];
-    final quality = large ? ref.watch(connectionQualityProvider) : const <int?>[];
+    final history = ref.watch(speedHistoryProvider);
+    final quality = ref.watch(connectionQualityProvider);
 
     final vpnTile = _Tile(
       icon: Icons.shield_rounded,
@@ -44,12 +44,14 @@ class SideBarStatsOverview extends ConsumerWidget {
       value: vpn == null ? '—' : size(vpn),
       share: share,
       accent: true,
+      compact: !large,
     );
     final directTile = _Tile(
       icon: Icons.alt_route_rounded,
       title: t.avpn.statsDirect,
       value: direct == null ? '—' : size(direct),
       share: share == null ? null : 1 - share,
+      compact: !large,
     );
 
     return Padding(
@@ -84,58 +86,57 @@ class SideBarStatsOverview extends ConsumerWidget {
                   value: speed(stats.uplink.toInt()),
                   color: onSpeed,
                 ),
-                if (large) ...[
-                  const Gap(16),
+                ...[
+                  Gap(large ? 16 : 10),
                   SizedBox(
-                    height: 110,
+                    height: large ? 110 : 44,
                     child: CustomPaint(painter: _SpeedGraph(history, color: onSpeed)),
                   ),
-                  const Gap(6),
-                  _Caption(t.avpn.speedHistory, color: onSpeed.withValues(alpha: .7)),
+                  if (large) ...[const Gap(6), _Caption(t.avpn.speedHistory, color: onSpeed.withValues(alpha: .7))],
                 ],
               ],
             ),
           ),
-          if (large) ...[const Gap(10), _QualityCard(samples: quality)],
-          const Gap(10),
-          _Tile(
-            icon: Icons.data_usage_rounded,
-            title: t.avpn.statsSession,
-            value: size(total),
-            detail: '↓ ${size(stats.downlinkTotal.toInt())}   ↑ ${size(stats.uplinkTotal.toInt())}',
-          ),
+          Gap(large ? 10 : 8),
+          _QualityCard(samples: quality, compact: !large),
           const Gap(8),
-          if (large)
-            // side by side, the same size
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: vpnTile),
-                  const Gap(8),
-                  Expanded(child: directTile),
-                ],
-              ),
-            )
-          else ...[
-            vpnTile,
-            const Gap(8),
-            directTile,
-          ],
-          if (large) ...[
-            const Gap(8),
+          _pair(
+            _Tile(
+              icon: Icons.data_usage_rounded,
+              title: t.avpn.statsSession,
+              value: size(total),
+              detail: large
+                  ? '↓ ${size(stats.downlinkTotal.toInt())}   ↑ ${size(stats.uplinkTotal.toInt())}'
+                  : '↓ ${size(stats.downlinkTotal.toInt())}\n↑ ${size(stats.uplinkTotal.toInt())}',
+              compact: !large,
+            ),
             _Tile(
               icon: Icons.lan_rounded,
               title: t.avpn.statsConnections,
               value: '${stats.connectionsIn}',
-              detail: '',
+              showBar: false,
+              compact: !large,
             ),
-          ],
+          ),
+          const Gap(8),
+          _pair(vpnTile, directTile),
         ],
       ),
     );
   }
 }
+
+/// Two tiles side by side, the same height.
+Widget _pair(Widget a, Widget b) => IntrinsicHeight(
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Expanded(child: a),
+      const Gap(8),
+      Expanded(child: b),
+    ],
+  ),
+);
 
 /// One stat as a card: icon, caption, value, and either a detail line or a share bar with its percentage.
 class _Tile extends StatelessWidget {
@@ -144,16 +145,24 @@ class _Tile extends StatelessWidget {
     required this.title,
     required this.value,
     this.detail,
+    this.showBar = true,
     this.share,
     this.accent = false,
+    this.compact = false,
   });
 
   final IconData icon;
   final String title;
   final String value;
   final String? detail;
+
+  /// the share bar under the value (when there's no detail line)
+  final bool showBar;
   final double? share;
   final bool accent;
+
+  /// the sidebar's narrow version: no icon, tighter, smaller value
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -162,10 +171,10 @@ class _Tile extends StatelessWidget {
     final gradient = accent ? theme.araLook.gradient : null;
     final color = accent ? scheme.primary : scheme.onSurfaceVariant;
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: compact ? const EdgeInsets.fromLTRB(10, 8, 10, 9) : const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(compact ? 12 : 14),
         border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
       ),
       child: Column(
@@ -173,17 +182,19 @@ class _Tile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: gradient,
-                  color: gradient == null ? color.withValues(alpha: .15) : null,
+              if (!compact) ...[
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: gradient,
+                    color: gradient == null ? color.withValues(alpha: .15) : null,
+                  ),
+                  child: Icon(icon, size: 13, color: gradient != null ? theme.araLook.onGradient : color),
                 ),
-                child: Icon(icon, size: 13, color: gradient != null ? theme.araLook.onGradient : color),
-              ),
-              const Gap(8),
+                const Gap(8),
+              ],
               Expanded(child: _Caption(title, color: scheme.onSurfaceVariant)),
               if (share != null)
                 Text(
@@ -192,15 +203,19 @@ class _Tile extends StatelessWidget {
                 ),
             ],
           ),
-          const Gap(6),
+          Gap(compact ? 4 : 6),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: (compact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const Gap(6),
-          if (detail != null)
+          Gap(compact ? 4 : 6),
+          if (detail == null && !showBar)
+            const SizedBox.shrink()
+          else if (detail != null)
             Text(detail!, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant))
           else
             ClipRRect(
@@ -352,9 +367,12 @@ class _SpeedGraph extends CustomPainter {
 
 /// Ping through the VPN and packet loss over the last minute: the values, and a bar per probe (lost ones red).
 class _QualityCard extends ConsumerWidget {
-  const _QualityCard({required this.samples});
+  const _QualityCard({required this.samples, this.compact = false});
 
   final List<int?> samples;
+
+  /// the sidebar's smaller version, without the caption under the bars
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -374,7 +392,10 @@ class _QualityCard extends ConsumerWidget {
           const Gap(4),
           Text(
             text,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: color),
+            style: (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -405,7 +426,7 @@ class _QualityCard extends ConsumerWidget {
           ),
           const Gap(10),
           SizedBox(
-            height: 56,
+            height: compact ? 28 : 56,
             child: CustomPaint(
               painter: _PingBars(
                 samples,
@@ -415,11 +436,12 @@ class _QualityCard extends ConsumerWidget {
               ),
             ),
           ),
-          const Gap(6),
-          Text(
-            samples.isEmpty ? t.avpn.statsNoData : t.avpn.statsPingHistory,
-            style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-          ),
+          if (!compact) const Gap(6),
+          if (!compact)
+            Text(
+              samples.isEmpty ? t.avpn.statsNoData : t.avpn.statsPingHistory,
+              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
         ],
       ),
     );
