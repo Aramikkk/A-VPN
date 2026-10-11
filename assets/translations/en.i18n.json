@@ -70,7 +70,9 @@
     "accentMono": "Mono",
     "accentPastel": "Pastel",
     "accentCyber": "Cyber",
-    "accentOled": "OLED"
+    "accentOled": "OLED",
+    "themes": "Themes",
+    "mtu": "Tunnel MTU"
   },
   "common": {
     "appTitle": "A-VPN",

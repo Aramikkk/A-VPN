@@ -26,6 +26,7 @@ import 'package:hiddify/features/settings/overview/sections/dns_options_page.dar
 import 'package:hiddify/features/settings/overview/sections/general_page.dart';
 import 'package:hiddify/features/settings/overview/sections/inbound_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
+import 'package:hiddify/features/settings/overview/sections/themes_page.dart';
 import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hiddify/features/stats/widget/speed_page.dart';
@@ -194,6 +195,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       path: 'general',
                       pageBuilder: (_, state) =>
                           customTransition(TransitionType.slide, state.pageKey, const GeneralPage()),
+                    ),
+                    GoRoute(
+                      name: 'themes',
+                      path: 'themes',
+                      pageBuilder: (_, state) =>
+                          customTransition(TransitionType.slide, state.pageKey, const ThemesPage()),
                     ),
                     GoRoute(
                       name: 'routingOptions',

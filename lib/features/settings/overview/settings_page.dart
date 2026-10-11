@@ -147,6 +147,11 @@ class SettingsPage extends HookConsumerWidget {
             namedLocation: context.namedLocation('general'),
           ),
           SettingsSection(
+            title: t.avpn.themes,
+            icon: Icons.palette_rounded,
+            namedLocation: context.namedLocation('themes'),
+          ),
+          SettingsSection(
             title: t.pages.settings.routing.title,
             icon: Icons.route_rounded,
             namedLocation: context.namedLocation('routingOptions'),

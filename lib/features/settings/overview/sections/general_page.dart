@@ -4,7 +4,6 @@ import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/features/auto_pause/auto_pause_page.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
@@ -54,8 +53,6 @@ class GeneralPage extends HookConsumerWidget {
       body: ListView(
         children: [
           const LocalePrefTile(),
-          const ThemeModePrefTile(),
-          const _AccentTile(),
           const EnableAnalyticsPrefTile(),
           SwitchListTile.adaptive(
             title: Text(t.pages.settings.general.autoIpCheck),
@@ -158,6 +155,18 @@ class GeneralPage extends HookConsumerWidget {
             },
           ),
           ValuePreferenceWidget(
+            value: ref.watch(ConfigOptions.mtu),
+            preferences: ref.watch(ConfigOptions.mtu.notifier),
+            title: t.avpn.mtu,
+            icon: Icons.straighten_rounded,
+            inputToValue: int.tryParse,
+            digitsOnly: true,
+            validateInput: (value) {
+              final mtu = int.tryParse(value);
+              return mtu != null && mtu >= 1280 && mtu <= 9000;
+            },
+          ),
+          ValuePreferenceWidget(
             value: ref.watch(ConfigOptions.connectionTestUrl),
             preferences: ref.watch(ConfigOptions.connectionTestUrl.notifier),
             title: t.pages.settings.general.connectionTestUrl,
@@ -200,82 +209,6 @@ class GeneralPage extends HookConsumerWidget {
             onChanged: ref.read(ConfigOptions.useXrayCoreWhenPossible.notifier).update,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Desktop colour theme: a row of gradient swatches, the chosen one ringed.
-class _AccentTile extends ConsumerWidget {
-  const _AccentTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final selected = ref.watch(Preferences.araAccent);
-    final brightness = Theme.of(context).brightness;
-    String name(AraAccent accent) => switch (accent) {
-      AraAccent.acid => t.avpn.accentAcid,
-      AraAccent.windows => t.avpn.accentWindows,
-      AraAccent.aurora => t.avpn.accentAurora,
-      AraAccent.sunset => t.avpn.accentSunset,
-      AraAccent.lagoon => t.avpn.accentLagoon,
-      AraAccent.neon => t.avpn.accentNeon,
-      AraAccent.mono => t.avpn.accentMono,
-      AraAccent.pastel => t.avpn.accentPastel,
-      AraAccent.cyber => t.avpn.accentCyber,
-      AraAccent.oled => t.avpn.accentOled,
-    };
-    return ListTile(
-      leading: const Icon(Icons.palette_rounded),
-      title: Text(t.avpn.accentTheme),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 4),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 10,
-          children: [
-            for (final accent in AraAccent.values)
-              Tooltip(
-                message: name(accent),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => ref.read(Preferences.araAccent.notifier).update(accent),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 56,
-                        height: 36,
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: accent == selected ? Theme.of(context).colorScheme.onSurface : Colors.transparent,
-                            width: 2,
-                          ),
-                        ),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: accent.gradient(brightness),
-                            borderRadius: BorderRadius.circular(10),
-                            // the OLED swatch is the background's own colour: outline it
-                            border: accent.pure ? Border.all(color: Theme.of(context).colorScheme.outline) : null,
-                          ),
-                          child: accent == selected
-                              ? Icon(Icons.check_rounded, color: accent.onGradient(brightness), size: 18)
-                              : const SizedBox.expand(),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(name(accent), style: Theme.of(context).textTheme.labelSmall),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
