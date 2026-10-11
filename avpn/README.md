@@ -75,6 +75,8 @@ cp ./hiddify/build/windows/installer/A-VPN-Setup-5.0.0.exe ./A-VPN/windows/
 
 **Интерфейс** — `lib/features/home/widget/avpn_home_body.dart` (главная в стиле INCY), `lib/features/stats/widget/side_bar_stats_overview.dart` (статистика: сайдбар на ПК, вкладка «Статистика» на телефоне и та же панель компактно в левой колонке на ПК, с графиком скорости, пингом/потерями — `connection_quality.dart`, замер через локальный прокси раз в 2 с, — и активными соединениями), `lib/core/theme/` (темы: `ara_accent.dart` — A-VPN/Windows 11/Аврора/Закат/Лагуна/Неон; на ПК шрифт Segoe UI Variable). Иконки — `avpn/scripts/make_icon.py`.
 
+**Автопауза (Android)** — VPN полностью закрывается, пока на экране приложение из списка (Госуслуги, банки), и открывается снова, когда его покидают. Наблюдает сам VPN-сервис (`bg/BoxService.kt`: `startAutoPause`/`pause`/`resume`; туннель закрывается, ядро останавливается, сервис остаётся с уведомлением «пауза» — иначе Android не даст перезапустить VPN из фона; после паузы ядро стартует с последней конфигурацией). Кто на экране — `bg/ForegroundApp.kt` по UsageStats (разрешение «Доступ к истории использования», `AutoPauseHandler.kt`). Настройки: `lib/features/auto_pause/auto_pause_page.dart`, prefs `auto_pause_enabled`, `auto_pause_apps` (строка через `;`).
+
 **Автозапуск**
 - Android: `bg/BootReceiver.kt` + «Автоподключение» при запуске приложения.
 - Windows: задача Планировщика `A-VPN` (`windows/packaging/avpn/autostart.ps1`): при входе, с наивысшими правами, `A-VPN.exe --autostart` → в трей и подключение (`lib/core/app_info/launch_args.dart`).

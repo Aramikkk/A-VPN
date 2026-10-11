@@ -42,6 +42,8 @@ import com.hiddify.hiddify.constant.Bugs
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -136,6 +138,65 @@ class BoxService(
 
 
     private var activeProfileName = ""
+
+    // A-VPN auto-pause: while an app from the list is on screen the tunnel is closed (the VPN disappears for
+    // every app) but this service stays up with a "paused" notification, and opens the tunnel again when the app
+    // leaves the screen. Staying up matters: Android doesn't let a stopped VPN restart itself from the background.
+    @Volatile
+    private var paused = false
+    private var autoPauseJob: Job? = null
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun startAutoPause() {
+        autoPauseJob?.cancel()
+        ForegroundApp.reset()
+        // runs for the whole session and reads the settings each time, so turning auto-pause on or off, or
+        // changing the list, works without reconnecting; while it's off it only reads two preferences a second
+        autoPauseJob = GlobalScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(1_000)
+                val apps = Settings.autoPauseApps
+                if (!Settings.autoPauseEnabled || apps.isEmpty() || !ForegroundApp.hasPermission(service)) {
+                    if (paused) resume()
+                    continue
+                }
+                val app = runCatching { ForegroundApp.current(service) }.getOrNull() ?: continue
+                if (!paused && app in apps && status.value == Status.Started) {
+                    pause(app)
+                } else if (paused && app !in apps) {
+                    resume()
+                }
+            }
+        }
+    }
+
+    private suspend fun pause(app: String) {
+        Log.d(TAG, "auto-pause for $app")
+        paused = true
+        val label = runCatching {
+            val pm = service.packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(app, 0)).toString()
+        }.getOrDefault(app)
+        withContext(Dispatchers.Main) {
+            notification.showText("A-VPN — пауза", "Открыто: $label. VPN включится, когда вы из него выйдете")
+        }
+        val pfd = fileDescriptor
+        if (pfd != null) {
+            pfd.close()
+            fileDescriptor = null
+        }
+        runCatching { Mobile.stop() }
+        status.postValue(Status.Stopped)
+    }
+
+    /** [startCore]: start the core with its last configuration (as on boot); false when the app starts it. */
+    private suspend fun resume(startCore: Boolean = true) {
+        Log.d(TAG, "auto-pause over, reconnecting")
+        paused = false
+        if (startCore) Settings.startCoreAfterStartingService = true
+        startService()
+    }
+
     private suspend fun startService() {
         try {
             status.postValue(Status.Starting)
@@ -199,6 +260,7 @@ class BoxService(
                 notification.show(activeProfileName, R.string.status_started)
             }
             notification.start()
+            startAutoPause()
         } catch (e: Exception) {
             stopAndAlert(Alert.StartService, e.message)
             return
@@ -261,7 +323,11 @@ class BoxService(
     }
 
     private fun stopService() {
-        if (status.value == Status.Stopped) return
+        // a paused VPN is stopped too: the service is still up and has to go
+        if (status.value == Status.Stopped && !paused) return
+        autoPauseJob?.cancel()
+        autoPauseJob = null
+        paused = false
         status.value = Status.Stopping
         if (receiverRegistered) {
             service.unregisterReceiver(receiver)
@@ -322,6 +388,12 @@ class BoxService(
     @Suppress("SameReturnValue")
     internal fun onStartCommand(): Int {
         if (status.value != Status.Stopped) return Service.START_NOT_STICKY
+        if (paused) {
+            // the user turned it on by hand while paused: reconnect now, the watch goes on
+            paused = false
+            GlobalScope.launch(Dispatchers.IO) { resume(startCore = Settings.startCoreAfterStartingService) }
+            return Service.START_NOT_STICKY
+        }
         status.value = Status.Starting
 
         if (!receiverRegistered) {

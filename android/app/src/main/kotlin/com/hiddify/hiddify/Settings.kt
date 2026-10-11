@@ -90,6 +90,14 @@ object Settings {
         set(value) =
             preferences.edit().putBoolean(SettingsKey.SYSTEM_PROXY_ENABLED, value).apply()
 
+    val autoPauseEnabled: Boolean
+        get() = preferences.getBoolean(SettingsKey.AUTO_PAUSE_ENABLED, false)
+
+    /** Package names, saved by the app as one ";"-separated string. */
+    val autoPauseApps: Set<String>
+        get() = preferences.getString(SettingsKey.AUTO_PAUSE_APPS, "")!!
+            .split(";").filter { it.isNotBlank() }.toSet()
+
     var startedByUser: Boolean
         get() = preferences.getBoolean(SettingsKey.STARTED_BY_USER, false)
         set(value) = preferences.edit().putBoolean(SettingsKey.STARTED_BY_USER, value).apply()

@@ -20,6 +20,10 @@ object SettingsKey {
     // cache
 
     const val STARTED_BY_USER = "${KEY_PREFIX}started_by_user"
+
+    // A-VPN auto-pause: the VPN steps aside while one of these apps is on screen
+    const val AUTO_PAUSE_ENABLED = "${KEY_PREFIX}auto_pause_enabled"
+    const val AUTO_PAUSE_APPS = "${KEY_PREFIX}auto_pause_apps"
     const val CONFIG_OPTIONS = "config_options_json"
 
     const val START_CORE_ON_STARTING_SERVICE = "${KEY_PREFIX}starting_core_on_starting_service"

@@ -127,6 +127,14 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
     }
 
 
+    /** The ongoing notification with a plain title and text (auto-pause). */
+    fun showText(title: String, text: String) {
+        stopListenSystemInfo()
+        service.startForeground(
+            notificationId, notificationBuilder.setContentTitle(title).setContentText(text).build()
+        )
+    }
+
     suspend fun start() {
         if (Settings.dynamicNotification && checkPermission()) {
 //            commandClient.connect()

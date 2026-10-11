@@ -5,6 +5,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
+import 'package:hiddify/features/auto_pause/auto_pause_page.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
@@ -63,6 +64,17 @@ class GeneralPage extends HookConsumerWidget {
             onChanged: ref.read(Preferences.autoCheckIp.notifier).update,
           ),
           if (PlatformUtils.isAndroid) ...[
+            ListTile(
+              leading: const Icon(Icons.pause_circle_outline_rounded),
+              title: Text(t.avpn.autoPause),
+              subtitle: Text(
+                ref.watch(Preferences.autoPauseEnabled)
+                    ? t.avpn.autoPauseCount(n: ref.watch(Preferences.autoPauseApps).length)
+                    : t.avpn.autoPauseHint,
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AutoPausePage())),
+            ),
             SwitchListTile.adaptive(
               title: Text(t.avpn.connectOnAppStart),
               subtitle: Text(t.avpn.connectOnAppStartMsg),

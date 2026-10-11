@@ -57,7 +57,15 @@
     "statsPingHistory": "Пинг до сервера за минуту",
     "statsNoData": "нет данных",
     "statsSessionShort": "Сессия",
-    "statsConnectionsShort": "Соединения"
+    "statsConnectionsShort": "Соединения",
+    "autoPause": "Автопауза VPN",
+    "autoPauseMsg": "Когда открыто одно из выбранных приложений (например, Госуслуги или банк), VPN полностью отключается, и приложение его не видит. Как только вы из него выходите, VPN включается снова.",
+    "autoPauseNeedAccess": "Чтобы понимать, какое приложение открыто, A-VPN нужен «Доступ к истории использования». Включите его для A-VPN на открывшемся экране.",
+    "autoPauseGrant": "Выдать доступ",
+    "autoPauseCount": "Выбрано приложений: $n",
+    "autoPauseSearch": "Поиск приложения",
+    "autoPauseShowSystem": "Показывать системные приложения",
+    "autoPauseHint": "Отключать VPN в выбранных приложениях"
   },
   "common": {
     "appTitle": "A-VPN",

@@ -112,6 +112,17 @@ abstract class Preferences {
   /// A-VPN: connect as soon as the app opens (Android; the desktop restores the last session instead).
   static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", false);
 
+  /// A-VPN auto-pause (Android): the VPN steps aside while one of [autoPauseApps] is on screen. Read by the
+  /// VPN service itself (SettingsKey.AUTO_PAUSE_*), so the list is one ";"-separated string.
+  static final autoPauseEnabled = PreferencesNotifier.create<bool, bool>("auto_pause_enabled", false);
+
+  static final autoPauseApps = PreferencesNotifier.create<Set<String>, String>(
+    "auto_pause_apps",
+    const {},
+    mapFrom: (value) => value.split(';').where((e) => e.isNotEmpty).toSet(),
+    mapTo: (value) => value.join(';'),
+  );
+
   /// A-VPN: the accent colour and gradient.
   static final araAccent = PreferencesNotifier.create<AraAccent, String>(
     "ara_accent",

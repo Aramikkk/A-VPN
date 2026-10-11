@@ -57,7 +57,15 @@
     "statsPingHistory": "Ping to the server, last minute",
     "statsNoData": "no data",
     "statsSessionShort": "Session",
-    "statsConnectionsShort": "Connections"
+    "statsConnectionsShort": "Connections",
+    "autoPause": "VPN auto-pause",
+    "autoPauseMsg": "While one of the chosen apps (a government or bank app, say) is open, the VPN turns off completely and the app can't see it. As soon as you leave it, the VPN comes back.",
+    "autoPauseNeedAccess": "To know which app is open, A-VPN needs “usage access”. Turn it on for A-VPN on the screen that opens.",
+    "autoPauseGrant": "Grant access",
+    "autoPauseCount": "Apps chosen: $n",
+    "autoPauseSearch": "Search apps",
+    "autoPauseShowSystem": "Show system apps",
+    "autoPauseHint": "Turn the VPN off in chosen apps"
   },
   "common": {
     "appTitle": "A-VPN",
