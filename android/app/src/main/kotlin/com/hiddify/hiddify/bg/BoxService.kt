@@ -185,7 +185,12 @@ class BoxService(
             pfd.close()
             fileDescriptor = null
         }
-        runCatching { Mobile.stop() }
+        // a full close, as when the VPN is turned off: a core that is only stopped can't be set up again
+        // ("createService - null" on every later start)
+        DefaultNetworkMonitor.stop()
+        withContext(Dispatchers.Main) {
+            runCatching { Mobile.close(4L) }
+        }
         status.postValue(Status.Stopped)
     }
 
@@ -222,18 +227,26 @@ class BoxService(
 
             DefaultNetworkMonitor.start()
             Libbox.setMemoryLimit(!Settings.disableMemoryLimit)
+            val setupOptions = SetupOptions().also {
+                it.basePath = Settings.baseDir
+                it.workingDir = Settings.workingDir
+                it.tempDir = Settings.tempDir
+                it.fixAndroidStack = com.hiddify.hiddify.bg.Bugs.fixAndroidStack
+                it.mode = 4L//mode.toLong()
+                it.listen = "127.0.0.1:${Settings.grpcServiceModePort}"
+                it.secret = ""
+                it.debug = Settings.debugMode
+            }
             val newService = try {
-                Mobile.setup(
-                    SetupOptions().also {
-                        it.basePath = Settings.baseDir
-                        it.workingDir = Settings.workingDir
-                        it.tempDir = Settings.tempDir
-                        it.fixAndroidStack = com.hiddify.hiddify.bg.Bugs.fixAndroidStack
-                        it.mode=4L//mode.toLong()
-                        it.listen= "127.0.0.1:${Settings.grpcServiceModePort}"
-                        it.secret=""
-                        it.debug = Settings.debugMode
-                    },platformInterface)
+                try {
+                    Mobile.setup(setupOptions, platformInterface)
+                } catch (e: Exception) {
+                    // A-VPN: a core left half-open (by a reload, or an older auto-pause) refuses to set up again;
+                    // close it and try once more instead of failing every start until the app is killed
+                    Log.w(TAG, "core setup failed, closing it and retrying: ${e.message}")
+                    runCatching { Mobile.close(4L) }
+                    Mobile.setup(setupOptions, platformInterface)
+                }
 
 
 //                Libbox.newService(content,platformInterface)
