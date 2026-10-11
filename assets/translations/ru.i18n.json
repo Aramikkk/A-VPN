@@ -41,7 +41,13 @@
     "statsDownload": "Загрузка",
     "statsUpload": "Отдача",
     "bytesUnits": "Б,КБ,МБ,ГБ,ТБ",
-    "perSecond": "/с"
+    "perSecond": "/с",
+    "accentTheme": "Цветовая тема",
+    "accentWindows": "Windows 11",
+    "accentAurora": "Аврора",
+    "accentSunset": "Закат",
+    "accentLagoon": "Лагуна",
+    "accentNeon": "Неон"
   },
   "common": {
     "appTitle": "A-VPN",

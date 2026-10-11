@@ -41,7 +41,13 @@
     "statsDownload": "Download",
     "statsUpload": "Upload",
     "bytesUnits": "B,KB,MB,GB,TB",
-    "perSecond": "/s"
+    "perSecond": "/s",
+    "accentTheme": "Colour theme",
+    "accentWindows": "Windows 11",
+    "accentAurora": "Aurora",
+    "accentSunset": "Sunset",
+    "accentLagoon": "Lagoon",
+    "accentNeon": "Neon"
   },
   "common": {
     "appTitle": "A-VPN",

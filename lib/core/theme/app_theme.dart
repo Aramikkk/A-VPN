@@ -1,13 +1,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
+import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 
 class AppTheme {
-  AppTheme(this.mode, this.fontFamily);
+  AppTheme(this.mode, this.fontFamily, {this.accent = AraAccent.windows});
   final AppThemeMode mode;
   final String fontFamily;
+
+  /// the desktop accent (the phone keeps its acid green)
+  final AraAccent accent;
 
   /// Light: white backgrounds and a deeper A-VPN green (the acid green doesn't read on white), whatever the
   /// wallpaper colours.
@@ -93,13 +97,10 @@ class AppTheme {
   ThemeData _windowsTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     final background = dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3);
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF0078D4), brightness: brightness).copyWith(
-      primary: dark ? const Color(0xFF60CDFF) : const Color(0xFF005FB8),
-      onPrimary: dark ? const Color(0xFF00243A) : Colors.white,
-      primaryContainer: dark ? const Color(0xFF0B3F70) : const Color(0xFFCCE4F7),
-      onPrimaryContainer: dark ? const Color(0xFFCDEBFF) : const Color(0xFF002A4D),
-      secondary: dark ? const Color(0xFF99D9FF) : const Color(0xFF0A6CC2),
-      tertiary: dark ? const Color(0xFF9FB8FF) : const Color(0xFF3A5BC7),
+    final seeded = ColorScheme.fromSeed(seedColor: accent.seed, brightness: brightness);
+    final scheme = seeded.copyWith(
+      primary: dark ? accent.darkPrimary : accent.lightPrimary,
+      onPrimary: dark ? const Color(0xFF101014) : Colors.white,
       surface: background,
       surfaceDim: dark ? const Color(0xFF1A1A1A) : const Color(0xFFEBEBEB),
       surfaceBright: dark ? const Color(0xFF383838) : Colors.white,
@@ -126,10 +127,15 @@ class AppTheme {
         thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.onPrimary : null),
         trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.primary : null),
       ),
-      fontFamily: fontFamily,
+      // Windows' own UI font renders crisp at small sizes; the bundled emoji font stays as the fallback for flags
+      fontFamily: 'Segoe UI Variable Text',
+      fontFamilyFallback: ['Segoe UI', if (fontFamily.isNotEmpty) fontFamily],
       extensions: <ThemeExtension<dynamic>>{
         ConnectionButtonTheme.light,
-        if (dark) AraLook.windowsDark else AraLook.windowsLight,
+        AraLook(
+          gradient: accent.gradient(brightness),
+          fastPing: dark ? const Color(0xFF6CCB5F) : const Color(0xFF0F7B0F),
+        ),
       },
     );
   }

@@ -20,8 +20,10 @@ import 'package:hiddify/features/proxy/data/lan_sharing.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Home screen: the provider card with the server list inside, a "check" row, and the connection card.
@@ -143,11 +145,11 @@ class _ProviderCard extends HookConsumerWidget {
         children: [
           Row(
             children: [
-              _InitialBadge(name: profile.name),
+              _InitialBadge(name: sigmaName(profile.name)),
               const Gap(12),
               Expanded(
                 child: Text(
-                  profile.name,
+                  sigmaName(profile.name),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: scheme.primary),
@@ -293,8 +295,9 @@ class _ServerTile extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: scheme.primary,
-                          fontSize: 10,
-                          letterSpacing: .4,
+                          fontSize: PlatformUtils.isDesktop ? 11.5 : 10,
+                          fontWeight: PlatformUtils.isDesktop ? FontWeight.w600 : null,
+                          letterSpacing: PlatformUtils.isDesktop ? .2 : .4,
                         ),
                       ),
                     ],
@@ -321,13 +324,12 @@ class _Delay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     if (testing) {
-      return SizedBox(
-        width: 18,
-        height: 18,
-        child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
-      );
+      return SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary));
     }
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500, letterSpacing: .2);
+    // the desktop gets a slightly larger, bolder ping: tiny thin text renders soft on Windows
+    final style = PlatformUtils.isDesktop
+        ? Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)
+        : Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500, letterSpacing: .2);
     if (delay <= 0) return Text('—', style: style?.copyWith(color: scheme.onSurfaceVariant));
     if (delay > 65000) return Icon(Icons.close_rounded, size: 14, color: scheme.error);
     // yellow and orange need darker shades to read on the light theme's white
@@ -383,10 +385,7 @@ class _Bars extends StatelessWidget {
             width: 3,
             height: 5.0 + i * 3,
             margin: EdgeInsets.only(left: i == 0 ? 0 : 2),
-            decoration: BoxDecoration(
-              color: i < lit ? color : off,
-              borderRadius: BorderRadius.circular(1),
-            ),
+            decoration: BoxDecoration(color: i < lit ? color : off, borderRadius: BorderRadius.circular(1)),
           ),
       ],
     );
@@ -506,7 +505,10 @@ class _SharingDialog extends HookConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (addresses != null && hotspot.isEmpty) ...[
-              Text(t.avpn.sharingNoHotspot, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+              Text(
+                t.avpn.sharingNoHotspot,
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+              ),
               const Gap(12),
             ],
             Text(t.avpn.sharingHowTo),
@@ -525,7 +527,10 @@ class _SharingDialog extends HookConsumerWidget {
                 ),
               ),
             const Gap(4),
-            Text(t.avpn.sharingNote, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              t.avpn.sharingNote,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       ),
@@ -586,13 +591,18 @@ class _ConnectionCard extends HookConsumerWidget {
     }
 
     final gradient = theme.araLook.gradient;
+    final units = t.avpn.bytesUnits.split(',');
+    String speed(int bytes) => '${formatBytes(bytes, units)}${t.avpn.perSecond}';
     final card = _Card(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Transform.scale(
             scale: 1.25,
-            child: Switch(value: connected || status is Connecting, onChanged: status.isSwitching ? null : (_) => toggle()),
+            child: Switch(
+              value: connected || status is Connecting,
+              onChanged: status.isSwitching ? null : (_) => toggle(),
+            ),
           ),
           const Gap(16),
           Expanded(
@@ -600,9 +610,10 @@ class _ConnectionCard extends HookConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  [if (connected && !serverMode && current != null && !current.isGroup) serverName(current).flag, title]
-                      .whereType<String>()
-                      .join(' '),
+                  [
+                    if (connected && !serverMode && current != null && !current.isGroup) serverName(current).flag,
+                    title,
+                  ].whereType<String>().join(' '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium,
@@ -612,10 +623,10 @@ class _ConnectionCard extends HookConsumerWidget {
                   Row(
                     children: [
                       Icon(Icons.arrow_upward_rounded, size: 14, color: scheme.primary),
-                      Text(' ${_speed(stats?.uplink.toInt() ?? 0)}', style: theme.textTheme.bodySmall),
+                      Text(' ${speed(stats?.uplink.toInt() ?? 0)}', style: theme.textTheme.bodySmall),
                       const Spacer(),
                       Icon(Icons.arrow_downward_rounded, size: 14, color: scheme.primary),
-                      Text(' ${_speed(stats?.downlink.toInt() ?? 0)}', style: theme.textTheme.bodySmall),
+                      Text(' ${speed(stats?.downlink.toInt() ?? 0)}', style: theme.textTheme.bodySmall),
                       const Spacer(),
                       Icon(Icons.schedule_rounded, size: 14, color: scheme.onSurfaceVariant),
                       Text(
@@ -659,7 +670,12 @@ class _InitialBadge extends StatelessWidget {
       ),
       child: Text(
         letter,
-        style: TextStyle(color: Theme.of(context).araLook.gradient != null ? Colors.white : scheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: -.5),
+        style: TextStyle(
+          color: Theme.of(context).araLook.gradient != null ? Colors.white : scheme.onPrimary,
+          fontWeight: FontWeight.w800,
+          fontSize: 19,
+          letterSpacing: -.5,
+        ),
       ),
     );
   }
@@ -686,7 +702,11 @@ class _RoundButton extends StatelessWidget {
           height: 40,
           child: Center(
             child: busy
-                ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary))
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
+                  )
                 : Icon(icon, size: 20),
           ),
         ),
@@ -695,12 +715,15 @@ class _RoundButton extends StatelessWidget {
   }
 }
 
+/// The provider calls its regular servers and its profile "Доступ"; A-VPN shows them as Sigma (Sigma Gate).
+String sigmaName(String name) =>
+    name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+
 /// A server's flag emoji (if its name has one) and its name without the flag and the core's " § N" suffix.
 ({String? flag, String title}) serverName(OutboundInfo server) {
   var name = server.tagDisplay.isNotEmpty ? server.tagDisplay : server.tag;
   name = name.replaceAll('§hide§', '').replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '').trim();
-  // the provider calls its regular servers "Доступ"; A-VPN shows them as Sigma (Sigma Gate)
-  name = name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ');
+  name = sigmaName(name);
   final runes = name.runes.toList();
   for (var i = 0; i + 1 < runes.length; i++) {
     final a = runes[i] - 0x1F1E6;
@@ -715,16 +738,12 @@ class _RoundButton extends StatelessWidget {
 
 String _gb(int bytes) => '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
 
-String _speed(int bytesPerSecond) => switch (bytesPerSecond) {
-  < 1024 => '$bytesPerSecond B/s',
-  < 1024 * 1024 => '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s',
-  _ => '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(1)} MB/s',
-};
-
 String _duration(Duration d) {
   String two(int n) => n.toString().padLeft(2, '0');
   final h = d.inHours;
-  return h > 0 ? '$h:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}' : '${two(d.inMinutes)}:${two(d.inSeconds % 60)}';
+  return h > 0
+      ? '$h:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}'
+      : '${two(d.inMinutes)}:${two(d.inSeconds % 60)}';
 }
 
 String _dateTime(DateTime t) {

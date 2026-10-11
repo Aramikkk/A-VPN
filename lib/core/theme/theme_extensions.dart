@@ -37,24 +37,6 @@ class AraLook extends ThemeExtension<AraLook> {
   final Gradient? gradient;
   final Color fastPing;
 
-  static const windowsLight = AraLook(
-    gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF0050A8), Color(0xFF0A7BD8), Color(0xFF46B0F2)],
-    ),
-    fastPing: Color(0xFF0F7B0F),
-  );
-
-  static const windowsDark = AraLook(
-    gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF0B3F8C), Color(0xFF1269C7), Color(0xFF3FA9F5)],
-    ),
-    fastPing: Color(0xFF6CCB5F),
-  );
-
   @override
   AraLook copyWith({Gradient? gradient, Color? fastPing}) =>
       AraLook(gradient: gradient ?? this.gradient, fastPing: fastPing ?? this.fastPing);

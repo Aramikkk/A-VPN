@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/actions_at_closing.dart';
+import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
 import 'package:hiddify/features/profile/model/profile_sort_enum.dart';
@@ -110,6 +111,14 @@ abstract class Preferences {
 
   /// A-VPN: connect as soon as the app opens (Android; the desktop restores the last session instead).
   static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", false);
+
+  /// A-VPN: the desktop app's accent colour and gradient.
+  static final araAccent = PreferencesNotifier.create<AraAccent, String>(
+    "ara_accent",
+    AraAccent.windows,
+    mapFrom: (value) => AraAccent.values.firstWhere((e) => e.name == value, orElse: () => AraAccent.windows),
+    mapTo: (value) => value.name,
+  );
 
   /// A-VPN: how the server list shows each server's ping.
   static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
