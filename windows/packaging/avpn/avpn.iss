@@ -49,10 +49,12 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
+; the launch after setup runs with setup's admin rights: A-VPN.exe may be marked "run as administrator"
+; (the VPN mode needs it), and Windows refuses to start such a file without them (error 740)
 ; start at sign-in through a scheduled task (also clears the Run-key entry older versions wrote)
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\autostart.ps1"" -Enable"; Flags: runhidden waituntilterminated; Tasks: autostart
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\autostart.ps1"" -Disable"; Flags: runhidden waituntilterminated; Tasks: not autostart
-Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\autostart.ps1"" -Disable"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveAutostart"
