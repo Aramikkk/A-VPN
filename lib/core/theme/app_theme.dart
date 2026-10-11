@@ -6,23 +6,26 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 
 class AppTheme {
-  AppTheme(this.mode, this.fontFamily, {this.accent = AraAccent.windows});
+  AppTheme(this.mode, this.fontFamily, {AraAccent? accent}) : accent = accent ?? AraAccent.platformDefault;
   final AppThemeMode mode;
   final String fontFamily;
 
-  /// the desktop accent (the phone keeps its acid green)
+  /// the accent colour and gradient (Settings → General → Colour theme)
   final AraAccent accent;
 
-  /// Light: white backgrounds and a deeper A-VPN green (the acid green doesn't read on white), whatever the
-  /// wallpaper colours.
+  AraLook _look(Brightness brightness) => AraLook(
+    gradient: accent.gradient(brightness),
+    onGradient: accent.onGradient(brightness),
+    fastPing: brightness == Brightness.dark ? const Color(0xFF6CCB5F) : const Color(0xFF0F7B0F),
+  );
+
+  /// Light: white backgrounds and the accent's deeper shade, whatever the wallpaper colours.
   ThemeData lightTheme(ColorScheme? lightColorScheme) {
     if (PlatformUtils.isDesktop) return _windowsTheme(Brightness.light);
     const white = Colors.white;
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF9EFF1F)).copyWith(
-      primary: const Color(0xFF3B8A00),
+    final scheme = ColorScheme.fromSeed(seedColor: accent.seed).copyWith(
+      primary: accent.lightPrimary,
       onPrimary: white,
-      primaryContainer: const Color(0xFFE2F9C8),
-      onPrimaryContainer: const Color(0xFF142B00),
       surface: white,
       surfaceDim: const Color(0xFFEDEEEB),
       surfaceBright: white,
@@ -40,7 +43,7 @@ class AppTheme {
       appBarTheme: const AppBarTheme(backgroundColor: white, surfaceTintColor: Colors.transparent),
       navigationBarTheme: const NavigationBarThemeData(backgroundColor: white, surfaceTintColor: Colors.transparent),
       fontFamily: fontFamily,
-      extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
+      extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _look(Brightness.light)},
     );
   }
 
@@ -59,14 +62,12 @@ class AppTheme {
     );
   }
 
-  /// OLED black: true black backgrounds, near-black cards and the A-VPN acid green, whatever the wallpaper colours.
+  /// OLED black: true black backgrounds, near-black cards and the accent, whatever the wallpaper colours.
   ThemeData _oledTheme() {
     const black = Colors.black;
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF9EFF1F), brightness: Brightness.dark).copyWith(
-      primary: const Color(0xFF9EFF1F),
+    final scheme = ColorScheme.fromSeed(seedColor: accent.seed, brightness: Brightness.dark).copyWith(
+      primary: accent.darkPrimary,
       onPrimary: black,
-      primaryContainer: const Color(0xFF1F3A05),
-      onPrimaryContainer: const Color(0xFFD9FFB0),
       surface: black,
       surfaceDim: black,
       surfaceBright: const Color(0xFF1C1C1E),
@@ -88,7 +89,7 @@ class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(backgroundColor: scheme.surfaceContainer),
       dialogTheme: DialogThemeData(backgroundColor: scheme.surfaceContainer),
       fontFamily: fontFamily,
-      extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
+      extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _look(Brightness.dark)},
     );
   }
 
@@ -130,13 +131,7 @@ class AppTheme {
       // Windows' own UI font renders crisp at small sizes; the bundled emoji font stays as the fallback for flags
       fontFamily: 'Segoe UI Variable Text',
       fontFamilyFallback: ['Segoe UI', if (fontFamily.isNotEmpty) fontFamily],
-      extensions: <ThemeExtension<dynamic>>{
-        ConnectionButtonTheme.light,
-        AraLook(
-          gradient: accent.gradient(brightness),
-          fastPing: dark ? const Color(0xFF6CCB5F) : const Color(0xFF0F7B0F),
-        ),
-      },
+      extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _look(brightness)},
     );
   }
 

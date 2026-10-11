@@ -21,11 +21,7 @@ abstract class DeviceHeaders {
       hwid = const Uuid().v4().replaceAll('-', '');
       await prefs.setString(_prefsKey, hwid);
     }
-    return _cached = {
-      'x-hwid': hwid,
-      'x-device-os': _osName(),
-      'x-device-model': 'A-VPN',
-    };
+    return _cached = {'x-hwid': hwid, 'x-device-os': _osName(), 'x-device-model': 'A-VPN'};
   }
 
   static String _osName() {

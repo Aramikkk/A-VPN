@@ -671,7 +671,7 @@ class _InitialBadge extends StatelessWidget {
       child: Text(
         letter,
         style: TextStyle(
-          color: Theme.of(context).araLook.gradient != null ? Colors.white : scheme.onPrimary,
+          color: Theme.of(context).araLook.gradient != null ? Theme.of(context).araLook.onGradient : scheme.onPrimary,
           fontWeight: FontWeight.w800,
           fontSize: 19,
           letterSpacing: -.5,

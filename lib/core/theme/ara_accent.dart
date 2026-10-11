@@ -1,9 +1,21 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
-/// The desktop app's accent: its colour and the gradient on the speed block, the provider badge and the
+/// The app's accent: its colour and the gradient on the speed block, the provider badge and the
 /// connection card. Picked in Settings → General.
 enum AraAccent {
-  /// Windows 11 blue.
+  /// A-VPN's own acid green (the phone's default); dark text on it.
+  acid(
+    seed: Color(0xFF9EFF1F),
+    lightPrimary: Color(0xFF3B8A00),
+    darkPrimary: Color(0xFF9EFF1F),
+    lightGradient: [Color(0xFF2E7D00), Color(0xFF5DBB0A), Color(0xFF9EE832)],
+    darkGradient: [Color(0xFF6FD400), Color(0xFF9EFF1F), Color(0xFFD2FF70)],
+    darkOnGradient: Color(0xFF0B1400),
+  ),
+
+  /// Windows 11 blue (the desktop's default).
   windows(
     seed: Color(0xFF0078D4),
     lightPrimary: Color(0xFF005FB8),
@@ -54,6 +66,7 @@ enum AraAccent {
     required this.darkPrimary,
     required this.lightGradient,
     required this.darkGradient,
+    this.darkOnGradient = Colors.white,
   });
 
   final Color seed;
@@ -61,6 +74,12 @@ enum AraAccent {
   final Color darkPrimary;
   final List<Color> lightGradient;
   final List<Color> darkGradient;
+  final Color darkOnGradient;
+
+  static AraAccent get platformDefault => Platform.isAndroid || Platform.isIOS ? acid : windows;
+
+  /// Text and icons on the gradient.
+  Color onGradient(Brightness brightness) => brightness == Brightness.dark ? darkOnGradient : Colors.white;
 
   LinearGradient gradient(Brightness brightness) => LinearGradient(
     begin: Alignment.topLeft,

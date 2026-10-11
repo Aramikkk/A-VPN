@@ -112,11 +112,11 @@ abstract class Preferences {
   /// A-VPN: connect as soon as the app opens (Android; the desktop restores the last session instead).
   static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", false);
 
-  /// A-VPN: the desktop app's accent colour and gradient.
+  /// A-VPN: the accent colour and gradient.
   static final araAccent = PreferencesNotifier.create<AraAccent, String>(
     "ara_accent",
-    AraAccent.windows,
-    mapFrom: (value) => AraAccent.values.firstWhere((e) => e.name == value, orElse: () => AraAccent.windows),
+    AraAccent.platformDefault,
+    mapFrom: (value) => AraAccent.values.firstWhere((e) => e.name == value, orElse: () => AraAccent.platformDefault),
     mapTo: (value) => value.name,
   );
 

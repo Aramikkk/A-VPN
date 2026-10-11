@@ -47,7 +47,10 @@
     "accentAurora": "Aurora",
     "accentSunset": "Sunset",
     "accentLagoon": "Lagoon",
-    "accentNeon": "Neon"
+    "accentNeon": "Neon",
+    "accentAcid": "A-VPN",
+    "speedTab": "Speed",
+    "speedHistory": "Last minute"
   },
   "common": {
     "appTitle": "A-VPN",

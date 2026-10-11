@@ -29,23 +29,27 @@ class ConnectionButtonTheme extends ThemeExtension<ConnectionButtonTheme> {
   }
 }
 
-/// A-VPN's accent gradient and the colour for a fast ping. On the desktop a Windows 11 blue gradient; on the
-/// phone none (flat acid green) and the scheme's primary for a fast ping.
+/// A-VPN's accent gradient, the colour of text on it, and the colour for a fast ping.
 class AraLook extends ThemeExtension<AraLook> {
-  const AraLook({this.gradient, required this.fastPing});
+  const AraLook({this.gradient, this.onGradient = Colors.white, required this.fastPing});
 
   final Gradient? gradient;
+  final Color onGradient;
   final Color fastPing;
 
   @override
-  AraLook copyWith({Gradient? gradient, Color? fastPing}) =>
-      AraLook(gradient: gradient ?? this.gradient, fastPing: fastPing ?? this.fastPing);
+  AraLook copyWith({Gradient? gradient, Color? onGradient, Color? fastPing}) => AraLook(
+    gradient: gradient ?? this.gradient,
+    onGradient: onGradient ?? this.onGradient,
+    fastPing: fastPing ?? this.fastPing,
+  );
 
   @override
   AraLook lerp(covariant ThemeExtension<AraLook>? other, double t) {
     if (other is! AraLook) return this;
     return AraLook(
       gradient: Gradient.lerp(gradient, other.gradient, t),
+      onGradient: Color.lerp(onGradient, other.onGradient, t)!,
       fastPing: Color.lerp(fastPing, other.fastPing, t)!,
     );
   }

@@ -3,14 +3,18 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
+import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// The desktop sidebar's traffic panel: live speed on the accent gradient, then matching tiles for this
-/// session, the share that went through the VPN and the share that went direct.
+/// The traffic panel: live speed on the accent gradient, then matching tiles for this session, the share that
+/// went through the VPN and the share that went direct. In the desktop sidebar, and [large] (with the last
+/// minute's speed graph) on the phone's Speed tab.
 class SideBarStatsOverview extends ConsumerWidget {
-  const SideBarStatsOverview({super.key});
+  const SideBarStatsOverview({super.key, this.large = false});
+
+  final bool large;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,20 +33,35 @@ class SideBarStatsOverview extends ConsumerWidget {
     final vpn = vpnUp == null || vpnDown == null ? null : vpnUp + vpnDown;
     final direct = vpn == null ? null : (total - vpn).clamp(0, total);
     final share = vpn == null || total == 0 ? null : (vpn / total).clamp(0.0, 1.0);
-    final onSpeed = gradient != null ? Colors.white : scheme.onPrimaryContainer;
+    final onSpeed = gradient != null ? theme.araLook.onGradient : scheme.onPrimaryContainer;
+    final history = large ? ref.watch(speedHistoryProvider) : const <({int down, int up})>[];
+
+    final vpnTile = _Tile(
+      icon: Icons.shield_rounded,
+      title: t.avpn.statsViaVpn,
+      value: vpn == null ? '—' : size(vpn),
+      share: share,
+      accent: true,
+    );
+    final directTile = _Tile(
+      icon: Icons.alt_route_rounded,
+      title: t.avpn.statsDirect,
+      value: direct == null ? '—' : size(direct),
+      share: share == null ? null : 1 - share,
+    );
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(large ? 16 : 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            padding: EdgeInsets.fromLTRB(16, 14, 16, large ? 16 : 14),
             decoration: BoxDecoration(
               gradient: gradient,
               color: gradient == null ? scheme.primaryContainer : null,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(large ? 24 : 16),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,6 +82,15 @@ class SideBarStatsOverview extends ConsumerWidget {
                   value: speed(stats.uplink.toInt()),
                   color: onSpeed,
                 ),
+                if (large) ...[
+                  const Gap(16),
+                  SizedBox(
+                    height: 110,
+                    child: CustomPaint(painter: _SpeedGraph(history, color: onSpeed)),
+                  ),
+                  const Gap(6),
+                  _Caption(t.avpn.speedHistory, color: onSpeed.withValues(alpha: .7)),
+                ],
               ],
             ),
           ),
@@ -74,20 +102,23 @@ class SideBarStatsOverview extends ConsumerWidget {
             detail: '↓ ${size(stats.downlinkTotal.toInt())}   ↑ ${size(stats.uplinkTotal.toInt())}',
           ),
           const Gap(8),
-          _Tile(
-            icon: Icons.shield_rounded,
-            title: t.avpn.statsViaVpn,
-            value: vpn == null ? '—' : size(vpn),
-            share: share,
-            accent: true,
-          ),
-          const Gap(8),
-          _Tile(
-            icon: Icons.alt_route_rounded,
-            title: t.avpn.statsDirect,
-            value: direct == null ? '—' : size(direct),
-            share: share == null ? null : 1 - share,
-          ),
+          if (large)
+            // side by side, the same size
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: vpnTile),
+                  const Gap(8),
+                  Expanded(child: directTile),
+                ],
+              ),
+            )
+          else ...[
+            vpnTile,
+            const Gap(8),
+            directTile,
+          ],
         ],
       ),
     );
@@ -138,7 +169,7 @@ class _Tile extends StatelessWidget {
                   gradient: gradient,
                   color: gradient == null ? color.withValues(alpha: .15) : null,
                 ),
-                child: Icon(icon, size: 13, color: gradient != null ? Colors.white : color),
+                child: Icon(icon, size: 13, color: gradient != null ? theme.araLook.onGradient : color),
               ),
               const Gap(8),
               Expanded(child: _Caption(title, color: scheme.onSurfaceVariant)),
@@ -239,4 +270,70 @@ class _SpeedRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Download (filled) and upload (line) speed over the last minute, scaled to the highest sample.
+class _SpeedGraph extends CustomPainter {
+  _SpeedGraph(this.samples, {required this.color});
+
+  final List<({int down, int up})> samples;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final grid = Paint()
+      ..color = color.withValues(alpha: .15)
+      ..strokeWidth = 1;
+    for (var i = 1; i < 4; i++) {
+      final y = size.height * i / 4;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+    if (samples.length < 2) return;
+    final peak = samples.fold<int>(1, (m, s) => s.down > m ? s.down : (s.up > m ? s.up : m));
+    final step = size.width / (SpeedHistory.length - 1);
+    final start = size.width - step * (samples.length - 1);
+    Offset point(int i, int value) => Offset(start + step * i, size.height - size.height * value / peak * .92);
+
+    final down = Path()..moveTo(start, size.height);
+    for (var i = 0; i < samples.length; i++) {
+      down.lineTo(point(i, samples[i].down).dx, point(i, samples[i].down).dy);
+    }
+    final downLine = Path.from(down);
+    down
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(
+      down,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: .45), color.withValues(alpha: .02)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      downLine,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    final up = Path();
+    for (var i = 0; i < samples.length; i++) {
+      final p = point(i, samples[i].up);
+      i == 0 ? up.moveTo(p.dx, p.dy) : up.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(
+      up,
+      Paint()
+        ..color = color.withValues(alpha: .6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SpeedGraph old) => old.samples != samples || old.color != color;
 }

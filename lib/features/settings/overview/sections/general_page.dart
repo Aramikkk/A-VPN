@@ -54,7 +54,7 @@ class GeneralPage extends HookConsumerWidget {
         children: [
           const LocalePrefTile(),
           const ThemeModePrefTile(),
-          if (PlatformUtils.isDesktop) const _AccentTile(),
+          const _AccentTile(),
           const EnableAnalyticsPrefTile(),
           SwitchListTile.adaptive(
             title: Text(t.pages.settings.general.autoIpCheck),
@@ -203,6 +203,7 @@ class _AccentTile extends ConsumerWidget {
     final selected = ref.watch(Preferences.araAccent);
     final brightness = Theme.of(context).brightness;
     String name(AraAccent accent) => switch (accent) {
+      AraAccent.acid => t.avpn.accentAcid,
       AraAccent.windows => t.avpn.accentWindows,
       AraAccent.aurora => t.avpn.accentAurora,
       AraAccent.sunset => t.avpn.accentSunset,
@@ -245,7 +246,7 @@ class _AccentTile extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: accent == selected
-                              ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                              ? Icon(Icons.check_rounded, color: accent.onGradient(brightness), size: 18)
                               : const SizedBox.expand(),
                         ),
                       ),
