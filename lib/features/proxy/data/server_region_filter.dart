@@ -90,6 +90,8 @@ abstract class ServerRegionFilter {
         _logger.warning('could not ask the platform for the network type', e);
       }
     }
+    // a computer is on Wi-Fi or a cable: the "LTE Only" servers are for a phone's own mobile data
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return NetworkKind.wifi;
     try {
       final kinds = await Connectivity().checkConnectivity();
       if (kinds.contains(ConnectivityResult.wifi) || kinds.contains(ConnectivityResult.ethernet)) {
