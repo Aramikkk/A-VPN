@@ -3,7 +3,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// The phone's Speed tab: the same traffic panel as the desktop sidebar, large, with the speed graph.
+/// The Statistics tab: the traffic panel, large, with the speed graph, ping and loss, and active connections.
 class SpeedPage extends ConsumerWidget {
   const SpeedPage({super.key});
 
@@ -12,7 +12,15 @@ class SpeedPage extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.speedTab)),
-      body: const SingleChildScrollView(child: SideBarStatsOverview(large: true)),
+      // on a wide window the panel stays a readable width
+      body: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: const SideBarStatsOverview(large: true),
+          ),
+        ),
+      ),
     );
   }
 }

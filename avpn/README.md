@@ -73,7 +73,7 @@ cp ./hiddify/build/windows/installer/A-VPN-Setup-5.0.0.exe ./A-VPN/windows/
 
 **Раздача** — `lan_sharing.dart`: прокси на порту 12334 для устройств в точке доступа.
 
-**Интерфейс** — `lib/features/home/widget/avpn_home_body.dart` (главная в стиле INCY), `lib/features/stats/widget/side_bar_stats_overview.dart` (статистика: сайдбар на ПК, вкладка «Статистика» на телефоне с графиком скорости, пингом/потерями — `connection_quality.dart`, замер через локальный прокси раз в 2 с, — и активными соединениями), `lib/core/theme/` (темы: `ara_accent.dart` — A-VPN/Windows 11/Аврора/Закат/Лагуна/Неон; на ПК шрифт Segoe UI Variable). Иконки — `avpn/scripts/make_icon.py`.
+**Интерфейс** — `lib/features/home/widget/avpn_home_body.dart` (главная в стиле INCY), `lib/features/stats/widget/side_bar_stats_overview.dart` (статистика: сайдбар на ПК, вкладка «Статистика» (телефон и ПК) с графиком скорости, пингом/потерями — `connection_quality.dart`, замер через локальный прокси раз в 2 с, — и активными соединениями), `lib/core/theme/` (темы: `ara_accent.dart` — A-VPN/Windows 11/Аврора/Закат/Лагуна/Неон; на ПК шрифт Segoe UI Variable). Иконки — `avpn/scripts/make_icon.py`.
 
 **Автозапуск**
 - Android: `bg/BootReceiver.kt` + «Автоподключение» при запуске приложения.

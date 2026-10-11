@@ -27,7 +27,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     // keeps a minute of speed samples, so the Speed tab's graph is full when it opens
-    if (isMobileBreakpoint) ref.listen(speedHistoryProvider, (_, _) {});
+    ref.listen(speedHistoryProvider, (_, _) {});
     // focus switch management
     final primaryFocusHash = useState<int?>(null);
     final navScopeNode = useFocusScopeNode();
@@ -143,7 +143,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 
   List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
     ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
-    if (isMobileBreakpoint) ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab),
+    ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab),
     if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
     ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
     if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),
