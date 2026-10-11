@@ -72,7 +72,11 @@
     "accentCyber": "Cyber",
     "accentOled": "OLED",
     "themes": "Themes",
-    "mtu": "Tunnel MTU"
+    "mtu": "Tunnel MTU",
+    "graphStart": "60 s ago",
+    "graphNow": "now",
+    "graphPeak": "Peak",
+    "graphAverage": "Average"
   },
   "common": {
     "appTitle": "A-VPN",

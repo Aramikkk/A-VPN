@@ -14,6 +14,7 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
+import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -32,6 +33,17 @@ class _Stats extends StatsNotifier {
       ..unknownFields.mergeVarintField(100, Int64(200 * 1024))
       ..unknownFields.mergeVarintField(101, Int64(300 * 1024 * 1024)),
   );
+}
+
+class _History extends SpeedHistory {
+  @override
+  List<({int down, int up})> build() => [
+    for (var i = 0; i < 60; i++)
+      (
+        down: (1.2e6 + 9e5 * ((i * 37) % 11) / 10 + (i > 40 && i < 46 ? 4e6 : 0)).round(),
+        up: (1.5e5 + 9e4 * (i % 5)).round(),
+      ),
+  ];
 }
 
 class _Quality extends ConnectionQuality {
@@ -70,6 +82,7 @@ void main() {
             translationsProvider.overrideWith((ref) async => t),
             statsNotifierProvider.overrideWith(_Stats.new),
             connectionQualityProvider.overrideWith(_Quality.new),
+            speedHistoryProvider.overrideWith(_History.new),
           ],
           child: MaterialApp(
             debugShowCheckedModeBanner: false,

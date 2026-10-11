@@ -25,6 +25,7 @@ void main() {
     expect(formatBytes(0, units), '0 Б');
     expect(formatBytes(1536, units), '1,5 КБ');
     expect(formatBytes(150 * 1024 * 1024, units), '150 МБ');
+    expect(formatBytes(10 * 1024 * 1024, units), '10 МБ');
     expect(formatBytes(3 * 1024 * 1024 * 1024 + 400 * 1024 * 1024, units), '3,4 ГБ');
   });
 }

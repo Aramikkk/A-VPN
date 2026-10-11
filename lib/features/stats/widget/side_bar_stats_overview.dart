@@ -93,10 +93,24 @@ class SideBarStatsOverview extends ConsumerWidget {
                 ...[
                   Gap(large ? 16 : 10),
                   SizedBox(
-                    height: large ? 110 : 44,
-                    child: CustomPaint(painter: _SpeedGraph(history, color: onSpeed)),
+                    height: large ? 130 : 64,
+                    child: CustomPaint(
+                      painter: _SpeedGraph(
+                        history,
+                        color: onSpeed,
+                        label: speed,
+                        detailed: large,
+                        textStyle: theme.textTheme.labelSmall!.copyWith(
+                          color: onSpeed.withValues(alpha: .75),
+                          fontSize: 10,
+                        ),
+                        startLabel: t.avpn.graphStart,
+                        nowLabel: t.avpn.graphNow,
+                      ),
+                    ),
                   ),
-                  if (large) ...[const Gap(6), _Caption(t.avpn.speedHistory, color: onSpeed.withValues(alpha: .7))],
+                  const Gap(8),
+                  _GraphSummary(history: history, color: onSpeed, speed: speed),
                 ],
               ],
             ),
@@ -311,35 +325,176 @@ class _SpeedRow extends StatelessWidget {
   }
 }
 
-/// Download (filled) and upload (line) speed over the last minute, scaled to the highest sample.
-class _SpeedGraph extends CustomPainter {
-  _SpeedGraph(this.samples, {required this.color});
+/// The legend and the minute's peak and average download speed, under the graph.
+class _GraphSummary extends ConsumerWidget {
+  const _GraphSummary({required this.history, required this.color, required this.speed});
 
-  final List<({int down, int up})> samples;
+  final List<({int down, int up})> history;
+  final Color color;
+  final String Function(int) speed;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(color: color.withValues(alpha: .85));
+    final strong = style?.copyWith(color: color, fontWeight: FontWeight.w700);
+    final downs = history.map((s) => s.down).toList();
+    final peak = downs.isEmpty ? 0 : downs.reduce((a, b) => a > b ? a : b);
+    final average = downs.isEmpty ? 0 : downs.reduce((a, b) => a + b) ~/ downs.length;
+    Widget legend(Widget mark, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        mark,
+        const Gap(4),
+        Text(text, style: style),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 14,
+          runSpacing: 4,
+          children: [
+            legend(
+              Container(
+                width: 12,
+                height: 8,
+                decoration: BoxDecoration(color: color.withValues(alpha: .55), borderRadius: BorderRadius.circular(2)),
+              ),
+              t.avpn.statsDownload,
+            ),
+            legend(
+              SizedBox(width: 14, height: 8, child: CustomPaint(painter: _DashSample(color))),
+              t.avpn.statsUpload,
+            ),
+          ],
+        ),
+        const Gap(4),
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: '${t.avpn.graphPeak} ', style: style),
+              TextSpan(text: speed(peak), style: strong),
+              TextSpan(text: '   ${t.avpn.graphAverage} ', style: style),
+              TextSpan(text: speed(average), style: strong),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+/// The upload line's look, for the legend.
+class _DashSample extends CustomPainter {
+  _DashSample(this.color);
+
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.6;
+    for (double x = 0; x < size.width; x += 5) {
+      canvas.drawLine(Offset(x, size.height / 2), Offset(x + 3, size.height / 2), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashSample old) => old.color != color;
+}
+
+/// The last minute of download (filled) and upload (dashed) speed, on a scale rounded to a readable number with
+/// its values on the side, and the time along the bottom.
+class _SpeedGraph extends CustomPainter {
+  _SpeedGraph(
+    this.samples, {
+    required this.color,
+    required this.label,
+    required this.detailed,
+    required this.textStyle,
+    required this.startLabel,
+    required this.nowLabel,
+  });
+
+  final List<({int down, int up})> samples;
+  final Color color;
+  final String Function(int bytesPerSecond) label;
+  final bool detailed;
+  final TextStyle textStyle;
+  final String startLabel;
+  final String nowLabel;
+
+  /// The top of the scale: 1, 2 or 5 times a power of ten in the unit the value reads in (KB/s, MB/s…), at or
+  /// above [value], so the scale says "10 MB/s" rather than "9.5 MB/s". At least 1 KB/s.
+  static int niceCeiling(int value) {
+    if (value <= 1024) return 1024;
+    var unit = 1;
+    while (value / unit >= 1024) {
+      unit *= 1024;
+    }
+    final inUnit = value / unit;
+    var decade = 1;
+    while (decade * 10 <= inUnit) {
+      decade *= 10;
+    }
+    for (final m in [1, 2, 5, 10]) {
+      if (decade * m >= inUnit) return decade * m * unit;
+    }
+    return decade * 10 * unit;
+  }
+
+  TextPainter _text(String text) => TextPainter(
+    text: TextSpan(text: text, style: textStyle),
+    textDirection: TextDirection.ltr,
+  )..layout();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final timeAxis = detailed ? 14.0 : 0.0;
+    final peak = samples.fold<int>(0, (m, s) => s.down > m ? s.down : (s.up > m ? s.up : m));
+    final top = niceCeiling(peak);
+    final rows = detailed ? 4 : 2;
+    // the scale's values sit in their own strip on the right, clear of the lines
+    final labels = [for (var i = 0; i < rows; i++) _text(label((top * (rows - i) / rows).round()))];
+    final gutter = labels.fold<double>(0, (w, l) => l.width > w ? l.width : w) + 6;
+    final chart = Size(size.width - gutter, size.height - timeAxis);
+
     final grid = Paint()
-      ..color = color.withValues(alpha: .15)
+      ..color = color.withValues(alpha: .16)
       ..strokeWidth = 1;
-    for (var i = 1; i < 4; i++) {
-      final y = size.height * i / 4;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    for (var i = 0; i <= rows; i++) {
+      final y = chart.height * i / rows;
+      canvas.drawLine(Offset(0, y), Offset(chart.width, y), grid);
+      if (i < rows) {
+        // centred on its line, except the top one, which hangs below it
+        final dy = i == 0 ? 0.0 : labels[i].height / 2;
+        labels[i].paint(canvas, Offset(size.width - labels[i].width, y - dy));
+      }
+    }
+    if (detailed) {
+      _text(startLabel).paint(canvas, Offset(0, chart.height + 2));
+      final now = _text(nowLabel);
+      now.paint(canvas, Offset(chart.width - now.width, chart.height + 2));
     }
     if (samples.length < 2) return;
-    final peak = samples.fold<int>(1, (m, s) => s.down > m ? s.down : (s.up > m ? s.up : m));
-    final step = size.width / (SpeedHistory.length - 1);
-    final start = size.width - step * (samples.length - 1);
-    Offset point(int i, int value) => Offset(start + step * i, size.height - size.height * value / peak * .92);
 
-    final down = Path()..moveTo(start, size.height);
+    final step = chart.width / (SpeedHistory.length - 1);
+    final start = chart.width - step * (samples.length - 1);
+    Offset point(int i, int value) => Offset(start + step * i, chart.height - chart.height * value / top);
+
+    final down = Path()..moveTo(start, chart.height);
     for (var i = 0; i < samples.length; i++) {
-      down.lineTo(point(i, samples[i].down).dx, point(i, samples[i].down).dy);
+      final p = point(i, samples[i].down);
+      down.lineTo(p.dx, p.dy);
     }
     final downLine = Path.from(down);
     down
-      ..lineTo(size.width, size.height)
+      ..lineTo(chart.width, chart.height)
       ..close();
     canvas.drawPath(
       down,
@@ -347,8 +502,8 @@ class _SpeedGraph extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [color.withValues(alpha: .45), color.withValues(alpha: .02)],
-        ).createShader(Offset.zero & size),
+          colors: [color.withValues(alpha: .5), color.withValues(alpha: .04)],
+        ).createShader(Offset.zero & chart),
     );
     canvas.drawPath(
       downLine,
@@ -359,18 +514,16 @@ class _SpeedGraph extends CustomPainter {
         ..strokeJoin = StrokeJoin.round,
     );
 
-    final up = Path();
-    for (var i = 0; i < samples.length; i++) {
-      final p = point(i, samples[i].up);
-      i == 0 ? up.moveTo(p.dx, p.dy) : up.lineTo(p.dx, p.dy);
+    // upload: dashed
+    final dash = Paint()
+      ..color = color.withValues(alpha: .85)
+      ..strokeWidth = 1.6;
+    for (var i = 0; i + 1 < samples.length; i++) {
+      if (i.isEven) canvas.drawLine(point(i, samples[i].up), point(i + 1, samples[i + 1].up), dash);
     }
-    canvas.drawPath(
-      up,
-      Paint()
-        ..color = color.withValues(alpha: .6)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
+
+    // the latest download speed, marked
+    canvas.drawCircle(point(samples.length - 1, samples.last.down), 3.5, Paint()..color = color);
   }
 
   @override

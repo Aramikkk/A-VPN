@@ -31,6 +31,7 @@ String formatBytes(int bytes, List<String> units, {String decimalSeparator = ','
     value /= 1024;
     unit++;
   }
-  final text = unit == 0 || value >= 100 ? value.round().toString() : value.toStringAsFixed(1);
+  var text = unit == 0 || value >= 100 ? value.round().toString() : value.toStringAsFixed(1);
+  if (text.endsWith('.0')) text = text.substring(0, text.length - 2); // "10 МБ", not "10,0 МБ"
   return '${text.replaceAll('.', decimalSeparator)} ${units[unit]}';
 }

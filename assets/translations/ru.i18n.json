@@ -72,7 +72,11 @@
     "accentCyber": "Кибер",
     "accentOled": "OLED",
     "themes": "Темы",
-    "mtu": "MTU туннеля"
+    "mtu": "MTU туннеля",
+    "graphStart": "60 с назад",
+    "graphNow": "сейчас",
+    "graphPeak": "Пик",
+    "graphAverage": "Средняя"
   },
   "common": {
     "appTitle": "A-VPN",
