@@ -4,6 +4,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
+import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
@@ -28,9 +29,11 @@ class SideBarStatsOverview extends ConsumerWidget {
     String size(int bytes) => formatBytes(bytes, units);
     String speed(int bytes) => '${formatBytes(bytes, units)}${t.avpn.perSecond}';
 
-    final total = stats.uplinkTotal.toInt() + stats.downlinkTotal.toInt();
-    final vpnUp = stats.vpnUplinkTotal;
-    final vpnDown = stats.vpnDownlinkTotal;
+    // the whole session's totals: the core's own counters restart at every reload (network or server change)
+    final session = ref.watch(sessionTotalsProvider);
+    final total = session.up + session.down;
+    final vpnUp = session.vpnUp;
+    final vpnDown = session.vpnDown;
     final vpn = vpnUp == null || vpnDown == null ? null : vpnUp + vpnDown;
     final direct = vpn == null ? null : (total - vpn).clamp(0, total);
     final share = vpn == null || total == 0 ? null : (vpn / total).clamp(0.0, 1.0);
@@ -106,8 +109,8 @@ class SideBarStatsOverview extends ConsumerWidget {
               title: t.avpn.statsSessionShort,
               value: size(total),
               detail: large
-                  ? '↓ ${size(stats.downlinkTotal.toInt())}   ↑ ${size(stats.uplinkTotal.toInt())}'
-                  : '↓ ${size(stats.downlinkTotal.toInt())}\n↑ ${size(stats.uplinkTotal.toInt())}',
+                  ? '↓ ${size(session.down)}   ↑ ${size(session.up)}'
+                  : '↓ ${size(session.down)}\n↑ ${size(session.up)}',
               compact: !large,
             ),
             _Tile(

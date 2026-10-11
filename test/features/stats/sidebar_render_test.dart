@@ -78,7 +78,10 @@ void main() {
                     : Align(
                         alignment: Alignment.bottomCenter,
                         child: SingleChildScrollView(
-                          child: SizedBox(width: width, child: SideBarStatsOverview(large: large)),
+                          child: SizedBox(
+                            width: width,
+                            child: SideBarStatsOverview(large: large),
+                          ),
                         ),
                       ),
               ),
@@ -91,7 +94,13 @@ void main() {
       if (Platform.environment['RENDER'] == '1') {
         await expectLater(
           find.byType(MaterialApp),
-          matchesGoldenFile('goldens/sidebar_${large ? 'large' : dark ? 'dark' : 'light'}.png'),
+          matchesGoldenFile(
+            'goldens/sidebar_${large
+                ? 'large'
+                : dark
+                ? 'dark'
+                : 'light'}.png',
+          ),
         );
       }
     }

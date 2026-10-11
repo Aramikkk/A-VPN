@@ -7,6 +7,7 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
+import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -28,6 +29,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     // keeps a minute of speed samples, so the Speed tab's graph is full when it opens
     ref.listen(speedHistoryProvider, (_, _) {});
+    // and adds up the session's traffic across the core's reloads, also while the panel isn't shown
+    ref.listen(sessionTotalsProvider, (_, _) {});
     // focus switch management
     final primaryFocusHash = useState<int?>(null);
     final navScopeNode = useFocusScopeNode();
