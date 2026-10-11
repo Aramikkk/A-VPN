@@ -5,6 +5,7 @@ import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -65,21 +66,34 @@ class HomePage extends HookConsumerWidget {
           const Gap(8),
         ],
       ),
-      body: SizedBox.expand(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  // the phone layout's width on a tablet; a computer window uses the room it has
-                  maxWidth: PlatformUtils.isDesktop ? 1000 : 600,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // an unfolded phone (a Fold is ~750 dp wide) or a tablet: the servers on the left, the statistics on the right
+          if (!PlatformUtils.isDesktop && constraints.maxWidth >= 700) {
+            return const Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(flex: 11, child: AraHomeBody()),
+                Expanded(
+                  flex: 9,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(right: 4),
+                    child: SideBarStatsOverview(large: true),
+                  ),
                 ),
-                child: const AraHomeBody(),
+              ],
+            );
+          }
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                // the phone layout's width on a tablet; a computer window uses the room it has
+                maxWidth: PlatformUtils.isDesktop ? 1000 : 600,
               ),
+              child: const AraHomeBody(),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

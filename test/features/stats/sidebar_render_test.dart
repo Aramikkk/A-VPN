@@ -49,7 +49,7 @@ Future<void> _loadFont(String family, List<String> files) async {
 }
 
 void main() {
-  testWidgets('sidebar panel fits at 248 px', (tester) async {
+  testWidgets('traffic panel fits: desktop sidebar 248 px, unfolded phone 330 px', (tester) async {
     await _loadFont('Segoe UI Variable Text', [r'C:\Windows\Fonts\SegUIVar.ttf']);
     await _loadFont('Segoe UI', [
       r'C:\Windows\Fonts\segoeui.ttf',
@@ -57,9 +57,9 @@ void main() {
       r'C:\Windows\Fonts\segoeuib.ttf',
     ]);
     final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
-    for (final dark in [false, true]) {
+    for (final (dark, width, large) in [(false, 248.0, false), (true, 248.0, false), (true, 330.0, true)]) {
       final theme = AppTheme(AppThemeMode.system, '', accent: AraAccent.lagoon);
-      await tester.binding.setSurfaceSize(const Size(248, 760));
+      await tester.binding.setSurfaceSize(Size(width, large ? 1100 : 760));
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -75,9 +75,11 @@ void main() {
                 // the translations load a frame later
                 builder: (context, ref, _) => !ref.watch(translationsProvider).hasValue
                     ? const SizedBox()
-                    : const Align(
+                    : Align(
                         alignment: Alignment.bottomCenter,
-                        child: SingleChildScrollView(child: SizedBox(width: 248, child: SideBarStatsOverview())),
+                        child: SingleChildScrollView(
+                          child: SizedBox(width: width, child: SideBarStatsOverview(large: large)),
+                        ),
                       ),
               ),
             ),
@@ -89,7 +91,7 @@ void main() {
       if (Platform.environment['RENDER'] == '1') {
         await expectLater(
           find.byType(MaterialApp),
-          matchesGoldenFile('goldens/sidebar_${dark ? 'dark' : 'light'}.png'),
+          matchesGoldenFile('goldens/sidebar_${large ? 'large' : dark ? 'dark' : 'light'}.png'),
         );
       }
     }

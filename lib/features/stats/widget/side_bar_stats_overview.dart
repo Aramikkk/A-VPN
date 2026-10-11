@@ -103,7 +103,7 @@ class SideBarStatsOverview extends ConsumerWidget {
           _pair(
             _Tile(
               icon: Icons.data_usage_rounded,
-              title: large ? t.avpn.statsSession : t.avpn.statsSessionShort,
+              title: t.avpn.statsSessionShort,
               value: size(total),
               detail: large
                   ? '↓ ${size(stats.downlinkTotal.toInt())}   ↑ ${size(stats.uplinkTotal.toInt())}'
@@ -112,7 +112,7 @@ class SideBarStatsOverview extends ConsumerWidget {
             ),
             _Tile(
               icon: Icons.lan_rounded,
-              title: large ? t.avpn.statsConnections : t.avpn.statsConnectionsShort,
+              title: t.avpn.statsConnectionsShort,
               value: '${stats.connectionsIn}',
               showBar: false,
               compact: !large,
@@ -196,13 +196,16 @@ class _Tile extends StatelessWidget {
                 const Gap(8),
               ],
               Expanded(
-                child: _Caption(title, color: scheme.onSurfaceVariant, tight: compact),
+                // tiles are narrow on a phone too: tight captions everywhere
+                child: _Caption(title, color: scheme.onSurfaceVariant, tight: true),
               ),
-              if (share != null)
+              if (share != null) ...[
+                const Gap(6),
                 Text(
                   '${(share! * 100).round()}%',
                   style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: color),
                 ),
+              ],
             ],
           ),
           Gap(compact ? 4 : 6),

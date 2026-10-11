@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -21,6 +22,9 @@ class ActiveBreakpointNotifier extends _$ActiveBreakpointNotifier {
 bool? isMobileBreakpoint(Ref ref) {
   final breakpoint = ref.watch(activeBreakpointNotifierProvider);
   if (breakpoint == null) return null;
+  // A-VPN: a phone keeps the phone navigation (bottom bar, Statistics tab) also unfolded or on a tablet;
+  // the wide home screen shows the statistics next to the servers instead
+  if (PlatformUtils.isAndroid || PlatformUtils.isIOS) return true;
   return breakpoint == Breakpoints.mobile;
 }
 
