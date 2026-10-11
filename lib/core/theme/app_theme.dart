@@ -17,6 +17,7 @@ class AppTheme {
     gradient: accent.gradient(brightness),
     onGradient: accent.onGradient(brightness),
     fastPing: brightness == Brightness.dark ? const Color(0xFF6CCB5F) : const Color(0xFF0F7B0F),
+    border: accent.pure ? (brightness == Brightness.dark ? Colors.white54 : Colors.black45) : null,
   );
 
   /// Light: white backgrounds and the accent's deeper shade, whatever the wallpaper colours.
@@ -97,9 +98,12 @@ class AppTheme {
   /// and a blue gradient for the highlights.
   ThemeData _windowsTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final background = dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3);
+    final pure = accent.pure;
+    final background = pure
+        ? (dark ? Colors.black : Colors.white)
+        : (dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3));
     final seeded = ColorScheme.fromSeed(seedColor: accent.seed, brightness: brightness);
-    final scheme = seeded.copyWith(
+    final windows = seeded.copyWith(
       primary: dark ? accent.darkPrimary : accent.lightPrimary,
       onPrimary: dark ? const Color(0xFF101014) : Colors.white,
       surface: background,
@@ -112,6 +116,20 @@ class AppTheme {
       surfaceContainerHighest: dark ? const Color(0xFF3A3A3A) : const Color(0xFFEFEFEF),
       outlineVariant: dark ? const Color(0xFF3D3D3D) : const Color(0xFFE5E5E5),
     );
+    // OLED: black cards on black (white on white), told apart by their outlines
+    final scheme = !pure
+        ? windows
+        : windows.copyWith(
+            surface: background,
+            surfaceDim: background,
+            surfaceBright: dark ? const Color(0xFF1C1C1C) : Colors.white,
+            surfaceContainerLowest: background,
+            surfaceContainerLow: dark ? const Color(0xFF0A0A0A) : Colors.white,
+            surfaceContainer: dark ? const Color(0xFF0E0E0E) : const Color(0xFFFAFAFA),
+            surfaceContainerHigh: dark ? const Color(0xFF141414) : const Color(0xFFF5F5F5),
+            surfaceContainerHighest: dark ? const Color(0xFF1C1C1C) : const Color(0xFFEDEDED),
+            outlineVariant: dark ? const Color(0xFF333333) : const Color(0xFFD6D6D6),
+          );
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,

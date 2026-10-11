@@ -1,6 +1,9 @@
 ; A-VPN installer for Windows. Build: ISCC.exe avpn.iss (after flutter build windows)
 #define AppName "A-VPN"
-#define AppVersion "5.0.0"
+; the release number: release.sh passes it from pubspec.yaml (/DAppVersion=…)
+#ifndef AppVersion
+  #define AppVersion "5.1.0"
+#endif
 #define AppExe "A-VPN.exe"
 #define BuildDir "..\..\..\build\windows\x64\runner\Release"
 

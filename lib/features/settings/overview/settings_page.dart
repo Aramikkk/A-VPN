@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
-import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
 import 'package:hiddify/features/settings/notifier/reset_tunnel/reset_tunnel_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -147,13 +146,6 @@ class SettingsPage extends HookConsumerWidget {
             icon: Icons.layers_rounded,
             namedLocation: context.namedLocation('general'),
           ),
-          if (ref.watch(hasAnyProfileProvider).value ?? false)
-            SettingsSection(
-              title: t.pages.settings.chain.title,
-              icon: Icons.webhook_rounded,
-              subtitle: Text(t.pages.settings.chain.subtitle),
-              namedLocation: context.namedLocation('chainOptions'),
-            ),
           SettingsSection(
             title: t.pages.settings.routing.title,
             icon: Icons.route_rounded,
@@ -168,11 +160,6 @@ class SettingsPage extends HookConsumerWidget {
             title: t.pages.settings.inbound.title,
             icon: Icons.input_rounded,
             namedLocation: context.namedLocation('inboundOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.tlsTricks.title,
-            icon: Icons.content_cut_rounded,
-            namedLocation: context.namedLocation('tlsTricks'),
           ),
           if (PlatformUtils.isIOS)
             Material(

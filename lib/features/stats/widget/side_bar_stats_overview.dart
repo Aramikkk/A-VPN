@@ -68,6 +68,7 @@ class SideBarStatsOverview extends ConsumerWidget {
             decoration: BoxDecoration(
               gradient: gradient,
               color: gradient == null ? scheme.primaryContainer : null,
+              border: theme.araLook.border == null ? null : Border.all(color: theme.araLook.border!),
               borderRadius: BorderRadius.circular(large ? 24 : 16),
             ),
             child: Column(
@@ -203,7 +204,7 @@ class _Tile extends StatelessWidget {
                 child: _Caption(title, color: scheme.onSurfaceVariant, tight: true),
               ),
               if (share != null) ...[
-                const Gap(6),
+                Gap(compact ? 2 : 6),
                 Text(
                   '${(share! * 100).round()}%',
                   style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: color),

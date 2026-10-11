@@ -543,14 +543,15 @@ abstract class ConfigOptions {
       //   protocol: ref.watch(muxProtocol),
       // ),
       tlsTricks: SingboxTlsTricks(
-        enableFragment: ref.watch(enableTlsFragment),
+        // A-VPN has no TLS tricks or chain settings any more: always off, whatever an older version saved
+        enableFragment: false,
         fragmentSize: ref.watch(tlsFragmentSize),
         fragmentSleep: ref.watch(tlsFragmentSleep),
-        mixedSniCase: ref.watch(enableTlsMixedSniCase),
-        enablePadding: ref.watch(enableTlsPadding),
+        mixedSniCase: false,
+        enablePadding: false,
         paddingSize: ref.watch(tlsPaddingSize),
       ),
-      chainStatus: ref.watch(chainStatus),
+      chainStatus: ChainStatus.off,
       extraSecurity: SingboxExtraSecurityOption(
         mode: ref.watch(extraSecurityMode),
         warp: SingboxExtraSecurityWarpOption(licenseKey: ref.watch(extraSecurityWarpLicenseKey)),

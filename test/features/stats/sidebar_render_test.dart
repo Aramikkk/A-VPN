@@ -58,7 +58,11 @@ void main() {
     ]);
     final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
     for (final (dark, width, large) in [(false, 248.0, false), (true, 248.0, false), (true, 330.0, true)]) {
-      final theme = AppTheme(AppThemeMode.system, '', accent: AraAccent.lagoon);
+      final theme = AppTheme(
+        AppThemeMode.system,
+        '',
+        accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'lagoon'),
+      );
       await tester.binding.setSurfaceSize(Size(width, large ? 1100 : 760));
       await tester.pumpWidget(
         ProviderScope(

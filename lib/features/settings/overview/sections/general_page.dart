@@ -221,6 +221,10 @@ class _AccentTile extends ConsumerWidget {
       AraAccent.sunset => t.avpn.accentSunset,
       AraAccent.lagoon => t.avpn.accentLagoon,
       AraAccent.neon => t.avpn.accentNeon,
+      AraAccent.mono => t.avpn.accentMono,
+      AraAccent.pastel => t.avpn.accentPastel,
+      AraAccent.cyber => t.avpn.accentCyber,
+      AraAccent.oled => t.avpn.accentOled,
     };
     return ListTile(
       leading: const Icon(Icons.palette_rounded),
@@ -256,6 +260,8 @@ class _AccentTile extends ConsumerWidget {
                           decoration: BoxDecoration(
                             gradient: accent.gradient(brightness),
                             borderRadius: BorderRadius.circular(10),
+                            // the OLED swatch is the background's own colour: outline it
+                            border: accent.pure ? Border.all(color: Theme.of(context).colorScheme.outline) : null,
                           ),
                           child: accent == selected
                               ? Icon(Icons.check_rounded, color: accent.onGradient(brightness), size: 18)

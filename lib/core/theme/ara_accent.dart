@@ -58,6 +58,50 @@ enum AraAccent {
     darkPrimary: Color(0xFFA9A0FF),
     lightGradient: [Color(0xFF1F5BFF), Color(0xFF7A3CFF), Color(0xFFFF3CA6)],
     darkGradient: [Color(0xFF1A4ADB), Color(0xFF6A2FE6), Color(0xFFE6338F)],
+  ),
+
+  /// Black and white, the most contrast: graphite into black on light, white into silver on dark.
+  mono(
+    seed: Color(0xFF5F6368),
+    lightPrimary: Color(0xFF111111),
+    darkPrimary: Color(0xFFFFFFFF),
+    lightGradient: [Color(0xFF000000), Color(0xFF2B2B2B), Color(0xFF5A5A5A)],
+    darkGradient: [Color(0xFFFFFFFF), Color(0xFFD9D9D9), Color(0xFFA8A8A8)],
+    darkOnGradient: Color(0xFF000000),
+  ),
+
+  /// Soft lavender, peach and mint: low contrast, easy on the eyes; dark text on it.
+  pastel(
+    seed: Color(0xFFB39DDB),
+    lightPrimary: Color(0xFF7E57C2),
+    darkPrimary: Color(0xFFD1C4E9),
+    lightGradient: [Color(0xFFD7C8F5), Color(0xFFF6D3E1), Color(0xFFFFE3C8)],
+    darkGradient: [Color(0xFFB9A6E8), Color(0xFFE6B7CC), Color(0xFFF3CBA8)],
+    lightOnGradient: Color(0xFF2B1F45),
+    darkOnGradient: Color(0xFF2B1F45),
+  ),
+
+  /// Signal yellow into orange: loud and high contrast, black text on it.
+  cyber(
+    seed: Color(0xFFFFD600),
+    lightPrimary: Color(0xFF8A6D00),
+    darkPrimary: Color(0xFFFFE135),
+    lightGradient: [Color(0xFFFFE135), Color(0xFFFFB300), Color(0xFFFF6D00)],
+    darkGradient: [Color(0xFFFFF04D), Color(0xFFFFC400), Color(0xFFFF8F00)],
+    lightOnGradient: Color(0xFF1A1400),
+    darkOnGradient: Color(0xFF1A1400),
+  ),
+
+  /// For OLED screens: pure black with white at night, pure white with black by day, no colour; the blocks get a
+  /// thin outline instead of a coloured gradient.
+  oled(
+    seed: Color(0xFF808080),
+    lightPrimary: Color(0xFF000000),
+    darkPrimary: Color(0xFFFFFFFF),
+    lightGradient: [Color(0xFFFFFFFF), Color(0xFFFAFAFA), Color(0xFFF0F0F0)],
+    darkGradient: [Color(0xFF000000), Color(0xFF060606), Color(0xFF111111)],
+    lightOnGradient: Color(0xFF000000),
+    pure: true,
   );
 
   const AraAccent({
@@ -66,7 +110,9 @@ enum AraAccent {
     required this.darkPrimary,
     required this.lightGradient,
     required this.darkGradient,
+    this.lightOnGradient = Colors.white,
     this.darkOnGradient = Colors.white,
+    this.pure = false,
   });
 
   final Color seed;
@@ -74,12 +120,16 @@ enum AraAccent {
   final Color darkPrimary;
   final List<Color> lightGradient;
   final List<Color> darkGradient;
+  final Color lightOnGradient;
   final Color darkOnGradient;
+
+  /// pure black / pure white backgrounds and outlined blocks (the OLED theme)
+  final bool pure;
 
   static AraAccent get platformDefault => Platform.isAndroid || Platform.isIOS ? acid : windows;
 
   /// Text and icons on the gradient.
-  Color onGradient(Brightness brightness) => brightness == Brightness.dark ? darkOnGradient : Colors.white;
+  Color onGradient(Brightness brightness) => brightness == Brightness.dark ? darkOnGradient : lightOnGradient;
 
   LinearGradient gradient(Brightness brightness) => LinearGradient(
     begin: Alignment.topLeft,

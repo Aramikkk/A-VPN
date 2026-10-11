@@ -665,7 +665,11 @@ class _ConnectionCard extends HookConsumerWidget {
     if (gradient == null || !connected) return card;
     // desktop, connected: the card gets a thin outline in the accent gradient
     return DecoratedBox(
-      decoration: BoxDecoration(gradient: gradient, borderRadius: BorderRadius.circular(26)),
+      decoration: BoxDecoration(
+        gradient: theme.araLook.border == null ? gradient : null,
+        color: theme.araLook.border,
+        borderRadius: BorderRadius.circular(26),
+      ),
       child: Padding(padding: const EdgeInsets.all(2), child: card),
     );
   }
@@ -688,6 +692,7 @@ class _InitialBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         color: scheme.primary,
         gradient: Theme.of(context).araLook.gradient,
+        border: Theme.of(context).araLook.border == null ? null : Border.all(color: Theme.of(context).araLook.border!),
       ),
       child: Text(
         letter,

@@ -31,17 +31,21 @@ class ConnectionButtonTheme extends ThemeExtension<ConnectionButtonTheme> {
 
 /// A-VPN's accent gradient, the colour of text on it, and the colour for a fast ping.
 class AraLook extends ThemeExtension<AraLook> {
-  const AraLook({this.gradient, this.onGradient = Colors.white, required this.fastPing});
+  const AraLook({this.gradient, this.onGradient = Colors.white, required this.fastPing, this.border});
 
   final Gradient? gradient;
+
+  /// an outline for the gradient blocks, when they're the same colour as the background (the OLED theme)
+  final Color? border;
   final Color onGradient;
   final Color fastPing;
 
   @override
-  AraLook copyWith({Gradient? gradient, Color? onGradient, Color? fastPing}) => AraLook(
+  AraLook copyWith({Gradient? gradient, Color? onGradient, Color? fastPing, Color? border}) => AraLook(
     gradient: gradient ?? this.gradient,
     onGradient: onGradient ?? this.onGradient,
     fastPing: fastPing ?? this.fastPing,
+    border: border ?? this.border,
   );
 
   @override
@@ -51,6 +55,7 @@ class AraLook extends ThemeExtension<AraLook> {
       gradient: Gradient.lerp(gradient, other.gradient, t),
       onGradient: Color.lerp(onGradient, other.onGradient, t)!,
       fastPing: Color.lerp(fastPing, other.fastPing, t)!,
+      border: Color.lerp(border, other.border, t),
     );
   }
 }
