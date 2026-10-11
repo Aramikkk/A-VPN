@@ -515,7 +515,9 @@
           "enable": "On",
           "prefer": "Preferred",
           "only": "Exclusive"
-        }
+        },
+        "blockedOnly": "Only blocked sites through the VPN",
+        "blockedOnlyHint": "Only sites and services blocked in Russia (YouTube, Instagram, Telegram, Discord, ChatGPT…) go through the VPN; everything else goes direct at full speed. On a phone on Wi-Fi only: on mobile data everything goes through the VPN because of operator whitelists"
       },
       "dns": {
         "title": "DNS",

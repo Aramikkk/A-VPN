@@ -9,6 +9,7 @@ import 'package:hiddify/core/logger/core_logger.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
+import 'package:hiddify/features/proxy/data/blocked_only_routing.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -217,7 +218,16 @@ class HiddifyCoreService with InfraLogger {
       ServerRegionFilter.lastApplied = NetworkKind.unknown;
     }
     if (ref.read(ConfigOptions.homeNetwork)) {
+      // Server mode decides every connection itself
       filtered = await HomeNetwork.attach(filtered, activeConfigPath: path);
+    } else if (ref.read(ConfigOptions.blockedOnlyViaVpn) &&
+        (PlatformUtils.isDesktop || await ServerRegionFilter.currentNetwork() != NetworkKind.mobile)) {
+      final testHost = Uri.tryParse(ref.read(ConfigOptions.connectionTestUrl))?.host;
+      filtered = await BlockedOnlyRouting.attach(
+        filtered,
+        activeConfigPath: path,
+        extraProxyHosts: [if (testHost != null && testHost.isNotEmpty) testHost],
+      );
     }
     return filtered;
   }
@@ -253,7 +263,11 @@ class HiddifyCoreService with InfraLogger {
       loggy.debug("hot reloading");
       try {
         final res = await core.bgClient.hotReload(
-          StartRequest(configPath: await _filteredConfig(path), configName: name, disableMemoryLimit: disableMemoryLimit),
+          StartRequest(
+            configPath: await _filteredConfig(path),
+            configName: name,
+            disableMemoryLimit: disableMemoryLimit,
+          ),
         );
         if (res.messageType == MessageType.EMPTY) return right(unit);
         loggy.info("hot reload not applied, restarting: ${res.messageType} ${res.message}");

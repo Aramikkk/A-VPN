@@ -13,6 +13,8 @@ import 'package:hiddify/features/app_based_routing/model/pkg_flag.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_notifier.dart';
 import 'package:hiddify/features/app_based_routing/overview/auto_selection_notifier.dart';
+import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/route_rules/widget/rule_tile.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -502,6 +504,17 @@ class _PinnedOptions extends ConsumerWidget {
           choices: BalancerStrategy.values,
           present: (value) => value.present(t),
           onSelected: ref.read(ConfigOptions.balancerStrategy.notifier).update,
+        ),
+        divider,
+        SwitchListTile.adaptive(
+          title: Text(routing.blockedOnly),
+          subtitle: Text(routing.blockedOnlyHint),
+          value: ref.watch(ConfigOptions.blockedOnlyViaVpn),
+          onChanged: (value) async {
+            await ref.read(ConfigOptions.blockedOnlyViaVpn.notifier).update(value);
+            // the rules are in the start config: reconnect so they apply now
+            await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
+          },
         ),
         divider,
         SwitchListTile.adaptive(

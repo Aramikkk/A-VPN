@@ -69,6 +69,8 @@ cp ./hiddify/build/windows/installer/A-VPN-Setup-5.0.0.exe ./A-VPN/windows/
 
 **Маршрутизация** — `lib/features/route_rules/notifier/rules_notifier.dart`: РКН-домены (.ru/.su/.рф из antifilter, `gen_rkn_domains.py`) через прокси, остальные .ru/.su/.рф и LAN напрямую, QUIC заблокирован. DNS: удалённый `https://8.8.8.8/dns-query`, прямой `udp://77.88.8.8` (DoH Яндекса не работает).
 
+**Через VPN только заблокированное** (по умолчанию вкл.; на телефоне только в Wi-Fi, на мобильном всё через VPN из-за белых списков) — `lib/features/proxy/data/blocked_only_routing.dart`: в стартовую конфигурацию добавляются правила «локальная сеть напрямую → QUIC к заблокированным отклонить → заблокированные домены/IP через `select` → остальное напрямую». Список — `blocked_list.dart`, генерируется `avpn/scripts/gen_blocked_list.py` из itdoginfo/allow-domains (Russia inside + подсети Telegram/Meta/Twitter/Discord) плюс домены Telegram/WhatsApp/X; обновлять раз в пару месяцев. Хост URL проверки пинга тоже идёт через VPN.
+
 **Режим «Сервер»** — `lib/features/proxy/data/home_network.dart`: WireGuard-профиль (Mechta.conf) как отдельный режим: домашняя сеть через WG, остальное напрямую.
 
 **Раздача** — `lan_sharing.dart`: прокси на порту 12334 для устройств в точке доступа.

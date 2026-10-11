@@ -148,6 +148,11 @@ abstract class ConfigOptions {
   /// Keep only European servers in the server list and the auto groups.
   static final europeOnlyServers = PreferencesNotifier.create<bool, bool>("europe-only-servers", true);
 
+  /// Only sites and services blocked in Russia go through the VPN, everything else direct (downloads, games,
+  /// updates at full speed). A phone applies it on Wi-Fi only: on mobile data operators may let only
+  /// whitelisted sites through, so there everything keeps going through the VPN.
+  static final blockedOnlyViaVpn = PreferencesNotifier.create<bool, bool>("blocked-only-via-vpn", true);
+
   /// On mobile data use only the provider's mobile-only ("LTE Only") servers, on Wi-Fi only the others.
   static final serversByNetwork = PreferencesNotifier.create<bool, bool>("servers-by-network", true);
 
