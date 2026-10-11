@@ -33,7 +33,15 @@
     "pingDots": "Dots",
     "pingTimeout": "Ping timeout",
     "pingTimeoutMsg": "A server that doesn't answer in this time counts as unreachable",
-    "seconds": "$n s"
+    "seconds": "$n s",
+    "statsSpeed": "Speed",
+    "statsSession": "This session",
+    "statsViaVpn": "Through VPN",
+    "statsDirect": "Direct",
+    "statsDownload": "Download",
+    "statsUpload": "Upload",
+    "bytesUnits": "B,KB,MB,GB,TB",
+    "perSecond": "/s"
   },
   "common": {
     "appTitle": "A-VPN",

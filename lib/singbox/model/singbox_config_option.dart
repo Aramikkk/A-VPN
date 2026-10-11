@@ -17,6 +17,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
   const factory SingboxConfigOption({
     required String region,
     required BalancerStrategy balancerStrategy,
+    required int balancerTolerance,
+    required bool balancerKeepConnections,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,
     required bool executeConfigAsIs,

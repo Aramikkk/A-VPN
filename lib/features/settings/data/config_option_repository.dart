@@ -134,7 +134,9 @@ abstract class ConfigOptions {
 
   static final tunImplementation = PreferencesNotifier.create<TunImplementation, String>(
     "tun-implementation",
-    TunImplementation.gvisor,
+    // the computer's own network stack (mixed) is much faster than the userspace one (gvisor); phones keep gvisor,
+    // which A-VPN was tuned with there
+    PlatformUtils.isDesktop ? TunImplementation.mixed : TunImplementation.gvisor,
     mapFrom: TunImplementation.values.byName,
     mapTo: (value) => value.name,
   );
@@ -490,6 +492,10 @@ abstract class ConfigOptions {
     return SingboxConfigOption(
       region: ref.watch(region).name,
       balancerStrategy: ref.watch(balancerStrategy),
+      // on a computer, stay on a server until another is faster by 150 ms or it stops answering, and don't cut
+      // open downloads and calls on a switch; the phone keeps taking the fastest, switching with the network
+      balancerTolerance: PlatformUtils.isDesktop ? 150 : 0,
+      balancerKeepConnections: PlatformUtils.isDesktop,
       // blockAds: ref.watch(blockAds),
       useXrayCoreWhenPossible: ref.watch(useXrayCoreWhenPossible),
       executeConfigAsIs: false,

@@ -33,7 +33,15 @@
     "pingDots": "Точки",
     "pingTimeout": "Таймаут пинга",
     "pingTimeoutMsg": "Сервер, не ответивший за это время, считается недоступным",
-    "seconds": "$n сек"
+    "seconds": "$n сек",
+    "statsSpeed": "Скорость",
+    "statsSession": "За сессию",
+    "statsViaVpn": "Через VPN",
+    "statsDirect": "Напрямую",
+    "statsDownload": "Загрузка",
+    "statsUpload": "Отдача",
+    "bytesUnits": "Б,КБ,МБ,ГБ,ТБ",
+    "perSecond": "/с"
   },
   "common": {
     "appTitle": "A-VPN",
