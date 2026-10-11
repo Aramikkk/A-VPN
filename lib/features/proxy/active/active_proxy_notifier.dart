@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/utils/throttler.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/data/proxy_repository.dart';
+import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/proxy/model/ip_info_entity.dart' as oldipinfo;
 import 'package:hiddify/features/proxy/model/proxy_failure.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 
 import 'package:hiddify/utils/riverpod_utils.dart';
@@ -84,6 +88,56 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     if (!serviceRunning) {
       return Stream.error(const ServiceNotRunning());
     }
+    // Ping every server right after connecting so the auto group can pick the fastest one now,
+    // instead of waiting for the first periodic url-test.
+    Future.delayed(const Duration(seconds: 2), () => _proxyRepo.urlTest("select").run());
+    // When the phone moves between Wi-Fi and mobile data, reload the config: the server filter keeps only the
+    // "LTE Only" servers on mobile data and only the others on Wi-Fi. A ping can't tell this on its own:
+    // with whitelists the other servers still answer a tiny test, then drop real traffic.
+    // Re-filter when the phone's network no longer matches the one the running config was made for. Checked
+    // a few seconds after a change event (a new network takes a moment to come up and be validated) and
+    // every 15 seconds as a safety net, since the events don't always show the switch to mobile data.
+    var switching = false;
+    Future<void> refilterIfNetworkChanged() async {
+      if (switching || !ref.read(ConfigOptions.serversByNetwork)) return;
+      final network = await ServerRegionFilter.currentNetwork();
+      if (network == NetworkKind.unknown || network == ServerRegionFilter.lastApplied) return;
+      switching = true;
+      try {
+        loggy.info("network is now ${network.name}, was ${ServerRegionFilter.lastApplied.name}: reloading servers");
+        final profile = await ref.read(activeProfileProvider.future);
+        // a reload that hangs must not block every later network change
+        await ref
+            .read(connectionNotifierProvider.notifier)
+            .reconnect(profile)
+            .timeout(
+              const Duration(seconds: 20),
+              onTimeout: () => loggy.warning("reload after the network change timed out, carrying on"),
+            );
+        await _proxyRepo.urlTest("select").run();
+      } finally {
+        switching = false;
+      }
+    }
+
+    final checks = <Timer>[];
+    final networkChanges = Connectivity().onConnectivityChanged.skip(1).listen((_) {
+      for (final timer in checks) {
+        timer.cancel();
+      }
+      checks
+        ..clear()
+        ..add(Timer(const Duration(seconds: 3), refilterIfNetworkChanged))
+        ..add(Timer(const Duration(seconds: 10), refilterIfNetworkChanged));
+    });
+    final safetyNet = Timer.periodic(const Duration(seconds: 15), (_) => refilterIfNetworkChanged());
+    ref.onDispose(() {
+      for (final timer in checks) {
+        timer.cancel();
+      }
+      safetyNet.cancel();
+      networkChanges.cancel();
+    });
     return _proxyRepo
         .watchActiveProxies()
         .map((event) => event.getOrElse((l) => List<OutboundGroup>.empty()))

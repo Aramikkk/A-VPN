@@ -54,6 +54,7 @@ enum ServiceMode {
 
 @JsonEnum(valueField: 'key')
 enum BalancerStrategy {
+  lowestDelay("lowest-delay"),
   roundRobin("round-robin"),
   consistentHash("consistent-hashing"),
   stickySession("sticky-sessions");
@@ -63,6 +64,7 @@ enum BalancerStrategy {
   final String key;
 
   String present(TranslationsEn t) => switch (this) {
+    lowestDelay => t.pages.settings.routing.balancerStrategy.lowestDelay,
     roundRobin => t.pages.settings.routing.balancerStrategy.roundRobin,
     consistentHash => t.pages.settings.routing.balancerStrategy.consistentHash,
     stickySession => t.pages.settings.routing.balancerStrategy.stickySession,

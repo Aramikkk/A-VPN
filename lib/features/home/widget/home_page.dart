@@ -4,14 +4,9 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
-import 'package:hiddify/features/home/widget/connection_button.dart';
-import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
-import 'package:hiddify/features/profile/widget/profile_tile.dart';
-import 'package:hiddify/features/proxy/active/active_proxy_card.dart';
-import 'package:hiddify/features/proxy/active/active_proxy_delay_indicator.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:sliver_tools/sliver_tools.dart';
 
 class HomePage extends HookConsumerWidget {
   const HomePage({super.key});
@@ -20,8 +15,6 @@ class HomePage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final t = ref.watch(translationsProvider).requireValue;
-    // final hasAnyProfile = ref.watch(hasAnyProfileProvider);
-    final activeProfile = ref.watch(activeProfileProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -71,20 +64,7 @@ class HomePage extends HookConsumerWidget {
           const Gap(8),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: const AssetImage('assets/images/world_map.png'), // Replace with your image path
-            fit: BoxFit.cover,
-            opacity: 0.09,
-            colorFilter: theme.brightness == Brightness.dark
-                ? ColorFilter.mode(Colors.white.withValues(alpha: .15), BlendMode.srcIn) //
-                : ColorFilter.mode(
-                    Colors.grey.withValues(alpha: 1),
-                    BlendMode.srcATop,
-                  ), // Apply white tint in dark mode
-          ),
-        ),
+      body: SizedBox.expand(
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -93,88 +73,9 @@ class HomePage extends HookConsumerWidget {
                 constraints: const BoxConstraints(
                   maxWidth: 600, // Set the maximum width here
                 ),
-                child: CustomScrollView(
-                  slivers: [
-                    // switch (activeProfile) {
-                    // AsyncData(value: final profile?) =>
-                    MultiSliver(
-                      children: [
-                        // const Gap(100),
-                        switch (activeProfile) {
-                          AsyncData(value: final profile?) => ProfileTile(
-                            profile: profile,
-                            isMain: true,
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          ),
-                          _ => const Text(""),
-                        },
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [ConnectionButton(), ActiveProxyDelayIndicator()],
-                                ),
-                              ),
-                              ActiveProxyFooter(),
-                              Gap(32),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    // AsyncData() => switch (hasAnyProfile) {
-                    //     AsyncData(value: true) => const EmptyActiveProfileHomeBody(),
-                    //     _ => const EmptyProfilesHomeBody(),
-                    //   },
-                    // AsyncError(:final error) => SliverErrorBodyPlaceholder(t.presentShortError(error)),
-                    // _ => const SliverToBoxAdapter(),
-                    // },
-                  ],
-                ),
+                child: const AraHomeBody(),
               ),
             ),
-            if (ref.watch(hasAnyProfileProvider).value ?? false)
-              Positioned(
-                right: 0,
-                left: 0,
-                bottom: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Material(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
-                      child: InkWell(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                        ),
-                        onTap: () => ref.read(bottomSheetsNotifierProvider.notifier).showQuickSettings(),
-                        child: Container(
-                          height: 32,
-                          padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(t.pages.home.quickSettings),
-                              const Gap(4),
-                              const Icon(Icons.arrow_drop_up_rounded, size: 16),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),

@@ -49,7 +49,9 @@ import kotlinx.coroutines.CancellationException
 class ServiceNotification(private val status: MutableLiveData<Status>, private val service: Service) : BroadcastReceiver(){
     companion object {
         private const val notificationId = 1
-        private const val notificationChannel = "service"
+        // a channel keeps the settings it was created with, so the badge-less one needs a new id
+        private const val notificationChannel = "service_no_badge"
+        private const val oldNotificationChannel = "service"
         var coreClient: CoreClient?=null
         val flags =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
@@ -74,10 +76,12 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
         NotificationCompat.Builder(service, notificationChannel)
                 .setShowWhen(false)
                 .setOngoing(true)
-                .setContentTitle("Hiddify")
+                .setContentTitle("A-VPN")
                 .setOnlyAlertOnce(true)
                 .setSmallIcon(R.drawable.ic_stat_logo)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setBadgeIconType(NotificationCompat.BADGE_ICON_NONE)
+                .setNumber(0)
                 .setContentIntent(
                         PendingIntent.getActivity(
                                 service,
@@ -107,15 +111,17 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
 
     fun show(profileName: String, @StringRes contentTextId: Int) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Application.notification.deleteNotificationChannel(oldNotificationChannel)
+            // the ongoing "connected" notification shouldn't put a count on the app icon
             Application.notification.createNotificationChannel(
                 NotificationChannel(
-                    notificationChannel, "hiddify service", NotificationManager.IMPORTANCE_LOW
-                )
+                    notificationChannel, "A-VPN", NotificationManager.IMPORTANCE_LOW
+                ).apply { setShowBadge(false) }
             )
         }
         service.startForeground(
             notificationId, notificationBuilder
-                .setContentTitle(profileName.takeIf { it.isNotBlank() } ?: "Hiddify")
+                .setContentTitle(profileName.takeIf { it.isNotBlank() } ?: "A-VPN")
                 .setContentText(service.getString(contentTextId)).build()
         )
     }

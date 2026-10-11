@@ -42,8 +42,8 @@ class FixBtns extends ConsumerWidget {
           icon: Icons.insert_drive_file,
           onTap: () async {
             final result = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: ['txt', 'json', 'yaml', 'yml', 'conf', 'ovpn'],
+              // no extension filter (the default, any file): Android can't map .conf or .ovpn to a type, so a
+              // filtered picker greys them out
             );
             if (result == null) return;
             final picked = result.files.single;

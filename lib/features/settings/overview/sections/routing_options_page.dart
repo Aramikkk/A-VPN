@@ -505,6 +505,27 @@ class _PinnedOptions extends ConsumerWidget {
         ),
         divider,
         SwitchListTile.adaptive(
+          title: Text(routing.europeOnlyServers),
+          subtitle: Text(routing.europeOnlyServersHint),
+          value: ref.watch(ConfigOptions.europeOnlyServers),
+          onChanged: ref.read(ConfigOptions.europeOnlyServers.notifier).update,
+        ),
+        divider,
+        SwitchListTile.adaptive(
+          title: Text(routing.serversByNetwork),
+          subtitle: Text(routing.serversByNetworkHint),
+          value: ref.watch(ConfigOptions.serversByNetwork),
+          onChanged: ref.read(ConfigOptions.serversByNetwork.notifier).update,
+        ),
+        divider,
+        SwitchListTile.adaptive(
+          title: Text(routing.homeNetwork),
+          subtitle: Text(routing.homeNetworkHint),
+          value: ref.watch(ConfigOptions.homeNetwork),
+          onChanged: ref.read(ConfigOptions.homeNetwork.notifier).update,
+        ),
+        divider,
+        SwitchListTile.adaptive(
           title: Text(routing.resolveDestination),
           value: ref.watch(ConfigOptions.resolveDestination),
           onChanged: ref.read(ConfigOptions.resolveDestination.notifier).update,

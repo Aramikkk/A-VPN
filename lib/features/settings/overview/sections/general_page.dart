@@ -6,17 +6,46 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
+import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/widget/preference_tile.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:humanizer/humanizer.dart';
 
+/// A dialog listing [values], [selected] ticked; returns the one tapped.
+Future<T?> _pick<T>(
+  BuildContext context, {
+  required String title,
+  required List<T> values,
+  required T selected,
+  required String Function(T) label,
+}) => showDialog<T>(
+  context: context,
+  builder: (context) => SimpleDialog(
+    title: Text(title),
+    children: [
+      for (final value in values)
+        ListTile(
+          title: Text(label(value)),
+          trailing: value == selected ? Icon(Icons.check_rounded, color: Theme.of(context).colorScheme.primary) : null,
+          onTap: () => Navigator.of(context).pop(value),
+        ),
+    ],
+  ),
+);
+
 class GeneralPage extends HookConsumerWidget {
   const GeneralPage({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    String pingStyleName(PingStyle style) => switch (style) {
+      PingStyle.numbers => t.avpn.pingNumbers,
+      PingStyle.bars => t.avpn.pingBars,
+      PingStyle.barsAndNumbers => t.avpn.pingBarsAndNumbers,
+      PingStyle.dots => t.avpn.pingDots,
+    };
 
     return Scaffold(
       appBar: AppBar(title: Text(t.pages.settings.general.title)),
@@ -32,6 +61,13 @@ class GeneralPage extends HookConsumerWidget {
             onChanged: ref.read(Preferences.autoCheckIp.notifier).update,
           ),
           if (PlatformUtils.isAndroid) ...[
+            SwitchListTile.adaptive(
+              title: Text(t.avpn.connectOnAppStart),
+              subtitle: Text(t.avpn.connectOnAppStartMsg),
+              secondary: const Icon(Icons.bolt_rounded),
+              value: ref.watch(Preferences.connectOnAppStart),
+              onChanged: ref.read(Preferences.connectOnAppStart.notifier).update,
+            ),
             SwitchListTile.adaptive(
               title: Text(t.pages.settings.general.dynamicNotification),
               secondary: const Icon(Icons.speed_rounded),
@@ -73,6 +109,38 @@ class GeneralPage extends HookConsumerWidget {
           // Debug mode and log level moved to the Logs page. Both decide how
           // much is recorded, which is only meaningful next to the logs
           // themselves — and next to the filters that decide what is shown.
+          ListTile(
+            title: Text(t.avpn.pingStyle),
+            subtitle: Text(pingStyleName(ref.watch(Preferences.pingStyle))),
+            leading: const Icon(Icons.signal_cellular_alt_rounded),
+            onTap: () async {
+              final picked = await _pick(
+                context,
+                title: t.avpn.pingStyle,
+                values: PingStyle.values,
+                selected: ref.read(Preferences.pingStyle),
+                label: pingStyleName,
+              );
+              if (picked != null) await ref.read(Preferences.pingStyle.notifier).update(picked);
+            },
+          ),
+          ListTile(
+            title: Text(t.avpn.pingTimeout),
+            subtitle: Text(
+              '${t.avpn.seconds(n: ref.watch(ConfigOptions.urlTestTimeout).inSeconds)} · ${t.avpn.pingTimeoutMsg}',
+            ),
+            leading: const Icon(Icons.hourglass_bottom_rounded),
+            onTap: () async {
+              final picked = await _pick(
+                context,
+                title: t.avpn.pingTimeout,
+                values: const [2, 3, 5, 7, 10],
+                selected: ref.read(ConfigOptions.urlTestTimeout).inSeconds,
+                label: (n) => t.avpn.seconds(n: n),
+              );
+              if (picked != null) await ref.read(ConfigOptions.urlTestTimeout.notifier).update(Duration(seconds: picked));
+            },
+          ),
           ValuePreferenceWidget(
             value: ref.watch(ConfigOptions.connectionTestUrl),
             preferences: ref.watch(ConfigOptions.connectionTestUrl.notifier),

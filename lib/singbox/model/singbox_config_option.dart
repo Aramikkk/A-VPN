@@ -40,6 +40,7 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required bool strictRoute,
     required String connectionTestUrl,
     @IntervalInSecondsConverter() required Duration urlTestInterval,
+    @IntervalInSecondsConverter() required Duration urlTestTimeout,
     required bool enableClashApi,
     required int clashApiPort,
     required bool enableTun,

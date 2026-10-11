@@ -9,6 +9,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/route_rules/notifier/rkn_ru_domains.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -21,9 +22,15 @@ const _geoUrl = 'https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set'
 /// Rules the app ships with, in the order a new list starts with. They are always in the list: the user can
 /// only switch and move them, and their content comes from here, so an update can change it.
 enum BuiltinRule {
+  // sites blocked in Russia go through the VPN even on Russian domains, so this one comes first;
+  // then the local network and Russian domains go direct; everything else takes the VPN
+  rknBlockedProxy(enabledByDefault: true),
+  // QUIC (HTTP/3 over UDP) crawls through a TCP tunnel and is often throttled in Russia; blocking it makes apps
+  // fall back to TCP at once instead of after a timeout
+  blockQuic(enabledByDefault: true),
   bypassLan(enabledByDefault: true),
   blockAds(enabledByDefault: false),
-  bypassRegion(enabledByDefault: true);
+  ruDomainsDirect(enabledByDefault: true);
 
   const BuiltinRule({required this.enabledByDefault});
 
@@ -37,7 +44,9 @@ enum BuiltinRule {
   String present(Translations t, Region region) => switch (this) {
     bypassLan => t.pages.settings.routing.builtinRules.bypassLan,
     blockAds => t.pages.settings.routing.builtinRules.blockAds,
-    bypassRegion => t.pages.settings.routing.builtinRules.bypassRegion(region: region.presentName(t)),
+    rknBlockedProxy => t.pages.settings.routing.builtinRules.rknBlockedProxy,
+    blockQuic => t.pages.settings.routing.builtinRules.blockQuic,
+    ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirect,
   };
 
   Rule get rule => switch (this) {
@@ -70,10 +79,12 @@ enum BuiltinRule {
         '$_geoUrl/block/geoip-phishing.srs',
       ],
     ),
-    bypassRegion => Rule(
-      outbound: Outbound.direct,
-      ruleSets: ['$_geoUrl/country/geosite-{region}.srs', '$_geoUrl/country/geoip-{region}.srs'],
-    ),
+    // Only blocked sites in the Russian zones need a rule: everything else already takes the VPN. The list is
+    // inline because the core downloads rule-sets through the proxy before it starts, and a server that
+    // doesn't answer yet (an "LTE Only" one on Wi-Fi) stalls that download and the whole start with it.
+    rknBlockedProxy => Rule(outbound: Outbound.proxy, domainSuffixes: rknRuDomains),
+    blockQuic => Rule(outbound: Outbound.block, protocols: [Protocol.quic]),
+    ruDomainsDirect => Rule(outbound: Outbound.direct, domainSuffixes: ['ru', 'su', 'xn--p1ai']),
   }..name = key;
 }
 
@@ -97,16 +108,14 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
   /// Every built-in rule once, with the app's content and the user's switch and place; the ones missing go
   /// first, as in a new list. The region rule does nothing while the region is Other, so it's left out then.
   List<Rule> _withBuiltins(List<Rule> saved) {
-    final region = ref.read(ConfigOptions.region);
     // the built-ins the list needs, in their own order; each one found in the saved list is crossed off
-    final missing = {
-      for (final builtin in BuiltinRule.values)
-        if (builtin != BuiltinRule.bypassRegion || region != Region.other) builtin,
-    };
+    final missing = {...BuiltinRule.values};
     final rules = <Rule>[];
     for (final rule in saved) {
       final builtin = BuiltinRule.of(rule);
       if (builtin == null) {
+        // a built-in an earlier version had and this one dropped
+        if (rule.name.startsWith('builtin:')) continue;
         rules.add(rule);
       } else if (missing.remove(builtin)) {
         rules.add(builtin.rule..enabled = rule.enabled);

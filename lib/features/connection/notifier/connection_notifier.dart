@@ -97,6 +97,18 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     await _connect();
   }
 
+  /// Connects when the app opens if the user asked for it and nothing is running yet (the VPN may already be
+  /// up, started at boot or from the quick-settings tile).
+  Future<void> connectOnAppStart() async {
+    if (!ref.read(Preferences.connectOnAppStart)) return;
+    if (await ref.read(activeProfileProvider.future) == null) return;
+    if (await future case Disconnected()) {
+      loggy.info("connecting on app start");
+      await ref.read(Preferences.startedByUser.notifier).update(true);
+      await _connect();
+    }
+  }
+
   Future<void> toggleConnection() async {
     final haptic = ref.read(hapticServiceProvider.notifier);
     if (state case AsyncError()) {

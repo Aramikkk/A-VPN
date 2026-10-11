@@ -132,6 +132,13 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
     }
 
     if (PlatformUtils.isAndroid) {
+      unawaited(
+        _safeInit(
+          "connect on app start",
+          () => container.read(connectionNotifierProvider.notifier).connectOnAppStart(),
+          timeout: 30000,
+        ),
+      );
       await _safeInit("android display mode", () async {
         await FlutterDisplayMode.setHighRefreshRate();
       });

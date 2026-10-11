@@ -26,14 +26,14 @@ abstract class ConfigOptions {
 
   static final balancerStrategy = PreferencesNotifier.create<BalancerStrategy, String>(
     "balancer-strategy",
-    BalancerStrategy.roundRobin,
+    BalancerStrategy.lowestDelay,
     mapFrom: (value) => BalancerStrategy.values.firstWhere((e) => e.key == value),
     mapTo: (value) => value.key,
   );
 
   static final region = PreferencesNotifier.create<Region, String>(
     "region",
-    Region.other,
+    Region.ru,
     mapFrom: Region.values.byName,
     mapTo: (value) => value.name,
   );
@@ -57,8 +57,9 @@ abstract class ConfigOptions {
 
   static final remoteDnsAddress = PreferencesNotifier.create<String, String>(
     "remote-dns-address",
-    "tcp://8.8.8.8",
+    "https://8.8.8.8/dns-query",
     possibleValues: List.of([
+      "https://8.8.8.8/dns-query",
       "local",
       // "udp://223.5.5.5",
       // "udp://1.1.1.1",
@@ -81,8 +82,9 @@ abstract class ConfigOptions {
 
   static final directDnsAddress = PreferencesNotifier.create<String, String>(
     "direct-dns-address",
-    "udp://1.1.1.1",
+    "udp://77.88.8.8",
     possibleValues: List.of([
+      "udp://77.88.8.8",
       "local",
       "udp://223.5.5.5",
       "udp://1.1.1.1",
@@ -93,7 +95,7 @@ abstract class ConfigOptions {
       "4.4.2.2",
       "8.8.8.8",
     ]),
-    defaultValueFunction: (ref) => ref.read(region) == Region.cn ? "223.5.5.5" : "1.1.1.1",
+    defaultValueFunction: (ref) => ref.read(region) == Region.cn ? "223.5.5.5" : "udp://77.88.8.8",
     validator: (value) => value.isNotBlank,
   );
 
@@ -141,9 +143,19 @@ abstract class ConfigOptions {
 
   static final strictRoute = PreferencesNotifier.create<bool, bool>("strict-route", true);
 
+  /// Keep only European servers in the server list and the auto groups.
+  static final europeOnlyServers = PreferencesNotifier.create<bool, bool>("europe-only-servers", true);
+
+  /// On mobile data use only the provider's mobile-only ("LTE Only") servers, on Wi-Fi only the others.
+  static final serversByNetwork = PreferencesNotifier.create<bool, bool>("servers-by-network", true);
+
+  /// Reach the networks of every WireGuard-only profile through it, alongside the active profile. Off until the
+  /// user turns it on (the home screen's "Server" button) when they need their server.
+  static final homeNetwork = PreferencesNotifier.create<bool, bool>("home-network", false);
+
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
-    "http://captive.apple.com/hotspot-detect.html",
+    "http://www.gstatic.com/generate_204",
     possibleValues: List.of([
       "http://connectivitycheck.gstatic.com/generate_204",
       "http://www.gstatic.com/generate_204",
@@ -166,6 +178,14 @@ abstract class ConfigOptions {
     mapTo: const IntervalInSecondsConverter().toJson,
   );
 
+  /// How long one server's ping may take before it counts as unreachable.
+  static final urlTestTimeout = PreferencesNotifier.create<Duration, int>(
+    "url-test-timeout",
+    const Duration(seconds: 5),
+    mapFrom: const IntervalInSecondsConverter().fromJson,
+    mapTo: const IntervalInSecondsConverter().toJson,
+  );
+
   static final enableClashApi = PreferencesNotifier.create<bool, bool>("enable-clash-api", true);
 
   static final clashApiPort = PreferencesNotifier.create<int, int>(
@@ -180,7 +200,7 @@ abstract class ConfigOptions {
 
   static final lanSharingPassword = PreferencesNotifier.create<String, String>("lan_sharing_password", "");
 
-  static final enableFakeDns = PreferencesNotifier.create<bool, bool>("enable-fake-dns", false);
+  static final enableFakeDns = PreferencesNotifier.create<bool, bool>("enable-fake-dns", true);
 
   // static final enableDnsRouting = PreferencesNotifier.create<bool, bool>("enable-dns-routing", true);
 
@@ -376,6 +396,7 @@ abstract class ConfigOptions {
     "strict-route": strictRoute,
     "connection-test-url": connectionTestUrl,
     "url-test-interval": urlTestInterval,
+    "url-test-timeout": urlTestTimeout,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
     "allow-connection-from-lan": allowConnectionFromLan,
@@ -492,6 +513,7 @@ abstract class ConfigOptions {
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: ref.watch(connectionTestUrl),
       urlTestInterval: ref.watch(urlTestInterval),
+      urlTestTimeout: ref.watch(urlTestTimeout),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),
       enableTun: mode == ServiceMode.tun,

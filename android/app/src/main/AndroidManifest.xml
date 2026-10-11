@@ -28,7 +28,7 @@
         android:name=".Application"
         android:banner="@mipmap/ic_banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="Hiddify"
+        android:label="A-VPN"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
@@ -133,6 +133,18 @@
             <meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
                 android:value="true"/>
         </service>
+        <!-- reconnects the VPN after the phone boots (or the app updates) if it was on before -->
+        <receiver
+            android:name=".bg.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <service
             android:name=".bg.ProxyService"
             android:exported="false"

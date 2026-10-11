@@ -9,6 +9,8 @@ import 'package:hiddify/core/logger/core_logger.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
+import 'package:hiddify/features/proxy/data/home_network.dart';
+import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper_stub.dart'
     if (dart.library.io) 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper.dart';
@@ -161,7 +163,7 @@ class HiddifyCoreService with InfraLogger {
       try {
         final res = await core.bgClient.start(
           StartRequest(
-            configPath: path,
+            configPath: await _filteredConfig(path),
             configName: name,
             // configContent: content,
             disableMemoryLimit: disableMemoryLimit,
@@ -201,6 +203,25 @@ class HiddifyCoreService with InfraLogger {
     });
   }
 
+  /// The config the core starts with: the profile's, or a copy without the servers that don't fit:
+  /// outside Europe, or not made for the network the phone is on.
+  Future<String> _filteredConfig(String path) async {
+    final europeOnly = ref.read(ConfigOptions.europeOnlyServers);
+    final network = ref.read(ConfigOptions.serversByNetwork)
+        ? await ServerRegionFilter.currentNetwork()
+        : NetworkKind.unknown;
+    var filtered = path;
+    if (europeOnly || network != NetworkKind.unknown) {
+      filtered = await ServerRegionFilter.apply(path, europeOnly: europeOnly, network: network);
+    } else {
+      ServerRegionFilter.lastApplied = NetworkKind.unknown;
+    }
+    if (ref.read(ConfigOptions.homeNetwork)) {
+      filtered = await HomeNetwork.attach(filtered, activeConfigPath: path);
+    }
+    return filtered;
+  }
+
   TaskEither<String, Unit> stop() {
     return TaskEither(() async {
       loggy.debug("stopping");
@@ -232,7 +253,7 @@ class HiddifyCoreService with InfraLogger {
       loggy.debug("hot reloading");
       try {
         final res = await core.bgClient.hotReload(
-          StartRequest(configPath: path, configName: name, disableMemoryLimit: disableMemoryLimit),
+          StartRequest(configPath: await _filteredConfig(path), configName: name, disableMemoryLimit: disableMemoryLimit),
         );
         if (res.messageType == MessageType.EMPTY) return right(unit);
         loggy.info("hot reload not applied, restarting: ${res.messageType} ${res.message}");
@@ -249,7 +270,12 @@ class HiddifyCoreService with InfraLogger {
       // if (!await core.restart(path, name)) {
       try {
         final res = await core.bgClient.restart(
-          StartRequest(configPath: path, configName: name, disableMemoryLimit: disableMemoryLimit, delayStart: true),
+          StartRequest(
+            configPath: await _filteredConfig(path),
+            configName: name,
+            disableMemoryLimit: disableMemoryLimit,
+            delayStart: true,
+          ),
         );
         if (res.messageType != MessageType.EMPTY) return left("${res.messageType} ${res.message}");
       } on GrpcError catch (e) {

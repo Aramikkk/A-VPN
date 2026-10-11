@@ -5,6 +5,7 @@ import 'package:hiddify/core/preferences/actions_at_closing.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
 import 'package:hiddify/features/profile/model/profile_sort_enum.dart';
+import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -106,6 +107,17 @@ abstract class Preferences {
   static final autoCheckIp = PreferencesNotifier.create<bool, bool>("auto_check_ip", true);
 
   static final startedByUser = PreferencesNotifier.create<bool, bool>("started_by_user", false);
+
+  /// A-VPN: connect as soon as the app opens (Android; the desktop restores the last session instead).
+  static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", false);
+
+  /// A-VPN: how the server list shows each server's ping.
+  static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
+    "ping_style",
+    PingStyle.numbers,
+    mapFrom: (value) => PingStyle.values.firstWhere((e) => e.name == value, orElse: () => PingStyle.numbers),
+    mapTo: (value) => value.name,
+  );
 
   static final storeReviewedByUser = PreferencesNotifier.create<bool, bool>("store_reviewed_by_user", false);
 

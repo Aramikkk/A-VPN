@@ -5,8 +5,10 @@ import 'package:dartx/dartx.dart';
 import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/db/db.dart';
+import 'package:hiddify/core/http_client/device_headers.dart';
 import 'package:hiddify/core/http_client/dio_http_client.dart';
 import 'package:hiddify/core/model/optional_range.dart';
+import 'package:hiddify/features/profile/data/clash_to_links.dart';
 import 'package:hiddify/features/profile/data/profile_data_mapper.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/model/profile_failure.dart';
@@ -167,7 +169,8 @@ class ProfileParser {
           cancelToken: cancelToken,
           userAgent: _ref.read(ConfigOptions.useXrayCoreWhenPossible)
               ? _httpClient.userAgent.replaceAll("HiddifyNext", "HiddifyNextX")
-              : null,
+              : DeviceHeaders.subscriptionUserAgent,
+          headers: await DeviceHeaders.get(),
         )
         .catchError((err) {
           if (CancelToken.isCancel(err as DioException)) {
@@ -175,6 +178,10 @@ class ProfileParser {
           }
           throw err;
         });
+    // the core can't read the provider's Clash file; hand it the same servers as share links. This has to
+    // happen first: expanding remote lines trims every line, which strips the YAML's indentation.
+    final links = ClashToLinks.convert(await File(tempFilePath).readAsString());
+    if (links != null) await File(tempFilePath).writeAsString(links);
     await expandRemoteLinesInParallel(
       tempFilePath: tempFilePath,
       httpClient: _httpClient,
