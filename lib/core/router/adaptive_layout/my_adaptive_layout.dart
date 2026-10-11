@@ -113,7 +113,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                                     alignment: Alignment.bottomCenter,
                                     // scrolls when the window is too short for the whole panel
                                     child: SingleChildScrollView(
-                                      child: SizedBox(width: 220, child: SideBarStatsOverview()),
+                                      child: SizedBox(width: 248, child: SideBarStatsOverview()),
                                     ),
                                   ),
                                 )

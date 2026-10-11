@@ -40,7 +40,7 @@ class SideBarStatsOverview extends ConsumerWidget {
 
     final vpnTile = _Tile(
       icon: Icons.shield_rounded,
-      title: t.avpn.statsViaVpn,
+      title: large ? t.avpn.statsViaVpn : 'VPN',
       value: vpn == null ? '—' : size(vpn),
       share: share,
       accent: true,
@@ -55,7 +55,7 @@ class SideBarStatsOverview extends ConsumerWidget {
     );
 
     return Padding(
-      padding: EdgeInsets.all(large ? 16 : 12),
+      padding: EdgeInsets.all(large ? 16 : 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -103,7 +103,7 @@ class SideBarStatsOverview extends ConsumerWidget {
           _pair(
             _Tile(
               icon: Icons.data_usage_rounded,
-              title: t.avpn.statsSession,
+              title: large ? t.avpn.statsSession : t.avpn.statsSessionShort,
               value: size(total),
               detail: large
                   ? '↓ ${size(stats.downlinkTotal.toInt())}   ↑ ${size(stats.uplinkTotal.toInt())}'
@@ -112,7 +112,7 @@ class SideBarStatsOverview extends ConsumerWidget {
             ),
             _Tile(
               icon: Icons.lan_rounded,
-              title: t.avpn.statsConnections,
+              title: large ? t.avpn.statsConnections : t.avpn.statsConnectionsShort,
               value: '${stats.connectionsIn}',
               showBar: false,
               compact: !large,
@@ -195,7 +195,9 @@ class _Tile extends StatelessWidget {
                 ),
                 const Gap(8),
               ],
-              Expanded(child: _Caption(title, color: scheme.onSurfaceVariant)),
+              Expanded(
+                child: _Caption(title, color: scheme.onSurfaceVariant, tight: compact),
+              ),
               if (share != null)
                 Text(
                   '${(share! * 100).round()}%',
@@ -234,10 +236,13 @@ class _Tile extends StatelessWidget {
 }
 
 class _Caption extends StatelessWidget {
-  const _Caption(this.text, {required this.color});
+  const _Caption(this.text, {required this.color, this.tight = false});
 
   final String text;
   final Color color;
+
+  /// narrow tiles: less letter spacing, so the caption fits
+  final bool tight;
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +252,7 @@ class _Caption extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: Theme.of(
         context,
-      ).textTheme.labelSmall?.copyWith(letterSpacing: 1.1, fontWeight: FontWeight.w600, color: color),
+      ).textTheme.labelSmall?.copyWith(letterSpacing: tight ? .3 : 1.1, fontWeight: FontWeight.w600, color: color),
     );
   }
 }

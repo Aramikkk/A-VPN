@@ -55,7 +55,9 @@
     "statsLoss": "Loss",
     "statsConnections": "Active connections",
     "statsPingHistory": "Ping to the server, last minute",
-    "statsNoData": "no data"
+    "statsNoData": "no data",
+    "statsSessionShort": "Session",
+    "statsConnectionsShort": "Connections"
   },
   "common": {
     "appTitle": "A-VPN",

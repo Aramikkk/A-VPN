@@ -55,7 +55,9 @@
     "statsLoss": "Потери",
     "statsConnections": "Активные соединения",
     "statsPingHistory": "Пинг до сервера за минуту",
-    "statsNoData": "нет данных"
+    "statsNoData": "нет данных",
+    "statsSessionShort": "Сессия",
+    "statsConnectionsShort": "Соединения"
   },
   "common": {
     "appTitle": "A-VPN",

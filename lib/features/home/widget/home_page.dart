@@ -6,6 +6,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/gen/assets.gen.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class HomePage extends HookConsumerWidget {
@@ -70,8 +71,9 @@ class HomePage extends HookConsumerWidget {
           children: [
             Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 600, // Set the maximum width here
+                constraints: BoxConstraints(
+                  // the phone layout's width on a tablet; a computer window uses the room it has
+                  maxWidth: PlatformUtils.isDesktop ? 1000 : 600,
                 ),
                 child: const AraHomeBody(),
               ),
