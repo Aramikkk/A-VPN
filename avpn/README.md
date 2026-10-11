@@ -24,7 +24,7 @@ Android (`com.aravpn.app`) и Windows 11.
 bash avpn/scripts/release.sh
 ```
 
-Соберёт APK и установщик в `.\A-VPNeleases\<версия>\` и выложит APK на ссылку для телефона. После — коммит и метка `git tag -a v<версия>`.
+Соберёт APK и установщик в `.\A-VPN\releases\<версия>\` и выложит APK на ссылку для телефона. После — коммит и метка `git tag -a v<версия>`.
 
 ## 1. Ядро (нужно только после правок в `hcore-build`)
 
