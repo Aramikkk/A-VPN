@@ -65,7 +65,8 @@
     "autoPauseCount": "Apps chosen: $n",
     "autoPauseSearch": "Search apps",
     "autoPauseShowSystem": "Show system apps",
-    "autoPauseHint": "Turn the VPN off in chosen apps"
+    "autoPauseHint": "Turn the VPN off in chosen apps",
+    "auto": "Auto"
   },
   "common": {
     "appTitle": "A-VPN",

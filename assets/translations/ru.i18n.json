@@ -65,7 +65,8 @@
     "autoPauseCount": "Выбрано приложений: $n",
     "autoPauseSearch": "Поиск приложения",
     "autoPauseShowSystem": "Показывать системные приложения",
-    "autoPauseHint": "Отключать VPN в выбранных приложениях"
+    "autoPauseHint": "Отключать VPN в выбранных приложениях",
+    "auto": "Авто"
   },
   "common": {
     "appTitle": "A-VPN",

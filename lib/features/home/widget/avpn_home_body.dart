@@ -134,6 +134,11 @@ class _ProviderCard extends HookConsumerWidget {
       for (final item in group?.items ?? <OutboundInfo>[])
         if (item.isVisible && item.tag != 'balance') item,
     ];
+    // the server the auto choice uses right now (the core starts on "balance", which picks the same way)
+    final autoGroup = group?.items
+        .where((i) => i.tag == (group.selected == 'balance' ? 'balance' : 'lowest'))
+        .firstOrNull;
+    final autoNow = autoGroup == null ? null : autoPick(autoGroup, group!.items);
     final remote = profile is RemoteProfileEntity ? profile as RemoteProfileEntity : null;
     final sub = remote?.subInfo;
     final updating = remote != null && ref.watch(updateProfileNotifierProvider(profile.id)).isLoading;
@@ -221,6 +226,7 @@ class _ProviderCard extends HookConsumerWidget {
                           servers[i].tag == group?.selected ||
                           (servers[i].tag == 'lowest' && group?.selected == 'balance'),
                       testing: testing,
+                      autoNow: servers[i].tag == 'lowest' ? autoNow : null,
                       onTap: () =>
                           ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", servers[i].tag),
                     ),
@@ -233,9 +239,18 @@ class _ProviderCard extends HookConsumerWidget {
 }
 
 class _ServerTile extends ConsumerWidget {
-  const _ServerTile({required this.server, required this.selected, required this.testing, required this.onTap});
+  const _ServerTile({
+    required this.server,
+    required this.selected,
+    required this.testing,
+    required this.onTap,
+    this.autoNow,
+  });
 
   final OutboundInfo server;
+
+  /// for the auto row: the server it uses right now
+  final OutboundInfo? autoNow;
   final bool selected;
   final bool testing;
   final VoidCallback onTap;
@@ -247,7 +262,10 @@ class _ServerTile extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final name = serverName(server);
     final (title, subtitle) = switch (server.tag) {
-      'lowest' => (t.avpn.autoBest, t.avpn.autoBestHint),
+      'lowest' => (
+        autoNow == null ? t.avpn.autoBest : '${t.avpn.auto}: ${_withFlag(serverName(autoNow!))}',
+        t.avpn.autoBestHint,
+      ),
       _ => (name.title, server.type.toUpperCase()),
     };
 
@@ -567,9 +585,11 @@ class _ConnectionCard extends HookConsumerWidget {
     }, [connected]);
 
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
+    // on auto, the country it uses right now
+    final picked = current != null && current.isGroup ? autoPick(current, group!.items) : null;
     final currentName = switch (current?.tag) {
-      'lowest' => t.avpn.autoBest,
-      'balance' => t.avpn.autoBest,
+      'lowest' ||
+      'balance' => picked == null ? t.avpn.autoBest : '${t.avpn.auto}: ${_withFlag(serverName(picked))}',
       null => null,
       _ => serverName(current!).title,
     };
@@ -714,6 +734,19 @@ class _RoundButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The server an auto group ("lowest", "balance") uses right now, if the core has said.
+OutboundInfo? autoPick(OutboundInfo group, List<OutboundInfo> items) {
+  if (!group.hasGroupSelectedTag() || group.groupSelectedTag.isEmpty) return null;
+  return items.where((i) => i.tag == group.groupSelectedTag).firstOrNull;
+}
+
+/// "🇱🇹 Литва" from "Sigma - Литва": the flag and the country, without the provider's prefix.
+String _withFlag(({String? flag, String title}) name) {
+  final dash = name.title.indexOf(' - ');
+  final country = dash < 0 ? name.title : name.title.substring(dash + 3).trim();
+  return [name.flag, country].whereType<String>().join(' ');
 }
 
 /// The provider calls its regular servers and its profile "Доступ"; A-VPN shows them as Sigma (Sigma Gate).
