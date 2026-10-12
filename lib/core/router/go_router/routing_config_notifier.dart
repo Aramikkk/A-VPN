@@ -31,6 +31,7 @@ import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart
 import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/speed_page.dart';
+import 'package:hiddify/features/stats/widget/topology_page.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -41,6 +42,7 @@ final branchesScope = <String, FocusScopeNode>{
   'home': FocusScopeNode(),
   'speed': FocusScopeNode(),
   'connections': FocusScopeNode(),
+  'topology': FocusScopeNode(),
   'profiles': FocusScopeNode(),
   'settings': FocusScopeNode(),
   'logs': FocusScopeNode(),
@@ -53,12 +55,20 @@ final loadingConfig = RoutingConfig(
 );
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
-    ? ['home', 'speed', 'connections', 'settings'][index]
-    : ['home', 'connections', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
+    ? ['home', 'speed', 'connections', 'topology', 'settings'][index]
+    : ['home', 'connections', 'topology', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
 
 int getIndexOfBranch(bool isMobileBreakpoint, bool showProfilesAction, String name) => isMobileBreakpoint
-    ? ['home', 'speed', 'connections', 'settings'].indexOf(name)
-    : ['home', 'connections', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'].indexOf(name);
+    ? ['home', 'speed', 'connections', 'topology', 'settings'].indexOf(name)
+    : [
+        'home',
+        'connections',
+        'topology',
+        if (showProfilesAction) 'profiles',
+        'settings',
+        'logs',
+        'about',
+      ].indexOf(name);
 
 @Riverpod(keepAlive: true)
 class RoutingConfigNotifier extends _$RoutingConfigNotifier {
@@ -171,6 +181,15 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   name: 'connections',
                   path: '/connections',
                   builder: (_, _) => FocusScope(node: branchesScope['connections'], child: const ConnectionsPage()),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'topology',
+                  path: '/topology',
+                  builder: (_, _) => FocusScope(node: branchesScope['topology'], child: const TopologyPage()),
                 ),
               ],
             ),

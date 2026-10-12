@@ -130,7 +130,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                 ? FocusScope(
                     node: navScopeNode,
                     child: NavigationBar(
-                      selectedIndex: navigationShell.currentIndex <= 3 ? navigationShell.currentIndex : 0,
+                      selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
                       destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
                       onDestinationSelected: (index) => _onTap(context, index),
                     ),
@@ -150,7 +150,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
   List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
     ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
     if (isMobileBreakpoint) ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab),
-    ShellRouteAction(Icons.hub_rounded, t.avpn.connectionsTab),
+    ShellRouteAction(Icons.list_alt_rounded, t.avpn.connectionsTab),
+    ShellRouteAction(Icons.hub_rounded, t.avpn.topologyTab),
     if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
     ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
     if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),

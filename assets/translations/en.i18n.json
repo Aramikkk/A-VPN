@@ -104,7 +104,20 @@
     "connNotConnected": "Connect to the VPN to see which apps connect to which sites, and which way each connection goes",
     "connEmpty": "No connections yet",
     "connClear": "Clear closed",
-    "connRule": "rule"
+    "connRule": "rule",
+    "connFlowCount": "Connections",
+    "connFlowTraffic": "Traffic",
+    "connOther": "Other",
+    "connRuleDefault": "Default",
+    "topologyTab": "Topology",
+    "connOpenOnly": "Open only",
+    "topoApps": "Apps",
+    "topoRules": "Rules",
+    "topoRoute": "Route",
+    "topoServers": "Servers",
+    "connShowSmall": "Show under 1 MB: $n",
+    "connHideSmall": "Hide under 1 MB",
+    "connHideSmallChip": "Hide small (< 1 MB)"
   },
   "common": {
     "appTitle": "A-VPN",

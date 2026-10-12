@@ -14,7 +14,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// went through the VPN and the share that went direct. In the desktop sidebar, and [large] (with the last
 /// minute's speed graph) on the phone's Speed tab.
 class SideBarStatsOverview extends ConsumerWidget {
-  const SideBarStatsOverview({super.key, this.large = false, this.dense = false, this.fill = false});
+  const SideBarStatsOverview({
+    super.key,
+    this.large = false,
+    this.dense = false,
+    this.fill = false,
+    this.split = false,
+  });
 
   final bool large;
 
@@ -25,6 +31,10 @@ class SideBarStatsOverview extends ConsumerWidget {
   /// [dense] stretched to the height it's given (the unfolded home, level with the servers' column): the graph
   /// takes the room left over; no padding of its own
   final bool fill;
+
+  /// [large] in two columns filling the height it's given (the unfolded phone's Statistics tab): the speed block
+  /// on the left with the graph taking the room left over, ping and the tiles on the right
+  final bool split;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -109,7 +119,10 @@ class SideBarStatsOverview extends ConsumerWidget {
           ),
           ...[
             Gap(large && !dense ? 16 : 10),
-            if (fill) Expanded(child: graph) else SizedBox(height: dense ? 92 : (large ? 130 : 64), child: graph),
+            if (fill || split)
+              Expanded(child: graph)
+            else
+              SizedBox(height: dense ? 92 : (large ? 130 : 64), child: graph),
             const Gap(8),
             _GraphSummary(
               history: history,
@@ -124,6 +137,52 @@ class SideBarStatsOverview extends ConsumerWidget {
       ),
     );
 
+    final sessionPair = _pair(
+      _Tile(
+        icon: Icons.data_usage_rounded,
+        title: t.avpn.statsSessionShort,
+        value: size(total),
+        detail: large
+            ? '↓ ${size(session.down)}   ↑ ${size(session.up)}'
+            : '↓ ${size(session.down)}\n↑ ${size(session.up)}',
+        compact: compact,
+      ),
+      _Tile(
+        icon: Icons.lan_rounded,
+        title: t.avpn.statsConnectionsShort,
+        value: '${stats.connectionsIn}',
+        showBar: false,
+        compact: compact,
+      ),
+    );
+
+    if (split) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(flex: 3, child: speedBlock),
+            const Gap(12),
+            Expanded(
+              flex: 2,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _QualityCard(samples: quality),
+                    const Gap(10),
+                    sessionPair,
+                    const Gap(8),
+                    _pair(vpnTile, directTile),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: fill
           ? EdgeInsets.zero
@@ -138,24 +197,7 @@ class SideBarStatsOverview extends ConsumerWidget {
           Gap(large ? 10 : 8),
           _QualityCard(samples: quality, compact: compact),
           const Gap(8),
-          _pair(
-            _Tile(
-              icon: Icons.data_usage_rounded,
-              title: t.avpn.statsSessionShort,
-              value: size(total),
-              detail: large
-                  ? '↓ ${size(session.down)}   ↑ ${size(session.up)}'
-                  : '↓ ${size(session.down)}\n↑ ${size(session.up)}',
-              compact: compact,
-            ),
-            _Tile(
-              icon: Icons.lan_rounded,
-              title: t.avpn.statsConnectionsShort,
-              value: '${stats.connectionsIn}',
-              showBar: false,
-              compact: compact,
-            ),
-          ),
+          sessionPair,
           const Gap(8),
           _pair(vpnTile, directTile),
         ],

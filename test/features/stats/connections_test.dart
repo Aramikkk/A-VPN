@@ -10,6 +10,7 @@ import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/features/stats/widget/topology_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 Map<String, dynamic> _clash(String id, String host, String process, List<String> chains, {int down = 1000}) => {
@@ -25,7 +26,13 @@ Map<String, dynamic> _clash(String id, String host, String process, List<String>
   'download': down,
   'start': '2026-10-12T14:00:00.000+03:00',
   'chains': chains,
-  'rule': 'rule_set=[blocked] => route(select)',
+  'rule': host == 'api.telegram.org'
+      ? 'final'
+      : chains.first == 'direct'
+      ? 'rule_set=[ru-sites] => route(direct)'
+      : chains.first == 'block'
+      ? 'rule_set=[ads] => reject'
+      : 'rule_set=[blocked] => route(select)',
 };
 
 final _sample = [
@@ -138,4 +145,38 @@ void main() {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/connections.png'));
     }
   });
+
+  for (final (name, size) in [('topology_phone', const Size(400, 860)), ('topology_unfolded', const Size(880, 860))]) {
+    testWidgets('the Topology tab renders: $name', (tester) async {
+      await _loadFont('Segoe UI', [r'C:/Windows/Fonts/segoeui.ttf', r'C:/Windows/Fonts/seguisb.ttf']);
+      await _loadFont('MaterialIcons', [
+        r'./tools/flutter/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+      ]);
+      await tester.binding.setSurfaceSize(size);
+      final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
+      final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed');
+      final theme = AppTheme(AppThemeMode.dark, '', accent: accent);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            translationsProvider.overrideWith((ref) async => t),
+            connectionsProvider.overrideWith(_Fake.new),
+            installedAppsProvider.overrideWith((ref) async => const {}),
+          ],
+          child: MaterialApp(
+            theme: theme.darkTheme(null),
+            home: Consumer(
+              builder: (context, ref, _) =>
+                  !ref.watch(translationsProvider).hasValue ? const SizedBox() : const TopologyPage(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CustomPaint), findsWidgets);
+      if (Platform.environment['RENDER'] == '1') {
+        await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/$name.png'));
+      }
+    });
+  }
 }

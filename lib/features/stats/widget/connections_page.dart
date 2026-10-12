@@ -38,10 +38,11 @@ class ConnectionsPage extends HookConsumerWidget {
     final view = useState(_View.apps);
     final filter = useState(_Filter.all);
     final query = useState('');
+    final showSmall = useState(false);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    String appName(String app) => app.isEmpty ? t.avpn.connUnknownApp : (apps[app]?.name ?? _shortApp(app));
+    String appName(String app) => connectionAppName(t, apps, app);
 
     final items = state.items.where((c) {
       if (filter.value == _Filter.vpn && c.route != ConnectionRoute.vpn) return false;
@@ -52,7 +53,10 @@ class ConnectionsPage extends HookConsumerWidget {
           appName(c.app).toLowerCase().contains(q) ||
           c.app.toLowerCase().contains(q);
     }).toList();
-    final groups = groupConnections(items, view.value == _View.apps ? (c) => c.app : (c) => c.host);
+    final allGroups = groupConnections(items, view.value == _View.apps ? (c) => c.app : (c) => c.host);
+    // apps and sites that moved less than a megabyte are left out unless asked for
+    final groups = showSmall.value ? allGroups : allGroups.where((g) => g.total >= smallTraffic).toList();
+    final hidden = allGroups.length - groups.length;
     final all = state.items;
     final open = all.where((c) => c.active).length;
     final viaVpn = all.where((c) => c.route == ConnectionRoute.vpn).length;
@@ -138,7 +142,7 @@ class ConnectionsPage extends HookConsumerWidget {
                         ],
                       ),
                     ),
-                    if (groups.isEmpty)
+                    if (groups.isEmpty && hidden == 0)
                       SliverFillRemaining(
                         hasScrollBody: false,
                         child: _Empty(icon: Icons.hourglass_empty_rounded, text: t.avpn.connEmpty),
@@ -147,15 +151,28 @@ class ConnectionsPage extends HookConsumerWidget {
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         sliver: SliverList.separated(
-                          itemCount: groups.length,
+                          itemCount: groups.length + (hidden > 0 || showSmall.value ? 1 : 0),
                           separatorBuilder: (_, _) => const Gap(8),
-                          itemBuilder: (context, i) => _GroupCard(
-                            key: ValueKey('${view.value}:${groups[i].key}'),
-                            group: groups[i],
-                            byApp: view.value == _View.apps,
-                            appName: appName,
-                            iconOf: (app) => apps[app]?.icon,
-                          ),
+                          itemBuilder: (context, i) => i == groups.length
+                              ? Center(
+                                  child: TextButton.icon(
+                                    icon: Icon(
+                                      showSmall.value ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      showSmall.value ? t.avpn.connHideSmall : t.avpn.connShowSmall(n: hidden),
+                                    ),
+                                    onPressed: () => showSmall.value = !showSmall.value,
+                                  ),
+                                )
+                              : _GroupCard(
+                                  key: ValueKey('${view.value}:${groups[i].key}'),
+                                  group: groups[i],
+                                  byApp: view.value == _View.apps,
+                                  appName: appName,
+                                  iconOf: (app) => apps[app]?.icon,
+                                ),
                         ),
                       ),
                   ],
@@ -165,6 +182,10 @@ class ConnectionsPage extends HookConsumerWidget {
     );
   }
 }
+
+/// The app's name as people know it: its label on the phone, the program's name on a computer.
+String connectionAppName(Translations t, Map<String, ({String name, Uint8List? icon})> apps, String app) =>
+    app.isEmpty ? t.avpn.connUnknownApp : (apps[app]?.name ?? _shortApp(app));
 
 /// "C:\Program Files\Google\Chrome\Application\chrome.exe" → "chrome"; a package keeps its last parts.
 String _shortApp(String app) {
@@ -379,7 +400,7 @@ class _InnerRow extends ConsumerWidget {
     final ports = {for (final c in group.items) '${c.network}:${c.port}'}.take(3).join(', ');
     final rules = {
       for (final c in group.items)
-        if (_ruleText(c.rule) case final r?) r,
+        if (ruleLabel(c.rule) case final r?) r,
     }.take(2).join(', ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
@@ -421,7 +442,7 @@ class _InnerRow extends ConsumerWidget {
 
 /// "rule_set=[blocked ru-blocked] => route(select)" → "blocked, ru-blocked"; "domain_suffix=[.ru] => …" → ".ru";
 /// null for the default route ("final").
-String? _ruleText(String rule) {
+String? ruleLabel(String rule) {
   final match = rule.split('=>').first.trim();
   if (match.isEmpty || match == 'final') return null;
   final values = RegExp(

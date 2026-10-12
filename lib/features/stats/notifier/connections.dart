@@ -222,6 +222,9 @@ class Connections extends Notifier<ConnectionsState> {
   List<SeenConnection> _sorted() => _seen.values.toList()..sort((a, b) => b.start.compareTo(a.start));
 }
 
+/// Apps and sites that moved less than this are hidden by default (1 MB).
+const smallTraffic = 1024 * 1024;
+
 /// Connections added up by a key (an app, or a site).
 class ConnectionGroup {
   ConnectionGroup(this.key);

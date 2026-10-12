@@ -104,7 +104,20 @@
     "connNotConnected": "Подключитесь к VPN — здесь появятся приложения и сайты, к которым они подключаются, и куда идёт каждое соединение",
     "connEmpty": "Пока нет соединений",
     "connClear": "Убрать закрытые",
-    "connRule": "правило"
+    "connRule": "правило",
+    "connFlowCount": "Соединения",
+    "connFlowTraffic": "Трафик",
+    "connOther": "Другие",
+    "connRuleDefault": "По умолчанию",
+    "topologyTab": "Топология",
+    "connOpenOnly": "Только открытые",
+    "topoApps": "Приложения",
+    "topoRules": "Правила",
+    "topoRoute": "Маршрут",
+    "topoServers": "Серверы",
+    "connShowSmall": "Показать меньше 1 МБ: $n",
+    "connHideSmall": "Скрыть меньше 1 МБ",
+    "connHideSmallChip": "Без мелких (< 1 МБ)"
   },
   "common": {
     "appTitle": "A-VPN",

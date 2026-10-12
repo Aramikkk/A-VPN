@@ -13,13 +13,18 @@ class SpeedPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.speedTab)),
       // on a wide window the panel stays a readable width
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: const SideBarStatsOverview(large: true),
-          ),
-        ),
+      // a wide screen (the unfolded phone) shows it all at once in two columns; otherwise one column that scrolls
+      body: LayoutBuilder(
+        builder: (context, constraints) => constraints.maxWidth >= 640 && constraints.maxHeight >= 480
+            ? const SideBarStatsOverview(large: true, split: true)
+            : SingleChildScrollView(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: const SideBarStatsOverview(large: true),
+                  ),
+                ),
+              ),
       ),
     );
   }

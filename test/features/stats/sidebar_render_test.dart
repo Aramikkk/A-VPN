@@ -17,6 +17,7 @@ import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
+import 'package:hiddify/features/stats/widget/speed_page.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -162,6 +163,43 @@ void main() {
           ),
         );
       }
+    }
+  });
+
+  testWidgets('the Statistics tab fits the unfolded phone in two columns', (tester) async {
+    await _loadFont('Segoe UI', [
+      r'C:/Windows/Fonts/segoeui.ttf',
+      r'C:/Windows/Fonts/seguisb.ttf',
+      r'C:/Windows/Fonts/segoeuib.ttf',
+    ]);
+    final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
+    final theme = AppTheme(
+      AppThemeMode.light,
+      '',
+      accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed'),
+    );
+    await tester.binding.setSurfaceSize(const Size(880, 820));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          translationsProvider.overrideWith((ref) async => t),
+          statsNotifierProvider.overrideWith(_Stats.new),
+          connectionQualityProvider.overrideWith(_Quality.new),
+          speedHistoryProvider.overrideWith(_History.new),
+        ],
+        child: MaterialApp(
+          theme: theme.lightTheme(null),
+          home: Consumer(
+            builder: (context, ref, _) =>
+                !ref.watch(translationsProvider).hasValue ? const SizedBox() : const SpeedPage(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Scrollable), findsOneWidget); // only the right column's own scroll, not the page's
+    if (Platform.environment['RENDER'] == '1') {
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/speed_unfolded.png'));
     }
   });
 }
