@@ -208,20 +208,23 @@ class HiddifyCoreService with InfraLogger {
   /// outside Europe, or not made for the network the phone is on.
   Future<String> _filteredConfig(String path) async {
     final europeOnly = ref.read(ConfigOptions.europeOnlyServers);
-    final network = ref.read(ConfigOptions.serversByNetwork)
+    final serversByNetwork = ref.read(ConfigOptions.serversByNetwork);
+    // the phone's network decides the servers and, for "only blocked through the VPN", the rules (Wi-Fi only):
+    // either way the config is made for one network and has to be remade when it changes
+    final current = serversByNetwork || _blockedOnlyFollowsNetwork(ref)
         ? await ServerRegionFilter.currentNetwork()
         : NetworkKind.unknown;
+    final network = serversByNetwork ? current : NetworkKind.unknown;
     var filtered = path;
     if (europeOnly || network != NetworkKind.unknown) {
       filtered = await ServerRegionFilter.apply(path, europeOnly: europeOnly, network: network);
-    } else {
-      ServerRegionFilter.lastApplied = NetworkKind.unknown;
     }
+    ServerRegionFilter.lastApplied = current;
     if (ref.read(ConfigOptions.homeNetwork)) {
       // Server mode decides every connection itself
       filtered = await HomeNetwork.attach(filtered, activeConfigPath: path);
     } else if (ref.read(ConfigOptions.blockedOnlyViaVpn) &&
-        (PlatformUtils.isDesktop || await ServerRegionFilter.currentNetwork() != NetworkKind.mobile)) {
+        (PlatformUtils.isDesktop || current != NetworkKind.mobile)) {
       final testHost = Uri.tryParse(ref.read(ConfigOptions.connectionTestUrl))?.host;
       filtered = await BlockedOnlyRouting.attach(
         filtered,
@@ -615,3 +618,7 @@ class HiddifyCoreService with InfraLogger {
     });
   }
 }
+
+/// "Only blocked through the VPN" on a phone applies on Wi-Fi only, so its rules follow the network.
+bool _blockedOnlyFollowsNetwork(Ref ref) =>
+    !PlatformUtils.isDesktop && ref.read(ConfigOptions.blockedOnlyViaVpn) && !ref.read(ConfigOptions.homeNetwork);

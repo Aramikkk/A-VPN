@@ -24,7 +24,8 @@ class ConnectionQuality extends AutoDisposeNotifier<List<int?>> {
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
     final port = ref.watch(ConfigOptions.mixedPort);
     final url = Uri.parse(ref.watch(ConfigOptions.connectionTestUrl));
-    if (!connected) return const [];
+    // the probes go through A-VPN's own proxy port: without it every probe would look lost
+    if (!connected || !ref.watch(ConfigOptions.enableMixedPort)) return const [];
 
     final client = HttpClient()
       ..connectionTimeout = timeout

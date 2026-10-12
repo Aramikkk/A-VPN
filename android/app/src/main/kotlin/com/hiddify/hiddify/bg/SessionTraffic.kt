@@ -98,5 +98,6 @@ object SessionTraffic {
         return name
     }
 
-    fun profileName(name: String) = name.replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma")
+    fun profileName(name: String) =
+        name.replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma").ifBlank { "A-VPN" }
 }

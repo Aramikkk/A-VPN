@@ -99,7 +99,14 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     // every 15 seconds as a safety net, since the events don't always show the switch to mobile data.
     var switching = false;
     Future<void> refilterIfNetworkChanged() async {
-      if (switching || !ref.read(ConfigOptions.serversByNetwork)) return;
+      // the config follows the network when it picks servers by network, or when "only blocked through the VPN"
+      // (Wi-Fi only on a phone) is on
+      final follows =
+          ref.read(ConfigOptions.serversByNetwork) ||
+          (!PlatformUtils.isDesktop &&
+              ref.read(ConfigOptions.blockedOnlyViaVpn) &&
+              !ref.read(ConfigOptions.homeNetwork));
+      if (switching || !follows) return;
       final network = await ServerRegionFilter.currentNetwork();
       if (network == NetworkKind.unknown || network == ServerRegionFilter.lastApplied) return;
       switching = true;

@@ -18,6 +18,7 @@ class AppTheme {
     onGradient: accent.onGradient(brightness),
     // the ping's colour scale starts at the accent (red, orange… in the red theme)
     fastPing: brightness == Brightness.dark ? accent.darkPrimary : accent.lightPrimary,
+    dark: brightness == Brightness.dark,
     border: accent.pure ? (brightness == Brightness.dark ? Colors.white54 : Colors.black45) : null,
   );
 
