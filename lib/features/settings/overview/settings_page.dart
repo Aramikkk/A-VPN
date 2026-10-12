@@ -3,7 +3,6 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
 import 'package:hiddify/features/settings/notifier/reset_tunnel/reset_tunnel_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -186,7 +185,8 @@ class SettingsPage extends HookConsumerWidget {
                 },
               ),
             ),
-          if (Breakpoint(context).isMobile()) ...[
+          // the logs and About are in the computer's side menu too, but the list is the same as on the phone
+          ...[
             SettingsSection(
               title: t.pages.logs.title,
               icon: Icons.description_rounded,

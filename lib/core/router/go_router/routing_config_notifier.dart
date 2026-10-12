@@ -224,31 +224,37 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 GoRoute(
                   name: 'settings',
                   path: '/settings',
-                  builder: (_, _) => FocusScope(node: branchesScope['settings'], child: SettingsPage()),
+                  builder: (_, _) => FocusScope(node: branchesScope['settings'], child: settingsWidth(SettingsPage())),
                   routes: <GoRoute>[
                     GoRoute(
                       name: 'general',
                       path: 'general',
                       pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const GeneralPage()),
+                          customTransition(TransitionType.slide, state.pageKey, settingsWidth(const GeneralPage())),
                     ),
                     GoRoute(
                       name: 'connectionOptions',
                       path: 'connection-options',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const GeneralPage(connection: true)),
+                      pageBuilder: (_, state) => customTransition(
+                        TransitionType.slide,
+                        state.pageKey,
+                        settingsWidth(const GeneralPage(connection: true)),
+                      ),
                     ),
                     GoRoute(
                       name: 'serversOptions',
                       path: 'servers-options',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const ServersOptionsPage()),
+                      pageBuilder: (_, state) => customTransition(
+                        TransitionType.slide,
+                        state.pageKey,
+                        settingsWidth(const ServersOptionsPage()),
+                      ),
                     ),
                     GoRoute(
                       name: 'themes',
                       path: 'themes',
                       pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const ThemesPage()),
+                          customTransition(TransitionType.slide, state.pageKey, settingsWidth(const ThemesPage())),
                     ),
                     GoRoute(
                       name: 'routingOptions',
@@ -256,7 +262,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       pageBuilder: (_, state) => customTransition(
                         TransitionType.slide,
                         state.pageKey,
-                        RoutingOptionsPage(routeRule: state.uri.queryParameters['routeRule']),
+                        settingsWidth(RoutingOptionsPage(routeRule: state.uri.queryParameters['routeRule'])),
                       ),
                       routes: <GoRoute>[
                         GoRoute(
@@ -267,7 +273,9 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                             return customTransition(
                               TransitionType.slide,
                               state.pageKey,
-                              RulePage(ruleListOrder: orderIdString != 'new' ? int.tryParse(orderIdString) : null),
+                              settingsWidth(
+                                RulePage(ruleListOrder: orderIdString != 'new' ? int.tryParse(orderIdString) : null),
+                              ),
                             );
                           },
                           onExit: (context, state) async {
@@ -292,7 +300,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                                 return customTransition(
                                   TransitionType.slide,
                                   state.pageKey,
-                                  GenericListPage(ruleListOrder: orderId, ruleEnum: ruleEnum),
+                                  settingsWidth(GenericListPage(ruleListOrder: orderId, ruleEnum: ruleEnum)),
                                 );
                               },
                             ),
@@ -302,7 +310,9 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                               pageBuilder: (_, state) => customTransition(
                                 TransitionType.slide,
                                 state.pageKey,
-                                PackageNamesPage(ruleListOrder: int.tryParse(state.pathParameters['orderId']!)),
+                                settingsWidth(
+                                  PackageNamesPage(ruleListOrder: int.tryParse(state.pathParameters['orderId']!)),
+                                ),
                               ),
                             ),
                           ],
@@ -311,7 +321,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                           name: 'appList',
                           path: 'app-list',
                           pageBuilder: (_, state) =>
-                              customTransition(TransitionType.slide, state.pageKey, const AppListPage()),
+                              customTransition(TransitionType.slide, state.pageKey, settingsWidth(const AppListPage())),
                         ),
                       ],
                     ),
@@ -319,38 +329,44 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       name: 'dnsOptions',
                       path: 'dns-options',
                       pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const DnsOptionsPage()),
+                          customTransition(TransitionType.slide, state.pageKey, settingsWidth(const DnsOptionsPage())),
                     ),
                     GoRoute(
                       name: 'inboundOptions',
                       path: 'inbound-options',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const InboundOptionsPage()),
+                      pageBuilder: (_, state) => customTransition(
+                        TransitionType.slide,
+                        state.pageKey,
+                        settingsWidth(const InboundOptionsPage()),
+                      ),
                     ),
                     GoRoute(
                       name: 'tlsTricks',
                       path: 'tls-tricks',
                       pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const TlsTricksPage()),
+                          customTransition(TransitionType.slide, state.pageKey, settingsWidth(const TlsTricksPage())),
                     ),
                     GoRoute(
                       name: 'chainOptions',
                       path: 'chain-options',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const ChainOptionsPage()),
+                      pageBuilder: (_, state) => customTransition(
+                        TransitionType.slide,
+                        state.pageKey,
+                        settingsWidth(const ChainOptionsPage()),
+                      ),
                     ),
                     if (isMobileBreakpoint) ...[
                       GoRoute(
                         name: 'logs',
                         path: 'logs',
                         pageBuilder: (_, state) =>
-                            customTransition(TransitionType.slide, state.pageKey, const LogsPage()),
+                            customTransition(TransitionType.slide, state.pageKey, settingsWidth(const LogsPage())),
                       ),
                       GoRoute(
                         name: 'about',
                         path: 'about',
                         pageBuilder: (_, state) =>
-                            customTransition(TransitionType.slide, state.pageKey, const AboutPage()),
+                            customTransition(TransitionType.slide, state.pageKey, settingsWidth(const AboutPage())),
                       ),
                     ],
                   ],
@@ -384,3 +400,16 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
     );
   }
 }
+
+/// The settings in a column the width of a phone or tablet in the middle of a computer's window, as on the
+/// phone, rather than stretched across it.
+Widget settingsWidth(Widget page) => !PlatformUtils.isDesktop
+    ? page
+    : Builder(
+        builder: (context) => ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Center(
+            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: page),
+          ),
+        ),
+      );
