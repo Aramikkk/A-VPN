@@ -21,15 +21,21 @@ class ThemesPage extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         children: const [
           SettingsBlock(children: [StylePicker(), ThemeModePrefTile(), AccentPicker()]),
+          SizedBox(height: 12),
+          // the true-black themes on their own: plain OLED and the neon ones
+          SettingsBlock(children: [AccentPicker(oled: true)]),
         ],
       ),
     );
   }
 }
 
-/// The colour themes as gradient swatches, the chosen one ringed.
+/// The colour themes as gradient swatches, the chosen one ringed: the coloured ones, or ([oled]) the true-black
+/// ones (OLED and the neon themes).
 class AccentPicker extends ConsumerWidget {
-  const AccentPicker({super.key});
+  const AccentPicker({super.key, this.oled = false});
+
+  final bool oled;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,57 +60,79 @@ class AccentPicker extends ConsumerWidget {
       AraAccent.pastel => t.avpn.accentPastel,
       AraAccent.cyber => t.avpn.accentCyber,
       AraAccent.oled => t.avpn.accentOled,
+      AraAccent.neonYellow => t.avpn.accentNeonYellow,
+      AraAccent.neonRed => t.avpn.accentNeonRed,
+      AraAccent.neonBlue => t.avpn.accentNeonBlue,
+      AraAccent.neonGreen => t.avpn.accentNeonGreen,
     };
     return ListTile(
-      leading: const Icon(Icons.palette_rounded),
-      title: Text(t.avpn.accentTheme),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 4),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 10,
-          children: [
-            for (final accent in AraAccent.values)
-              Tooltip(
-                message: name(accent),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => ref.read(Preferences.araAccent.notifier).update(accent),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 56,
-                        height: 36,
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: accent == selected ? Theme.of(context).colorScheme.onSurface : Colors.transparent,
-                            width: 2,
+      leading: Icon(oled ? Icons.contrast_rounded : Icons.palette_rounded),
+      title: Text(oled ? t.avpn.accentOledGroup : t.avpn.accentTheme),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (oled) Text(t.avpn.accentOledGroupMsg),
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              children: [
+                for (final accent in AraAccent.values.where((a) => a.pure == oled))
+                  Tooltip(
+                    message: name(accent),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => ref.read(Preferences.araAccent.notifier).update(accent),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 56,
+                            height: 36,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: accent == selected
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: accent.gradient(brightness),
+                                borderRadius: BorderRadius.circular(10),
+                                // the OLED swatch is the background's own colour: outline it
+                                border: accent.pure ? Border.all(color: Theme.of(context).colorScheme.outline) : null,
+                              ),
+                              child: accent == selected
+                                  ? Icon(Icons.check_rounded, color: accent.onGradient(brightness), size: 18)
+                                  // the Mono themes' blocks are all graphite: a dot shows their colour
+                                  : accent.icon != null
+                                  ? Center(
+                                      child: CircleAvatar(
+                                        radius: 7,
+                                        backgroundColor: brightness == Brightness.dark
+                                            ? accent.darkPrimary
+                                            : accent.lightPrimary,
+                                      ),
+                                    )
+                                  : const SizedBox.expand(),
+                            ),
                           ),
-                        ),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: accent.gradient(brightness),
-                            borderRadius: BorderRadius.circular(10),
-                            // the OLED swatch is the background's own colour: outline it
-                            border: accent.pure ? Border.all(color: Theme.of(context).colorScheme.outline) : null,
-                          ),
-                          child: accent == selected
-                              ? Icon(Icons.check_rounded, color: accent.onGradient(brightness), size: 18)
-                              : const SizedBox.expand(),
-                        ),
+                          const SizedBox(height: 4),
+                          Text(name(accent), style: Theme.of(context).textTheme.labelSmall),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(name(accent), style: Theme.of(context).textTheme.labelSmall),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -162,7 +190,7 @@ class StylePicker extends ConsumerWidget {
                       Text(names(style).$1, style: theme.textTheme.titleSmall),
                       Text(
                         names(style).$2,
-                        maxLines: 2,
+                        maxLines: 3,
                         style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                       ),
                     ],

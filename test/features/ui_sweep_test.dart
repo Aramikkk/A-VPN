@@ -248,7 +248,9 @@ void main() {
             (const Size(760, 1000), 'pc'),
           ]) {
             for (final dark in [true, false]) {
-              for (final accent in [AraAccent.oled, AraAccent.monoRed]) {
+              // ACCENTS=oledYellow,oledRed picks the themes (and names the pictures after them)
+              final picked = Platform.environment['ACCENTS']?.split(',').map(AraAccent.values.byName).toList();
+              for (final accent in picked ?? [AraAccent.oled, AraAccent.monoRed, AraAccent.neonYellow]) {
                 where = '${screen.name} ${style.name} ${accent.name} ${dark ? 'night' : 'day'} $sizeName';
                 SharedPreferences.setMockInitialValues({'ara_style': style.name});
                 final prefs = await tester.runAsync(SharedPreferences.getInstance);
@@ -306,11 +308,13 @@ void main() {
                     }
                   }
                 }
-                if (Platform.environment['RENDER'] == '1' && accent == AraAccent.oled && sizeName != 'small') {
+                if (Platform.environment['RENDER'] == '1' &&
+                    (picked != null || accent == AraAccent.oled) &&
+                    sizeName != 'small') {
                   await expectLater(
                     find.byType(Router<Object>),
                     matchesGoldenFile(
-                      'goldens/sweep/${screen.name}_${style.name}_${dark ? 'night' : 'day'}_$sizeName.png',
+                      'goldens/sweep/${screen.name}_${style.name}${picked == null ? '' : '_${accent.name}'}_${dark ? 'night' : 'day'}_$sizeName.png',
                     ),
                   );
                 }

@@ -185,7 +185,13 @@
     "topoToDirect": "напрямую",
     "topoToBlock": "заблокировано",
     "topoUncounted": "Ещё $amount не попало в список: соединения короче 2 секунд и то, что было, пока приложение было закрыто. Всего за сессию: VPN $vpn, напрямую $direct",
-    "connOpenOf": "открыто $open из $n"
+    "connOpenOf": "открыто $open из $n",
+    "accentNeonYellow": "Неон жёлтый",
+    "accentNeonRed": "Неон красный",
+    "accentNeonBlue": "Неон синий",
+    "accentNeonGreen": "Неон зелёный",
+    "accentOledGroup": "OLED — чистый чёрный",
+    "accentOledGroupMsg": "Пиксели ночью выключены: обычный OLED и неоновые темы с заливкой"
   },
   "common": {
     "appTitle": "A-VPN",

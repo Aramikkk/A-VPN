@@ -185,7 +185,13 @@
     "topoToDirect": "direct",
     "topoToBlock": "blocked",
     "topoUncounted": "Another $amount isn't in the list: connections shorter than 2 seconds and those while the app was closed. The session in all: VPN $vpn, direct $direct",
-    "connOpenOf": "$open of $n open"
+    "connOpenOf": "$open of $n open",
+    "accentNeonYellow": "Neon yellow",
+    "accentNeonRed": "Neon red",
+    "accentNeonBlue": "Neon blue",
+    "accentNeonGreen": "Neon green",
+    "accentOledGroup": "OLED — true black",
+    "accentOledGroupMsg": "Pixels off at night: plain OLED and the neon themes"
   },
   "common": {
     "appTitle": "A-VPN",

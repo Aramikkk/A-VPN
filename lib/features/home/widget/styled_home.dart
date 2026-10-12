@@ -402,6 +402,7 @@ class _GraphiteRow extends StatelessWidget {
     required this.testing,
     required this.first,
     required this.onTap,
+    this.flooded = false,
   });
 
   final String? flag;
@@ -414,21 +415,58 @@ class _GraphiteRow extends StatelessWidget {
   final bool first;
   final VoidCallback onTap;
 
+  /// already drawn inside the neon theme override
+  final bool flooded;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
+    final fill = theme.araLook.neonFill;
+    if (selected && fill != null && !flooded) {
+      // the neon themes: the chosen row is the neon itself, everything on it black
+      return Theme(
+        data: theme.copyWith(
+          textTheme: theme.textTheme.apply(bodyColor: Colors.black, displayColor: Colors.black),
+          colorScheme: scheme.copyWith(
+            primary: Colors.black,
+            onSurface: Colors.black,
+            // opaque, so a flag in the text keeps its colours
+            onSurfaceVariant: Color.alphaBlend(Colors.black.withValues(alpha: .62), fill),
+            surfaceContainerHigh: fill,
+            surfaceContainerHighest: Colors.black.withValues(alpha: .12),
+          ),
+          extensions: [AraLook(fastPing: Colors.black, pingOn: fill, style: theme.araLook.style, neonFill: fill)],
+        ),
+        child: _GraphiteRow(
+          flag: flag,
+          group: group,
+          title: title,
+          subtitle: subtitle,
+          delay: delay,
+          selected: selected,
+          testing: testing,
+          first: first,
+          onTap: onTap,
+          flooded: true,
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
         // the chosen one: a tint of the accent and an accent outline
-        color: selected
+        color: flooded
+            ? scheme.surfaceContainerHigh
+            : selected
             ? Color.alphaBlend(scheme.primary.withValues(alpha: dark ? .1 : .07), scheme.surfaceContainerHigh)
             : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: selected ? BorderSide(color: scheme.primary.withValues(alpha: .65), width: 1.5) : BorderSide.none,
+          side: selected && !flooded
+              ? BorderSide(color: scheme.primary.withValues(alpha: .65), width: 1.5)
+              : BorderSide.none,
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -733,12 +771,16 @@ class _Orb extends HookWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    center: const Alignment(0, -.25),
-                    colors: dark
-                        ? const [Color(0xFF2C2C32), Color(0xFF121215)]
-                        : const [Colors.white, Color(0xFFE9E9EE)],
-                  ),
+                  // the neon themes: switched on, the button is the neon itself
+                  color: on ? theme.araLook.neonFill : null,
+                  gradient: on && theme.araLook.neonFill != null
+                      ? null
+                      : RadialGradient(
+                          center: const Alignment(0, -.25),
+                          colors: dark
+                              ? const [Color(0xFF2C2C32), Color(0xFF121215)]
+                              : const [Colors.white, Color(0xFFE9E9EE)],
+                        ),
                   boxShadow: on
                       ? [BoxShadow(color: scheme.primary.withValues(alpha: dark ? .45 : .3), blurRadius: 28)]
                       : null,
@@ -749,7 +791,9 @@ class _Orb extends HookWidget {
                     child: Icon(
                       Icons.power_settings_new_rounded,
                       size: 30,
-                      color: on ? (dark ? Colors.white : scheme.primary) : scheme.onSurfaceVariant,
+                      color: on
+                          ? (theme.araLook.neonFill != null ? Colors.black : (dark ? Colors.white : scheme.primary))
+                          : scheme.onSurfaceVariant,
                     ),
                   ),
                 ),

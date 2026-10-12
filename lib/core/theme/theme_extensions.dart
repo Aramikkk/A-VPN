@@ -44,7 +44,11 @@ class AraLook extends ThemeExtension<AraLook> {
     this.style = AraStyle.classic,
     this.iconGradient,
     this.pingOn,
+    this.neonFill,
   });
+
+  /// the neon the chosen server and the connect button are filled with (black text on it); null: not filled
+  final Color? neonFill;
 
   /// a neon gradient the icons are painted in (Cyberpunk); null: plain icons
   final Gradient? iconGradient;
@@ -141,6 +145,7 @@ class AraLook extends ThemeExtension<AraLook> {
     style: style,
     iconGradient: iconGradient,
     pingOn: pingOn,
+    neonFill: neonFill,
   );
 
   @override
@@ -158,6 +163,7 @@ class AraLook extends ThemeExtension<AraLook> {
       style: t < .5 ? style : other.style,
       iconGradient: Gradient.lerp(iconGradient, other.iconGradient, t),
       pingOn: Color.lerp(pingOn, other.pingOn, t),
+      neonFill: Color.lerp(neonFill, other.neonFill, t),
     );
   }
 }

@@ -448,6 +448,8 @@ class AppTheme {
         ? (dark
               ? const [Color(0xFF101018), Color(0xFF0A0A0F), Color(0xFF140A12)]
               : const [Color(0xFFFFFFFF), Color(0xFFFCFCFE), Color(0xFFF5F5FA)])
+        : accent.filled && !cyber && !editorial
+        ? [accent.darkPrimary, accent.darkPrimary]
         : accent.pure
         ? [p.card, p.card]
         : dark
@@ -457,7 +459,12 @@ class AppTheme {
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
     final Color down;
     final Color up;
-    if (cyber) {
+    final filled = accent.filled && !cyber && !editorial;
+    if (filled) {
+      // on the neon block: black lines, upload a lighter shade of it
+      down = Colors.black;
+      up = Color.alphaBlend(Colors.black.withValues(alpha: .55), block);
+    } else if (cyber) {
       // neon: orange down and cyan up, on black by night and white by day
       down = primary;
       up = dark ? const Color(0xFF00F0FF) : const Color(0xFF0099A8);
@@ -474,12 +481,13 @@ class AppTheme {
     }
     return AraLook(
       gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: blockColours),
-      onGradient: p.fg,
+      onGradient: filled ? Colors.black : p.fg,
       fastPing: primary,
+      neonFill: filled ? accent.darkPrimary : null,
       dark: dark,
       border: editorial ? p.strongLine : (cyber ? primary.withValues(alpha: .55) : p.line),
-      graphDown: AraLook.readableOn(down, block),
-      graphUp: AraLook.readableOn(up, block),
+      graphDown: filled ? down : AraLook.readableOn(down, block),
+      graphUp: filled ? up : AraLook.readableOn(up, block),
       style: style,
       pingOn: p.card,
       // Cyberpunk's icons in neon: hot pink through orange to yellow (by day to cyan, to read on white)

@@ -171,6 +171,62 @@ enum AraAccent {
     darkGradient: [Color(0xFF000000), Color(0xFF060606), Color(0xFF111111)],
     lightOnGradient: Color(0xFF000000),
     pure: true,
+  ),
+
+  /// OLED flooded with neon yellow: the chosen server, the connect button and the speed block filled with
+  /// it, black text on top (the Cyberpunk 2077 poster).
+  neonYellow(
+    seed: Color(0xFFFCEE0A),
+    lightPrimary: Color(0xFF8F8200),
+    darkPrimary: Color(0xFFFCEE0A),
+    lightGradient: [Color(0xFFFCEE0A), Color(0xFFFCEE0A), Color(0xFFFCEE0A)],
+    darkGradient: [Color(0xFFFCEE0A), Color(0xFFFCEE0A), Color(0xFFFCEE0A)],
+    lightOnGradient: Color(0xFF000000),
+    darkOnGradient: Color(0xFF000000),
+    pure: true,
+    filled: true,
+  ),
+
+  /// OLED flooded with neon red: the chosen server, the connect button and the speed block filled with
+  /// it, black text on top (the Cyberpunk 2077 poster).
+  neonRed(
+    seed: Color(0xFFFF1A4B),
+    lightPrimary: Color(0xFFE0002E),
+    darkPrimary: Color(0xFFFF1A4B),
+    lightGradient: [Color(0xFFFF1A4B), Color(0xFFFF1A4B), Color(0xFFFF1A4B)],
+    darkGradient: [Color(0xFFFF1A4B), Color(0xFFFF1A4B), Color(0xFFFF1A4B)],
+    lightOnGradient: Color(0xFF000000),
+    darkOnGradient: Color(0xFF000000),
+    pure: true,
+    filled: true,
+  ),
+
+  /// OLED flooded with neon blue: the chosen server, the connect button and the speed block filled with
+  /// it, black text on top (the Cyberpunk 2077 poster).
+  neonBlue(
+    seed: Color(0xFF00B4FF),
+    lightPrimary: Color(0xFF0062E0),
+    darkPrimary: Color(0xFF00B4FF),
+    lightGradient: [Color(0xFF00B4FF), Color(0xFF00B4FF), Color(0xFF00B4FF)],
+    darkGradient: [Color(0xFF00B4FF), Color(0xFF00B4FF), Color(0xFF00B4FF)],
+    lightOnGradient: Color(0xFF000000),
+    darkOnGradient: Color(0xFF000000),
+    pure: true,
+    filled: true,
+  ),
+
+  /// OLED flooded with neon green: the chosen server, the connect button and the speed block filled with
+  /// it, black text on top (the Cyberpunk 2077 poster).
+  neonGreen(
+    seed: Color(0xFF39FF14),
+    lightPrimary: Color(0xFF128A00),
+    darkPrimary: Color(0xFF39FF14),
+    lightGradient: [Color(0xFF39FF14), Color(0xFF39FF14), Color(0xFF39FF14)],
+    darkGradient: [Color(0xFF39FF14), Color(0xFF39FF14), Color(0xFF39FF14)],
+    lightOnGradient: Color(0xFF000000),
+    darkOnGradient: Color(0xFF000000),
+    pure: true,
+    filled: true,
   );
 
   const AraAccent({
@@ -182,6 +238,7 @@ enum AraAccent {
     this.lightOnGradient = Colors.white,
     this.darkOnGradient = Colors.white,
     this.pure = false,
+    this.filled = false,
     this.icon,
   });
 
@@ -195,6 +252,9 @@ enum AraAccent {
 
   /// pure black / pure white backgrounds and outlined blocks (the OLED theme)
   final bool pure;
+
+  /// the neon floods the chosen server, the connect button and the speed block (with black text on it)
+  final bool filled;
 
   /// the home-screen icon in this colour (Android): one of the launcher aliases; other themes keep the red one
   final String? icon;
