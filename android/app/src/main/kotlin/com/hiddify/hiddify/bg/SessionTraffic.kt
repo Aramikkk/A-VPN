@@ -86,7 +86,9 @@ object SessionTraffic {
     fun serverLine(currentOutbound: String): String {
         val parts = currentOutbound.split("→")
         val auto = parts.size > 1 && parts[0].trim() in setOf("lowest", "balance")
-        var name = parts.last().replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma").trim()
+        // without the core's "§ 15" numbering
+        var name = parts.last().replace("§hide§", "").replace(Regex("\s*§\s*\d+\s*$"), "")
+            .replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma").trim()
         if (auto) {
             // the flag and the country, without the provider's prefix
             val flag = Regex("^\\S+\\s").find(name)?.value?.takeIf { it.codePoints().anyMatch { c -> c in 0x1F1E6..0x1F1FF } } ?: ""

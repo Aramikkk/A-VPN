@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/router/adaptive_layout/branch_swiper.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
@@ -129,12 +130,16 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
         return null;
       },
       routes: <RouteBase>[
-        StatefulShellRoute.indexedStack(
+        StatefulShellRoute(
           builder: (_, _, navigationShell) => MyAdaptiveLayout(
             navigationShell: navigationShell,
             isMobileBreakpoint: isMobileBreakpoint,
             showProfilesAction: showProfilesAction,
           ),
+          // the phone's tabs slide and follow a swipe; the desktop just switches
+          navigatorContainerBuilder: (context, navigationShell, children) => isMobileBreakpoint
+              ? BranchSwiper(navigationShell: navigationShell, children: children)
+              : IndexedStack(index: navigationShell.currentIndex, children: children),
           branches: <StatefulShellBranch>[
             StatefulShellBranch(
               routes: <GoRoute>[
@@ -226,6 +231,18 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       path: 'general',
                       pageBuilder: (_, state) =>
                           customTransition(TransitionType.slide, state.pageKey, const GeneralPage()),
+                    ),
+                    GoRoute(
+                      name: 'connectionOptions',
+                      path: 'connection-options',
+                      pageBuilder: (_, state) =>
+                          customTransition(TransitionType.slide, state.pageKey, const GeneralPage(connection: true)),
+                    ),
+                    GoRoute(
+                      name: 'serversOptions',
+                      path: 'servers-options',
+                      pageBuilder: (_, state) =>
+                          customTransition(TransitionType.slide, state.pageKey, const ServersOptionsPage()),
                     ),
                     GoRoute(
                       name: 'themes',

@@ -394,12 +394,21 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? (editorial ? primary : Colors.white) : p.muted,
+          (s) => s.contains(WidgetState.selected)
+              ? (editorial ? (AraLook.contrast(primary, p.fg) >= 2.6 ? primary : p.bg) : onPrimary)
+              : p.muted,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected) ? (editorial ? p.fg : primary) : p.highest,
         ),
-        trackOutlineColor: WidgetStatePropertyAll(editorial ? p.strongLine : Colors.transparent),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (s) => editorial ? p.strongLine : (s.contains(WidgetState.selected) ? primary : p.line),
+        ),
+        thumbIcon: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? Icon(Icons.check_rounded, size: 16, color: editorial ? p.fg : primary)
+              : null,
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 14)),

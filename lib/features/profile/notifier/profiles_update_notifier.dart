@@ -85,8 +85,14 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
           )
           .first;
 
+      // the app's own choice (Settings → Launch and connection) over the subscription's
+      final hours = ref.read(Preferences.subUpdateHours);
       final toUpdate = remoteProfiles.where((profile) {
-        final updateInterval = profile.options?.updateInterval;
+        final updateInterval = switch (hours) {
+          0 => profile.options?.updateInterval,
+          < 0 => null,
+          _ => Duration(hours: hours),
+        };
         final shouldUpdate =
             force || updateInterval != null && updateInterval <= DateTime.now().difference(profile.lastUpdate);
         if (!shouldUpdate) {

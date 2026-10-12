@@ -498,14 +498,6 @@ class _PinnedOptions extends ConsumerWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _MenuOption(
-          title: routing.balancerStrategy.title,
-          selected: ref.watch(ConfigOptions.balancerStrategy),
-          choices: BalancerStrategy.values,
-          present: (value) => value.present(t),
-          onSelected: ref.read(ConfigOptions.balancerStrategy.notifier).update,
-        ),
-        divider,
         SwitchListTile.adaptive(
           title: Text(routing.blockedOnly),
           subtitle: Text(routing.blockedOnlyHint),
@@ -515,20 +507,6 @@ class _PinnedOptions extends ConsumerWidget {
             // the rules are in the start config: reconnect so they apply now
             await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
           },
-        ),
-        divider,
-        SwitchListTile.adaptive(
-          title: Text(routing.europeOnlyServers),
-          subtitle: Text(routing.europeOnlyServersHint),
-          value: ref.watch(ConfigOptions.europeOnlyServers),
-          onChanged: ref.read(ConfigOptions.europeOnlyServers.notifier).update,
-        ),
-        divider,
-        SwitchListTile.adaptive(
-          title: Text(routing.serversByNetwork),
-          subtitle: Text(routing.serversByNetworkHint),
-          value: ref.watch(ConfigOptions.serversByNetwork),
-          onChanged: ref.read(ConfigOptions.serversByNetwork.notifier).update,
         ),
         divider,
         SwitchListTile.adaptive(
@@ -608,6 +586,46 @@ class _MenuOption<T> extends HookWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Settings → Servers: how the server is chosen and which ones are shown.
+class ServersOptionsPage extends ConsumerWidget {
+  const ServersOptionsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final routing = t.pages.settings.routing;
+    const divider = Divider(height: 1, indent: 16, endIndent: 16);
+    return Scaffold(
+      appBar: AppBar(title: Text(t.avpn.settingsServers)),
+      body: ListView(
+        children: [
+          _MenuOption(
+            title: routing.balancerStrategy.title,
+            selected: ref.watch(ConfigOptions.balancerStrategy),
+            choices: BalancerStrategy.values,
+            present: (value) => value.present(t),
+            onSelected: ref.read(ConfigOptions.balancerStrategy.notifier).update,
+          ),
+          divider,
+          SwitchListTile.adaptive(
+            title: Text(routing.europeOnlyServers),
+            subtitle: Text(routing.europeOnlyServersHint),
+            value: ref.watch(ConfigOptions.europeOnlyServers),
+            onChanged: ref.read(ConfigOptions.europeOnlyServers.notifier).update,
+          ),
+          divider,
+          SwitchListTile.adaptive(
+            title: Text(routing.serversByNetwork),
+            subtitle: Text(routing.serversByNetworkHint),
+            value: ref.watch(ConfigOptions.serversByNetwork),
+            onChanged: ref.read(ConfigOptions.serversByNetwork.notifier).update,
+          ),
+        ],
       ),
     );
   }

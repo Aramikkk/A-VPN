@@ -113,6 +113,17 @@ abstract class Preferences {
   /// A-VPN: connect as soon as the app opens (Android; the desktop restores the last session instead).
   static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", false);
 
+  /// A-VPN (Android): turn the VPN on in the background when the phone starts, even if it was off before
+  static final connectOnBoot = PreferencesNotifier.create<bool, bool>("connect_on_boot", false);
+
+  /// A-VPN: ping the servers when the app opens, if the last such ping was half an hour ago or more
+  static final autoPingOnOpen = PreferencesNotifier.create<bool, bool>("auto_ping_on_open", true);
+  static final lastAutoPing = PreferencesNotifier.create<int, int>("last_auto_ping", 0);
+
+  /// A-VPN: how often the subscription (the server list) updates, in hours; 0: as the subscription says,
+  /// -1: never
+  static final subUpdateHours = PreferencesNotifier.create<int, int>("sub_update_hours", 0);
+
   /// A-VPN auto-pause (Android): the VPN steps aside while one of [autoPauseApps] is on screen. Read by the
   /// VPN service itself (SettingsKey.AUTO_PAUSE_*), so the list is one ";"-separated string.
   static final autoPauseEnabled = PreferencesNotifier.create<bool, bool>("auto_pause_enabled", false);

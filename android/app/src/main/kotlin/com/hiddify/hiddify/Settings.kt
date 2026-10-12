@@ -98,6 +98,10 @@ object Settings {
         get() = preferences.getString(SettingsKey.AUTO_PAUSE_APPS, "")!!
             .split(";").filter { it.isNotBlank() }.toSet()
 
+    /** The app's "turn the VPN on when the phone starts" switch. */
+    val connectOnBoot: Boolean
+        get() = preferences.getBoolean(SettingsKey.CONNECT_ON_BOOT, false)
+
     var startedByUser: Boolean
         get() = preferences.getBoolean(SettingsKey.STARTED_BY_USER, false)
         set(value) = preferences.edit().putBoolean(SettingsKey.STARTED_BY_USER, value).apply()

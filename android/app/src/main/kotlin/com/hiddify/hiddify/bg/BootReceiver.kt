@@ -15,15 +15,15 @@ import kotlinx.coroutines.withContext
 class BootReceiver : BroadcastReceiver() {
     @OptIn(DelicateCoroutinesApi::class)
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED,
-            "android.intent.action.QUICKBOOT_POWERON", "com.htc.intent.action.QUICKBOOT_POWERON" -> {
-            }
-
+        val boot = when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            "android.intent.action.QUICKBOOT_POWERON", "com.htc.intent.action.QUICKBOOT_POWERON" -> true
+            Intent.ACTION_MY_PACKAGE_REPLACED -> false
             else -> return
         }
         GlobalScope.launch(Dispatchers.IO) {
-            if (Settings.startedByUser) {
+            // after an update: only if it was on; at boot also when "turn on when the phone starts" is set
+            if (Settings.startedByUser || (boot && Settings.connectOnBoot)) {
                 withContext(Dispatchers.Main) {
                     Settings.startCoreAfterStartingService=true //H
                     BoxService.start()

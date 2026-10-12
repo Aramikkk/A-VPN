@@ -26,8 +26,10 @@ import 'package:hiddify/features/log/data/log_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
+import 'package:hiddify/features/proxy/notifier/auto_ping.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
@@ -157,6 +159,10 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   // the Connections tab's list fills from the start, not from when the tab is first opened
   await _safeInit("connections", () async => container.read(connectionsProvider));
+  // the traffic history for the Statistics tab's periods counts from the start too
+  await _safeInit("traffic history", () async => container.read(trafficHistoryProvider));
+  // fresh pings when the app opens (Settings → Launch and connection)
+  await _safeInit("auto ping", () async => container.read(autoPingProvider));
 
   Logger.bootstrap.info("bootstrap took [${stopWatch.elapsedMilliseconds}ms]");
   stopWatch.stop();

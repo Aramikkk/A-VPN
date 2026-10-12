@@ -7,6 +7,7 @@ import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
+import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -56,7 +57,23 @@ class SideBarStatsOverview extends ConsumerWidget {
     final direct = vpn == null ? null : (total - vpn).clamp(0, total);
     final share = vpn == null || total == 0 ? null : (vpn / total).clamp(0.0, 1.0);
     final onSpeed = gradient != null ? theme.araLook.onGradient : scheme.onPrimaryContainer;
-    final history = ref.watch(speedHistoryProvider);
+    final minute = ref.watch(speedHistoryProvider);
+    // the Statistics tab picks the period; the sidebar always shows the last minute
+    final range = large ? ref.watch(statsRangeProvider) : StatsRange.minute;
+    ref.watch(trafficHistoryProvider);
+    final series = range == StatsRange.minute ? null : ref.read(trafficHistoryProvider.notifier).series(range);
+    final history = series?.points ?? minute;
+    final slots = series?.slots ?? SpeedHistory.length;
+    String two(int n) => n.toString().padLeft(2, '0');
+    final since = ref.read(trafficHistoryProvider.notifier).since;
+    final sinceLabel = since == null ? '' : '${two(since.day)}.${two(since.month)}';
+    final ticks = switch (range) {
+      StatsRange.minute => [t.avpn.graphStart, '−45', '−30', '−15', t.avpn.graphNow],
+      StatsRange.tenMinutes => [t.avpn.graphTenMinutesAgo, '−7,5', '−5', '−2,5', t.avpn.graphNow],
+      StatsRange.hour => [t.avpn.graphHourAgo, '−45', '−30', '−15', t.avpn.graphNow],
+      StatsRange.day => [t.avpn.graphDayAgo, '−18 ч', '−12', '−6', t.avpn.graphNow],
+      StatsRange.all => [sinceLabel, '', '', '', t.avpn.graphToday],
+    };
     final quality = ref.watch(connectionQualityProvider);
     final downColor = theme.araLook.graphDown ?? onSpeed;
     final upColor = theme.araLook.graphUp ?? onSpeed.withValues(alpha: .7);
@@ -87,7 +104,8 @@ class SideBarStatsOverview extends ConsumerWidget {
         label: speed,
         detailed: large,
         textStyle: theme.textTheme.labelSmall!.copyWith(color: onSpeed.withValues(alpha: .75), fontSize: 10),
-        ticks: [t.avpn.graphStart, '−45', '−30', '−15', t.avpn.graphNow],
+        ticks: ticks,
+        slots: slots,
       ),
     );
     final speedBlock = Container(
@@ -118,7 +136,8 @@ class SideBarStatsOverview extends ConsumerWidget {
             color: onSpeed,
           ),
           ...[
-            Gap(large && !dense ? 16 : 10),
+            if (large) ...[Gap(dense ? 8 : 12), _RangePicker(range: range, color: onSpeed)],
+            Gap(large && !dense ? 12 : 10),
             if (fill || split)
               Expanded(child: graph)
             else
@@ -132,6 +151,25 @@ class SideBarStatsOverview extends ConsumerWidget {
               speed: speed,
               oneLine: dense,
             ),
+            if (series != null) ...[
+              const Gap(4),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: '${t.avpn.graphPeriodTotal} '),
+                    TextSpan(
+                      text: size(series.total.total),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    if (series.total.total > 0)
+                      TextSpan(text: '  ·  VPN ${(series.total.vpn * 100 / series.total.total).round()}%'),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(color: onSpeed.withValues(alpha: .85)),
+              ),
+            ],
           ],
         ],
       ),
@@ -481,7 +519,11 @@ class _SpeedGraph extends CustomPainter {
     required this.detailed,
     required this.textStyle,
     required this.ticks,
+    this.slots = SpeedHistory.length,
   });
+
+  /// how many samples the graph's width holds (fewer samples sit at the right)
+  final int slots;
 
   final List<({int down, int up})> samples;
 
@@ -553,11 +595,11 @@ class _SpeedGraph extends CustomPainter {
       if (i < rows) labels[i].paint(canvas, Offset(size.width - labels[i].width, y + 1));
     }
     // every 15 seconds: a faint line, and on the detailed graph its label
-    final step = chart.width / (SpeedHistory.length - 1);
+    final step = chart.width / (slots - 1).clamp(1, 1 << 20);
     var firstEnd = 0.0;
     final lastStart = detailed && ticks.length > 4 ? chart.width - _text(ticks[4]).width : chart.width;
     for (var k = 0; k <= 4; k++) {
-      final x = chart.width - step * 15 * (4 - k) * (SpeedHistory.length - 1) / 60;
+      final x = chart.width * k / 4;
       if (k > 0 && k < 4) {
         canvas.drawLine(Offset(x, 0), Offset(x, chart.height), grid);
       }
@@ -775,4 +817,55 @@ class _PingBars extends CustomPainter {
 bool _isRed(Color color) {
   final hue = HSLColor.fromColor(color).hue;
   return hue < 20 || hue > 340;
+}
+
+/// The period chips on the speed block: a minute, ten minutes, an hour, a day, all the time.
+class _RangePicker extends ConsumerWidget {
+  const _RangePicker({required this.range, required this.color});
+
+  final StatsRange range;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final labels = {
+      StatsRange.minute: t.avpn.rangeMinute,
+      StatsRange.tenMinutes: t.avpn.rangeTenMinutes,
+      StatsRange.hour: t.avpn.rangeHour,
+      StatsRange.day: t.avpn.rangeDay,
+      StatsRange.all: t.avpn.rangeAll,
+    };
+    return Row(
+      children: [
+        for (final r in StatsRange.values)
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => ref.read(statsRangeProvider.notifier).range = r,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: r == range ? color.withValues(alpha: .16) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: color.withValues(alpha: r == range ? .5 : .18)),
+                ),
+                child: Text(
+                  labels[r]!,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: color.withValues(alpha: r == range ? 1 : .7),
+                    fontWeight: r == range ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
