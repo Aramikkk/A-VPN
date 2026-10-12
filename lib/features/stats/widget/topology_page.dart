@@ -132,7 +132,7 @@ class TopologyPage extends HookConsumerWidget {
                           items,
                           byTraffic: byTraffic.value,
                           appName: (app) => connectionAppName(t, apps, app),
-                          ruleName: (rule) => ruleLabel(rule) ?? t.avpn.connRuleDefault,
+                          ruleName: (rule) => ruleLabel(rule, t) ?? t.avpn.connRuleDefault,
                           routeName: (route) => switch (route) {
                             ConnectionRoute.vpn => 'VPN',
                             ConnectionRoute.direct => t.avpn.statsDirect,

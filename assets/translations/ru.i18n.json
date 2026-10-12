@@ -117,7 +117,10 @@
     "topoServers": "Серверы",
     "connShowSmall": "Показать меньше 1 МБ: $n",
     "connHideSmall": "Скрыть меньше 1 МБ",
-    "connHideSmallChip": "Без мелких (< 1 МБ)"
+    "connHideSmallChip": "Без мелких (< 1 МБ)",
+    "ruleBlocked": "заблокированные в РФ",
+    "ruleRuSites": "российские сайты",
+    "ruleRuApps": "российские приложения"
   },
   "common": {
     "appTitle": "A-VPN",
@@ -469,7 +472,8 @@
           "bypassRegion": "Обход сайтов региона $region",
           "rknBlockedProxy": "Заблокированные РКН сайты через VPN",
           "blockQuic": "Блокировать QUIC (приложения сразу переходят на TCP)",
-          "ruDomainsDirect": "Сайты .ru, .su и .рф напрямую"
+          "ruDomainsDirect": "Российские сайты напрямую (.ru, .su, .рф, Яндекс, VK, банки…)",
+          "ruAppsDirect": "Российские приложения напрямую (Яндекс, банки, Госуслуги, Авито…)"
         },
         "appBasedRouting": {
           "title": "Маршрутизация по приложениям",

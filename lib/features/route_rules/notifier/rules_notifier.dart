@@ -10,6 +10,7 @@ import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/route_rules/notifier/rkn_ru_domains.dart';
+import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -30,7 +31,9 @@ enum BuiltinRule {
   blockQuic(enabledByDefault: true),
   bypassLan(enabledByDefault: true),
   blockAds(enabledByDefault: false),
-  ruDomainsDirect(enabledByDefault: true);
+  ruDomainsDirect(enabledByDefault: true),
+  // Russian apps on the phone (Yandex Music, banks, Gosuslugi…) direct, whatever servers they use
+  ruAppsDirect(enabledByDefault: true);
 
   const BuiltinRule({required this.enabledByDefault});
 
@@ -47,6 +50,7 @@ enum BuiltinRule {
     rknBlockedProxy => t.pages.settings.routing.builtinRules.rknBlockedProxy,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuic,
     ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirect,
+    ruAppsDirect => t.pages.settings.routing.builtinRules.ruAppsDirect,
   };
 
   Rule get rule => switch (this) {
@@ -84,7 +88,8 @@ enum BuiltinRule {
     // doesn't answer yet (an "LTE Only" one on Wi-Fi) stalls that download and the whole start with it.
     rknBlockedProxy => Rule(outbound: Outbound.proxy, domainSuffixes: rknRuDomains),
     blockQuic => Rule(outbound: Outbound.block, protocols: [Protocol.quic]),
-    ruDomainsDirect => Rule(outbound: Outbound.direct, domainSuffixes: ['ru', 'su', 'xn--p1ai']),
+    ruDomainsDirect => Rule(outbound: Outbound.direct, domainSuffixes: ['ru', 'su', 'xn--p1ai', ...ruServiceDomains]),
+    ruAppsDirect => Rule(outbound: Outbound.direct, packageNames: ruAppPackages),
   }..name = key;
 }
 
@@ -121,9 +126,11 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
         rules.add(builtin.rule..enabled = rule.enabled);
       }
     }
+    // a built-in this version added goes last, after the ones the user already has: "blocked sites through the
+    // VPN" stays ahead of the new direct rules
     return _updateListOrder([
-      for (final builtin in missing) builtin.rule..enabled = builtin.enabledByDefault,
       ...rules,
+      for (final builtin in missing) builtin.rule..enabled = builtin.enabledByDefault,
     ]);
   }
 

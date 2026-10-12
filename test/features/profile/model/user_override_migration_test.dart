@@ -30,9 +30,7 @@ void main() {
     });
 
     test("false flags stay unset", () {
-      final o = UserOverride.fromStr(
-        v1({'enableWarp': false, 'enablePsiphon': false, 'enableFragment': false}),
-      )!;
+      final o = UserOverride.fromStr(v1({'enableWarp': false, 'enablePsiphon': false, 'enableFragment': false}))!;
       expect(o.extraSecurity, isNull);
       expect(o.enableFragment, isFalse);
     });

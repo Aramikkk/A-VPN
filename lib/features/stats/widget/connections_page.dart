@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/features/route_rules/notifier/rkn_ru_domains.dart';
+import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -400,7 +402,7 @@ class _InnerRow extends ConsumerWidget {
     final ports = {for (final c in group.items) '${c.network}:${c.port}'}.take(3).join(', ');
     final rules = {
       for (final c in group.items)
-        if (ruleLabel(c.rule) case final r?) r,
+        if (ruleLabel(c.rule, t) case final r?) r,
     }.take(2).join(', ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
@@ -442,9 +444,14 @@ class _InnerRow extends ConsumerWidget {
 
 /// "rule_set=[blocked ru-blocked] => route(select)" → "blocked, ru-blocked"; "domain_suffix=[.ru] => …" → ".ru";
 /// null for the default route ("final").
-String? ruleLabel(String rule) {
+///
+/// The app's own rules read by name: the blocked-sites list, the Russian sites and the Russian apps.
+String? ruleLabel(String rule, Translations t) {
   final match = rule.split('=>').first.trim();
   if (match.isEmpty || match == 'final') return null;
+  if (match.contains(rknRuDomains.first)) return t.avpn.ruleBlocked;
+  if (match.contains('xn--p1ai')) return t.avpn.ruleRuSites;
+  if (match.contains(ruAppPackages.first)) return t.avpn.ruleRuApps;
   final values = RegExp(
     r'\[([^\]]*)\]',
   ).allMatches(match).expand((m) => m.group(1)!.split(' ')).where((v) => v.isNotEmpty);

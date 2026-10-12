@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/stats/model/vpn_traffic.dart';
+import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Where a connection went.
@@ -68,6 +71,42 @@ class SeenConnection {
     down: down,
     active: false,
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'app': app,
+    'host': host,
+    'port': port,
+    'network': network,
+    'route': route.name,
+    'outbound': outbound,
+    'rule': rule,
+    'start': start.millisecondsSinceEpoch,
+    'up': up,
+    'down': down,
+  };
+
+  /// A saved one: closed, since the app was away when it was saved.
+  static SeenConnection? fromJson(Map<String, dynamic> json) {
+    try {
+      return SeenConnection(
+        id: json['id'] as String,
+        app: json['app'] as String,
+        host: json['host'] as String,
+        port: json['port'] as int,
+        network: json['network'] as String,
+        route: ConnectionRoute.values.byName(json['route'] as String),
+        outbound: json['outbound'] as String,
+        rule: json['rule'] as String,
+        start: DateTime.fromMillisecondsSinceEpoch(json['start'] as int),
+        up: json['up'] as int,
+        down: json['down'] as int,
+        active: false,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// One entry of the Clash API's /connections list.
   static SeenConnection? fromClash(Map<String, dynamic> json) {
@@ -139,27 +178,50 @@ class ConnectionsState {
   final DateTime? since;
 }
 
-/// The connections the core reports through its local Clash API, every 2 seconds while the tab is open, with
-/// the ones that have closed since kept for the session, so short ones (a site's images, a DNS lookup) show too.
+/// The connections the core reports through its local Clash API, every 2 seconds from the app's start (main.dart
+/// reads it), with the ones that have closed since kept for the whole VPN session, so short ones (a site's images,
+/// a DNS lookup) show too. The list is saved to disk now and then, so it's still there when the app comes back
+/// after Android closed it; a new session (the core's start time changes) starts it over.
 final connectionsProvider = NotifierProvider<Connections, ConnectionsState>(Connections.new);
 
 class Connections extends Notifier<ConnectionsState> {
   static const interval = Duration(seconds: 2);
   static const keepClosed = 400;
+  static const saveEvery = Duration(seconds: 10);
 
   HttpClient? _client;
   final _seen = <String, SeenConnection>{};
 
+  /// the VPN session the list belongs to (the core's start time)
+  DateTime? _session;
+  DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
+
+  File? get _file {
+    final dirs = ref.read(appDirectoriesProvider).valueOrNull;
+    return dirs == null ? null : File('${dirs.baseDir.path}/connections_session.json');
+  }
+
   @override
   ConnectionsState build() {
+    ref.listen(statsNotifierProvider, (_, next) {
+      final session = next.valueOrNull?.sessionStartedAt;
+      if (session == null || session == _session) return;
+      final first = _session == null;
+      _session = session;
+      if (first && _seen.isEmpty) {
+        _restore(session);
+      } else {
+        // a new VPN session: a new list
+        _seen.clear();
+      }
+      state = ConnectionsState(items: _sorted(), available: state.available, since: session);
+    });
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
     final enabled = ref.watch(ConfigOptions.enableClashApi);
     final port = ref.watch(ConfigOptions.clashApiPort);
     final secret = ref.watch(ConfigOptions.clashApiSecret);
-    if (!connected || !enabled) {
-      _seen.clear();
-      return const ConnectionsState(available: false);
-    }
+    // not connected (or only for a moment while the app comes back): nothing to ask, the list stays as it is
+    if (!connected || !enabled) return ConnectionsState(items: _sorted(), available: false, since: _session);
     // the core's API is on this machine: never through a proxy
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 2)
@@ -173,13 +235,41 @@ class Connections extends Notifier<ConnectionsState> {
       _client = null;
     });
     unawaited(_poll(client, url, secret));
-    return ConnectionsState(items: _sorted(), since: DateTime.now());
+    return ConnectionsState(items: _sorted(), since: _session);
+  }
+
+  void _restore(DateTime session) {
+    try {
+      final file = _file;
+      if (file == null || !file.existsSync()) return;
+      final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      if (json['session'] != session.millisecondsSinceEpoch) return;
+      for (final item in (json['items'] as List).whereType<Map<String, dynamic>>()) {
+        final c = SeenConnection.fromJson(item);
+        if (c != null) _seen[c.id] = c;
+      }
+    } catch (_) {
+      // an unreadable list is just not restored
+    }
+  }
+
+  void _save() {
+    final file = _file;
+    final session = _session;
+    if (file == null || session == null) return;
+    _saved = DateTime.now();
+    final json = jsonEncode({
+      'session': session.millisecondsSinceEpoch,
+      'items': [for (final c in _seen.values) c.toJson()],
+    });
+    unawaited(file.writeAsString(json).then((_) {}, onError: (_) {}));
   }
 
   /// Forget the closed ones.
   void clearClosed() {
     _seen.removeWhere((_, c) => !c.active);
-    state = ConnectionsState(items: _sorted(), since: DateTime.now());
+    state = ConnectionsState(items: _sorted(), since: _session);
+    _save();
   }
 
   Future<void> _poll(HttpClient client, Uri url, String secret) async {
@@ -195,7 +285,7 @@ class Connections extends Notifier<ConnectionsState> {
     }
     if (!identical(client, _client)) return; // disposed meanwhile
     if (list == null && _seen.isEmpty) {
-      state = ConnectionsState(available: false, since: state.since);
+      state = ConnectionsState(available: false, since: _session);
       return;
     }
     final open = <String>{};
@@ -216,7 +306,8 @@ class Connections extends Notifier<ConnectionsState> {
     for (final c in closed.skip(keepClosed)) {
       _seen.remove(c.id);
     }
-    state = ConnectionsState(items: _sorted(), since: state.since);
+    state = ConnectionsState(items: _sorted(), since: _session);
+    if (DateTime.now().difference(_saved) > saveEvery) _save();
   }
 
   List<SeenConnection> _sorted() => _seen.values.toList()..sort((a, b) => b.start.compareTo(a.start));

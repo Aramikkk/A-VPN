@@ -98,6 +98,26 @@ void main() {
     expect(SeenConnection.fromClash(bare)!.host, '203.0.113.7');
   });
 
+  test('a connection saved and read back', () {
+    final c = _sample.first;
+    final back = SeenConnection.fromJson(c.toJson())!;
+    expect(
+      (back.id, back.app, back.host, back.route, back.outbound, back.down),
+      (c.id, c.app, c.host, c.route, c.outbound, c.down),
+    );
+    expect(back.active, isFalse);
+    expect(SeenConnection.fromJson({'id': 1}), isNull);
+  });
+
+  test('the app own rules read by name', () async {
+    final t = await AppLocale.ru.build();
+    expect(ruleLabel('domain_suffix=[ru su xn--p1ai yandex.net] => route(direct)', t), 'российские сайты');
+    expect(ruleLabel('package_name=[ru.yandex.music ru.yandex.taxi] => route(direct)', t), 'российские приложения');
+    expect(ruleLabel('domain_suffix=[abook-club.ru x.ru] => route(select)', t), 'заблокированные в РФ');
+    expect(ruleLabel('final', t), isNull);
+    expect(ruleLabel('rule_set=[ads] => reject', t), 'ads');
+  });
+
   test('grouped by app, the most traffic first, both ways counted', () {
     final groups = groupConnections(_sample, (c) => c.app);
     expect(groups.first.key, 'ru.yandex.disk');
