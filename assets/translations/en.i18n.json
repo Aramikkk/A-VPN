@@ -108,7 +108,7 @@
     "connFlowCount": "Connections",
     "connFlowTraffic": "Traffic",
     "connOther": "Other",
-    "connRuleDefault": "Default",
+    "connRuleDefault": "no rule (default)",
     "topologyTab": "Topology",
     "connOpenOnly": "Open only",
     "topoApps": "Apps",
@@ -154,8 +154,8 @@
     "topoServerCount": "Servers",
     "topoFlow": "Where the traffic goes",
     "topoServersTitle": "VPN servers",
-    "topoRulesTitle": "By which rules",
-    "ruleEverythingElse": "everything else",
+    "topoRulesTitle": "Why the traffic went that way",
+    "ruleEverythingElse": "everything else (on no list)",
     "connectOnBoot": "Turn the VPN on when the phone starts",
     "connectOnBootMsg": "The VPN comes on in the background after a restart, even if it was off before. Let the app run in the background without battery limits so the phone doesn't stop it.",
     "settingsConnection": "Launch and connection",
@@ -179,7 +179,12 @@
     "statsPingPeriod": "Ping to the server over the chosen period",
     "ruleBlockedIps": "blocked addresses (Telegram etc.)",
     "ruleLocalNet": "local network",
-    "ruleAppsVpn": "apps through the VPN"
+    "ruleAppsVpn": "apps through the VPN",
+    "topoRulesHint": "Each rule is a list of sites or apps; on the right, where it sent their traffic",
+    "topoToVpn": "through VPN",
+    "topoToDirect": "direct",
+    "topoToBlock": "blocked",
+    "topoUncounted": "Another $amount isn't in the list: connections shorter than 2 seconds and those while the app was closed. The session in all: VPN $vpn, direct $direct"
   },
   "common": {
     "appTitle": "A-VPN",

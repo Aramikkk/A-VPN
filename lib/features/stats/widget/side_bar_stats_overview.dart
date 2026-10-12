@@ -772,30 +772,33 @@ class _QualityCard extends ConsumerWidget {
             ),
           if (spread != null) ...[
             Gap(compact ? 6 : 4),
-            Text.rich(
-              TextSpan(
-                children: [
-                  for (final (i, (label, ms)) in [
-                    (t.avpn.pingAvg, spread.avg),
-                    (t.avpn.pingMin, spread.min),
-                    (t.avpn.pingMax, spread.max),
-                    if (spread.jitter >= 0) (t.avpn.pingJitter, spread.jitter),
-                  ].indexed) ...[
-                    TextSpan(text: '${i == 0 ? '' : '  ·  '}$label '),
-                    TextSpan(
-                      text: i == 3 ? '±$ms' : '$ms',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: i == 3 ? scheme.onSurface : theme.araLook.pingColor(ms, scheme.onSurface),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    for (final (i, (label, ms)) in [
+                      (t.avpn.pingAvg, spread.avg),
+                      (t.avpn.pingMin, spread.min),
+                      (t.avpn.pingMax, spread.max),
+                      if (spread.jitter >= 0) (t.avpn.pingJitter, spread.jitter),
+                    ].indexed) ...[
+                      TextSpan(text: '${i == 0 ? '' : ' · '}$label '),
+                      TextSpan(
+                        text: i == 3 ? '±$ms' : '$ms',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: i == 3 ? scheme.onSurface : theme.araLook.pingColor(ms, scheme.onSurface),
+                        ),
                       ),
-                    ),
+                    ],
+                    if (!compact) const TextSpan(text: ' ms'),
                   ],
-                  if (!compact) const TextSpan(text: ' ms'),
-                ],
+                ),
+                maxLines: 1,
+                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         ],
@@ -831,7 +834,11 @@ class _PingBars extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final slot = size.width / slots;
     final barWidth = slot * (slots > 40 ? .7 : .62);
-    final peak = samples.whereType<int>().fold<int>(50, (m, v) => v > m ? v : m);
+    // the scale follows the usual ping, not one stray spike: a spike over three times the median fills the bar
+    final answered = samples.whereType<int>().where((v) => v > 0).toList()..sort();
+    final median = answered.isEmpty ? 50 : answered[answered.length ~/ 2];
+    final top = answered.isEmpty ? 50 : answered.last;
+    final peak = top.clamp(50, median * 3 < 50 ? 50 : median * 3);
     final offset = (slots - samples.length).clamp(0, slots);
     final shown = samples.length > slots ? samples.sublist(samples.length - slots) : samples;
     for (var i = 0; i < slots; i++) {

@@ -148,7 +148,7 @@ class GeneralPage extends HookConsumerWidget {
                   SwitchListTile.adaptive(
                     title: Text(t.pages.settings.general.autoStart),
                     secondary: const Icon(Icons.auto_mode_rounded),
-                    value: ref.watch(autoStartNotifierProvider).asData!.value,
+                    value: ref.watch(autoStartNotifierProvider).valueOrNull ?? false,
                     onChanged: (value) async => value
                         ? await ref.read(autoStartNotifierProvider.notifier).enable()
                         : await ref.read(autoStartNotifierProvider.notifier).disable(),

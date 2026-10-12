@@ -47,7 +47,7 @@ class ConnectionFlow {
     required Color Function(ConnectionRoute route) routeColor,
     int maxPerColumn = 6,
   }) {
-    double weightOf(SeenConnection c) => byTraffic ? c.total.toDouble() : 1;
+    double weightOf(SeenConnection c) => byTraffic ? c.total.toDouble() : c.count.toDouble();
     // each connection's path; a direct or blocked one ends at the route
     final paths = <(List<String>, double, ConnectionRoute)>[
       for (final c in items)

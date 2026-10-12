@@ -131,6 +131,17 @@ void main() {
     expect(ruleLabel('rule_set=[ads] => reject', t), 'ads');
   });
 
+  test('older closed connections added up keep their traffic and their count', () {
+    final a = _sample[3].closed();
+    final b = _sample[4].closed();
+    final sum = a.plus(b, 'sum:x');
+    expect((sum.down, sum.up, sum.count, sum.active), (a.down + b.down, a.up + b.up, 2, false));
+    final back = SeenConnection.fromJson(sum.toJson())!;
+    expect(back.count, 2);
+    final group = groupConnections([sum, _sample[6]], (c) => c.app).firstWhere((g) => g.key == 'ru.yandex.disk');
+    expect((group.count, group.direct, group.total), (2, 2, sum.total));
+  });
+
   test('grouped by app, the most traffic first, both ways counted', () {
     final groups = groupConnections(_sample, (c) => c.app);
     expect(groups.first.key, 'ru.yandex.disk');

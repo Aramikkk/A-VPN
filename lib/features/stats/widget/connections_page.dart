@@ -61,8 +61,9 @@ class ConnectionsPage extends HookConsumerWidget {
     final hidden = allGroups.length - groups.length;
     final all = state.items;
     final open = all.where((c) => c.active).length;
-    final viaVpn = all.where((c) => c.route == ConnectionRoute.vpn).length;
-    final direct = all.where((c) => c.route == ConnectionRoute.direct).length;
+    int count(ConnectionRoute route) => all.where((c) => c.route == route).fold(0, (n, c) => n + c.count);
+    final viaVpn = count(ConnectionRoute.vpn);
+    final direct = count(ConnectionRoute.direct);
 
     return Scaffold(
       appBar: AppBar(
@@ -353,9 +354,7 @@ class _GroupCard extends HookConsumerWidget {
                       ),
                       const Gap(2),
                       Text(
-                        group.open > 0
-                            ? t.avpn.connOpenCount(n: group.open)
-                            : t.avpn.connCount(n: group.items.length),
+                        group.open > 0 ? t.avpn.connOpenCount(n: group.open) : t.avpn.connCount(n: group.count),
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: group.open > 0 ? scheme.primary : scheme.onSurfaceVariant,
                         ),
@@ -399,7 +398,10 @@ class _InnerRow extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final ports = {for (final c in group.items) '${c.network}:${c.port}'}.take(3).join(', ');
+    final ports = {
+      for (final c in group.items)
+        if (c.port > 0) '${c.network}:${c.port}',
+    }.take(3).join(', ');
     final rules = {
       for (final c in group.items)
         if (ruleLabel(c.rule, t) case final r?) r,

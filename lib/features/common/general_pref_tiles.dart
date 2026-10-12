@@ -48,7 +48,7 @@ class EnableAnalyticsPrefTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
 
-    final enabled = ref.watch(analyticsControllerProvider).requireValue;
+    final enabled = ref.watch(analyticsControllerProvider).valueOrNull ?? false;
 
     return SwitchListTile.adaptive(
       title: Text(t.pages.settings.general.enableAnalytics),

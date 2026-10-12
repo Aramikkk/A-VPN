@@ -5,6 +5,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/connections_flow.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -20,7 +21,7 @@ class TopologyPage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final state = ref.watch(connectionsProvider);
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
-    final byTraffic = useState(false);
+    final byTraffic = useState(true);
     final openOnly = useState(false);
     final hideSmall = useState(true);
     final theme = Theme.of(context);
@@ -35,7 +36,7 @@ class TopologyPage extends HookConsumerWidget {
         if (g.total >= smallTraffic) g.key,
     };
     final items = hideSmall.value ? open.where((c) => bigApps.contains(c.app)).toList() : open;
-    double weight(SeenConnection c) => byTraffic.value ? c.total.toDouble() : 1;
+    double weight(SeenConnection c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble();
     String value(double w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}';
     final total = items.fold<double>(0, (s, c) => s + weight(c));
     double sum(Iterable<SeenConnection> cs) => cs.fold<double>(0, (s, c) => s + weight(c));
@@ -45,7 +46,17 @@ class TopologyPage extends HookConsumerWidget {
       items.where((c) => c.route == ConnectionRoute.vpn && c.outbound.isNotEmpty),
       (c) => c.outbound,
     );
-    final rules = groupConnections(items, (c) => ruleLabel(c.rule, t) ?? t.avpn.connRuleDefault);
+    // a rule and the way it sent its traffic: the same list can send some of it through the VPN and some direct
+    final rules = groupConnections(items, (c) => '${c.route.index}${ruleLabel(c.rule, t) ?? t.avpn.connRuleDefault}');
+
+    // what the core counted for the whole session against what the list holds: connections shorter than one poll
+    // and the ones while the app was closed aren't in the list
+    final info = ref.watch(statsNotifierProvider).valueOrNull;
+    final sessionVpn = (info?.vpnUplinkTotal ?? 0) + (info?.vpnDownlinkTotal ?? 0);
+    final sessionAll = (info?.uplinkTotal.toInt() ?? 0) + (info?.downlinkTotal.toInt() ?? 0);
+    final listed = state.items.where((c) => c.route != ConnectionRoute.block).fold<int>(0, (s, c) => s + c.total);
+    final uncounted = info?.vpnDownlinkTotal == null ? 0 : sessionAll - listed;
+    final showUncounted = uncounted > smallTraffic && uncounted > sessionAll * .05;
 
     if (!state.available && state.items.isEmpty) {
       return Scaffold(
@@ -231,11 +242,33 @@ class TopologyPage extends HookConsumerWidget {
                 const Gap(12),
                 _Section(
                   title: t.avpn.topoRulesTitle,
-                  child: _Ranking(
-                    rows: [for (final g in rules.take(8)) (g.key, sum(g.items))]..sort((a, b) => b.$2.compareTo(a.$2)),
+                  hint: t.avpn.topoRulesHint,
+                  child: _RuleRows(
+                    rows: [
+                      for (final g in rules.take(8))
+                        (
+                          name: g.key.substring(1),
+                          route: g.items.first.route,
+                          servers: g.servers.join(', '),
+                          weight: sum(g.items),
+                        ),
+                    ]..sort((a, b) => b.weight.compareTo(a.weight)),
                     total: total,
                     value: value,
-                    colour: palette[1],
+                  ),
+                ),
+              ],
+              if (byTraffic.value && !openOnly.value && showUncounted) ...[
+                const Gap(12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    t.avpn.topoUncounted(
+                      amount: formatBytes(uncounted, units),
+                      vpn: formatBytes(sessionVpn, units),
+                      direct: formatBytes(sessionAll - sessionVpn, units),
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -295,9 +328,10 @@ class _Total extends StatelessWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child});
+  const _Section({required this.title, required this.child, this.hint});
 
   final String title;
+  final String? hint;
   final Widget child;
 
   @override
@@ -322,6 +356,10 @@ class _Section extends StatelessWidget {
               letterSpacing: 1,
             ),
           ),
+          if (hint != null) ...[
+            const Gap(3),
+            Text(hint!, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+          ],
           const Gap(10),
           child,
         ],
@@ -385,6 +423,113 @@ class _Ranking extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The rules' rows: the rule (its list's name), where it sent the traffic (through the VPN and which servers,
+/// direct, or blocked) in that way's colour, and how much.
+class _RuleRows extends ConsumerWidget {
+  const _RuleRows({required this.rows, required this.total, required this.value});
+
+  final List<({String name, ConnectionRoute route, String servers, double weight})> rows;
+  final double total;
+  final String Function(double) value;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final surface = scheme.surfaceContainerLow;
+    final top = rows.fold<double>(0, (m, r) => r.weight > m ? r.weight : m);
+    return Column(
+      children: [
+        for (final r in rows)
+          Builder(
+            builder: (context) {
+              final colour = switch (r.route) {
+                ConnectionRoute.vpn => AraLook.readableOn(scheme.primary, surface),
+                ConnectionRoute.direct => AraLook.readableOn(const Color(0xFF9AA0A6), surface),
+                ConnectionRoute.block => AraLook.readableOn(scheme.error, surface),
+              };
+              final way = switch (r.route) {
+                ConnectionRoute.vpn => r.servers.isEmpty ? t.avpn.topoToVpn : '${t.avpn.topoToVpn} · ${r.servers}',
+                ConnectionRoute.direct => t.avpn.topoToDirect,
+                ConnectionRoute.block => t.avpn.topoToBlock,
+              };
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                r.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const Gap(1),
+                              Row(
+                                children: [
+                                  Icon(
+                                    r.route == ConnectionRoute.block
+                                        ? Icons.block_rounded
+                                        : Icons.arrow_forward_rounded,
+                                    size: 13,
+                                    color: colour,
+                                  ),
+                                  const Gap(4),
+                                  Flexible(
+                                    child: Text(
+                                      way,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colour,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Gap(8),
+                        Text(
+                          '${value(r.weight)} · ${total <= 0 ? 0 : (r.weight * 100 / total).round()}%',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Gap(6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: top <= 0 ? 0 : r.weight / top,
+                        minHeight: 6,
+                        color: colour,
+                        backgroundColor: scheme.surfaceContainerHighest,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
       ],
     );

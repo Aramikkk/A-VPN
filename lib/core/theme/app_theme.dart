@@ -386,11 +386,12 @@ class AppTheme {
         shape: small.copyWith(
           side: BorderSide(color: editorial ? p.strongLine : (cyber ? primary.withValues(alpha: .6) : p.line)),
         ),
-        selectedColor: editorial ? p.fg : primary.withValues(alpha: .18),
+        // a selected chip keeps its text colour, so its fill is a tint (Editorial's ink would hide the text)
+        selectedColor: editorial ? p.fg.withValues(alpha: .14) : primary.withValues(alpha: .18),
         backgroundColor: Colors.transparent,
         labelStyle: text.labelLarge,
         secondaryLabelStyle: text.labelLarge?.copyWith(color: editorial ? p.bg : p.fg),
-        checkmarkColor: editorial ? p.bg : primary,
+        checkmarkColor: editorial ? p.fg : primary,
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(

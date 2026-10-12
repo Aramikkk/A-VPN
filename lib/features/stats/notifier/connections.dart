@@ -28,6 +28,7 @@ class SeenConnection {
     required this.up,
     required this.down,
     required this.active,
+    this.count = 1,
   });
 
   final String id;
@@ -55,6 +56,10 @@ class SeenConnection {
   /// still open
   final bool active;
 
+  /// how many connections this is: more than one for older closed ones added up by app, site, route and rule, so
+  /// a long session keeps all of its traffic without keeping every connection
+  final int count;
+
   int get total => up + down;
 
   SeenConnection closed() => SeenConnection(
@@ -70,6 +75,24 @@ class SeenConnection {
     up: up,
     down: down,
     active: false,
+    count: count,
+  );
+
+  /// [other] added to this one, kept under [id]
+  SeenConnection plus(SeenConnection other, String id) => SeenConnection(
+    id: id,
+    app: app,
+    host: host,
+    port: port == other.port ? port : 0,
+    network: network == other.network ? network : '',
+    route: route,
+    outbound: outbound,
+    rule: rule,
+    start: start.isAfter(other.start) ? start : other.start,
+    up: up + other.up,
+    down: down + other.down,
+    active: false,
+    count: count + other.count,
   );
 
   Map<String, dynamic> toJson() => {
@@ -84,6 +107,7 @@ class SeenConnection {
     'start': start.millisecondsSinceEpoch,
     'up': up,
     'down': down,
+    if (count != 1) 'count': count,
   };
 
   /// A saved one: closed, since the app was away when it was saved.
@@ -102,6 +126,7 @@ class SeenConnection {
         up: json['up'] as int,
         down: json['down'] as int,
         active: false,
+        count: json['count'] as int? ?? 1,
       );
     } catch (_) {
       return null;
@@ -305,14 +330,40 @@ class Connections extends Notifier<ConnectionsState> {
         if (!open.contains(id) && _seen[id]!.active) _seen[id] = _seen[id]!.closed();
       }
     }
-    // keep the latest closed ones only
-    final closed = _seen.values.where((c) => !c.active).toList()..sort((a, b) => b.start.compareTo(a.start));
-    for (final c in closed.skip(keepClosed)) {
-      _seen.remove(c.id);
-    }
+    _fold();
     state = ConnectionsState(items: _sorted(), since: _session);
     if (DateTime.now().difference(_saved) > saveEvery) _save();
   }
+
+  /// The latest [keepClosed] closed connections are kept one by one; older ones are added up by app, site, route,
+  /// server and rule, so their traffic still counts.
+  void _fold() {
+    final closed = _seen.values.where((c) => !c.active && !c.id.startsWith(summaryPrefix)).toList()
+      ..sort((a, b) => b.start.compareTo(a.start));
+    for (final c in closed.skip(keepClosed)) {
+      _seen.remove(c.id);
+      final key = '$summaryPrefix${c.app}|${c.host}|${c.route.name}|${c.outbound}|${c.rule}';
+      final summary = _seen[key];
+      _seen[key] = summary == null ? c.plus(_none, key) : summary.plus(c, key);
+    }
+  }
+
+  static const summaryPrefix = 'sum:';
+  static final _none = SeenConnection(
+    id: '',
+    app: '',
+    host: '',
+    port: 0,
+    network: '',
+    route: ConnectionRoute.direct,
+    outbound: '',
+    rule: '',
+    start: DateTime.fromMillisecondsSinceEpoch(0),
+    up: 0,
+    down: 0,
+    active: false,
+    count: 0,
+  );
 
   List<SeenConnection> _sorted() => _seen.values.toList()..sort((a, b) => b.start.compareTo(a.start));
 }
@@ -333,20 +384,24 @@ class ConnectionGroup {
   int blocked = 0;
   int open = 0;
 
+  /// connections in it (an added-up entry counts as all of its connections)
+  int count = 0;
+
   int get total => up + down;
 
   void add(SeenConnection c) {
     items.add(c);
+    count += c.count;
     up += c.up;
     down += c.down;
     if (c.active) open++;
     switch (c.route) {
       case ConnectionRoute.vpn:
-        vpn++;
+        vpn += c.count;
       case ConnectionRoute.direct:
-        direct++;
+        direct += c.count;
       case ConnectionRoute.block:
-        blocked++;
+        blocked += c.count;
     }
   }
 
@@ -373,6 +428,6 @@ List<ConnectionGroup> groupConnections(Iterable<SeenConnection> items, String Fu
   }
   return groups.values.toList()..sort((a, b) {
     final byTraffic = b.total.compareTo(a.total);
-    return byTraffic != 0 ? byTraffic : b.items.length.compareTo(a.items.length);
+    return byTraffic != 0 ? byTraffic : b.count.compareTo(a.count);
   });
 }
