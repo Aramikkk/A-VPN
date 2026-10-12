@@ -119,6 +119,7 @@ class StylePicker extends ConsumerWidget {
     (String, String) names(AraStyle style) => switch (style) {
       AraStyle.graphite => (t.avpn.styleGraphite, t.avpn.styleGraphiteHint),
       AraStyle.editorial => (t.avpn.styleEditorial, t.avpn.styleEditorialHint),
+      AraStyle.cyberpunk => (t.avpn.styleCyberpunk, t.avpn.styleCyberpunkHint),
       AraStyle.classic => (t.avpn.styleClassic, t.avpn.styleClassicHint),
     };
     return ListTile(
@@ -181,6 +182,8 @@ class _StylePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = brightness == Brightness.dark;
     final p = style == AraStyle.classic ? null : AppTheme.palette(style, brightness);
+    final cyber = style == AraStyle.cyberpunk;
+    final neon = cyber ? (dark ? const Color(0xFF00F0FF) : const Color(0xFFD1003F)) : accent;
     final bg = p?.bg ?? (dark ? Colors.black : Colors.white);
     final fg = p?.fg ?? (dark ? Colors.white : Colors.black);
     final line = p?.line ?? (dark ? const Color(0xFF26262B) : const Color(0xFFDDDFDA));
@@ -190,7 +193,7 @@ class _StylePreview extends StatelessWidget {
       height: 9,
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: selected ? (editorial ? fg : accent.withValues(alpha: .3)) : card,
+        color: selected ? (editorial ? fg : neon.withValues(alpha: .3)) : card,
         borderRadius: BorderRadius.circular(editorial ? 0 : 4),
         border: editorial ? Border(bottom: BorderSide(color: line)) : null,
       ),
@@ -201,7 +204,7 @@ class _StylePreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: line),
+        border: Border.all(color: cyber ? neon.withValues(alpha: .6) : line),
         gradient: style == AraStyle.graphite
             ? RadialGradient(
                 center: const Alignment(0, -1.3),
@@ -220,7 +223,7 @@ class _StylePreview extends StatelessWidget {
           row(false),
           row(false),
           const Spacer(),
-          if (style == AraStyle.graphite)
+          if (style == AraStyle.graphite || cyber)
             Row(
               children: [
                 Container(
@@ -228,15 +231,15 @@ class _StylePreview extends StatelessWidget {
                   height: 18,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: accent, width: 2),
-                    boxShadow: [BoxShadow(color: accent.withValues(alpha: .5), blurRadius: 8)],
+                    border: Border.all(color: neon, width: 2),
+                    boxShadow: [BoxShadow(color: neon.withValues(alpha: .5), blurRadius: 8)],
                   ),
                 ),
                 const Spacer(),
                 Container(
                   width: 34,
                   height: 12,
-                  decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(9)),
+                  decoration: BoxDecoration(color: neon, borderRadius: BorderRadius.circular(cyber ? 0 : 9)),
                 ),
               ],
             )

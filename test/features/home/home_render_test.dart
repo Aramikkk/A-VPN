@@ -124,7 +124,7 @@ void main() {
     ]);
   });
 
-  for (final style in [AraStyle.graphite, AraStyle.editorial]) {
+  for (final style in [AraStyle.graphite, AraStyle.editorial, AraStyle.cyberpunk]) {
     for (final (dark, connected) in [(true, true), (false, false), (false, true), (true, false)]) {
       final name = '${style.name}_${dark ? 'night' : 'day'}_${connected ? 'on' : 'off'}';
       testWidgets('home: $name', (tester) async {

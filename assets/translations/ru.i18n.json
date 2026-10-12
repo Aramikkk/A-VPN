@@ -148,7 +148,9 @@
     "styleClassicHint": "Прежний вид, карточки и градиенты",
     "daysShort": "$days дн.",
     "stNotProtected": "не защищено",
-    "stPingButton": "Пинг"
+    "stPingButton": "Пинг",
+    "styleCyberpunk": "Киберпанк",
+    "styleCyberpunkHint": "Неон ночью, сигнальный жёлтый днём"
   },
   "common": {
     "appTitle": "A-VPN",

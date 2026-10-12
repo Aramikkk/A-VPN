@@ -349,6 +349,9 @@ class _StyledServerList extends ConsumerWidget {
     );
     if (editorial) return list;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    if (Theme.of(context).araLook.style == AraStyle.cyberpunk) {
+      return Container(clipBehavior: Clip.antiAlias, decoration: _neonPanel(scheme, 14), child: list);
+    }
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -582,17 +585,26 @@ class _GraphiteDock extends ConsumerWidget {
       Disconnecting() => t.avpn.disconnecting,
       Disconnected() => t.avpn.stOffShort,
     };
+    final cyber = theme.araLook.style == AraStyle.cyberpunk;
     return Container(
       margin: const EdgeInsets.fromLTRB(0, 6, 0, 12),
       padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow.withValues(alpha: dark ? .85 : 1),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: dark
-            ? null
-            : [BoxShadow(color: Colors.black.withValues(alpha: .08), blurRadius: 30, offset: const Offset(0, 10))],
-      ),
+      decoration: cyber
+          ? _neonPanel(scheme, 16)
+          : BoxDecoration(
+              color: scheme.surfaceContainerLow.withValues(alpha: dark ? .85 : 1),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: scheme.outlineVariant),
+              boxShadow: dark
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .08),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+            ),
       child: Row(
         children: [
           _Orb(on: on, busy: busy, onTap: busy ? null : () => _toggleConnection(ref)),
@@ -668,7 +680,11 @@ class _Orb extends HookWidget {
       return null;
     }, [busy]);
     final hsl = HSLColor.fromColor(scheme.primary);
-    final second = hsl.saturation < .12 ? scheme.primary : hsl.withHue((hsl.hue + 28) % 360).toColor();
+    final second = theme.araLook.style == AraStyle.cyberpunk
+        ? theme.araLook.graphUp ?? scheme.primary
+        : hsl.saturation < .12
+        ? scheme.primary
+        : hsl.withHue((hsl.hue + 28) % 360).toColor();
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -831,3 +847,13 @@ class _EditorialDock extends ConsumerWidget {
 /// The accent where it sits on ink (the chosen row, the switch's knob): itself when it reads there, else paper.
 Color _onInk(ColorScheme scheme) =>
     AraLook.contrast(scheme.primary, scheme.onSurface) >= 2.6 ? scheme.primary : scheme.surface;
+
+/// Cyberpunk's panel: cut corners, a neon outline and a faint neon glow.
+ShapeDecoration _neonPanel(ColorScheme scheme, double cut) => ShapeDecoration(
+  color: scheme.surfaceContainerLow.withValues(alpha: .9),
+  shape: BeveledRectangleBorder(
+    borderRadius: BorderRadius.circular(cut),
+    side: BorderSide(color: scheme.primary.withValues(alpha: .55)),
+  ),
+  shadows: [BoxShadow(color: scheme.primary.withValues(alpha: .18), blurRadius: 18)],
+);

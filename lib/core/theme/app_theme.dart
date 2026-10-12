@@ -197,6 +197,20 @@ class AppTheme {
   /// The palette of a style in day or night: background, cards, text, lines.
   static AraPalette palette(AraStyle style, Brightness brightness) {
     final dark = brightness == Brightness.dark;
+    if (style == AraStyle.cyberpunk) {
+      return AraPalette(
+        bg: dark ? const Color(0xFF07070D) : const Color(0xFFFCEE0A),
+        fg: dark ? const Color(0xFFE6FBFF) : const Color(0xFF0A0A12),
+        muted: dark ? const Color(0xFF7189A6) : const Color(0xFF4A4520),
+        card: dark ? const Color(0xFF0E0E1A) : const Color(0xFFFFF6A3),
+        container: dark ? const Color(0xFF131325) : const Color(0xFFFFF27A),
+        high: dark ? const Color(0xFF19192F) : const Color(0xFFF2E33C),
+        highest: dark ? const Color(0xFF20203A) : const Color(0xFFE8D820),
+        line: dark ? const Color(0xFF1E2A3F) : const Color(0xFFD9CB2A),
+        strongLine: dark ? const Color(0xFF00F0FF) : const Color(0xFF0A0A12),
+        nav: dark ? const Color(0xFF07070D) : const Color(0xFFFCEE0A),
+      );
+    }
     return style == AraStyle.editorial
         ? AraPalette(
             bg: dark ? const Color(0xFF131211) : const Color(0xFFF3F1EC),
@@ -228,9 +242,12 @@ class AppTheme {
   ThemeData _styledTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
+    final cyber = style == AraStyle.cyberpunk;
     final p = palette(style, brightness);
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
-    final accentColour = editorial && colourless
+    final accentColour = cyber
+        ? (dark ? const Color(0xFF00F0FF) : const Color(0xFFD1003F))
+        : editorial && colourless
         ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A))
         : (dark ? accent.darkPrimary : accent.lightPrimary);
     final primary = AraLook.readableOn(accentColour, p.bg);
@@ -280,7 +297,7 @@ class AppTheme {
       bodySmall: base.bodySmall?.copyWith(fontWeight: FontWeight.w500),
       labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       labelMedium: base.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-      labelSmall: editorial
+      labelSmall: editorial || cyber
           ? base.labelSmall?.copyWith(
               fontFamily: 'JetBrains Mono',
               fontWeight: FontWeight.w700,
@@ -291,10 +308,19 @@ class AppTheme {
     );
 
     final radius = editorial ? 6.0 : 20.0;
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(radius),
-      side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide.none,
-    );
+    // Cyberpunk cuts its corners and outlines its panels in neon
+    final ShapeBorder shape = cyber
+        ? BeveledRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: primary.withValues(alpha: .5)),
+          )
+        : RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+            side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide.none,
+          );
+    final OutlinedBorder small = cyber
+        ? BeveledRectangleBorder(borderRadius: BorderRadius.circular(7))
+        : RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99));
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -342,9 +368,8 @@ class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(backgroundColor: p.card, surfaceTintColor: Colors.transparent),
       popupMenuTheme: PopupMenuThemeData(color: p.card, surfaceTintColor: Colors.transparent),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(editorial ? 4 : 99),
-          side: BorderSide(color: editorial ? p.strongLine : p.line),
+        shape: small.copyWith(
+          side: BorderSide(color: editorial ? p.strongLine : (cyber ? primary.withValues(alpha: .6) : p.line)),
         ),
         selectedColor: editorial ? p.fg : primary.withValues(alpha: .18),
         backgroundColor: Colors.transparent,
@@ -354,9 +379,7 @@ class AppTheme {
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
-          shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99)),
-          ),
+          shape: WidgetStatePropertyAll(small),
           side: WidgetStatePropertyAll(BorderSide(color: editorial ? p.strongLine : p.line)),
           backgroundColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.selected) ? (editorial ? p.fg : primary.withValues(alpha: .18)) : null,
@@ -381,11 +404,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 14)),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99)),
-        ),
-      ),
+      filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(shape: small)),
       listTileTheme: ListTileThemeData(iconColor: editorial ? p.fg : primary),
       extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _styledLook(brightness, p, primary)},
     );
@@ -397,8 +416,13 @@ class AppTheme {
   AraLook _styledLook(Brightness brightness, AraPalette p, Color primary) {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
+    final cyber = style == AraStyle.cyberpunk;
     final blockColours = editorial
         ? [p.card, p.card]
+        : cyber
+        ? (dark
+              ? const [Color(0xFF151530), Color(0xFF0E0E1A), Color(0xFF1A0A1E)]
+              : const [Color(0xFFFFF8B8), Color(0xFFFFF6A3), Color(0xFFFFEF6B)])
         : dark
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
@@ -406,7 +430,11 @@ class AppTheme {
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
     final Color down;
     final Color up;
-    if (editorial) {
+    if (cyber) {
+      // neon: cyan down and magenta up by night, magenta-red and teal on yellow by day
+      down = primary;
+      up = dark ? const Color(0xFFFF2A6D) : const Color(0xFF00727D);
+    } else if (editorial) {
       down = p.fg;
       up = colourless ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A)) : primary;
     } else if (colourless) {
@@ -422,7 +450,7 @@ class AppTheme {
       onGradient: p.fg,
       fastPing: primary,
       dark: dark,
-      border: editorial ? p.strongLine : p.line,
+      border: editorial ? p.strongLine : (cyber ? primary.withValues(alpha: .55) : p.line),
       graphDown: AraLook.readableOn(down, block),
       graphUp: AraLook.readableOn(up, block),
       style: style,

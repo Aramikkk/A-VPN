@@ -148,7 +148,9 @@
     "styleClassicHint": "The earlier look, cards and gradients",
     "daysShort": "$days d",
     "stNotProtected": "not protected",
-    "stPingButton": "Ping"
+    "stPingButton": "Ping",
+    "styleCyberpunk": "Cyberpunk",
+    "styleCyberpunkHint": "Neon by night, signal yellow by day"
   },
   "common": {
     "appTitle": "A-VPN",

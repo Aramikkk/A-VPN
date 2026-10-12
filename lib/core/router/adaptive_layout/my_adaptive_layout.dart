@@ -142,6 +142,12 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                           AraStyle.graphite => Border(
                             top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
                           ),
+                          AraStyle.cyberpunk => Border(
+                            top: BorderSide(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: .6),
+                              width: 1.5,
+                            ),
+                          ),
                           AraStyle.classic => null,
                         },
                       ),

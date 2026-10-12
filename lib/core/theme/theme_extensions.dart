@@ -72,7 +72,7 @@ class AraLook extends ThemeExtension<AraLook> {
   };
 
   /// Four steps from [base]: the hue turns a little warmer each step and the colour softens; a colourless accent
-  /// (Monochrome, OLED) gets green, yellow, orange and red instead. Every step is darkened (light theme) or lightened
+  /// (Monochrome, OLED) fades from black (or white) towards grey instead. Every step is darkened (light theme) or lightened
   /// (dark theme) as far as needed to stay readable on the cards: contrast at least 3:1.
   static List<Color> pingScale(Color base, {bool dark = false}) {
     final hsl = HSLColor.fromColor(base);
@@ -82,7 +82,8 @@ class AraLook extends ThemeExtension<AraLook> {
       for (var i = 0; i < 4; i++)
         _readable(
           colourless
-              ? HSLColor.fromColor(_trafficLight[i])
+              // black (or white) fading to grey: the theme's own colour, not a traffic light
+              ? hsl.withLightness((dark ? hsl.lightness - i * .15 : hsl.lightness + i * .15).clamp(0.0, 1.0))
               : hsl.withHue((hsl.hue + i * 18) % 360).withSaturation((hsl.saturation * (1 - i * .08)).clamp(0.0, 1.0)),
           card,
           dark: dark,
@@ -94,9 +95,6 @@ class AraLook extends ThemeExtension<AraLook> {
   /// least 3:1.
   static Color readableOn(Color colour, Color background) =>
       _readable(HSLColor.fromColor(colour), background, dark: background.computeLuminance() < .4);
-
-  /// a colourless accent's ping scale: green, yellow, orange, red
-  static const _trafficLight = [Color(0xFF16A34A), Color(0xFFCA8A04), Color(0xFFEA580C), Color(0xFFDC2626)];
 
   static Color _readable(HSLColor colour, Color card, {required bool dark}) {
     var c = colour;
