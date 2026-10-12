@@ -9,6 +9,7 @@ import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The traffic panel: live speed on the accent gradient, then matching tiles for this session, the share that
@@ -59,7 +60,9 @@ class SideBarStatsOverview extends ConsumerWidget {
     final onSpeed = gradient != null ? theme.araLook.onGradient : scheme.onPrimaryContainer;
     final minute = ref.watch(speedHistoryProvider);
     // the Statistics tab picks the period; the sidebar always shows the last minute
-    final range = large ? ref.watch(statsRangeProvider) : StatsRange.minute;
+    // the Statistics tab and the computer's sidebar pick the period; elsewhere it's the last minute
+    final pickRange = large || PlatformUtils.isDesktop;
+    final range = pickRange ? ref.watch(statsRangeProvider) : StatsRange.minute;
     ref.watch(trafficHistoryProvider);
     final series = range == StatsRange.minute ? null : ref.read(trafficHistoryProvider.notifier).series(range);
     final history = series?.points ?? minute;
@@ -136,7 +139,10 @@ class SideBarStatsOverview extends ConsumerWidget {
             color: onSpeed,
           ),
           ...[
-            if (large) ...[Gap(dense ? 8 : 12), _RangePicker(range: range, color: onSpeed)],
+            if (pickRange) ...[
+              Gap(dense || !large ? 8 : 12),
+              _RangePicker(range: range, color: onSpeed, short: !large),
+            ],
             Gap(large && !dense ? 12 : 10),
             if (fill || split)
               Expanded(child: graph)
@@ -851,7 +857,10 @@ bool _isRed(Color color) {
 
 /// The period chips on the speed block: a minute, ten minutes, an hour, a day, all the time.
 class _RangePicker extends ConsumerWidget {
-  const _RangePicker({required this.range, required this.color});
+  const _RangePicker({required this.range, required this.color, this.short = false});
+
+  /// the narrow sidebar's labels: «1м», «10м», «1ч», «24ч», «Всё»
+  final bool short;
 
   final StatsRange range;
   final Color color;
@@ -884,7 +893,13 @@ class _RangePicker extends ConsumerWidget {
                   border: Border.all(color: color.withValues(alpha: r == range ? .5 : .18)),
                 ),
                 child: Text(
-                  labels[r]!,
+                  short
+                      ? labels[r]!
+                            .replaceAll(' мин', 'м')
+                            .replaceAll(' ч', 'ч')
+                            .replaceAll(' min', 'm')
+                            .replaceAll(' h', 'h')
+                      : labels[r]!,
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   style: theme.textTheme.labelMedium?.copyWith(
