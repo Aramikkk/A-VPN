@@ -49,7 +49,7 @@ cd ./tools/hcore-build && go test -tags=with_gvisor,with_quic,with_wireguard,wit
 dart run slang                                         # после правок в assets/translations/*.i18n.json
 dart run build_runner build --delete-conflicting-outputs   # после правок моделей/провайдеров
 flutter analyze --no-pub lib && flutter test --no-pub
-flutter build apk --release --target lib/main_prod.dart --split-per-abi --target-platform android-arm,android-arm64 --no-pub
+flutter build apk --release --target lib/main_prod.dart --split-per-abi --target-platform android-arm64 --no-pub
 cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ./A-VPN/share/A-VPN.apk
 ```
 

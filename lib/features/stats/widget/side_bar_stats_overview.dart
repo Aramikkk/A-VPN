@@ -584,7 +584,8 @@ class _SpeedGraph extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final timeAxis = detailed ? 14.0 : 0.0;
-    final peak = samples.fold<int>(0, (m, s) => s.down > m ? s.down : (s.up > m ? s.up : m));
+    // the scale covers both lines: an upload burst above the download used to run off the top
+    final peak = samples.fold<int>(0, (m, s) => [m, s.down, s.up].reduce((a, b) => a > b ? a : b));
     final top = niceCeiling(peak);
     final rows = detailed ? 4 : 2;
     // the scale's values sit in their own strip on the right, clear of the lines
@@ -619,6 +620,8 @@ class _SpeedGraph extends CustomPainter {
       }
     }
     if (samples.length < 2) return;
+    // nothing draws outside the chart (the end dots may reach a little over its edges)
+    canvas.clipRect(Rect.fromLTRB(-6, -6, chart.width + 6, chart.height + 6));
 
     final start = chart.width - step * (samples.length - 1);
     Offset point(int i, int value) => Offset(start + step * i, chart.height - chart.height * value / top);
