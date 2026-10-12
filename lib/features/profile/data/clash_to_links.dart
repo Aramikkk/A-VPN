@@ -32,7 +32,8 @@ abstract class ClashToLinks {
     return switch (p['type']) {
       'vless' => 'vless://${Uri.encodeComponent('${p['uuid']}')}@$host?${_query(_vlessParams(p))}#$name',
       'trojan' => 'trojan://${Uri.encodeComponent('${p['password']}')}@$host?${_query(_vlessParams(p))}#$name',
-      'hysteria2' => 'hy2://${Uri.encodeComponent('${p['password'] ?? p['auth'] ?? ''}')}@$host?${_query(_hy2Params(p))}#$name',
+      'hysteria2' =>
+        'hy2://${Uri.encodeComponent('${p['password'] ?? p['auth'] ?? ''}')}@$host?${_query(_hy2Params(p))}#$name',
       _ => null,
     };
   }

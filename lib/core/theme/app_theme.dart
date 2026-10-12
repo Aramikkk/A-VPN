@@ -16,7 +16,8 @@ class AppTheme {
   AraLook _look(Brightness brightness) => AraLook(
     gradient: accent.gradient(brightness),
     onGradient: accent.onGradient(brightness),
-    fastPing: brightness == Brightness.dark ? const Color(0xFF6CCB5F) : const Color(0xFF0F7B0F),
+    // the ping's colour scale starts at the accent (red, orange… in the red theme)
+    fastPing: brightness == Brightness.dark ? accent.darkPrimary : accent.lightPrimary,
     border: accent.pure ? (brightness == Brightness.dark ? Colors.white54 : Colors.black45) : null,
   );
 

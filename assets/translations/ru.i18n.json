@@ -48,7 +48,7 @@
     "accentSunset": "Закат",
     "accentLagoon": "Лагуна",
     "accentNeon": "Неон",
-    "accentAcid": "A-VPN",
+    "accentAcid": "Кислотная",
     "speedTab": "Статистика",
     "speedHistory": "Последняя минута",
     "statsPing": "Пинг",
@@ -76,7 +76,9 @@
     "graphStart": "60 с назад",
     "graphNow": "сейчас",
     "graphPeak": "Пик",
-    "graphAverage": "Средняя"
+    "graphAverage": "Средняя",
+    "accentMonoRed": "Моно-красная",
+    "statsTitle": "Статистика"
   },
   "common": {
     "appTitle": "A-VPN",

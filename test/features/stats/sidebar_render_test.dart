@@ -112,6 +112,36 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      // stretched to the servers' column on an unfolded phone: fills the given height without overflowing
+      if (dense) {
+        await tester.binding.setSurfaceSize(Size(width, 700));
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              translationsProvider.overrideWith((ref) async => t),
+              statsNotifierProvider.overrideWith(_Stats.new),
+              connectionQualityProvider.overrideWith(_Quality.new),
+              speedHistoryProvider.overrideWith(_History.new),
+            ],
+            child: MaterialApp(
+              theme: theme.lightTheme(null),
+              home: Scaffold(
+                body: Consumer(
+                  builder: (context, ref, _) => !ref.watch(translationsProvider).hasValue
+                      ? const SizedBox()
+                      : const SizedBox(height: 660, child: SideBarStatsOverview(large: true, dense: true, fill: true)),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getSize(find.byType(SideBarStatsOverview)).height, 660);
+        if (Platform.environment['RENDER'] == '1') {
+          await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/sidebar_fill.png'));
+        }
+        continue;
+      }
       // beside the servers on an unfolded phone the whole panel has to fit the screen's height
       if (dense) {
         final height = tester.getSize(find.byType(SideBarStatsOverview)).height;

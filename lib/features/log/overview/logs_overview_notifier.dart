@@ -38,10 +38,7 @@ class LogsOverviewNotifier extends _$LogsOverviewNotifier with AppLogger {
     _drawn = logRing.revision;
     const initial = LogsOverviewState();
     return initial.copyWith(
-      logs: logRing.view(
-        minLevel: initial.minLevel,
-        category: initial.category,
-      ),
+      logs: logRing.view(minLevel: initial.minLevel, category: initial.category),
     );
   }
 
@@ -56,11 +53,7 @@ class LogsOverviewNotifier extends _$LogsOverviewNotifier with AppLogger {
 
   List<LogRecord> _view() {
     _drawn = logRing.revision;
-    return logRing.view(
-      minLevel: state.minLevel,
-      category: state.category,
-      text: state.text,
-    );
+    return logRing.view(minLevel: state.minLevel, category: state.category, text: state.text);
   }
 
   /// Called from TickerMode, so a shell route that keeps this page mounted off
@@ -99,9 +92,7 @@ class LogsOverviewNotifier extends _$LogsOverviewNotifier with AppLogger {
   }
 
   void filterCategory(LogCategory? category) {
-    state = category == null
-        ? state.copyWith(clearCategory: true)
-        : state.copyWith(category: category);
+    state = category == null ? state.copyWith(clearCategory: true) : state.copyWith(category: category);
     state = state.copyWith(logs: _view());
   }
 

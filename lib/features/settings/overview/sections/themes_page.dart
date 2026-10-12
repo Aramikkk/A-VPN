@@ -29,6 +29,7 @@ class AccentPicker extends ConsumerWidget {
     final selected = ref.watch(Preferences.araAccent);
     final brightness = Theme.of(context).brightness;
     String name(AraAccent accent) => switch (accent) {
+      AraAccent.monoRed => t.avpn.accentMonoRed,
       AraAccent.acid => t.avpn.accentAcid,
       AraAccent.windows => t.avpn.accentWindows,
       AraAccent.aurora => t.avpn.accentAurora,

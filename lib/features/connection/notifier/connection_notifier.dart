@@ -231,6 +231,4 @@ class SingleCall {
 }
 
 /// Whether the core is hot reloading; only the connection button shows it.
-final hotReloadingProvider = StreamProvider<bool>(
-  (ref) => ref.watch(connectionRepositoryProvider).watchHotReloading(),
-);
+final hotReloadingProvider = StreamProvider<bool>((ref) => ref.watch(connectionRepositoryProvider).watchHotReloading());

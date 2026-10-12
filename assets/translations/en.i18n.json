@@ -48,7 +48,7 @@
     "accentSunset": "Sunset",
     "accentLagoon": "Lagoon",
     "accentNeon": "Neon",
-    "accentAcid": "A-VPN",
+    "accentAcid": "Acid",
     "speedTab": "Statistics",
     "speedHistory": "Last minute",
     "statsPing": "Ping",
@@ -76,7 +76,9 @@
     "graphStart": "60 s ago",
     "graphNow": "now",
     "graphPeak": "Peak",
-    "graphAverage": "Average"
+    "graphAverage": "Average",
+    "accentMonoRed": "Mono red",
+    "statsTitle": "Statistics"
   },
   "common": {
     "appTitle": "A-VPN",

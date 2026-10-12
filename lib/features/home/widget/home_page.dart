@@ -70,15 +70,38 @@ class HomePage extends HookConsumerWidget {
         builder: (context, constraints) {
           // an unfolded phone (a Fold is ~750 dp wide) or a tablet: the servers on the left, the statistics on the right
           if (!PlatformUtils.isDesktop && constraints.maxWidth >= 700) {
-            return const Row(
+            // the right column mirrors the left one: a heading like "Current provider", the same outer margin, and
+            // the panel stretched to end level with the connection card (when the screen is tall enough for it)
+            final heading = Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+              child: Text(
+                t.avpn.statsTitle.toUpperCase(),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 1.2),
+              ),
+            );
+            final tall = constraints.maxHeight >= 560;
+            return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(flex: 11, child: AraHomeBody()),
+                const Expanded(flex: 11, child: AraHomeBody()),
                 Expanded(
                   flex: 9,
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.only(right: 4),
-                    child: SideBarStatsOverview(large: true, dense: true),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 4, 16, 16),
+                    child: tall
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              heading,
+                              const Expanded(child: SideBarStatsOverview(large: true, dense: true, fill: true)),
+                            ],
+                          )
+                        : SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [heading, const SideBarStatsOverview(large: true, dense: true)],
+                            ),
+                          ),
                   ),
                 ),
               ],

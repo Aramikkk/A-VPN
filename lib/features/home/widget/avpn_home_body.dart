@@ -351,12 +351,9 @@ class _Delay extends ConsumerWidget {
     if (delay <= 0) return Text('—', style: style?.copyWith(color: scheme.onSurfaceVariant));
     if (delay > 65000) return Icon(Icons.close_rounded, size: 14, color: scheme.error);
     // yellow and orange need darker shades to read on the light theme's white
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final color = switch (delay) {
-      <= 100 => Theme.of(context).araLook.fastPing,
-      <= 150 => dark ? Colors.yellow.shade400 : Colors.amber.shade800,
-      <= 250 => dark ? Colors.orange.shade400 : Colors.deepOrange.shade600,
-      <= 500 => dark ? Colors.redAccent.shade200 : Colors.red.shade700,
+      // the theme's own scale (red, orange, amber, yellow in the red theme), grey when slow
+      <= 500 => Theme.of(context).araLook.pingColor(delay, scheme.onSurfaceVariant),
       _ => scheme.onSurfaceVariant,
     };
     final number = Text('$delay ms', style: style?.copyWith(color: color));

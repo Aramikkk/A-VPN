@@ -14,13 +14,17 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// went through the VPN and the share that went direct. In the desktop sidebar, and [large] (with the last
 /// minute's speed graph) on the phone's Speed tab.
 class SideBarStatsOverview extends ConsumerWidget {
-  const SideBarStatsOverview({super.key, this.large = false, this.dense = false});
+  const SideBarStatsOverview({super.key, this.large = false, this.dense = false, this.fill = false});
 
   final bool large;
 
   /// [large] made to fit one screen height (the unfolded phone's home, beside the servers): a lower graph,
   /// legend and figures on one line, compact cards
   final bool dense;
+
+  /// [dense] stretched to the height it's given (the unfolded home, level with the servers' column): the graph
+  /// takes the room left over; no padding of its own
+  final bool fill;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -62,64 +66,65 @@ class SideBarStatsOverview extends ConsumerWidget {
       compact: compact,
     );
 
-    return Padding(
-      padding: dense ? const EdgeInsets.fromLTRB(12, 4, 12, 8) : EdgeInsets.all(large ? 16 : 10),
+    final graph = CustomPaint(
+      painter: _SpeedGraph(
+        history,
+        color: onSpeed,
+        label: speed,
+        detailed: large,
+        textStyle: theme.textTheme.labelSmall!.copyWith(color: onSpeed.withValues(alpha: .75), fontSize: 10),
+        startLabel: t.avpn.graphStart,
+        nowLabel: t.avpn.graphNow,
+      ),
+    );
+    final speedBlock = Container(
+      padding: EdgeInsets.fromLTRB(16, dense ? 12 : 14, 16, large && !dense ? 16 : 12),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        color: gradient == null ? scheme.primaryContainer : null,
+        border: theme.araLook.border == null ? null : Border.all(color: theme.araLook.border!),
+        borderRadius: BorderRadius.circular(large ? 24 : 16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: EdgeInsets.fromLTRB(16, dense ? 12 : 14, 16, large && !dense ? 16 : 12),
-            decoration: BoxDecoration(
-              gradient: gradient,
-              color: gradient == null ? scheme.primaryContainer : null,
-              border: theme.araLook.border == null ? null : Border.all(color: theme.araLook.border!),
-              borderRadius: BorderRadius.circular(large ? 24 : 16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _Caption(t.avpn.statsSpeed, color: onSpeed.withValues(alpha: .8)),
-                const Gap(8),
-                _SpeedRow(
-                  icon: Icons.south_rounded,
-                  label: t.avpn.statsDownload,
-                  value: speed(stats.downlink.toInt()),
-                  color: onSpeed,
-                  big: true,
-                ),
-                const Gap(4),
-                _SpeedRow(
-                  icon: Icons.north_rounded,
-                  label: t.avpn.statsUpload,
-                  value: speed(stats.uplink.toInt()),
-                  color: onSpeed,
-                ),
-                ...[
-                  Gap(large && !dense ? 16 : 10),
-                  SizedBox(
-                    height: dense ? 92 : (large ? 130 : 64),
-                    child: CustomPaint(
-                      painter: _SpeedGraph(
-                        history,
-                        color: onSpeed,
-                        label: speed,
-                        detailed: large,
-                        textStyle: theme.textTheme.labelSmall!.copyWith(
-                          color: onSpeed.withValues(alpha: .75),
-                          fontSize: 10,
-                        ),
-                        startLabel: t.avpn.graphStart,
-                        nowLabel: t.avpn.graphNow,
-                      ),
-                    ),
-                  ),
-                  const Gap(8),
-                  _GraphSummary(history: history, color: onSpeed, speed: speed, oneLine: dense),
-                ],
-              ],
-            ),
+          _Caption(t.avpn.statsSpeed, color: onSpeed.withValues(alpha: .8)),
+          const Gap(8),
+          _SpeedRow(
+            icon: Icons.south_rounded,
+            label: t.avpn.statsDownload,
+            value: speed(stats.downlink.toInt()),
+            color: onSpeed,
+            big: true,
           ),
+          const Gap(4),
+          _SpeedRow(
+            icon: Icons.north_rounded,
+            label: t.avpn.statsUpload,
+            value: speed(stats.uplink.toInt()),
+            color: onSpeed,
+          ),
+          ...[
+            Gap(large && !dense ? 16 : 10),
+            if (fill) Expanded(child: graph) else SizedBox(height: dense ? 92 : (large ? 130 : 64), child: graph),
+            const Gap(8),
+            _GraphSummary(history: history, color: onSpeed, speed: speed, oneLine: dense),
+          ],
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: fill
+          ? EdgeInsets.zero
+          : dense
+          ? const EdgeInsets.fromLTRB(12, 4, 12, 8)
+          : EdgeInsets.all(large ? 16 : 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          if (fill) Expanded(child: speedBlock) else speedBlock,
           Gap(large ? 10 : 8),
           _QualityCard(samples: quality, compact: compact),
           const Gap(8),
@@ -619,7 +624,9 @@ class _QualityCard extends ConsumerWidget {
               value(
                 t.avpn.statsPing,
                 summary.ping == null ? '—' : '${summary.ping} ms',
-                summary.ping == null ? scheme.onSurfaceVariant : scheme.primary,
+                summary.ping == null
+                    ? scheme.onSurfaceVariant
+                    : theme.araLook.pingColor(summary.ping!, scheme.onSurfaceVariant),
               ),
               value(
                 t.avpn.statsLoss,
@@ -634,8 +641,10 @@ class _QualityCard extends ConsumerWidget {
             child: CustomPaint(
               painter: _PingBars(
                 samples,
-                ok: scheme.primary,
-                lost: scheme.error,
+                ok: theme.araLook.pingColors.first,
+                colorOf: (ms) => theme.araLook.pingColor(ms, scheme.onSurfaceVariant),
+                // a lost probe in red, unless red already means a fast ping (the red theme): then in the text colour
+                lost: _isRed(theme.araLook.pingColors.first) ? scheme.onSurface : scheme.error,
                 track: scheme.outlineVariant.withValues(alpha: .5),
               ),
             ),
@@ -654,10 +663,13 @@ class _QualityCard extends ConsumerWidget {
 
 /// One bar per probe, height by ping (scaled to the slowest answer); a lost probe is a full-height red bar.
 class _PingBars extends CustomPainter {
-  _PingBars(this.samples, {required this.ok, required this.lost, required this.track});
+  _PingBars(this.samples, {required this.ok, required this.lost, required this.track, this.colorOf});
 
   final List<int?> samples;
   final Color ok;
+
+  /// each answered probe in the colour of its ping (the theme's scale)
+  final Color Function(int ms)? colorOf;
   final Color lost;
   final Color track;
 
@@ -677,11 +689,16 @@ class _PingBars extends CustomPainter {
       final height = sample == null ? size.height : (size.height * (sample / peak)).clamp(3.0, size.height);
       canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height - height, barWidth, height), const Radius.circular(2)),
-        Paint()..color = sample == null ? lost : ok,
+        Paint()..color = sample == null ? lost : (colorOf?.call(sample) ?? ok),
       );
     }
   }
 
   @override
   bool shouldRepaint(_PingBars old) => old.samples != samples || old.ok != ok;
+}
+
+bool _isRed(Color color) {
+  final hue = HSLColor.fromColor(color).hue;
+  return hue < 20 || hue > 340;
 }

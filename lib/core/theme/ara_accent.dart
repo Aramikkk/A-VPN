@@ -1,11 +1,19 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 /// The app's accent: its colour and the gradient on the speed block, the provider badge and the
 /// connection card. Picked in Settings → General.
 enum AraAccent {
-  /// A-VPN's own acid green (the phone's default); dark text on it.
+  /// A-VPN's own look (the default): black, graphite, grey and white with a red accent, after the Mono emblem.
+  /// Graphite blocks with white text by day and by night.
+  monoRed(
+    seed: Color(0xFFEE4245),
+    lightPrimary: Color(0xFFE0353A),
+    darkPrimary: Color(0xFFFF5A5D),
+    lightGradient: [Color(0xFF0E0E0E), Color(0xFF2B2B2B), Color(0xFF474747)],
+    darkGradient: [Color(0xFF2B2B2B), Color(0xFF1C1C1C), Color(0xFF0E0E0E)],
+  ),
+
+  /// A-VPN's earlier acid green; dark text on it.
   acid(
     seed: Color(0xFF9EFF1F),
     lightPrimary: Color(0xFF3B8A00),
@@ -126,7 +134,7 @@ enum AraAccent {
   /// pure black / pure white backgrounds and outlined blocks (the OLED theme)
   final bool pure;
 
-  static AraAccent get platformDefault => Platform.isAndroid || Platform.isIOS ? acid : windows;
+  static AraAccent get platformDefault => monoRed;
 
   /// Text and icons on the gradient.
   Color onGradient(Brightness brightness) => brightness == Brightness.dark ? darkOnGradient : lightOnGradient;
