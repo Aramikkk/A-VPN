@@ -739,8 +739,6 @@ class _Orb extends HookWidget {
       }
       return null;
     }, [busy]);
-    final hsl = HSLColor.fromColor(scheme.primary);
-    final second = hsl.saturation < .12 ? scheme.primary : hsl.withHue((hsl.hue + 28) % 360).toColor();
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -751,7 +749,8 @@ class _Orb extends HookWidget {
           builder: (context, _) => CustomPaint(
             painter: _RingPainter(
               colors: on || busy
-                  ? [scheme.primary, second, scheme.primary]
+                  // one colour, the accent
+                  ? [scheme.primary, scheme.primary]
                   : [scheme.outlineVariant, scheme.outlineVariant],
               sweep: on ? 1 : (busy ? .3 : 1),
               rotation: spin.value,
@@ -761,31 +760,24 @@ class _Orb extends HookWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    center: const Alignment(0, -.25),
-                    colors: dark
-                        ? const [Color(0xFF2C2C32), Color(0xFF121215)]
-                        : const [Colors.white, Color(0xFFE9E9EE)],
-                  ),
+                  // one colour, no gradient
+                  color: dark ? const Color(0xFF16161A) : Colors.white,
                   boxShadow: on
                       ? [BoxShadow(color: scheme.primary.withValues(alpha: dark ? .45 : .3), blurRadius: 28)]
                       : null,
                 ),
                 child: Center(
-                  child: AraIconPaint(
-                    enabled: on,
-                    child: Icon(
-                      Icons.power_settings_new_rounded,
-                      size: 30,
-                      // the neon themes: the ring and the icon in the neon, the middle dark
-                      color: on
-                          ? (theme.araLook.neonFill == null
-                                ? (dark ? Colors.white : scheme.primary)
-                                : (dark
-                                      ? theme.araLook.neonFill!
-                                      : AraLook.readableOn(theme.araLook.neonFill!, Colors.white)))
-                          : scheme.onSurfaceVariant,
-                    ),
+                  child: Icon(
+                    Icons.power_settings_new_rounded,
+                    size: 30,
+                    // the neon themes: the ring and the icon in the neon, the middle dark
+                    color: on
+                        ? (theme.araLook.neonFill == null
+                              ? (dark ? Colors.white : scheme.primary)
+                              : (dark
+                                    ? theme.araLook.neonFill!
+                                    : AraLook.readableOn(theme.araLook.neonFill!, Colors.white)))
+                        : scheme.onSurfaceVariant,
                   ),
                 ),
               ),

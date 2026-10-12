@@ -466,41 +466,43 @@ class _CheckRow extends HookConsumerWidget {
     // the toggles on the left, the ping check (classic) on the right
     return Row(
       children: [
-        // a narrow phone moves the last toggle to a second line rather than cut it
+        // one line; a very narrow screen shrinks it a little rather than cut it
         Expanded(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _ToggleChip(
-                icon: Icons.wifi_tethering_rounded,
-                label: t.avpn.sharing,
-                selected: sharingOn,
-                onSelected: toggleSharing,
-              ),
-              _ToggleChip(
-                icon: Icons.public_rounded,
-                label: t.avpn.global,
-                selected: ref.watch(ConfigOptions.globalMode),
-                onSelected: toggleGlobal,
-              ),
-              if (serverAvailable) ...[
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Row(
+              spacing: 6,
+              children: [
                 _ToggleChip(
-                  icon: Icons.home_rounded,
-                  label: t.avpn.server,
-                  selected: serverOn,
-                  onSelected: toggleServer,
+                  icon: Icons.wifi_tethering_rounded,
+                  label: t.avpn.sharing,
+                  selected: sharingOn,
+                  onSelected: toggleSharing,
                 ),
+                _ToggleChip(
+                  icon: Icons.public_rounded,
+                  label: t.avpn.global,
+                  selected: ref.watch(ConfigOptions.globalMode),
+                  onSelected: toggleGlobal,
+                ),
+                if (serverAvailable) ...[
+                  _ToggleChip(
+                    icon: Icons.home_rounded,
+                    label: t.avpn.server,
+                    selected: serverOn,
+                    onSelected: toggleServer,
+                  ),
+                ],
+                if (sharingOn)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: t.avpn.sharingTitle,
+                    icon: const Icon(Icons.info_outline_rounded, size: 20),
+                    onPressed: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+                  ),
               ],
-              if (sharingOn)
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: t.avpn.sharingTitle,
-                  icon: const Icon(Icons.info_outline_rounded, size: 20),
-                  onPressed: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
-                ),
-            ],
+            ),
           ),
         ),
         if (showCheck)
@@ -526,12 +528,16 @@ class _ToggleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return FilterChip(
-      avatar: Icon(icon, size: 18, color: selected ? scheme.onPrimary : null),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      labelPadding: const EdgeInsetsDirectional.only(start: 2, end: 6),
+      avatar: Icon(icon, size: 16, color: selected ? scheme.onPrimary : null),
       label: Text(label),
       selected: selected,
       showCheckmark: false,
       selectedColor: scheme.primary,
-      labelStyle: TextStyle(color: selected ? scheme.onPrimary : null),
+      labelStyle: TextStyle(fontSize: 13, color: selected ? scheme.onPrimary : null),
       // the styled looks shape their chips themselves
       shape: Theme.of(context).araLook.style == AraStyle.classic
           ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
