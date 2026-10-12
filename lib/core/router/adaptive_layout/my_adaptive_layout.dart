@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
+import 'package:hiddify/core/router/adaptive_layout/nav_icons.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
@@ -164,18 +165,26 @@ class MyAdaptiveLayout extends HookConsumerWidget {
   }
 
   List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
-    ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
-    if (isMobileBreakpoint) ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab),
-    ShellRouteAction(Icons.list_alt_rounded, t.avpn.connectionsTab),
-    ShellRouteAction(Icons.hub_rounded, t.avpn.topologyTab),
-    if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
-    ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title),
+    ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title, svg: NavIcons.home),
+    if (isMobileBreakpoint) ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab, svg: NavIcons.stats),
+    ShellRouteAction(Icons.list_alt_rounded, t.avpn.connectionsTab, svg: NavIcons.connections),
+    ShellRouteAction(Icons.hub_rounded, t.avpn.topologyTab, svg: NavIcons.topology),
+    if (showProfilesAction && !isMobileBreakpoint)
+      ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title, svg: NavIcons.profiles),
+    ShellRouteAction(Icons.settings_rounded, t.pages.settings.title, svg: NavIcons.settings),
+    if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title, svg: NavIcons.logs),
+    if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title, svg: NavIcons.about),
   ];
 
-  List<NavigationDestination> _navDests(List<ShellRouteAction> actions) =>
-      actions.map((e) => NavigationDestination(icon: Icon(e.icon), label: e.title)).toList();
-  List<NavigationRailDestination> _navRailDests(List<ShellRouteAction> actions) =>
-      actions.map((e) => NavigationRailDestination(icon: Icon(e.icon), label: Text(e.title))).toList();
+  Widget _icon(ShellRouteAction e, {bool selected = false}) =>
+      e.svg == null ? Icon(e.icon) : NavIcon(e.svg!, selected: selected);
+
+  List<NavigationDestination> _navDests(List<ShellRouteAction> actions) => actions
+      .map((e) => NavigationDestination(icon: _icon(e), selectedIcon: _icon(e, selected: true), label: e.title))
+      .toList();
+  List<NavigationRailDestination> _navRailDests(List<ShellRouteAction> actions) => actions
+      .map(
+        (e) => NavigationRailDestination(icon: _icon(e), selectedIcon: _icon(e, selected: true), label: Text(e.title)),
+      )
+      .toList();
 }

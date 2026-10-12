@@ -36,65 +36,50 @@ class _StyledHome extends HookConsumerWidget {
       _ => _withFlag(serverName(current!)),
     };
 
-    final glow = !editorial
-        ? BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(0, -1.15),
-              radius: 1.05,
-              colors: [
-                scheme.primary.withValues(alpha: theme.brightness == Brightness.dark ? .2 : .1),
-                Colors.transparent,
-              ],
-            ),
-          )
-        : null;
-
-    return DecoratedBox(
-      decoration: glow ?? const BoxDecoration(),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 2, 18, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _StatusBlock(editorial: editorial, status: status, lastServer: currentName),
-            const Gap(14),
-            _ServersHeader(
-              editorial: editorial,
-              profile: profile,
-              testing: testing,
-              onCheck: connected ? onCheck : null,
-            ),
-            const Gap(6),
-            Expanded(
-              child: profile == null
-                  ? _EmptyCard(text: t.avpn.noProfile)
-                  : servers.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          t.avpn.connectToSeeServers,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _StatusBlock(editorial: editorial, status: status, lastServer: currentName),
+          const Gap(14),
+          _ServersHeader(
+            editorial: editorial,
+            profile: profile,
+            testing: testing,
+            onCheck: connected && editorial ? onCheck : null,
+            showCheck: editorial,
+          ),
+          const Gap(6),
+          Expanded(
+            child: profile == null
+                ? _EmptyCard(text: t.avpn.noProfile)
+                : servers.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        t.avpn.connectToSeeServers,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                       ),
-                    )
-                  : _StyledServerList(
-                      editorial: editorial,
-                      servers: servers,
-                      selectedTag: group?.selected,
-                      autoNow: autoNow,
-                      testing: testing,
                     ),
-            ),
-            const Gap(6),
-            _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
-            if (editorial)
-              _EditorialDock(status: status)
-            else
-              _GraphiteDock(status: status, server: connected ? currentName : null),
-          ],
-        ),
+                  )
+                : _StyledServerList(
+                    editorial: editorial,
+                    servers: servers,
+                    selectedTag: group?.selected,
+                    autoNow: autoNow,
+                    testing: testing,
+                  ),
+          ),
+          const Gap(6),
+          _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
+          if (editorial)
+            _EditorialDock(status: status)
+          else
+            _GraphiteDock(status: status, server: connected ? currentName : null, testing: testing, onCheck: onCheck),
+        ],
       ),
     );
   }
@@ -131,64 +116,81 @@ class _StatusBlock extends HookConsumerWidget {
     final time = _duration(now.value.difference(stats?.sessionStartedAt ?? since.value ?? now.value));
     final down = speed(stats?.downlink.toInt() ?? 0);
     final up = speed(stats?.uplink.toInt() ?? 0);
-    final title = switch (status) {
-      Connected() => t.avpn.stProtected,
+    final waiting = switch (status) {
       Connecting() => t.avpn.connecting,
       Disconnecting() => t.avpn.disconnecting,
-      Disconnected() => t.avpn.stOff,
+      _ => null,
     };
 
     if (editorial) {
-      final line = connected
-          ? '${t.avpn.stProtected} $time · ↓ $down · ↑ $up'
-          : (status.isSwitching ? title : t.avpn.stNoVpn);
+      final line = connected ? '$time · ↓ $down · ↑ $up' : (waiting ?? t.avpn.stNoVpn);
       return Padding(
-        padding: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.only(top: 8),
         child: Text(
           line.toUpperCase(),
           maxLines: 2,
-          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, letterSpacing: .8),
-        ),
-      );
-    }
-    final small = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontSize: 26,
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .2,
             color: connected ? scheme.onSurface : scheme.onSurfaceVariant,
           ),
         ),
+      );
+    }
+    if (!connected) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          waiting ?? t.avpn.stTapBelow,
+          style: theme.textTheme.titleMedium?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w700),
+        ),
+      );
+    }
+    final big = theme.textTheme.titleMedium?.copyWith(
+      fontSize: 18,
+      fontWeight: FontWeight.w800,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    Widget item(IconData icon, String text, {Color? colour}) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: colour ?? scheme.onSurfaceVariant),
         const Gap(4),
-        if (connected)
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: '${t.avpn.stConnected} · '),
-                TextSpan(
-                  text: time,
-                  style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w800),
-                ),
-                TextSpan(text: '  ·  ↓ $down  ·  ↑ $up'),
-              ],
-            ),
-            style: small?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          )
-        else
-          Text(t.avpn.stTapBelow, style: small),
+        Text(text, style: big?.copyWith(color: colour)),
       ],
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          children: [
+            item(Icons.schedule_rounded, time, colour: scheme.primary),
+            const Gap(18),
+            item(Icons.south_rounded, down),
+            const Gap(14),
+            item(Icons.north_rounded, up),
+          ],
+        ),
+      ),
     );
   }
 }
 
 /// "СЕРВЕРЫ · Sigma · 23 дн." with the subscription's refresh, and the ping check.
 class _ServersHeader extends ConsumerWidget {
-  const _ServersHeader({required this.editorial, required this.profile, required this.testing, this.onCheck});
+  const _ServersHeader({
+    required this.editorial,
+    required this.profile,
+    required this.testing,
+    this.onCheck,
+    this.showCheck = true,
+  });
+
+  /// the ping check at the end (Graphite has it in the connect panel)
+  final bool showCheck;
 
   final bool editorial;
   final ProfileEntity? profile;
@@ -245,34 +247,35 @@ class _ServersHeader extends ConsumerWidget {
                   ),
           ),
         const Spacer(),
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: testing ? null : onCheck,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Row(
-              children: [
-                if (testing)
-                  SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 1.6, color: scheme.primary),
-                  )
-                else
-                  Icon(
-                    Icons.refresh_rounded,
-                    size: 15,
-                    color: onCheck == null ? scheme.onSurfaceVariant : scheme.primary,
+        if (showCheck)
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: testing ? null : onCheck,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                children: [
+                  if (testing)
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.6, color: scheme.primary),
+                    )
+                  else
+                    Icon(
+                      Icons.refresh_rounded,
+                      size: 15,
+                      color: onCheck == null ? scheme.onSurfaceVariant : scheme.primary,
+                    ),
+                  const Gap(4),
+                  Text(
+                    (editorial ? t.avpn.stPingMs : t.avpn.stPing).toUpperCase(),
+                    style: label?.copyWith(color: onCheck == null ? scheme.onSurfaceVariant : scheme.primary),
                   ),
-                const Gap(4),
-                Text(
-                  (editorial ? t.avpn.stPingMs : t.avpn.stPing).toUpperCase(),
-                  style: label?.copyWith(color: onCheck == null ? scheme.onSurfaceVariant : scheme.primary),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
     if (!editorial) return row;
@@ -500,7 +503,9 @@ class _EditorialRow extends StatelessWidget {
           fontSize: 15,
           fontWeight: FontWeight.w800,
           letterSpacing: 0,
-          color: delay > 150 || selected ? scheme.primary : (delay <= 0 ? scheme.onSurfaceVariant : ink),
+          color: selected
+              ? _onInk(scheme)
+              : (delay > 150 ? scheme.primary : (delay <= 0 ? scheme.onSurfaceVariant : ink)),
         ),
       );
     }
@@ -556,10 +561,12 @@ Future<void> _toggleConnection(WidgetRef ref) async {
 
 /// Graphite's connect panel: the glowing ring button, the state and server, and a pill button.
 class _GraphiteDock extends ConsumerWidget {
-  const _GraphiteDock({required this.status, required this.server});
+  const _GraphiteDock({required this.status, required this.server, required this.testing, required this.onCheck});
 
   final ConnectionStatus status;
   final String? server;
+  final bool testing;
+  final VoidCallback onCheck;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -613,15 +620,23 @@ class _GraphiteDock extends ConsumerWidget {
             ),
           ),
           const Gap(8),
-          FilledButton(
+          // connected: check the servers' ping (the ring button disconnects); off: connect
+          FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: on || busy ? scheme.surfaceContainerHighest : scheme.primary,
-              foregroundColor: on || busy ? scheme.onSurface : scheme.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              backgroundColor: on ? scheme.surfaceContainerHighest : scheme.primary,
+              foregroundColor: on ? scheme.onSurface : scheme.onPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 14),
             ),
-            onPressed: busy ? null : () => _toggleConnection(ref),
-            child: Text(on ? t.avpn.stDisconnect : t.avpn.stConnect),
+            onPressed: busy || (on && testing) ? null : (on ? onCheck : () => _toggleConnection(ref)),
+            icon: on && testing
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
+                  )
+                : Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
+            label: Text(on ? t.avpn.stPingButton : t.avpn.stConnect),
           ),
         ],
       ),
@@ -812,3 +827,7 @@ class _EditorialDock extends ConsumerWidget {
     );
   }
 }
+
+/// The accent where it sits on ink (the chosen row, the switch's knob): itself when it reads there, else paper.
+Color _onInk(ColorScheme scheme) =>
+    AraLook.contrast(scheme.primary, scheme.onSurface) >= 2.6 ? scheme.primary : scheme.surface;

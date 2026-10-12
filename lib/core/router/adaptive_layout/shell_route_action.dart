@@ -5,5 +5,8 @@ class ShellRouteAction {
   final IconData icon;
   final String title;
 
-  ShellRouteAction(this.icon, this.title);
+  /// the line icon's shapes (NavIcons); drawn instead of [icon] when set
+  final String? svg;
+
+  ShellRouteAction(this.icon, this.title, {this.svg});
 }

@@ -147,7 +147,8 @@
     "styleEditorialHint": "Paper, ink and big type",
     "styleClassicHint": "The earlier look, cards and gradients",
     "daysShort": "$days d",
-    "stNotProtected": "not protected"
+    "stNotProtected": "not protected",
+    "stPingButton": "Ping"
   },
   "common": {
     "appTitle": "A-VPN",

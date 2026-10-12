@@ -147,7 +147,8 @@
     "styleEditorialHint": "Бумага, чернила и крупный шрифт",
     "styleClassicHint": "Прежний вид, карточки и градиенты",
     "daysShort": "$days дн.",
-    "stNotProtected": "не защищено"
+    "stNotProtected": "не защищено",
+    "stPingButton": "Пинг"
   },
   "common": {
     "appTitle": "A-VPN",

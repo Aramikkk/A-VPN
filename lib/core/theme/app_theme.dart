@@ -229,7 +229,11 @@ class AppTheme {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
     final p = palette(style, brightness);
-    final primary = AraLook.readableOn(dark ? accent.darkPrimary : accent.lightPrimary, p.bg);
+    final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
+    final accentColour = editorial && colourless
+        ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A))
+        : (dark ? accent.darkPrimary : accent.lightPrimary);
+    final primary = AraLook.readableOn(accentColour, p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
     final scheme = ColorScheme.fromSeed(seedColor: accent.seed, brightness: brightness).copyWith(
       primary: primary,
@@ -277,7 +281,12 @@ class AppTheme {
       labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       labelMedium: base.labelMedium?.copyWith(fontWeight: FontWeight.w600),
       labelSmall: editorial
-          ? base.labelSmall?.copyWith(fontFamily: 'JetBrains Mono', fontWeight: FontWeight.w700, fontSize: 10.5, letterSpacing: 0)
+          ? base.labelSmall?.copyWith(
+              fontFamily: 'JetBrains Mono',
+              fontWeight: FontWeight.w700,
+              fontSize: 10.5,
+              letterSpacing: 0,
+            )
           : base.labelSmall?.copyWith(fontWeight: FontWeight.w600),
     );
 

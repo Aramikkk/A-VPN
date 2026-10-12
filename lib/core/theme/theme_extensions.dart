@@ -106,6 +106,9 @@ class AraLook extends ThemeExtension<AraLook> {
     return c.toColor();
   }
 
+  /// The WCAG contrast ratio of two colours (1 to 21).
+  static double contrast(Color a, Color b) => _contrast(a, b);
+
   static double _contrast(Color a, Color b) {
     final la = a.computeLuminance();
     final lb = b.computeLuminance();

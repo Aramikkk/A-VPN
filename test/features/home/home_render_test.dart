@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/core/router/adaptive_layout/nav_icons.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
@@ -156,12 +157,19 @@ void main() {
                         appBar: AppBar(title: const Text('A-VPN')),
                         body: const AraHomeBody(),
                         bottomNavigationBar: NavigationBar(
-                          destinations: const [
-                            NavigationDestination(icon: Icon(Icons.power_settings_new_rounded), label: 'Главная'),
-                            NavigationDestination(icon: Icon(Icons.speed_rounded), label: 'Статистика'),
-                            NavigationDestination(icon: Icon(Icons.list_alt_rounded), label: 'Соединения'),
-                            NavigationDestination(icon: Icon(Icons.hub_rounded), label: 'Топология'),
-                            NavigationDestination(icon: Icon(Icons.settings_rounded), label: 'Настройки'),
+                          destinations: [
+                            for (final (svg, label) in [
+                              (NavIcons.home, 'Главная'),
+                              (NavIcons.stats, 'Статистика'),
+                              (NavIcons.connections, 'Соединения'),
+                              (NavIcons.topology, 'Топология'),
+                              (NavIcons.settings, 'Настройки'),
+                            ])
+                              NavigationDestination(
+                                icon: NavIcon(svg),
+                                selectedIcon: NavIcon(svg, selected: true),
+                                label: label,
+                              ),
                           ],
                         ),
                       ),

@@ -4,6 +4,8 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/gen/assets.gen.dart';
@@ -18,8 +20,13 @@ class HomePage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final t = ref.watch(translationsProvider).requireValue;
 
-    return Scaffold(
+    // Graphite: a soft glow in the accent colour from the top, behind the app bar and both columns of an unfolded
+    // phone
+    final graphite = theme.araLook.style == AraStyle.graphite;
+    final scaffold = Scaffold(
+      backgroundColor: graphite ? Colors.transparent : null,
       appBar: AppBar(
+        backgroundColor: graphite ? Colors.transparent : null,
         // leading: (RootScaffold.stateKey.currentState?.hasDrawer ?? false) && showDrawerButton(context)
         //     ? DrawerButton(
         //         onPressed: () {
@@ -118,6 +125,24 @@ class HomePage extends HookConsumerWidget {
           );
         },
       ),
+    );
+    if (!graphite) return scaffold;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        gradient: RadialGradient(
+          center: const Alignment(0, -1.25),
+          radius: 1.25,
+          colors: [
+            Color.alphaBlend(
+              theme.colorScheme.primary.withValues(alpha: theme.brightness == Brightness.dark ? .2 : .1),
+              theme.scaffoldBackgroundColor,
+            ),
+            theme.scaffoldBackgroundColor,
+          ],
+        ),
+      ),
+      child: scaffold,
     );
   }
 }
