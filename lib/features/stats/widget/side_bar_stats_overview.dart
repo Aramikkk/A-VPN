@@ -14,9 +14,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// went through the VPN and the share that went direct. In the desktop sidebar, and [large] (with the last
 /// minute's speed graph) on the phone's Speed tab.
 class SideBarStatsOverview extends ConsumerWidget {
-  const SideBarStatsOverview({super.key, this.large = false});
+  const SideBarStatsOverview({super.key, this.large = false, this.dense = false});
 
   final bool large;
+
+  /// [large] made to fit one screen height (the unfolded phone's home, beside the servers): a lower graph,
+  /// legend and figures on one line, compact cards
+  final bool dense;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,30 +45,31 @@ class SideBarStatsOverview extends ConsumerWidget {
     final history = ref.watch(speedHistoryProvider);
     final quality = ref.watch(connectionQualityProvider);
 
+    final compact = !large || dense;
     final vpnTile = _Tile(
       icon: Icons.shield_rounded,
-      title: large ? t.avpn.statsViaVpn : 'VPN',
+      title: large && !dense ? t.avpn.statsViaVpn : 'VPN',
       value: vpn == null ? '—' : size(vpn),
       share: share,
       accent: true,
-      compact: !large,
+      compact: compact,
     );
     final directTile = _Tile(
       icon: Icons.alt_route_rounded,
       title: t.avpn.statsDirect,
       value: direct == null ? '—' : size(direct),
       share: share == null ? null : 1 - share,
-      compact: !large,
+      compact: compact,
     );
 
     return Padding(
-      padding: EdgeInsets.all(large ? 16 : 10),
+      padding: dense ? const EdgeInsets.fromLTRB(12, 4, 12, 8) : EdgeInsets.all(large ? 16 : 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, large ? 16 : 14),
+            padding: EdgeInsets.fromLTRB(16, dense ? 12 : 14, 16, large && !dense ? 16 : 12),
             decoration: BoxDecoration(
               gradient: gradient,
               color: gradient == null ? scheme.primaryContainer : null,
@@ -91,9 +96,9 @@ class SideBarStatsOverview extends ConsumerWidget {
                   color: onSpeed,
                 ),
                 ...[
-                  Gap(large ? 16 : 10),
+                  Gap(large && !dense ? 16 : 10),
                   SizedBox(
-                    height: large ? 130 : 64,
+                    height: dense ? 92 : (large ? 130 : 64),
                     child: CustomPaint(
                       painter: _SpeedGraph(
                         history,
@@ -110,13 +115,13 @@ class SideBarStatsOverview extends ConsumerWidget {
                     ),
                   ),
                   const Gap(8),
-                  _GraphSummary(history: history, color: onSpeed, speed: speed),
+                  _GraphSummary(history: history, color: onSpeed, speed: speed, oneLine: dense),
                 ],
               ],
             ),
           ),
           Gap(large ? 10 : 8),
-          _QualityCard(samples: quality, compact: !large),
+          _QualityCard(samples: quality, compact: compact),
           const Gap(8),
           _pair(
             _Tile(
@@ -126,14 +131,14 @@ class SideBarStatsOverview extends ConsumerWidget {
               detail: large
                   ? '↓ ${size(session.down)}   ↑ ${size(session.up)}'
                   : '↓ ${size(session.down)}\n↑ ${size(session.up)}',
-              compact: !large,
+              compact: compact,
             ),
             _Tile(
               icon: Icons.lan_rounded,
               title: t.avpn.statsConnectionsShort,
               value: '${stats.connectionsIn}',
               showBar: false,
-              compact: !large,
+              compact: compact,
             ),
           ),
           const Gap(8),
@@ -327,11 +332,14 @@ class _SpeedRow extends StatelessWidget {
 
 /// The legend and the minute's peak and average download speed, under the graph.
 class _GraphSummary extends ConsumerWidget {
-  const _GraphSummary({required this.history, required this.color, required this.speed});
+  const _GraphSummary({required this.history, required this.color, required this.speed, this.oneLine = false});
 
   final List<({int down, int up})> history;
   final Color color;
   final String Function(int) speed;
+
+  /// the legend and the figures side by side (they wrap when there's no room)
+  final bool oneLine;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -349,6 +357,38 @@ class _GraphSummary extends ConsumerWidget {
         Text(text, style: style),
       ],
     );
+    final downMark = Container(
+      width: 12,
+      height: 8,
+      decoration: BoxDecoration(color: color.withValues(alpha: .55), borderRadius: BorderRadius.circular(2)),
+    );
+    final upMark = SizedBox(width: 14, height: 8, child: CustomPaint(painter: _DashSample(color)));
+    if (oneLine) {
+      // the marks with arrows instead of words, and the figures beside them
+      return Row(
+        children: [
+          legend(downMark, '↓'),
+          const Gap(10),
+          legend(upMark, '↑'),
+          const Gap(12),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: '${t.avpn.graphPeak} ', style: style),
+                  TextSpan(text: speed(peak), style: strong),
+                  TextSpan(text: '  ${t.avpn.graphAverage} ', style: style),
+                  TextSpan(text: speed(average), style: strong),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -471,9 +511,8 @@ class _SpeedGraph extends CustomPainter {
       final y = chart.height * i / rows;
       canvas.drawLine(Offset(0, y), Offset(chart.width, y), grid);
       if (i < rows) {
-        // centred on its line, except the top one, which hangs below it
-        final dy = i == 0 ? 0.0 : labels[i].height / 2;
-        labels[i].paint(canvas, Offset(size.width - labels[i].width, y - dy));
+        // each value hangs just below its line, so they're evenly spaced
+        labels[i].paint(canvas, Offset(size.width - labels[i].width, y + 1));
       }
     }
     if (detailed) {

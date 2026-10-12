@@ -78,7 +78,7 @@ class HomePage extends HookConsumerWidget {
                   flex: 9,
                   child: SingleChildScrollView(
                     padding: EdgeInsets.only(right: 4),
-                    child: SideBarStatsOverview(large: true),
+                    child: SideBarStatsOverview(large: true, dense: true),
                   ),
                 ),
               ],

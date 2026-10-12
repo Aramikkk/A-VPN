@@ -61,7 +61,7 @@ Future<void> _loadFont(String family, List<String> files) async {
 }
 
 void main() {
-  testWidgets('traffic panel fits: desktop sidebar 248 px, unfolded phone 330 px', (tester) async {
+  testWidgets('traffic panel fits: desktop sidebar 248 px, phone tab 330 px, unfolded home 320 x 640', (tester) async {
     await _loadFont('Segoe UI Variable Text', [r'C:\Windows\Fonts\SegUIVar.ttf']);
     await _loadFont('Segoe UI', [
       r'C:\Windows\Fonts\segoeui.ttf',
@@ -69,13 +69,18 @@ void main() {
       r'C:\Windows\Fonts\segoeuib.ttf',
     ]);
     final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
-    for (final (dark, width, large) in [(false, 248.0, false), (true, 248.0, false), (true, 330.0, true)]) {
+    for (final (dark, width, large, dense) in [
+      (false, 248.0, false, false),
+      (true, 248.0, false, false),
+      (true, 330.0, true, false),
+      (false, 320.0, true, true),
+    ]) {
       final theme = AppTheme(
         AppThemeMode.system,
         '',
         accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'lagoon'),
       );
-      await tester.binding.setSurfaceSize(Size(width, large ? 1100 : 760));
+      await tester.binding.setSurfaceSize(Size(width, dense ? 640 : (large ? 1100 : 760)));
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -97,7 +102,7 @@ void main() {
                         child: SingleChildScrollView(
                           child: SizedBox(
                             width: width,
-                            child: SideBarStatsOverview(large: large),
+                            child: SideBarStatsOverview(large: large, dense: dense),
                           ),
                         ),
                       ),
@@ -107,12 +112,19 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      // beside the servers on an unfolded phone the whole panel has to fit the screen's height
+      if (dense) {
+        final height = tester.getSize(find.byType(SideBarStatsOverview)).height;
+        expect(height, lessThanOrEqualTo(640), reason: 'the dense panel is $height tall');
+      }
       // overflowing text fails the test by itself; the picture is written only on request (RENDER=1)
       if (Platform.environment['RENDER'] == '1') {
         await expectLater(
           find.byType(MaterialApp),
           matchesGoldenFile(
-            'goldens/sidebar_${large
+            'goldens/sidebar_${dense
+                ? 'dense'
+                : large
                 ? 'large'
                 : dark
                 ? 'dark'
