@@ -183,7 +183,7 @@ class _StylePreview extends StatelessWidget {
     final dark = brightness == Brightness.dark;
     final p = style == AraStyle.classic ? null : AppTheme.palette(style, brightness);
     final cyber = style == AraStyle.cyberpunk;
-    final neon = cyber ? (dark ? const Color(0xFF00F0FF) : const Color(0xFFD1003F)) : accent;
+    final neon = cyber ? (dark ? const Color(0xFFFF7A00) : const Color(0xFFFF5A00)) : accent;
     final bg = p?.bg ?? (dark ? Colors.black : Colors.white);
     final fg = p?.fg ?? (dark ? Colors.white : Colors.black);
     final line = p?.line ?? (dark ? const Color(0xFF26262B) : const Color(0xFFDDDFDA));

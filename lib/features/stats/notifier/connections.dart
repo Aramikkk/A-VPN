@@ -154,7 +154,11 @@ class SeenConnection {
 
   /// "🇸🇪 Доступ - Швеция 2" → "🇸🇪 Швеция 2": the flag and the country, without the provider's prefix.
   static String serverName(String tag) {
-    final name = tag.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').trim();
+    final name = tag
+        .replaceAll('§hide§', '')
+        .replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '')
+        .replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma')
+        .trim();
     final dash = name.indexOf(' - ');
     if (dash < 0) return name;
     final flag = RegExp(r'^(\S+)\s').firstMatch(name)?.group(1);

@@ -7,7 +7,7 @@ enum AraStyle {
   /// Editorial: paper (or dark paper), black and one accent colour, huge type, monospaced labels and thin rules.
   editorial,
 
-  /// Cyberpunk: night city black with neon cyan and magenta, by day signal yellow with black; cut corners,
+  /// Cyberpunk: pure black by night, pure white by day, with contrasting neons (orange, cyan, magenta); cut corners,
   /// monospaced labels and a neon glow. Its colours are its own, whatever the colour theme.
   cyberpunk,
 

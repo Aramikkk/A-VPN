@@ -150,7 +150,12 @@
     "stNotProtected": "not protected",
     "stPingButton": "Ping",
     "styleCyberpunk": "Cyberpunk",
-    "styleCyberpunkHint": "Neon by night, signal yellow by day"
+    "styleCyberpunkHint": "Black and white with neon accents",
+    "topoServerCount": "Servers",
+    "topoFlow": "Where the traffic goes",
+    "topoServersTitle": "VPN servers",
+    "topoRulesTitle": "By which rules",
+    "ruleEverythingElse": "everything else"
   },
   "common": {
     "appTitle": "A-VPN",

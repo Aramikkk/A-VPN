@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 
 /// The menu's line icons: thin rounded strokes in the icon colour the menu gives each state; the chosen tab's
 /// lines are bolder.
@@ -48,6 +49,12 @@ class NavIcon extends StatelessWidget {
     final svg =
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" '
         'stroke-width="${selected ? 2.3 : 1.7}" stroke-linecap="round" stroke-linejoin="round">$paths</svg>';
-    return SvgPicture.string(svg, width: size, height: size, colorFilter: ColorFilter.mode(colour, BlendMode.srcIn));
+    final picture = SvgPicture.string(
+      svg,
+      width: size,
+      height: size,
+      colorFilter: ColorFilter.mode(colour, BlendMode.srcIn),
+    );
+    return AraIconPaint(enabled: selected, child: picture);
   }
 }

@@ -155,7 +155,7 @@ class _StatusBlock extends HookConsumerWidget {
     Widget item(IconData icon, String text, {Color? colour}) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: colour ?? scheme.onSurfaceVariant),
+        AraIconPaint(child: Icon(icon, size: 18, color: colour ?? scheme.onSurfaceVariant)),
         const Gap(4),
         Text(text, style: big?.copyWith(color: colour)),
       ],
@@ -308,43 +308,53 @@ class _StyledServerList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final scheme = Theme.of(context).colorScheme;
-    final list = ListView.builder(
-      padding: EdgeInsets.symmetric(vertical: editorial ? 0 : 4, horizontal: editorial ? 0 : 6),
-      itemCount: servers.length,
-      itemBuilder: (context, i) {
-        final server = servers[i];
-        final selected = server.tag == selectedTag || (server.tag == 'lowest' && selectedTag == 'balance');
-        final name = serverName(server);
-        final auto = server.tag == 'lowest';
-        // "Финляндия" with "Sigma · VLESS" under it, rather than "Sigma - Финляндия"
-        final dash = name.title.indexOf(' - ');
-        final title = auto ? t.avpn.auto : (dash < 0 ? name.title : name.title.substring(dash + 3).trim());
-        final subtitle = auto
-            ? (autoNow == null ? t.avpn.autoBestHint : '${t.avpn.stNow}: ${_withFlag(serverName(autoNow!))}')
-            : [if (dash > 0) name.title.substring(0, dash).trim(), server.type.toUpperCase()].join(' · ');
-        void select() => ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
-        return editorial
-            ? _EditorialRow(
-                flag: server.isGroup ? null : name.flag,
-                group: server.isGroup,
-                title: title,
-                subtitle: subtitle,
-                delay: server.urlTestDelay,
-                selected: selected,
-                testing: testing,
-                onTap: select,
-              )
-            : _GraphiteRow(
-                flag: server.isGroup ? null : name.flag,
-                group: server.isGroup,
-                title: title,
-                subtitle: subtitle,
-                delay: server.urlTestDelay,
-                selected: selected,
-                testing: testing,
-                first: i == 0,
-                onTap: select,
-              );
+    final list = LayoutBuilder(
+      builder: (context, box) {
+        final base = editorial ? 66.0 : 64.0;
+        final room = box.maxHeight - (editorial ? 0 : 8);
+        final rows = (room / base).floor().clamp(1, 1000);
+        // whole rows only: they stretch a little so the last one in view isn't cut in half
+        final extent = servers.length <= rows ? base : room / rows;
+        return ListView.builder(
+          itemExtent: extent,
+          padding: EdgeInsets.symmetric(vertical: editorial ? 0 : 4, horizontal: editorial ? 0 : 6),
+          itemCount: servers.length,
+          itemBuilder: (context, i) {
+            final server = servers[i];
+            final selected = server.tag == selectedTag || (server.tag == 'lowest' && selectedTag == 'balance');
+            final name = serverName(server);
+            final auto = server.tag == 'lowest';
+            // "Финляндия" with "Sigma · VLESS" under it, rather than "Sigma - Финляндия"
+            final dash = name.title.indexOf(' - ');
+            final title = auto ? t.avpn.auto : (dash < 0 ? name.title : name.title.substring(dash + 3).trim());
+            final subtitle = auto
+                ? (autoNow == null ? t.avpn.autoBestHint : '${t.avpn.stNow}: ${_withFlag(serverName(autoNow!))}')
+                : [if (dash > 0) name.title.substring(0, dash).trim(), server.type.toUpperCase()].join(' · ');
+            void select() => ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
+            return editorial
+                ? _EditorialRow(
+                    flag: server.isGroup ? null : name.flag,
+                    group: server.isGroup,
+                    title: title,
+                    subtitle: subtitle,
+                    delay: server.urlTestDelay,
+                    selected: selected,
+                    testing: testing,
+                    onTap: select,
+                  )
+                : _GraphiteRow(
+                    flag: server.isGroup ? null : name.flag,
+                    group: server.isGroup,
+                    title: title,
+                    subtitle: subtitle,
+                    delay: server.urlTestDelay,
+                    selected: selected,
+                    testing: testing,
+                    first: i == 0,
+                    onTap: select,
+                  );
+          },
+        );
       },
     );
     if (editorial) return list;
@@ -380,7 +390,7 @@ class _Flag extends StatelessWidget {
       width: 26,
       child: Center(
         child: group
-            ? Icon(Icons.auto_awesome_rounded, size: 17, color: color)
+            ? AraIconPaint(child: Icon(Icons.auto_awesome_rounded, size: 17, color: color))
             : Text(flag ?? '🌐', style: const TextStyle(fontSize: 18, fontFamilyFallback: ['Emoji'])),
       ),
     );
@@ -433,33 +443,36 @@ class _GraphiteRow extends StatelessWidget {
                     border: Border(left: BorderSide(color: scheme.primary, width: 3)),
                   )
                 : null,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            child: Row(
-              children: [
-                _Flag(flag: flag, group: group, color: scheme.primary),
-                const Gap(12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 15),
-                      ),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 12),
-                      ),
-                    ],
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  _Flag(flag: flag, group: group, color: scheme.primary),
+                  const Gap(12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 17),
+                        ),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const Gap(8),
-                _Delay(delay: delay, testing: testing),
-              ],
+                  const Gap(8),
+                  _Delay(delay: delay, testing: testing),
+                ],
+              ),
             ),
           ),
         ),
@@ -515,7 +528,8 @@ class _EditorialRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
           color: selected ? scheme.onSurface : null,
           border: Border(bottom: BorderSide(color: selected ? scheme.onSurface : scheme.outlineVariant)),
@@ -532,7 +546,7 @@ class _EditorialRow extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 17, color: ink),
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 18, color: ink),
                   ),
                   const Gap(1),
                   Text(
@@ -647,7 +661,10 @@ class _GraphiteDock extends ConsumerWidget {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
                   )
-                : Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
+                : AraIconPaint(
+                    enabled: on,
+                    child: Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
+                  ),
             label: Text(on ? t.avpn.stPingButton : t.avpn.stConnect),
           ),
         ],
@@ -716,10 +733,13 @@ class _Orb extends HookWidget {
                       : null,
                 ),
                 child: Center(
-                  child: Icon(
-                    Icons.power_settings_new_rounded,
-                    size: 30,
-                    color: on ? (dark ? Colors.white : scheme.primary) : scheme.onSurfaceVariant,
+                  child: AraIconPaint(
+                    enabled: on,
+                    child: Icon(
+                      Icons.power_settings_new_rounded,
+                      size: 30,
+                      color: on ? (dark ? Colors.white : scheme.primary) : scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),

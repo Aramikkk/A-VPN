@@ -42,7 +42,15 @@ class AraLook extends ThemeExtension<AraLook> {
     this.graphDown,
     this.graphUp,
     this.style = AraStyle.classic,
+    this.iconGradient,
+    this.pingOn,
   });
+
+  /// a neon gradient the icons are painted in (Cyberpunk); null: plain icons
+  final Gradient? iconGradient;
+
+  /// the cards the ping colours have to read on; null: white (or near-black) cards
+  final Color? pingOn;
 
   /// the look the theme was built for: the home screen and a few blocks draw themselves to match it
   final AraStyle style;
@@ -60,7 +68,7 @@ class AraLook extends ThemeExtension<AraLook> {
 
   /// The ping's colours from fast to slow (≤100, ≤150, ≤250, ≤500 ms), drawn from the theme's accent: in the red
   /// theme red, orange, amber, yellow. Slower than that is grey.
-  List<Color> get pingColors => pingScale(fastPing, dark: dark);
+  List<Color> get pingColors => pingScale(fastPing, dark: dark, card: pingOn);
 
   /// The colour for a ping of [ms] milliseconds; [muted] for slower than 500 ms.
   Color pingColor(int ms, Color muted) => switch (ms) {
@@ -74,10 +82,10 @@ class AraLook extends ThemeExtension<AraLook> {
   /// Four steps from [base]: the hue turns a little warmer each step and the colour softens; a colourless accent
   /// (Monochrome, OLED) fades from black (or white) towards grey instead. Every step is darkened (light theme) or lightened
   /// (dark theme) as far as needed to stay readable on the cards: contrast at least 3:1.
-  static List<Color> pingScale(Color base, {bool dark = false}) {
+  static List<Color> pingScale(Color base, {bool dark = false, Color? card}) {
     final hsl = HSLColor.fromColor(base);
     final colourless = hsl.saturation < .12;
-    final card = dark ? const Color(0xFF17171A) : const Color(0xFFFBFBFB);
+    final on = card ?? (dark ? const Color(0xFF17171A) : const Color(0xFFFBFBFB));
     return [
       for (var i = 0; i < 4; i++)
         _readable(
@@ -85,7 +93,7 @@ class AraLook extends ThemeExtension<AraLook> {
               // black (or white) fading to grey: the theme's own colour, not a traffic light
               ? hsl.withLightness((dark ? hsl.lightness - i * .15 : hsl.lightness + i * .15).clamp(0.0, 1.0))
               : hsl.withHue((hsl.hue + i * 18) % 360).withSaturation((hsl.saturation * (1 - i * .08)).clamp(0.0, 1.0)),
-          card,
+          on,
           dark: dark,
         ),
     ];
@@ -131,6 +139,8 @@ class AraLook extends ThemeExtension<AraLook> {
     graphDown: graphDown,
     graphUp: graphUp,
     style: style,
+    iconGradient: iconGradient,
+    pingOn: pingOn,
   );
 
   @override
@@ -146,6 +156,8 @@ class AraLook extends ThemeExtension<AraLook> {
       graphDown: Color.lerp(graphDown, other.graphDown, t),
       graphUp: Color.lerp(graphUp, other.graphUp, t),
       style: t < .5 ? style : other.style,
+      iconGradient: Gradient.lerp(iconGradient, other.iconGradient, t),
+      pingOn: Color.lerp(pingOn, other.pingOn, t),
     );
   }
 }
@@ -153,4 +165,25 @@ class AraLook extends ThemeExtension<AraLook> {
 extension AraLookOf on ThemeData {
   AraLook get araLook =>
       extension<AraLook>() ?? AraLook(fastPing: colorScheme.primary, dark: brightness == Brightness.dark);
+}
+
+/// Paints [child] (an icon) in the theme's neon icon gradient when it has one.
+class AraIconPaint extends StatelessWidget {
+  const AraIconPaint({super.key, required this.child, this.enabled = true});
+
+  final Widget child;
+
+  /// false: leave the icon as it is (an unselected tab, a muted state)
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient = Theme.of(context).araLook.iconGradient;
+    if (gradient == null || !enabled) return child;
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (bounds) => gradient.createShader(bounds),
+      child: child,
+    );
+  }
 }

@@ -150,7 +150,12 @@
     "stNotProtected": "не защищено",
     "stPingButton": "Пинг",
     "styleCyberpunk": "Киберпанк",
-    "styleCyberpunkHint": "Неон ночью, сигнальный жёлтый днём"
+    "styleCyberpunkHint": "Чёрный и белый с неоновыми акцентами",
+    "topoServerCount": "Серверов",
+    "topoFlow": "Куда идёт трафик",
+    "topoServersTitle": "Серверы VPN",
+    "topoRulesTitle": "По каким правилам",
+    "ruleEverythingElse": "остальное"
   },
   "common": {
     "appTitle": "A-VPN",

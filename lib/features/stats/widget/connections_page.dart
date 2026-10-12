@@ -452,6 +452,12 @@ String? ruleLabel(String rule, Translations t) {
   if (match.contains(rknRuDomains.first)) return t.avpn.ruleBlocked;
   if (match.contains('xn--p1ai')) return t.avpn.ruleRuSites;
   if (match.contains(ruAppPackages.first)) return t.avpn.ruleRuApps;
+  final action = rule.contains('=>') ? rule.split('=>').last : '';
+  final listed = RegExp(r'\[([^\]]*)\]').allMatches(match).expand((m) => m.group(1)!.split(' ')).length;
+  // a long list of sites: the blocked ones (through the VPN) or the Russian ones (direct)
+  if (listed > 20) return action.contains('direct') ? t.avpn.ruleRuSites : t.avpn.ruleBlocked;
+  // only the protocol left to match: everything the other rules didn't take
+  if (RegExp(r'^network=\[[a-z ]+\]$').hasMatch(match)) return t.avpn.ruleEverythingElse;
   final values = RegExp(
     r'\[([^\]]*)\]',
   ).allMatches(match).expand((m) => m.group(1)!.split(' ')).where((v) => v.isNotEmpty);

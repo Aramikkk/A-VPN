@@ -8,7 +8,7 @@ class FlowNode {
 
   final int column;
   final String label;
-  final Color color;
+  Color color;
   double weight = 0;
   Rect rect = Rect.zero;
 
@@ -25,8 +25,9 @@ class FlowLink {
   double weight = 0;
 }
 
-/// The connections as flows between columns — app → rule → route → server — each node as tall as the
-/// connections (or traffic) through it. Built from [items]; small nodes in a column fold into "other".
+/// The connections as flows between columns — app → route (VPN, direct, blocked) → server — each node as tall as
+/// the connections (or traffic) through it. Built from [items]; small nodes in a column fold into "other". Each app
+/// gets its own colour, so its flow can be followed to its servers.
 class ConnectionFlow {
   ConnectionFlow._(this.columns, this.links);
 
@@ -39,10 +40,10 @@ class ConnectionFlow {
     List<SeenConnection> items, {
     required bool byTraffic,
     required String Function(String app) appName,
-    required String Function(String rule) ruleName,
     required String Function(ConnectionRoute route) routeName,
     required String other,
     required List<Color> palette,
+    required List<Color> appColours,
     required Color Function(ConnectionRoute route) routeColor,
     int maxPerColumn = 6,
   }) {
@@ -51,12 +52,7 @@ class ConnectionFlow {
     final paths = <(List<String>, double, ConnectionRoute)>[
       for (final c in items)
         (
-          [
-            appName(c.app),
-            ruleName(c.rule),
-            routeName(c.route),
-            if (c.route == ConnectionRoute.vpn && c.outbound.isNotEmpty) c.outbound,
-          ],
+          [appName(c.app), routeName(c.route), if (c.route == ConnectionRoute.vpn && c.outbound.isNotEmpty) c.outbound],
           weightOf(c),
           c.route,
         ),
@@ -64,13 +60,13 @@ class ConnectionFlow {
 
     // the biggest nodes of each column keep their names, the rest is "other"
     final keep = <int, Set<String>>{};
-    for (var col = 0; col < 4; col++) {
+    for (var col = 0; col < 3; col++) {
       final totals = <String, double>{};
       for (final (path, w, _) in paths) {
         if (col < path.length) totals[path[col]] = (totals[path[col]] ?? 0) + w;
       }
       final sorted = totals.keys.toList()..sort((a, b) => totals[b]!.compareTo(totals[a]!));
-      keep[col] = sorted.take(col == 2 ? 3 : maxPerColumn - 1).toSet();
+      keep[col] = sorted.take(col == 1 ? 3 : maxPerColumn - 1).toSet();
       if (sorted.length == maxPerColumn) keep[col]!.add(sorted.last);
     }
 
@@ -78,7 +74,7 @@ class ConnectionFlow {
     final links = <String, FlowLink>{};
     FlowNode node(int col, String label, ConnectionRoute route) => nodes.putIfAbsent(
       '$col\u0000$label',
-      () => FlowNode(col, label, col == 2 ? routeColor(route) : palette[col % palette.length]),
+      () => FlowNode(col, label, col == 1 ? routeColor(route) : palette[col == 0 ? 0 : 3]),
     );
     for (final (path, w, route) in paths) {
       final named = [for (var col = 0; col < path.length; col++) keep[col]!.contains(path[col]) ? path[col] : other];
@@ -99,7 +95,7 @@ class ConnectionFlow {
       n.weight = inW > outW ? inW : outW;
     }
     final columns = [
-      for (var col = 0; col < 4; col++)
+      for (var col = 0; col < 3; col++)
         nodes.values.where((n) => n.column == col).toList()..sort((a, b) {
           // "other" last, then by weight
           if (a.label == other) return 1;
@@ -107,6 +103,12 @@ class ConnectionFlow {
           return b.weight.compareTo(a.weight);
         }),
     ].where((c) => c.isNotEmpty).toList();
+    // the apps in distinct colours, the biggest first
+    if (columns.isNotEmpty) {
+      for (final (i, n) in columns.first.indexed) {
+        n.color = n.label == other ? palette[3] : appColours[i % appColours.length];
+      }
+    }
     return ConnectionFlow._(columns, links.values.toList());
   }
 }
@@ -123,9 +125,9 @@ class ConnectionFlowPainter extends CustomPainter {
   final String Function(double weight) valueLabel;
 
   /// the tallest a node gets, so a few connections don't fill the screen
-  static const maxNode = 90.0;
+  static const maxNode = 70.0;
 
-  static const bar = 10.0;
+  static const bar = 12.0;
   static const gap = 6.0;
 
   @override
@@ -135,6 +137,7 @@ class ConnectionFlowPainter extends CustomPainter {
     // the last column keeps room for its names on the right
     final step = cols == 1 ? 0.0 : (size.width * .66 - bar) / (cols - 1);
     final total = flow.columns.first.fold<double>(0, (s, n) => s + n.weight);
+    String share(double w) => total <= 0 ? '' : ' · ${(w * 100 / total).round()}%';
     // the chart's height: the screen, or less when there are only a few nodes (from the top)
     final most = flow.columns.fold<int>(0, (m, c) => c.length > m ? c.length : m);
     final area = (most * maxNode + gap * (most - 1)).clamp(0.0, size.height);
@@ -191,7 +194,7 @@ class ConnectionFlowPainter extends CustomPainter {
         path,
         Paint()
           ..shader = LinearGradient(
-            colors: [l.from.color.withValues(alpha: .38), l.to.color.withValues(alpha: .38)],
+            colors: [l.from.color.withValues(alpha: .42), l.to.color.withValues(alpha: .22)],
           ).createShader(Rect.fromLTRB(x0, 0, x1, size.height)),
       );
     }
@@ -200,7 +203,7 @@ class ConnectionFlowPainter extends CustomPainter {
     for (var c = 0; c < cols; c++) {
       final maxWidth = c == cols - 1 ? size.width - flow.columns[c].first.rect.right - 6 : step - bar - 8;
       for (final n in flow.columns[c]) {
-        canvas.drawRRect(RRect.fromRectAndRadius(n.rect, const Radius.circular(2)), Paint()..color = n.color);
+        canvas.drawRRect(RRect.fromRectAndRadius(n.rect, const Radius.circular(4)), Paint()..color = n.color);
         if (n.rect.height < 9 && flow.columns[c].length > 3) continue; // no room for a name
         TextPainter line(String text, TextStyle style) => TextPainter(
           text: TextSpan(text: text, style: style),
@@ -212,7 +215,7 @@ class ConnectionFlowPainter extends CustomPainter {
         final name = line(n.label, textStyle);
         final value = n.rect.height >= 26
             ? line(
-                valueLabel(n.weight),
+                '${valueLabel(n.weight)}${share(n.weight)}',
                 textStyle.copyWith(
                   color: textStyle.color?.withValues(alpha: .65),
                   fontWeight: FontWeight.w600,
@@ -243,7 +246,22 @@ class ConnectionFlowPainter extends CustomPainter {
 List<Color> flowPalette(Color primary, Color surface) {
   final hsl = HSLColor.fromColor(primary);
   final base = hsl.saturation < .12
-      ? const [Color(0xFF6E8BFF), Color(0xFF7FD18B), Color(0xFFF2C14E), Color(0xFFE88B8B)]
+      ? const [Color(0xFF6E8BFF), Color(0xFF7FD18B), Color(0xFFF2C14E), Color(0xFF9AA0A6)]
       : [primary, hsl.withHue((hsl.hue + 120) % 360).toColor(), primary, hsl.withHue((hsl.hue + 220) % 360).toColor()];
   return [for (final c in base) AraLook.readableOn(c, surface)];
 }
+
+/// Distinct colours for the apps, readable on [surface].
+List<Color> flowAppColours(Color surface) => [
+  for (final c in const [
+    Color(0xFF4C8DFF),
+    Color(0xFFFF7A45),
+    Color(0xFF2EC4B6),
+    Color(0xFFD45CFF),
+    Color(0xFFFFB020),
+    Color(0xFF52C452),
+    Color(0xFFFF5C8A),
+    Color(0xFF8C7CFF),
+  ])
+    AraLook.readableOn(c, surface),
+];

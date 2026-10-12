@@ -199,16 +199,16 @@ class AppTheme {
     final dark = brightness == Brightness.dark;
     if (style == AraStyle.cyberpunk) {
       return AraPalette(
-        bg: dark ? const Color(0xFF07070D) : const Color(0xFFFCEE0A),
-        fg: dark ? const Color(0xFFE6FBFF) : const Color(0xFF0A0A12),
-        muted: dark ? const Color(0xFF7189A6) : const Color(0xFF4A4520),
-        card: dark ? const Color(0xFF0E0E1A) : const Color(0xFFFFF6A3),
-        container: dark ? const Color(0xFF131325) : const Color(0xFFFFF27A),
-        high: dark ? const Color(0xFF19192F) : const Color(0xFFF2E33C),
-        highest: dark ? const Color(0xFF20203A) : const Color(0xFFE8D820),
-        line: dark ? const Color(0xFF1E2A3F) : const Color(0xFFD9CB2A),
-        strongLine: dark ? const Color(0xFF00F0FF) : const Color(0xFF0A0A12),
-        nav: dark ? const Color(0xFF07070D) : const Color(0xFFFCEE0A),
+        bg: dark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
+        fg: dark ? const Color(0xFFF5F5F7) : const Color(0xFF0A0A12),
+        muted: dark ? const Color(0xFF8A8A99) : const Color(0xFF5E5E6B),
+        card: dark ? const Color(0xFF0B0B10) : const Color(0xFFFFFFFF),
+        container: dark ? const Color(0xFF101016) : const Color(0xFFF8F8FA),
+        high: dark ? const Color(0xFF16161E) : const Color(0xFFF0F0F4),
+        highest: dark ? const Color(0xFF1E1E28) : const Color(0xFFE6E6EC),
+        line: dark ? const Color(0xFF1C1C26) : const Color(0xFFE2E2EA),
+        strongLine: dark ? const Color(0xFFFF7A00) : const Color(0xFF0A0A12),
+        nav: dark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
       );
     }
     return style == AraStyle.editorial
@@ -246,7 +246,7 @@ class AppTheme {
     final p = palette(style, brightness);
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
     final accentColour = cyber
-        ? (dark ? const Color(0xFF00F0FF) : const Color(0xFFD1003F))
+        ? (dark ? const Color(0xFFFF7A00) : const Color(0xFFFF5A00))
         : editorial && colourless
         ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A))
         : (dark ? accent.darkPrimary : accent.lightPrimary);
@@ -421,8 +421,8 @@ class AppTheme {
         ? [p.card, p.card]
         : cyber
         ? (dark
-              ? const [Color(0xFF151530), Color(0xFF0E0E1A), Color(0xFF1A0A1E)]
-              : const [Color(0xFFFFF8B8), Color(0xFFFFF6A3), Color(0xFFFFEF6B)])
+              ? const [Color(0xFF101018), Color(0xFF0A0A0F), Color(0xFF140A12)]
+              : const [Color(0xFFFFFFFF), Color(0xFFFCFCFE), Color(0xFFF5F5FA)])
         : dark
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
@@ -431,9 +431,9 @@ class AppTheme {
     final Color down;
     final Color up;
     if (cyber) {
-      // neon: cyan down and magenta up by night, magenta-red and teal on yellow by day
+      // neon: orange down and cyan up, on black by night and white by day
       down = primary;
-      up = dark ? const Color(0xFFFF2A6D) : const Color(0xFF00727D);
+      up = dark ? const Color(0xFF00F0FF) : const Color(0xFF0099A8);
     } else if (editorial) {
       down = p.fg;
       up = colourless ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A)) : primary;
@@ -454,6 +454,17 @@ class AppTheme {
       graphDown: AraLook.readableOn(down, block),
       graphUp: AraLook.readableOn(up, block),
       style: style,
+      pingOn: p.card,
+      // Cyberpunk's icons in neon: hot pink through orange to yellow (by day to cyan, to read on white)
+      iconGradient: cyber
+          ? LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: dark
+                  ? const [Color(0xFFFF2E63), Color(0xFFFF7A00), Color(0xFFFFD300)]
+                  : const [Color(0xFFFF2E63), Color(0xFFFF6A00), Color(0xFF00B8C4)],
+            )
+          : null,
     );
   }
 
