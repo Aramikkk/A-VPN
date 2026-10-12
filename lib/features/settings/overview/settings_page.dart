@@ -137,67 +137,84 @@ class SettingsPage extends HookConsumerWidget {
           const Gap(8),
         ],
       ),
+      // the sections in one outlined block, so the list reads as a whole
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         children: [
-          // TipCard(message: t.settings.experimentalMsg),
-          SettingsSection(
-            title: t.pages.settings.general.title,
-            icon: Icons.layers_rounded,
-            namedLocation: context.namedLocation('general'),
-          ),
-          SettingsSection(
-            title: t.avpn.settingsConnection,
-            icon: Icons.power_settings_new_rounded,
-            namedLocation: context.namedLocation('connectionOptions'),
-          ),
-          SettingsSection(
-            title: t.avpn.themes,
-            icon: Icons.palette_rounded,
-            namedLocation: context.namedLocation('themes'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.routing.title,
-            icon: Icons.route_rounded,
-            namedLocation: context.namedLocation('routingOptions'),
-          ),
-          SettingsSection(
-            title: t.avpn.settingsServers,
-            icon: Icons.dns_outlined,
-            namedLocation: context.namedLocation('serversOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.dns.title,
-            icon: Icons.dns_rounded,
-            namedLocation: context.namedLocation('dnsOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.inbound.title,
-            icon: Icons.input_rounded,
-            namedLocation: context.namedLocation('inboundOptions'),
-          ),
-          if (PlatformUtils.isIOS)
-            Material(
-              child: ListTile(
-                title: Text(t.pages.settings.resetTunnel),
-                leading: const Icon(Icons.autorenew_rounded),
-                onTap: () async {
-                  await ref.read(resetTunnelNotifierProvider.notifier).run();
-                },
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                children: [
+                  // TipCard(message: t.settings.experimentalMsg),
+                  SettingsSection(
+                    title: t.pages.settings.general.title,
+                    icon: Icons.layers_rounded,
+                    namedLocation: context.namedLocation('general'),
+                  ),
+                  SettingsSection(
+                    title: t.avpn.settingsConnection,
+                    icon: Icons.power_settings_new_rounded,
+                    namedLocation: context.namedLocation('connectionOptions'),
+                  ),
+                  SettingsSection(
+                    title: t.avpn.themes,
+                    icon: Icons.palette_rounded,
+                    namedLocation: context.namedLocation('themes'),
+                  ),
+                  SettingsSection(
+                    title: t.pages.settings.routing.title,
+                    icon: Icons.route_rounded,
+                    namedLocation: context.namedLocation('routingOptions'),
+                  ),
+                  SettingsSection(
+                    title: t.avpn.settingsServers,
+                    icon: Icons.dns_outlined,
+                    namedLocation: context.namedLocation('serversOptions'),
+                  ),
+                  SettingsSection(
+                    title: t.pages.settings.dns.title,
+                    icon: Icons.dns_rounded,
+                    namedLocation: context.namedLocation('dnsOptions'),
+                  ),
+                  SettingsSection(
+                    title: t.pages.settings.inbound.title,
+                    icon: Icons.input_rounded,
+                    namedLocation: context.namedLocation('inboundOptions'),
+                  ),
+                  if (PlatformUtils.isIOS)
+                    Material(
+                      child: ListTile(
+                        title: Text(t.pages.settings.resetTunnel),
+                        leading: const Icon(Icons.autorenew_rounded),
+                        onTap: () async {
+                          await ref.read(resetTunnelNotifierProvider.notifier).run();
+                        },
+                      ),
+                    ),
+                  // the logs and About are in the computer's side menu too, but the list is the same as on the phone
+                  ...[
+                    SettingsSection(
+                      title: t.pages.logs.title,
+                      icon: Icons.description_rounded,
+                      namedLocation: context.namedLocation('logs'),
+                    ),
+                    SettingsSection(
+                      title: t.pages.about.title,
+                      icon: Icons.info_rounded,
+                      namedLocation: context.namedLocation('about'),
+                    ),
+                  ],
+                ],
               ),
             ),
-          // the logs and About are in the computer's side menu too, but the list is the same as on the phone
-          ...[
-            SettingsSection(
-              title: t.pages.logs.title,
-              icon: Icons.description_rounded,
-              namedLocation: context.namedLocation('logs'),
-            ),
-            SettingsSection(
-              title: t.pages.about.title,
-              icon: Icons.info_rounded,
-              namedLocation: context.namedLocation('about'),
-            ),
-          ],
+          ),
         ],
       ),
     );

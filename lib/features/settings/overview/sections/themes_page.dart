@@ -5,6 +5,7 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
+import 'package:hiddify/features/settings/widget/settings_block.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Settings → Themes: light or dark (or with the system), and the colour theme.
@@ -16,7 +17,12 @@ class ThemesPage extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.themes)),
-      body: ListView(children: const [StylePicker(), ThemeModePrefTile(), AccentPicker()]),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        children: const [
+          SettingsBlock(children: [StylePicker(), ThemeModePrefTile(), AccentPicker()]),
+        ],
+      ),
     );
   }
 }

@@ -213,7 +213,7 @@ class _Count extends StatelessWidget {
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
+          border: Border.all(color: scheme.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,7 +302,7 @@ class _GroupCard extends HookConsumerWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -372,7 +372,7 @@ class _GroupCard extends HookConsumerWidget {
             ),
           ),
           if (expanded.value) ...[
-            Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: .6)),
+            Divider(height: 1, color: scheme.outlineVariant),
             for (final g in inner.take(50))
               _InnerRow(title: byApp ? (g.key.isEmpty ? '—' : g.key) : appName(g.key), group: g, size: size),
             if (inner.length > 50)

@@ -18,6 +18,7 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/route_rules/widget/rule_tile.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/settings/widget/settings_block.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -603,27 +604,32 @@ class ServersOptionsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.settingsServers)),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         children: [
-          _MenuOption(
-            title: routing.balancerStrategy.title,
-            selected: ref.watch(ConfigOptions.balancerStrategy),
-            choices: BalancerStrategy.values,
-            present: (value) => value.present(t),
-            onSelected: ref.read(ConfigOptions.balancerStrategy.notifier).update,
-          ),
-          divider,
-          SwitchListTile.adaptive(
-            title: Text(routing.europeOnlyServers),
-            subtitle: Text(routing.europeOnlyServersHint),
-            value: ref.watch(ConfigOptions.europeOnlyServers),
-            onChanged: ref.read(ConfigOptions.europeOnlyServers.notifier).update,
-          ),
-          divider,
-          SwitchListTile.adaptive(
-            title: Text(routing.serversByNetwork),
-            subtitle: Text(routing.serversByNetworkHint),
-            value: ref.watch(ConfigOptions.serversByNetwork),
-            onChanged: ref.read(ConfigOptions.serversByNetwork.notifier).update,
+          SettingsBlock(
+            children: [
+              _MenuOption(
+                title: routing.balancerStrategy.title,
+                selected: ref.watch(ConfigOptions.balancerStrategy),
+                choices: BalancerStrategy.values,
+                present: (value) => value.present(t),
+                onSelected: ref.read(ConfigOptions.balancerStrategy.notifier).update,
+              ),
+              divider,
+              SwitchListTile.adaptive(
+                title: Text(routing.europeOnlyServers),
+                subtitle: Text(routing.europeOnlyServersHint),
+                value: ref.watch(ConfigOptions.europeOnlyServers),
+                onChanged: ref.read(ConfigOptions.europeOnlyServers.notifier).update,
+              ),
+              divider,
+              SwitchListTile.adaptive(
+                title: Text(routing.serversByNetwork),
+                subtitle: Text(routing.serversByNetworkHint),
+                value: ref.watch(ConfigOptions.serversByNetwork),
+                onChanged: ref.read(ConfigOptions.serversByNetwork.notifier).update,
+              ),
+            ],
           ),
         ],
       ),

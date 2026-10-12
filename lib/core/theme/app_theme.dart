@@ -206,7 +206,7 @@ class AppTheme {
         container: dark ? const Color(0xFF101016) : const Color(0xFFF8F8FA),
         high: dark ? const Color(0xFF16161E) : const Color(0xFFF0F0F4),
         highest: dark ? const Color(0xFF1E1E28) : const Color(0xFFE6E6EC),
-        line: dark ? const Color(0xFF1C1C26) : const Color(0xFFE2E2EA),
+        line: dark ? const Color(0xFF2C2C3A) : const Color(0xFFD2D2DC),
         strongLine: dark ? const Color(0xFFFF7A00) : const Color(0xFF0A0A12),
         nav: dark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
       );
@@ -220,7 +220,7 @@ class AppTheme {
             container: dark ? const Color(0xFF211F1C) : const Color(0xFFE6E2D9),
             high: dark ? const Color(0xFF282521) : const Color(0xFFDFDAD0),
             highest: dark ? const Color(0xFF2F2C27) : const Color(0xFFD7D2C7),
-            line: dark ? const Color(0xFF34312C) : const Color(0xFFD3CFC5),
+            line: dark ? const Color(0xFF46423B) : const Color(0xFFC2BDB1),
             strongLine: dark ? const Color(0xFFECE8DF) : const Color(0xFF111111),
             nav: dark ? const Color(0xFF131211) : const Color(0xFFF3F1EC),
           )
@@ -232,7 +232,7 @@ class AppTheme {
             container: dark ? const Color(0xFF1A1A1D) : const Color(0xFFF8F8FA),
             high: dark ? const Color(0xFF202024) : const Color(0xFFEFEFF2),
             highest: dark ? const Color(0xFF26262B) : const Color(0xFFE8E8EC),
-            line: dark ? const Color(0xFF242428) : const Color(0xFFE4E4E9),
+            line: dark ? const Color(0xFF34343B) : const Color(0xFFD3D3DA),
             strongLine: dark ? const Color(0xFF4A4A52) : const Color(0xFFB9B9C2),
             nav: dark ? const Color(0xFF0F0F12) : Colors.white,
           );
@@ -254,7 +254,7 @@ class AppTheme {
             container: dark ? const Color(0xFF0E0E10) : const Color(0xFFF7F7F8),
             high: dark ? const Color(0xFF151517) : const Color(0xFFF0F0F2),
             highest: dark ? const Color(0xFF1C1C1F) : const Color(0xFFE8E8EB),
-            line: dark ? const Color(0xFF1C1C1F) : const Color(0xFFE6E6EA),
+            line: dark ? const Color(0xFF2E2E33) : const Color(0xFFD6D6DC),
             strongLine: styled.strongLine,
             nav: dark ? Colors.black : Colors.white,
           )
@@ -331,7 +331,7 @@ class AppTheme {
           )
         : RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
-            side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide.none,
+            side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide(color: p.line),
           );
     final OutlinedBorder small = cyber
         ? BeveledRectangleBorder(borderRadius: BorderRadius.circular(7))

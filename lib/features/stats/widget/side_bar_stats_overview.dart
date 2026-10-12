@@ -299,7 +299,7 @@ class _Tile extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(compact ? 12 : 14),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -353,7 +353,7 @@ class _Tile extends StatelessWidget {
                 value: share ?? 0,
                 minHeight: 5,
                 color: accent ? scheme.primary : scheme.onSurfaceVariant.withValues(alpha: .55),
-                backgroundColor: scheme.outlineVariant.withValues(alpha: .6),
+                backgroundColor: scheme.outlineVariant,
               ),
             ),
         ],
@@ -726,7 +726,7 @@ class _QualityCard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -98,7 +98,7 @@ class _Card extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .6)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: child,
     );
