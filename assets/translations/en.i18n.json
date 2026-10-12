@@ -184,7 +184,8 @@
     "topoToVpn": "through VPN",
     "topoToDirect": "direct",
     "topoToBlock": "blocked",
-    "topoUncounted": "Another $amount isn't in the list: connections shorter than 2 seconds and those while the app was closed. The session in all: VPN $vpn, direct $direct"
+    "topoUncounted": "Another $amount isn't in the list: connections shorter than 2 seconds and those while the app was closed. The session in all: VPN $vpn, direct $direct",
+    "connOpenOf": "$open of $n open"
   },
   "common": {
     "appTitle": "A-VPN",

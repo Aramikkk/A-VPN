@@ -71,10 +71,11 @@ class SideBarStatsOverview extends ConsumerWidget {
     final since = ref.read(trafficHistoryProvider.notifier).since;
     final sinceLabel = since == null ? '' : '${two(since.day)}.${two(since.month)}';
     final ticks = switch (range) {
-      StatsRange.minute => [t.avpn.graphStart, '−45', '−30', '−15', t.avpn.graphNow],
-      StatsRange.tenMinutes => [t.avpn.graphTenMinutesAgo, '−7,5', '−5', '−2,5', t.avpn.graphNow],
-      StatsRange.hour => [t.avpn.graphHourAgo, '−45', '−30', '−15', t.avpn.graphNow],
-      StatsRange.day => [t.avpn.graphDayAgo, '−18 ч', '−12', '−6', t.avpn.graphNow],
+      // the same shape on every period: the start with its unit, three marks, now
+      StatsRange.minute => ['−60 с', '−45', '−30', '−15', t.avpn.graphNow],
+      StatsRange.tenMinutes => ['−10 мин', '−7,5', '−5', '−2,5', t.avpn.graphNow],
+      StatsRange.hour => ['−60 мин', '−45', '−30', '−15', t.avpn.graphNow],
+      StatsRange.day => ['−24 ч', '−18', '−12', '−6', t.avpn.graphNow],
       StatsRange.all => [sinceLabel, '', '', '', t.avpn.graphToday],
     };
     final quality = ref.watch(connectionQualityProvider);
@@ -104,7 +105,21 @@ class SideBarStatsOverview extends ConsumerWidget {
         color: onSpeed,
         downColor: downColor,
         upColor: upColor,
-        label: speed,
+        label: (value, top) {
+          // every mark of the scale in the top mark's unit: «1,5 МБ/с … 0,5 МБ/с», not «512 КБ/с» under «1 МБ/с»
+          var unit = 0;
+          var div = 1.0;
+          while (top / div >= 1024 && unit < units.length - 1) {
+            div *= 1024;
+            unit++;
+          }
+          final v = value / div;
+          // «0,25», «0,5», «1», «37,5», «150»: as many decimals as the mark has, at most two
+          var text = v >= 100 ? '${v.round()}' : v.toStringAsFixed(2);
+          if (text.contains('.')) text = text.replaceFirst(RegExp(r'\.?0+$'), '');
+          text = text.replaceAll('.', ',');
+          return '$text ${units[unit]}${t.avpn.perSecond}';
+        },
         detailed: large,
         textStyle: theme.textTheme.labelSmall!.copyWith(color: onSpeed.withValues(alpha: .75), fontSize: 10),
         ticks: ticks,
@@ -145,7 +160,9 @@ class SideBarStatsOverview extends ConsumerWidget {
             ],
             Gap(large && !dense ? 12 : 10),
             if (fill || split)
-              Expanded(child: graph)
+              Expanded(
+                child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 160), child: graph),
+              )
             else
               SizedBox(height: dense ? 92 : (large ? 130 : 64), child: graph),
             const Gap(8),
@@ -201,29 +218,39 @@ class SideBarStatsOverview extends ConsumerWidget {
     );
 
     if (split) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(flex: 3, child: speedBlock),
-            const Gap(12),
-            Expanded(
-              flex: 2,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _QualityCard(samples: quality, range: range),
-                    const Gap(10),
-                    sessionPair,
-                    const Gap(8),
-                    _pair(vpnTile, directTile),
-                  ],
-                ),
+      // both columns end on the same line: the speed block is as tall as the cards beside it, its graph taking
+      // what the header leaves (the page scrolls when the screen is shorter)
+      return LayoutBuilder(
+        builder: (context, box) => SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: ConstrainedBox(
+            // at least the screen's height: the graph and the ping bars grow into it
+            constraints: BoxConstraints(minHeight: box.maxHeight.isFinite ? box.maxHeight - 24 : 0),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 3, child: speedBlock),
+                  const Gap(12),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _QualityCard(samples: quality, range: range, fill: true),
+                        ),
+                        const Gap(10),
+                        sessionPair,
+                        const Gap(10),
+                        _pair(vpnTile, directTile),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       );
     }
@@ -537,7 +564,9 @@ class _SpeedGraph extends CustomPainter {
   final Color color;
   final Color downColor;
   final Color upColor;
-  final String Function(int bytesPerSecond) label;
+
+  /// a mark of the scale, given the top mark (the marks share its unit)
+  final String Function(int bytesPerSecond, int top) label;
   final bool detailed;
   final TextStyle textStyle;
 
@@ -589,7 +618,7 @@ class _SpeedGraph extends CustomPainter {
     final top = niceCeiling(peak);
     final rows = detailed ? 4 : 2;
     // the scale's values sit in their own strip on the right, clear of the lines
-    final labels = [for (var i = 0; i < rows; i++) _text(label((top * (rows - i) / rows).round()))];
+    final labels = [for (var i = 0; i < rows; i++) _text(label((top * (rows - i) / rows).round(), top))];
     final gutter = labels.fold<double>(0, (w, l) => l.width > w ? l.width : w) + 6;
     final chart = Size(size.width - gutter, size.height - timeAxis);
 
@@ -599,7 +628,11 @@ class _SpeedGraph extends CustomPainter {
     for (var i = 0; i <= rows; i++) {
       final y = chart.height * i / rows;
       canvas.drawLine(Offset(0, y), Offset(chart.width, y), grid);
-      if (i < rows) labels[i].paint(canvas, Offset(size.width - labels[i].width, y + 1));
+      // each mark centred on its line (the top one just under the edge)
+      if (i < rows) {
+        final h = labels[i].height;
+        labels[i].paint(canvas, Offset(size.width - labels[i].width, (y - h / 2).clamp(0, chart.height - h)));
+      }
     }
     // every 15 seconds: a faint line, and on the detailed graph its label
     final step = chart.width / (slots - 1).clamp(1, 1 << 20);
@@ -672,7 +705,10 @@ class _SpeedGraph extends CustomPainter {
 
 /// Ping through the VPN and packet loss over the last minute: the values, and a bar per probe (lost ones red).
 class _QualityCard extends ConsumerWidget {
-  const _QualityCard({required this.samples, this.compact = false, this.range = StatsRange.minute});
+  const _QualityCard({required this.samples, this.compact = false, this.range = StatsRange.minute, this.fill = false});
+
+  /// the bars take the height the card is given (beside the speed block on the unfolded phone)
+  final bool fill;
 
   final List<int?> samples;
 
@@ -729,6 +765,7 @@ class _QualityCard extends ConsumerWidget {
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
+        mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
@@ -748,7 +785,8 @@ class _QualityCard extends ConsumerWidget {
             ],
           ),
           const Gap(10),
-          SizedBox(
+          _grow(
+            fill,
             height: compact ? 28 : 56,
             child: CustomPaint(
               painter: _PingBars(
@@ -924,3 +962,13 @@ class _RangePicker extends ConsumerWidget {
     );
   }
 }
+
+/// [child] at [height], or, when [grow], taking the height left (never less than [height])
+Widget _grow(bool grow, {required double height, required Widget child}) => grow
+    ? Expanded(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: height),
+          child: child,
+        ),
+      )
+    : SizedBox(height: height, child: child);

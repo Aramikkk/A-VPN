@@ -200,7 +200,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(Scrollable), findsOneWidget); // only the right column's own scroll, not the page's
+    expect(find.byType(Scrollable), findsOneWidget); // one scroll for the page: both columns move together
     if (Platform.environment['RENDER'] == '1') {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/speed_unfolded.png'));
     }

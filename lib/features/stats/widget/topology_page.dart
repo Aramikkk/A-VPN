@@ -165,6 +165,7 @@ class TopologyPage extends HookConsumerWidget {
                   _Total(label: t.avpn.topoServerCount, value: '${servers.length}', colour: scheme.onSurface),
                 ],
               ),
+
               const Gap(12),
               _Section(
                 title: t.avpn.topoFlow,
@@ -315,11 +316,11 @@ class _Total extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(value, style: theme.textTheme.titleLarge?.copyWith(fontSize: 20, color: colour)),
             ),
-            if (share != null)
-              Text(
-                '${(share! * 100).round()}%',
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w700),
-              ),
+            // a card without a share keeps the line empty, so the three cards are the same height
+            Text(
+              share == null ? '' : '${(share! * 100).round()}%',
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w700),
+            ),
           ],
         ),
       ),

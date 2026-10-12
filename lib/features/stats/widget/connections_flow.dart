@@ -66,8 +66,14 @@ class ConnectionFlow {
         if (col < path.length) totals[path[col]] = (totals[path[col]] ?? 0) + w;
       }
       final sorted = totals.keys.toList()..sort((a, b) => totals[b]!.compareTo(totals[a]!));
-      keep[col] = sorted.take(col == 1 ? 3 : maxPerColumn - 1).toSet();
-      if (sorted.length == maxPerColumn) keep[col]!.add(sorted.last);
+      // slivers too thin to carry a name (under 3%) go into "other", which gets one
+      final sum = totals.values.fold<double>(0, (s, w) => s + w);
+      final named = sorted
+          .take(col == 1 ? 3 : maxPerColumn - 1)
+          .where((k) => totals[k]! >= sum * .03 || k == sorted.first);
+      keep[col] = named.toSet();
+      // a single leftover keeps its own name rather than become "other"
+      if (sorted.length == keep[col]!.length + 1) keep[col]!.add(sorted.last);
     }
 
     final nodes = <String, FlowNode>{};

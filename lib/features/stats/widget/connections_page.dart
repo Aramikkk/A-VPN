@@ -59,6 +59,13 @@ class ConnectionsPage extends HookConsumerWidget {
     // apps and sites that moved less than a megabyte are left out unless asked for
     final groups = showSmall.value ? allGroups : allGroups.where((g) => g.total >= smallTraffic).toList();
     final hidden = allGroups.length - groups.length;
+    Widget card(ConnectionGroup g) => _GroupCard(
+      key: ValueKey('${view.value}:${g.key}'),
+      group: g,
+      byApp: view.value == _View.apps,
+      appName: appName,
+      iconOf: (app) => apps[app]?.icon,
+    );
     final all = state.items;
     final open = all.where((c) => c.active).length;
     int count(ConnectionRoute route) => all.where((c) => c.route == route).fold(0, (n, c) => n + c.count);
@@ -151,32 +158,45 @@ class ConnectionsPage extends HookConsumerWidget {
                         child: _Empty(icon: Icons.hourglass_empty_rounded, text: t.avpn.connEmpty),
                       )
                     else
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        sliver: SliverList.separated(
-                          itemCount: groups.length + (hidden > 0 || showSmall.value ? 1 : 0),
-                          separatorBuilder: (_, _) => const Gap(8),
-                          itemBuilder: (context, i) => i == groups.length
-                              ? Center(
-                                  child: TextButton.icon(
-                                    icon: Icon(
-                                      showSmall.value ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                                      size: 18,
+                      SliverLayoutBuilder(
+                        builder: (context, box) {
+                          // the list's own width (not the screen's: on a computer the menu takes part of it)
+                          final wide = box.crossAxisExtent >= 720;
+                          final rows = wide ? (groups.length + 1) ~/ 2 : groups.length;
+                          return SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            sliver: SliverList.separated(
+                              itemCount: rows + (hidden > 0 || showSmall.value ? 1 : 0),
+                              separatorBuilder: (_, _) => const Gap(8),
+                              itemBuilder: (context, i) => i == rows
+                                  ? Center(
+                                      child: TextButton.icon(
+                                        icon: Icon(
+                                          showSmall.value ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                          size: 18,
+                                        ),
+                                        label: Text(
+                                          showSmall.value ? t.avpn.connHideSmall : t.avpn.connShowSmall(n: hidden),
+                                        ),
+                                        onPressed: () => showSmall.value = !showSmall.value,
+                                      ),
+                                    )
+                                  : !wide
+                                  ? card(groups[i])
+                                  // a wide screen: two cards a row
+                                  : Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(child: card(groups[2 * i])),
+                                        const Gap(8),
+                                        Expanded(
+                                          child: 2 * i + 1 < groups.length ? card(groups[2 * i + 1]) : const SizedBox(),
+                                        ),
+                                      ],
                                     ),
-                                    label: Text(
-                                      showSmall.value ? t.avpn.connHideSmall : t.avpn.connShowSmall(n: hidden),
-                                    ),
-                                    onPressed: () => showSmall.value = !showSmall.value,
-                                  ),
-                                )
-                              : _GroupCard(
-                                  key: ValueKey('${view.value}:${groups[i].key}'),
-                                  group: groups[i],
-                                  byApp: view.value == _View.apps,
-                                  appName: appName,
-                                  iconOf: (app) => apps[app]?.icon,
-                                ),
-                        ),
+                            ),
+                          );
+                        },
                       ),
                   ],
                 ),
@@ -353,10 +373,20 @@ class _GroupCard extends HookConsumerWidget {
                         ),
                       ),
                       const Gap(2),
-                      Text(
-                        group.open > 0 ? t.avpn.connOpenCount(n: group.open) : t.avpn.connCount(n: group.count),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: group.open > 0 ? scheme.primary : scheme.onSurfaceVariant,
+                      // the count shrinks rather than push the card's text aside on a narrow phone
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 76),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            group.open > 0
+                                ? t.avpn.connOpenOf(open: group.open, n: group.count)
+                                : t.avpn.connCount(n: group.count),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: group.open > 0 ? scheme.primary : scheme.onSurfaceVariant,
+                            ),
+                          ),
                         ),
                       ),
                       Icon(
