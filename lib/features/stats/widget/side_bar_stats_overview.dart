@@ -208,7 +208,7 @@ class SideBarStatsOverview extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _QualityCard(samples: quality),
+                    _QualityCard(samples: quality, range: range),
                     const Gap(10),
                     sessionPair,
                     const Gap(8),
@@ -233,7 +233,7 @@ class SideBarStatsOverview extends ConsumerWidget {
         children: [
           if (fill) Expanded(child: speedBlock) else speedBlock,
           Gap(large ? 10 : 8),
-          _QualityCard(samples: quality, compact: compact),
+          _QualityCard(samples: quality, compact: compact, range: range),
           const Gap(8),
           sessionPair,
           const Gap(8),
@@ -663,9 +663,12 @@ class _SpeedGraph extends CustomPainter {
 
 /// Ping through the VPN and packet loss over the last minute: the values, and a bar per probe (lost ones red).
 class _QualityCard extends ConsumerWidget {
-  const _QualityCard({required this.samples, this.compact = false});
+  const _QualityCard({required this.samples, this.compact = false, this.range = StatsRange.minute});
 
   final List<int?> samples;
+
+  /// the period the ping and loss are for (the Statistics tab's choice)
+  final StatsRange range;
 
   /// the sidebar's smaller version, without the caption under the bars
   final bool compact;
@@ -675,8 +678,20 @@ class _QualityCard extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final summary = summarize(samples);
-    final spread = pingSpread(samples);
+    // the last minute probe by probe; a longer period from the saved history
+    final period = range == StatsRange.minute ? null : ref.read(connectionQualityProvider.notifier).period(range);
+    final bars = period?.bars ?? samples;
+    final summary = period == null
+        ? summarize(samples)
+        : (
+            ping: period.total.average,
+            loss: period.total.sent == 0 ? null : period.total.lost * 100 / period.total.sent,
+          );
+    final spread = period == null
+        ? pingSpread(samples)
+        : period.total.average == null
+        ? null
+        : (avg: period.total.average!, min: period.total.min, max: period.total.max, jitter: -1);
     final loss = summary.loss;
     final lossColor = loss == null || loss == 0
         ? theme.araLook.fastPing
@@ -728,7 +743,8 @@ class _QualityCard extends ConsumerWidget {
             height: compact ? 28 : 56,
             child: CustomPaint(
               painter: _PingBars(
-                samples,
+                bars,
+                slots: period?.slots ?? ConnectionQuality.length,
                 ok: theme.araLook.pingColors.first,
                 colorOf: (ms) => theme.araLook.pingColor(ms, scheme.onSurfaceVariant),
                 // a lost probe in red, unless red already means a fast ping (the red theme): then in the text colour
@@ -740,7 +756,9 @@ class _QualityCard extends ConsumerWidget {
           if (!compact) const Gap(6),
           if (!compact)
             Text(
-              samples.isEmpty ? t.avpn.statsNoData : t.avpn.statsPingHistory,
+              bars.isEmpty
+                  ? t.avpn.statsNoData
+                  : (period == null ? t.avpn.statsPingHistory : t.avpn.statsPingPeriod),
               style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           if (spread != null) ...[
@@ -752,7 +770,7 @@ class _QualityCard extends ConsumerWidget {
                     (t.avpn.pingAvg, spread.avg),
                     (t.avpn.pingMin, spread.min),
                     (t.avpn.pingMax, spread.max),
-                    (t.avpn.pingJitter, spread.jitter),
+                    if (spread.jitter >= 0) (t.avpn.pingJitter, spread.jitter),
                   ].indexed) ...[
                     TextSpan(text: '${i == 0 ? '' : '  ·  '}$label '),
                     TextSpan(
@@ -779,9 +797,20 @@ class _QualityCard extends ConsumerWidget {
 
 /// One bar per probe, height by ping (scaled to the slowest answer); a lost probe is a full-height red bar.
 class _PingBars extends CustomPainter {
-  _PingBars(this.samples, {required this.ok, required this.lost, required this.track, this.colorOf});
+  _PingBars(
+    this.samples, {
+    required this.ok,
+    required this.lost,
+    required this.track,
+    this.colorOf,
+    this.slots = ConnectionQuality.length,
+  });
 
+  /// a probe's (or a slot's average) ping; null: lost; 0: no probes in that slot
   final List<int?> samples;
+
+  /// how many bars the width holds
+  final int slots;
   final Color ok;
 
   /// each answered probe in the colour of its ping (the theme's scale)
@@ -791,17 +820,18 @@ class _PingBars extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const slots = ConnectionQuality.length;
     final slot = size.width / slots;
-    final barWidth = slot * .62;
+    final barWidth = slot * (slots > 40 ? .7 : .62);
     final peak = samples.whereType<int>().fold<int>(50, (m, v) => v > m ? v : m);
-    final offset = slots - samples.length;
+    final offset = (slots - samples.length).clamp(0, slots);
+    final shown = samples.length > slots ? samples.sublist(samples.length - slots) : samples;
     for (var i = 0; i < slots; i++) {
       final x = i * slot + (slot - barWidth) / 2;
       final rect = RRect.fromRectAndRadius(Rect.fromLTWH(x, 0, barWidth, size.height), const Radius.circular(2));
       canvas.drawRRect(rect, Paint()..color = track);
       if (i < offset) continue;
-      final sample = samples[i - offset];
+      final sample = shown[i - offset];
+      if (sample == 0) continue;
       final height = sample == null ? size.height : (size.height * (sample / peak)).clamp(3.0, size.height);
       canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height - height, barWidth, height), const Radius.circular(2)),

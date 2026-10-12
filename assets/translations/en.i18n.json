@@ -175,7 +175,8 @@
     "subUpdate": "Update the subscription",
     "subUpdateAsProvider": "As the provider says",
     "subUpdateNever": "Never by itself",
-    "subUpdateEvery": "Every $n h"
+    "subUpdateEvery": "Every $n h",
+    "statsPingPeriod": "Ping to the server over the chosen period"
   },
   "common": {
     "appTitle": "A-VPN",

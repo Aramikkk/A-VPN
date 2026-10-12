@@ -175,7 +175,8 @@
     "subUpdate": "Обновлять подписку",
     "subUpdateAsProvider": "Как задаёт провайдер",
     "subUpdateNever": "Не обновлять сама",
-    "subUpdateEvery": "Раз в $n ч"
+    "subUpdateEvery": "Раз в $n ч",
+    "statsPingPeriod": "Пинг до сервера за выбранный период"
   },
   "common": {
     "appTitle": "A-VPN",

@@ -310,14 +310,14 @@ class _StyledServerList extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final list = LayoutBuilder(
       builder: (context, box) {
-        final base = editorial ? 66.0 : 64.0;
-        final room = box.maxHeight - (editorial ? 0 : 8);
+        final base = editorial ? 66.0 : 62.0;
+        final room = box.maxHeight;
         final rows = (room / base).floor().clamp(1, 1000);
         // whole rows only: they stretch a little so the last one in view isn't cut in half
         final extent = servers.length <= rows ? base : room / rows;
         return ListView.builder(
           itemExtent: extent,
-          padding: EdgeInsets.symmetric(vertical: editorial ? 0 : 4, horizontal: editorial ? 0 : 6),
+          padding: EdgeInsets.zero,
           itemCount: servers.length,
           itemBuilder: (context, i) {
             final server = servers[i];
@@ -358,22 +358,16 @@ class _StyledServerList extends ConsumerWidget {
       },
     );
     if (editorial) return list;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     if (Theme.of(context).araLook.style == AraStyle.cyberpunk) {
-      return Container(clipBehavior: Clip.antiAlias, decoration: _neonPanel(scheme, 14), child: list);
+      return Container(
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: _neonPanel(scheme, 14),
+        child: list,
+      );
     }
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow.withValues(alpha: dark ? .75 : 1),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: dark
-            ? null
-            : [BoxShadow(color: Colors.black.withValues(alpha: .05), blurRadius: 20, offset: const Offset(0, 6))],
-      ),
-      child: list,
-    );
+    // Graphite: the rows on the page itself, no card round them
+    return list;
   }
 }
 
@@ -424,55 +418,63 @@ class _GraphiteRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        border: first || selected ? null : Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: .7))),
-      ),
+    final dark = theme.brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
-        color: Colors.transparent,
+        color: selected ? scheme.surfaceContainerHigh : Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           onTap: onTap,
-          child: Ink(
-            decoration: selected
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      colors: [scheme.primary.withValues(alpha: .24), scheme.primary.withValues(alpha: .03)],
-                    ),
-                    border: Border(left: BorderSide(color: scheme.primary, width: 3)),
-                  )
-                : null,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Row(
-                children: [
-                  _Flag(flag: flag, group: group, color: scheme.primary),
-                  const Gap(12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 17),
-                        ),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 12),
-                        ),
-                      ],
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                // the flag on a soft tile
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? scheme.primary.withValues(alpha: dark ? .16 : .1)
+                        : scheme.surfaceContainerHighest.withValues(alpha: dark ? .7 : 1),
+                    borderRadius: BorderRadius.circular(13),
                   ),
-                  const Gap(8),
-                  _Delay(delay: delay, testing: testing),
+                  child: group
+                      ? AraIconPaint(child: Icon(Icons.auto_awesome_rounded, size: 19, color: scheme.primary))
+                      : Text(flag ?? '🌐', style: const TextStyle(fontSize: 21, fontFamilyFallback: ['Emoji'])),
+                ),
+                const Gap(12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 16.5),
+                      ),
+                      const Gap(1),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const Gap(8),
+                _Delay(delay: delay, testing: testing),
+                if (selected) ...[
+                  const Gap(10),
+                  AraIconPaint(child: Icon(Icons.check_circle_rounded, size: 20, color: scheme.primary)),
                 ],
-              ),
+              ],
             ),
           ),
         ),

@@ -28,6 +28,7 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/proxy/notifier/auto_ping.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
@@ -163,6 +164,8 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   await _safeInit("traffic history", () async => container.read(trafficHistoryProvider));
   // fresh pings when the app opens (Settings → Launch and connection)
   await _safeInit("auto ping", () async => container.read(autoPingProvider));
+  // ping and loss are measured from the start and kept (the Statistics tab shows any period)
+  await _safeInit("connection quality", () async => container.read(connectionQualityProvider));
 
   Logger.bootstrap.info("bootstrap took [${stopWatch.elapsedMilliseconds}ms]");
   stopWatch.stop();
