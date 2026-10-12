@@ -253,7 +253,7 @@ class TopologyPage extends HookConsumerWidget {
                         (
                           name: g.key.substring(1),
                           route: g.items.first.route,
-                          servers: g.servers.join(', '),
+                          servers: serverFlags(g.servers),
                           weight: sum(g.items),
                         ),
                     ]..sort((a, b) => b.weight.compareTo(a.weight)),

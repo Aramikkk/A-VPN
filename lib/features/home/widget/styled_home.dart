@@ -425,19 +425,29 @@ class _GraphiteRow extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final fill = theme.araLook.neonFill;
     if (selected && fill != null && !flooded) {
-      // the neon themes: the chosen row is the neon itself, everything on it black
+      // the neon themes: the chosen row is the neon itself; the text on it white on the deep neons (red, blue),
+      // black on the light ones (yellow, green)
+      final ink = fill.computeLuminance() > .6 ? Colors.black : Colors.white;
       return Theme(
         data: theme.copyWith(
-          textTheme: theme.textTheme.apply(bodyColor: Colors.black, displayColor: Colors.black),
+          textTheme: theme.textTheme.apply(bodyColor: ink, displayColor: ink),
           colorScheme: scheme.copyWith(
-            primary: Colors.black,
-            onSurface: Colors.black,
-            // opaque, so a flag in the text keeps its colours
-            onSurfaceVariant: Color.alphaBlend(Colors.black.withValues(alpha: .85), fill),
+            primary: ink,
+            onSurface: ink,
+            onSurfaceVariant: ink,
             surfaceContainerHigh: fill,
-            surfaceContainerHighest: Colors.black.withValues(alpha: .12),
+            surfaceContainerHighest: Colors.black.withValues(alpha: .14),
           ),
-          extensions: [AraLook(fastPing: Colors.black, pingOn: fill, style: theme.araLook.style, neonFill: fill)],
+          // the ping in the same ink (its scale would otherwise shift it to read on the neon)
+          extensions: [
+            AraLook(
+              fastPing: ink,
+              pingOn: ink == Colors.white ? Colors.black : Colors.white,
+              dark: ink == Colors.white,
+              style: theme.araLook.style,
+              neonFill: fill,
+            ),
+          ],
         ),
         child: _GraphiteRow(
           flag: flag,

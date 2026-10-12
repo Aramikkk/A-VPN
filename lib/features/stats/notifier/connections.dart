@@ -431,3 +431,17 @@ List<ConnectionGroup> groupConnections(Iterable<SeenConnection> items, String Fu
     return byTraffic != 0 ? byTraffic : b.count.compareTo(a.count);
   });
 }
+
+/// Servers in short: one keeps its name ("🇸🇪 Швеция 3"); several show just their flags, each country once
+/// ("🇸🇪 🇫🇮 🇵🇱"), a server without a flag by name.
+String serverFlags(Iterable<String> servers) {
+  final list = servers.toList();
+  if (list.length <= 1) return list.join();
+  final shown = <String>{};
+  for (final server in list) {
+    final flag = RegExp(r'^(\S+)\s').firstMatch(server)?.group(1);
+    final isFlag = flag != null && flag.runes.any((r) => r >= 0x1F1E6 && r <= 0x1F1FF);
+    shown.add(isFlag ? flag : server);
+  }
+  return shown.join(' ');
+}

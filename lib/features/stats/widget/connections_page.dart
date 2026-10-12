@@ -510,7 +510,7 @@ String? ruleLabel(String rule, Translations t) {
 String _routeText(Translations t, ConnectionGroup g) {
   if (g.mixed) return t.avpn.connMixed;
   return switch (g.mainRoute) {
-    ConnectionRoute.vpn => g.servers.isEmpty ? 'VPN' : 'VPN · ${g.servers.join(', ')}',
+    ConnectionRoute.vpn => g.servers.isEmpty ? 'VPN' : 'VPN · ${serverFlags(g.servers)}',
     ConnectionRoute.direct => t.avpn.statsDirect,
     ConnectionRoute.block => t.avpn.connBlocked,
   };
@@ -557,11 +557,7 @@ class _RouteBadge extends ConsumerWidget {
       runSpacing: 4,
       children: [
         if (group.vpn > 0)
-          pill(
-            ConnectionRoute.vpn,
-            servers.isEmpty ? 'VPN' : 'VPN · ${servers.take(2).join(', ')}${servers.length > 2 ? '…' : ''}',
-            group.vpn,
-          ),
+          pill(ConnectionRoute.vpn, servers.isEmpty ? 'VPN' : 'VPN · ${serverFlags(servers)}', group.vpn),
         if (group.direct > 0) pill(ConnectionRoute.direct, t.avpn.statsDirect, group.direct),
         if (group.blocked > 0) pill(ConnectionRoute.block, t.avpn.connBlocked, group.blocked),
       ],

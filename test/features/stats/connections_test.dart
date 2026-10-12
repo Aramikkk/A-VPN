@@ -142,6 +142,13 @@ void main() {
     expect((group.count, group.direct, group.total), (2, 2, sum.total));
   });
 
+  test('servers in short: one by name, several by their flags, each country once', () {
+    expect(serverFlags(['🇸🇪 Швеция 3']), '🇸🇪 Швеция 3');
+    expect(serverFlags(['🇸🇪 Швеция 3', '🇸🇪 Швеция 2', '🇫🇮 Финляндия']), '🇸🇪 🇫🇮');
+    expect(serverFlags(['🇸🇪 Швеция 3', 'Дом']), '🇸🇪 Дом');
+    expect(serverFlags(const []), '');
+  });
+
   test('grouped by app, the most traffic first, both ways counted', () {
     final groups = groupConnections(_sample, (c) => c.app);
     expect(groups.first.key, 'ru.yandex.disk');
