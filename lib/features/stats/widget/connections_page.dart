@@ -57,7 +57,21 @@ class ConnectionsPage extends HookConsumerWidget {
     }).toList();
     final allGroups = groupConnections(items, view.value == _View.apps ? (c) => c.app : (c) => c.host);
     // apps and sites that moved less than a megabyte are left out unless asked for
-    final groups = showSmall.value ? allGroups : allGroups.where((g) => g.total >= smallTraffic).toList();
+    final fresh = showSmall.value ? allGroups : allGroups.where((g) => g.total >= smallTraffic).toList();
+    // the order by traffic is redone every 30 seconds, not on every update, so the cards don't jump around
+    // while they're read; a new app or site comes in at the end until then
+    final order = useRef(<String>[]);
+    final sortedAt = useRef(DateTime.fromMillisecondsSinceEpoch(0));
+    final sortedFor = useRef('');
+    final sortKey = '${view.value}|${filter.value}|${query.value}|${showSmall.value}';
+    final now = DateTime.now();
+    if (sortKey != sortedFor.value || now.difference(sortedAt.value) > const Duration(seconds: 30)) {
+      order.value = [for (final g in fresh) g.key];
+      sortedAt.value = now;
+      sortedFor.value = sortKey;
+    }
+    final place = {for (final (i, k) in order.value.indexed) k: i};
+    final groups = [...fresh]..sort((a, b) => (place[a.key] ?? 1 << 30).compareTo(place[b.key] ?? 1 << 30));
     final hidden = allGroups.length - groups.length;
     Widget card(ConnectionGroup g) => _GroupCard(
       key: ValueKey('${view.value}:${g.key}'),
@@ -160,9 +174,7 @@ class ConnectionsPage extends HookConsumerWidget {
                     else
                       SliverLayoutBuilder(
                         builder: (context, box) {
-                          // the list's own width (not the screen's: on a computer the menu takes part of it)
-                          final wide = box.crossAxisExtent >= 720;
-                          final rows = wide ? (groups.length + 1) ~/ 2 : groups.length;
+                          final rows = groups.length;
                           return SliverPadding(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             sliver: SliverList.separated(
@@ -181,19 +193,7 @@ class ConnectionsPage extends HookConsumerWidget {
                                         onPressed: () => showSmall.value = !showSmall.value,
                                       ),
                                     )
-                                  : !wide
-                                  ? card(groups[i])
-                                  // a wide screen: two cards a row
-                                  : Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(child: card(groups[2 * i])),
-                                        const Gap(8),
-                                        Expanded(
-                                          child: 2 * i + 1 < groups.length ? card(groups[2 * i + 1]) : const SizedBox(),
-                                        ),
-                                      ],
-                                    ),
+                                  : card(groups[i]),
                             ),
                           );
                         },
