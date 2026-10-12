@@ -113,11 +113,17 @@ class ConnectionFlow {
 
 /// Draws a [ConnectionFlow]: bars for the nodes, bands for the links, names beside the bars.
 class ConnectionFlowPainter extends CustomPainter {
-  ConnectionFlowPainter(this.flow, {required this.textStyle, required this.background});
+  ConnectionFlowPainter(this.flow, {required this.textStyle, required this.background, required this.valueLabel});
 
   final ConnectionFlow flow;
   final TextStyle textStyle;
   final Color background;
+
+  /// a node's weight as text: a count, or traffic
+  final String Function(double weight) valueLabel;
+
+  /// the tallest a node gets, so a few connections don't fill the screen
+  static const maxNode = 90.0;
 
   static const bar = 10.0;
   static const gap = 6.0;
@@ -129,15 +135,18 @@ class ConnectionFlowPainter extends CustomPainter {
     // the last column keeps room for its names on the right
     final step = cols == 1 ? 0.0 : (size.width * .66 - bar) / (cols - 1);
     final total = flow.columns.first.fold<double>(0, (s, n) => s + n.weight);
+    // the chart's height: the screen, or less when there are only a few nodes (from the top)
+    final most = flow.columns.fold<int>(0, (m, c) => c.length > m ? c.length : m);
+    final area = (most * maxNode + gap * (most - 1)).clamp(0.0, size.height);
     for (var c = 0; c < cols; c++) {
       final column = flow.columns[c];
       final colTotal = column.fold<double>(0, (s, n) => s + n.weight);
-      final room = size.height - gap * (column.length - 1);
-      // every column on the first one's scale, centred
+      final room = area - gap * (column.length - 1);
+      // every column on the first one's scale, centred in the chart
       final scale = room / (total > colTotal ? total : colTotal);
-      var y = (size.height - colTotal * scale - gap * (column.length - 1)) / 2;
+      var y = (area - colTotal * scale - gap * (column.length - 1)) / 2;
       for (final n in column) {
-        final h = (n.weight * scale).clamp(2.0, size.height);
+        final h = (n.weight * scale).clamp(2.0, area);
         n
           ..rect = Rect.fromLTWH(c * step, y, bar, h)
           ..outOffset = 0
@@ -193,22 +202,34 @@ class ConnectionFlowPainter extends CustomPainter {
       for (final n in flow.columns[c]) {
         canvas.drawRRect(RRect.fromRectAndRadius(n.rect, const Radius.circular(2)), Paint()..color = n.color);
         if (n.rect.height < 9 && flow.columns[c].length > 3) continue; // no room for a name
-        final text = TextPainter(
-          text: TextSpan(text: n.label, style: textStyle),
+        TextPainter line(String text, TextStyle style) => TextPainter(
+          text: TextSpan(text: text, style: style),
           textDirection: TextDirection.ltr,
           maxLines: 1,
           ellipsis: '…',
         )..layout(maxWidth: maxWidth.clamp(10, double.infinity));
-        final at = Offset(n.rect.right + 5, n.rect.center.dy - text.height / 2);
-        // a backing so the name reads over the bands
+        // the name, and under it how much went through (when the bar is tall enough for two lines)
+        final name = line(n.label, textStyle);
+        final value = n.rect.height >= 26
+            ? line(
+                valueLabel(n.weight),
+                textStyle.copyWith(
+                  color: textStyle.color?.withValues(alpha: .65),
+                  fontWeight: FontWeight.w600,
+                  fontSize: (textStyle.fontSize ?? 12) - 1,
+                ),
+              )
+            : null;
+        final width = value == null || name.width > value.width ? name.width : value.width;
+        final height = name.height + (value?.height ?? 0);
+        final at = Offset(n.rect.right + 5, n.rect.center.dy - height / 2);
+        // a backing so the text reads over the bands
         canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(at.dx - 2, at.dy, text.width + 4, text.height),
-            const Radius.circular(3),
-          ),
-          Paint()..color = background.withValues(alpha: .55),
+          RRect.fromRectAndRadius(Rect.fromLTWH(at.dx - 2, at.dy, width + 4, height), const Radius.circular(3)),
+          Paint()..color = background.withValues(alpha: .6),
         );
-        text.paint(canvas, at);
+        name.paint(canvas, at);
+        value?.paint(canvas, at + Offset(0, name.height));
       }
     }
   }

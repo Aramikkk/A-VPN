@@ -61,6 +61,12 @@ class _Fake extends Connections {
   ConnectionsState build() => ConnectionsState(items: _sample);
 }
 
+/// one big connection: the case that drew full-height walls
+class _FakeOne extends Connections {
+  @override
+  ConnectionsState build() => ConnectionsState(items: [_sample[2]]);
+}
+
 Future<void> _loadFont(String family, List<String> files) async {
   final loader = FontLoader(family);
   for (final file in files) {
@@ -146,7 +152,11 @@ void main() {
     }
   });
 
-  for (final (name, size) in [('topology_phone', const Size(400, 860)), ('topology_unfolded', const Size(880, 860))]) {
+  for (final (name, size, one, dark) in [
+    ('topology_phone', const Size(400, 860), false, true),
+    ('topology_unfolded', const Size(880, 860), false, false),
+    ('topology_one', const Size(400, 860), true, false),
+  ]) {
     testWidgets('the Topology tab renders: $name', (tester) async {
       await _loadFont('Segoe UI', [r'C:/Windows/Fonts/segoeui.ttf', r'C:/Windows/Fonts/seguisb.ttf']);
       await _loadFont('MaterialIcons', [
@@ -155,16 +165,16 @@ void main() {
       await tester.binding.setSurfaceSize(size);
       final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
       final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed');
-      final theme = AppTheme(AppThemeMode.dark, '', accent: accent);
+      final theme = AppTheme(dark ? AppThemeMode.dark : AppThemeMode.light, '', accent: accent);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             translationsProvider.overrideWith((ref) async => t),
-            connectionsProvider.overrideWith(_Fake.new),
+            connectionsProvider.overrideWith(one ? _FakeOne.new : _Fake.new),
             installedAppsProvider.overrideWith((ref) async => const {}),
           ],
           child: MaterialApp(
-            theme: theme.darkTheme(null),
+            theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
             home: Consumer(
               builder: (context, ref, _) =>
                   !ref.watch(translationsProvider).hasValue ? const SizedBox() : const TopologyPage(),

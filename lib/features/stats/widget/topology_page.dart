@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_flow.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
@@ -23,6 +24,7 @@ class TopologyPage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final surface = theme.scaffoldBackgroundColor;
+    final units = t.avpn.bytesUnits.split(',');
 
     final hideSmall = useState(true);
     final open = openOnly.value ? state.items.where((c) => c.active).toList() : state.items;
@@ -125,6 +127,7 @@ class TopologyPage extends HookConsumerWidget {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
+                        final palette = flowPalette(scheme.primary, surface);
                         final flow = ConnectionFlow.build(
                           items,
                           byTraffic: byTraffic.value,
@@ -136,9 +139,9 @@ class TopologyPage extends HookConsumerWidget {
                             ConnectionRoute.block => t.avpn.connBlocked,
                           },
                           other: t.avpn.connOther,
-                          palette: flowPalette(scheme.primary, surface),
+                          palette: palette,
                           routeColor: (route) => switch (route) {
-                            ConnectionRoute.vpn => AraLook.readableOn(scheme.primary, surface),
+                            ConnectionRoute.vpn => palette[2],
                             ConnectionRoute.direct => AraLook.readableOn(const Color(0xFF9AA0A6), surface),
                             ConnectionRoute.block => AraLook.readableOn(scheme.error, surface),
                           },
@@ -155,6 +158,7 @@ class TopologyPage extends HookConsumerWidget {
                           painter: ConnectionFlowPainter(
                             flow,
                             background: surface,
+                            valueLabel: (w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}',
                             textStyle: theme.textTheme.labelSmall!.copyWith(color: scheme.onSurface, fontSize: 12),
                           ),
                         );
