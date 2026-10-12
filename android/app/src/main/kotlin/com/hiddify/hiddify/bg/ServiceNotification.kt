@@ -154,10 +154,11 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
     }
 
     fun updateStatus(previous:SystemInfo,status: SystemInfo) {
-        val uplink=status.uplink_total - previous.uplink_total
-        val downlink=status.downlink_total - previous.downlink_total
-        val content = "${Libbox.formatBytes(uplink)}/s ↑\t${Libbox.formatBytes(downlink)}/s ↓ \n${status.current_outbound}"
-        val title = "${status.current_profile}"
+        // A-VPN: the session's traffic through the VPN and direct, then the server ("Авто: 🇸🇪 Швеция 2")
+        val (vpn, direct) = SessionTraffic.add(status)
+        val content = "VPN ${SessionTraffic.format(vpn)} · напрямую ${SessionTraffic.format(direct)}\n" +
+            SessionTraffic.serverLine(status.current_outbound)
+        val title = SessionTraffic.profileName(status.current_profile)
         Application.notificationManager.notify(
                 notificationId,
                 notificationBuilder.setContentTitle(title).setContentText(content).build()
