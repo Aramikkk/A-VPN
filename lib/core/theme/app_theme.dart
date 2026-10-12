@@ -197,20 +197,6 @@ class AppTheme {
   /// The palette of a style in day or night: background, cards, text, lines.
   static AraPalette palette(AraStyle style, Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    if (style == AraStyle.cyberpunk) {
-      return AraPalette(
-        bg: dark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-        fg: dark ? const Color(0xFFF5F5F7) : const Color(0xFF0A0A12),
-        muted: dark ? const Color(0xFF8A8A99) : const Color(0xFF5E5E6B),
-        card: dark ? const Color(0xFF0B0B10) : const Color(0xFFFFFFFF),
-        container: dark ? const Color(0xFF101016) : const Color(0xFFF8F8FA),
-        high: dark ? const Color(0xFF16161E) : const Color(0xFFF0F0F4),
-        highest: dark ? const Color(0xFF1E1E28) : const Color(0xFFE6E6EC),
-        line: dark ? const Color(0xFF2C2C3A) : const Color(0xFFD2D2DC),
-        strongLine: dark ? const Color(0xFFFF7A00) : const Color(0xFF0A0A12),
-        nav: dark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-      );
-    }
     return style == AraStyle.editorial
         ? AraPalette(
             bg: dark ? const Color(0xFF131211) : const Color(0xFFF3F1EC),
@@ -242,7 +228,6 @@ class AppTheme {
   ThemeData _styledTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
-    final cyber = style == AraStyle.cyberpunk;
     final styled = palette(style, brightness);
     // the OLED theme in Graphite: true black by night (pixels off) and pure white by day, cards just off it
     final p = accent.pure && style == AraStyle.graphite
@@ -260,9 +245,7 @@ class AppTheme {
           )
         : styled;
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
-    final accentColour = cyber
-        ? (dark ? const Color(0xFFFF7A00) : const Color(0xFFFF5A00))
-        : editorial && colourless
+    final accentColour = editorial && colourless
         ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A))
         : (dark ? accent.darkPrimary : accent.lightPrimary);
     final primary = AraLook.readableOn(accentColour, p.bg);
@@ -312,7 +295,7 @@ class AppTheme {
       bodySmall: base.bodySmall?.copyWith(fontWeight: FontWeight.w500),
       labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       labelMedium: base.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-      labelSmall: editorial || cyber
+      labelSmall: editorial
           ? base.labelSmall?.copyWith(
               fontFamily: 'JetBrains Mono',
               fontWeight: FontWeight.w700,
@@ -323,19 +306,11 @@ class AppTheme {
     );
 
     final radius = editorial ? 6.0 : 20.0;
-    // Cyberpunk cuts its corners and outlines its panels in neon
-    final ShapeBorder shape = cyber
-        ? BeveledRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: primary.withValues(alpha: .5)),
-          )
-        : RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(radius),
-            side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide(color: p.line),
-          );
-    final OutlinedBorder small = cyber
-        ? BeveledRectangleBorder(borderRadius: BorderRadius.circular(7))
-        : RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99));
+    final ShapeBorder shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+      side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide(color: p.line),
+    );
+    final OutlinedBorder small = RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99));
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -383,9 +358,7 @@ class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(backgroundColor: p.card, surfaceTintColor: Colors.transparent),
       popupMenuTheme: PopupMenuThemeData(color: p.card, surfaceTintColor: Colors.transparent),
       chipTheme: ChipThemeData(
-        shape: small.copyWith(
-          side: BorderSide(color: editorial ? p.strongLine : (cyber ? primary.withValues(alpha: .6) : p.line)),
-        ),
+        shape: small.copyWith(side: BorderSide(color: editorial ? p.strongLine : p.line)),
         // a selected chip keeps its text colour, so its fill is a tint (Editorial's ink would hide the text)
         selectedColor: editorial ? p.fg.withValues(alpha: .14) : primary.withValues(alpha: .18),
         backgroundColor: Colors.transparent,
@@ -441,14 +414,9 @@ class AppTheme {
   AraLook _styledLook(Brightness brightness, AraPalette p, Color primary) {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
-    final cyber = style == AraStyle.cyberpunk;
     final blockColours = editorial
         ? [p.card, p.card]
-        : cyber
-        ? (dark
-              ? const [Color(0xFF101018), Color(0xFF0A0A0F), Color(0xFF140A12)]
-              : const [Color(0xFFFFFFFF), Color(0xFFFCFCFE), Color(0xFFF5F5FA)])
-        : accent.filled && !cyber && !editorial
+        : accent.filled
         ? [accent.darkPrimary, accent.darkPrimary]
         : accent.pure
         ? [p.card, p.card]
@@ -459,15 +427,11 @@ class AppTheme {
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
     final Color down;
     final Color up;
-    final filled = accent.filled && !cyber && !editorial;
+    final filled = accent.filled && !editorial;
     if (filled) {
       // on the neon block: black lines, upload a lighter shade of it
       down = Colors.black;
       up = Color.alphaBlend(Colors.black.withValues(alpha: .55), block);
-    } else if (cyber) {
-      // neon: orange down and cyan up, on black by night and white by day
-      down = primary;
-      up = dark ? const Color(0xFF00F0FF) : const Color(0xFF0099A8);
     } else if (editorial) {
       down = p.fg;
       up = colourless ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A)) : primary;
@@ -485,21 +449,11 @@ class AppTheme {
       fastPing: primary,
       neonFill: filled ? accent.darkPrimary : null,
       dark: dark,
-      border: editorial ? p.strongLine : (cyber ? primary.withValues(alpha: .55) : p.line),
+      border: editorial ? p.strongLine : p.line,
       graphDown: filled ? down : AraLook.readableOn(down, block),
       graphUp: filled ? up : AraLook.readableOn(up, block),
       style: style,
       pingOn: p.card,
-      // Cyberpunk's icons in neon: hot pink through orange to yellow (by day to cyan, to read on white)
-      iconGradient: cyber
-          ? LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: dark
-                  ? const [Color(0xFFFF2E63), Color(0xFFFF7A00), Color(0xFFFFD300)]
-                  : const [Color(0xFFFF2E63), Color(0xFFFF6A00), Color(0xFF00B8C4)],
-            )
-          : null,
     );
   }
 

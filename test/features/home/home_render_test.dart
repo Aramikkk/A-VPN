@@ -128,7 +128,7 @@ void main() {
     ]);
   });
 
-  for (final style in [AraStyle.graphite, AraStyle.editorial, AraStyle.cyberpunk]) {
+  for (final style in [AraStyle.graphite, AraStyle.editorial]) {
     for (final (dark, connected) in [(true, true), (false, false), (false, true), (true, false)]) {
       final name = '${style.name}_${dark ? 'night' : 'day'}_${connected ? 'on' : 'off'}';
       testWidgets('home: $name', (tester) async {
@@ -137,7 +137,7 @@ void main() {
         await tester.binding.setSurfaceSize(const Size(390, 844));
         final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
         final prefs = await tester.runAsync(SharedPreferences.getInstance);
-        final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed');
+        final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
         final theme = AppTheme(AppThemeMode.system, '', accent: accent, style: style);
         await tester.pumpWidget(
           ProviderScope(

@@ -114,10 +114,10 @@ void main() {
     final t = await AppLocale.ru.build();
     expect(ruleLabel('domain_suffix=[ru su xn--p1ai yandex.net] => route(direct)', t), 'российские сайты');
     expect(ruleLabel('package_name=[ru.yandex.music ru.yandex.taxi] => route(direct)', t), 'российские приложения');
-    expect(ruleLabel('domain_suffix=[abook-club.ru x.ru] => route(select)', t), 'заблокированные сайты');
+    expect(ruleLabel('domain_suffix=[abook-club.ru x.ru] => route(select)', t), 'заблокированные сайты, Google и ИИ');
     expect(
       ruleLabel('domain_suffix=[10minutemail.com 1337x.to 24.kg ...] => route(select)', t),
-      'заблокированные сайты',
+      'заблокированные сайты, Google и ИИ',
     );
     expect(
       ruleLabel('ip_cidr=[5.28.192.0/18 5.200.14.128/25 31.13.24.0/21 ...] => route(select)', t),
@@ -175,7 +175,7 @@ void main() {
     ]);
     await tester.binding.setSurfaceSize(const Size(400, 1000));
     final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
-    final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed');
+    final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
     final theme = AppTheme(
       AppThemeMode.dark,
       '',
@@ -220,7 +220,7 @@ void main() {
       ]);
       await tester.binding.setSurfaceSize(size);
       final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
-      final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed');
+      final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
       final theme = AppTheme(
         dark ? AppThemeMode.dark : AppThemeMode.light,
         '',

@@ -20,10 +20,8 @@ class ThemesPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         children: const [
-          SettingsBlock(children: [StylePicker(), ThemeModePrefTile(), AccentPicker()]),
-          SizedBox(height: 12),
-          // the true-black themes on their own: plain OLED and the neon ones
-          SettingsBlock(children: [AccentPicker(oled: true)]),
+          // the colour themes are all true black now: OLED and the neon colours
+          SettingsBlock(children: [StylePicker(), ThemeModePrefTile(), AccentPicker(oled: true)]),
         ],
       ),
     );
@@ -43,27 +41,21 @@ class AccentPicker extends ConsumerWidget {
     final selected = ref.watch(Preferences.araAccent);
     final brightness = Theme.of(context).brightness;
     String name(AraAccent accent) => switch (accent) {
-      AraAccent.monoRed => t.avpn.accentMonoRed,
-      AraAccent.monoBlue => t.avpn.accentMonoBlue,
-      AraAccent.monoEmerald => t.avpn.accentMonoEmerald,
-      AraAccent.monoOrange => t.avpn.accentMonoOrange,
-      AraAccent.monoViolet => t.avpn.accentMonoViolet,
-      AraAccent.monoTeal => t.avpn.accentMonoTeal,
-      AraAccent.monoGold => t.avpn.accentMonoGold,
-      AraAccent.acid => t.avpn.accentAcid,
-      AraAccent.windows => t.avpn.accentWindows,
-      AraAccent.aurora => t.avpn.accentAurora,
-      AraAccent.sunset => t.avpn.accentSunset,
-      AraAccent.lagoon => t.avpn.accentLagoon,
-      AraAccent.neon => t.avpn.accentNeon,
-      AraAccent.mono => t.avpn.accentMono,
-      AraAccent.pastel => t.avpn.accentPastel,
-      AraAccent.cyber => t.avpn.accentCyber,
       AraAccent.oled => t.avpn.accentOled,
       AraAccent.neonYellow => t.avpn.accentNeonYellow,
       AraAccent.neonRed => t.avpn.accentNeonRed,
       AraAccent.neonBlue => t.avpn.accentNeonBlue,
       AraAccent.neonGreen => t.avpn.accentNeonGreen,
+      AraAccent.neonOrange => t.avpn.accentNeonOrange,
+      AraAccent.neonAmber => t.avpn.accentNeonAmber,
+      AraAccent.neonCoral => t.avpn.accentNeonCoral,
+      AraAccent.neonPink => t.avpn.accentNeonPink,
+      AraAccent.neonFuchsia => t.avpn.accentNeonFuchsia,
+      AraAccent.neonViolet => t.avpn.accentNeonViolet,
+      AraAccent.neonIndigo => t.avpn.accentNeonIndigo,
+      AraAccent.neonTurquoise => t.avpn.accentNeonTurquoise,
+      AraAccent.neonMint => t.avpn.accentNeonMint,
+      AraAccent.neonLavender => t.avpn.accentNeonLavender,
     };
     return ListTile(
       leading: Icon(oled ? Icons.contrast_rounded : Icons.palette_rounded),
@@ -153,7 +145,6 @@ class StylePicker extends ConsumerWidget {
     (String, String) names(AraStyle style) => switch (style) {
       AraStyle.graphite => (t.avpn.styleGraphite, t.avpn.styleGraphiteHint),
       AraStyle.editorial => (t.avpn.styleEditorial, t.avpn.styleEditorialHint),
-      AraStyle.cyberpunk => (t.avpn.styleCyberpunk, t.avpn.styleCyberpunkHint),
       AraStyle.classic => (t.avpn.styleClassic, t.avpn.styleClassicHint),
     };
     return ListTile(
@@ -216,8 +207,7 @@ class _StylePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = brightness == Brightness.dark;
     final p = style == AraStyle.classic ? null : AppTheme.palette(style, brightness);
-    final cyber = style == AraStyle.cyberpunk;
-    final neon = cyber ? (dark ? const Color(0xFFFF7A00) : const Color(0xFFFF5A00)) : accent;
+    final neon = accent;
     final bg = p?.bg ?? (dark ? Colors.black : Colors.white);
     final fg = p?.fg ?? (dark ? Colors.white : Colors.black);
     final line = p?.line ?? (dark ? const Color(0xFF26262B) : const Color(0xFFDDDFDA));
@@ -238,7 +228,7 @@ class _StylePreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cyber ? neon.withValues(alpha: .6) : line),
+        border: Border.all(color: line),
         gradient: style == AraStyle.graphite
             ? RadialGradient(
                 center: const Alignment(0, -1.3),
@@ -257,7 +247,7 @@ class _StylePreview extends StatelessWidget {
           row(false),
           row(false),
           const Spacer(),
-          if (style == AraStyle.graphite || cyber)
+          if (style == AraStyle.graphite)
             Row(
               children: [
                 Container(
@@ -273,7 +263,7 @@ class _StylePreview extends StatelessWidget {
                 Container(
                   width: 34,
                   height: 12,
-                  decoration: BoxDecoration(color: neon, borderRadius: BorderRadius.circular(cyber ? 0 : 9)),
+                  decoration: BoxDecoration(color: neon, borderRadius: BorderRadius.circular(9)),
                 ),
               ],
             )

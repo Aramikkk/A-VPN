@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:hiddify/features/route_rules/notifier/blocked_list.dart';
+import 'package:hiddify/features/route_rules/notifier/foreign_services.dart';
 import 'package:hiddify/features/route_rules/notifier/rkn_ru_domains.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 
@@ -19,7 +20,8 @@ abstract class BlockedOnlyRouting {
   /// The rules, in order. [extraProxyHosts]: hosts that must also go through the VPN (the ping test URL, so
   /// the ping shows the VPN's latency).
   static List<Map<String, dynamic>> rules({List<String> extraProxyHosts = const []}) {
-    final domains = {...blockedDomains, ...rknRuDomains, ...extraProxyHosts}.toList()..sort();
+    // blocked sites, and Google and the AI services, which refuse Russian addresses even when not blocked
+    final domains = {...blockedDomains, ...rknRuDomains, ...foreignVpnDomains, ...extraProxyHosts}.toList()..sort();
     return [
       // the local network and the router
       {'ip_is_private': true, 'action': 'route', 'outbound': _directTag},
@@ -27,6 +29,8 @@ abstract class BlockedOnlyRouting {
       {'domain_suffix': domains, 'protocol': 'quic', 'action': 'reject'},
       {'domain_suffix': domains, 'action': 'route', 'outbound': _proxyTag},
       {'ip_cidr': blockedCidrs, 'action': 'route', 'outbound': _proxyTag},
+      // Google's and the AI services' apps on the phone, whatever servers they use
+      {'package_name': foreignVpnApps, 'action': 'route', 'outbound': _proxyTag},
       // the rest of the internet
       {
         'network': ['tcp', 'udp'],

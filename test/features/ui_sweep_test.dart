@@ -250,7 +250,7 @@ void main() {
             for (final dark in [true, false]) {
               // ACCENTS=oledYellow,oledRed picks the themes (and names the pictures after them)
               final picked = Platform.environment['ACCENTS']?.split(',').map(AraAccent.values.byName).toList();
-              for (final accent in picked ?? [AraAccent.oled, AraAccent.monoRed, AraAccent.neonYellow]) {
+              for (final accent in picked ?? [AraAccent.oled, AraAccent.neonRed, AraAccent.neonYellow]) {
                 where = '${screen.name} ${style.name} ${accent.name} ${dark ? 'night' : 'day'} $sizeName';
                 SharedPreferences.setMockInitialValues({'ara_style': style.name});
                 final prefs = await tester.runAsync(SharedPreferences.getInstance);

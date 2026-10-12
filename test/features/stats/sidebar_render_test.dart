@@ -80,7 +80,7 @@ void main() {
       final theme = AppTheme(
         AppThemeMode.system,
         '',
-        accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'lagoon'),
+        accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonBlue'),
         style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
       );
       await tester.binding.setSurfaceSize(Size(width, dense ? 640 : (large ? 1100 : 760)));
@@ -178,7 +178,7 @@ void main() {
     final theme = AppTheme(
       AppThemeMode.light,
       '',
-      accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed'),
+      accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed'),
       style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
     );
     await tester.binding.setSurfaceSize(const Size(880, 820));

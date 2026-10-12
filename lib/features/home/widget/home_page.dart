@@ -22,8 +22,7 @@ class HomePage extends HookConsumerWidget {
 
     // Graphite: a soft glow in the accent colour from the top, behind the app bar and both columns of an unfolded
     // phone
-    final cyber = theme.araLook.style == AraStyle.cyberpunk;
-    final graphite = theme.araLook.style == AraStyle.graphite || cyber;
+    final graphite = theme.araLook.style == AraStyle.graphite;
     final scaffold = Scaffold(
       backgroundColor: graphite ? Colors.transparent : null,
       appBar: AppBar(
@@ -132,7 +131,6 @@ class HomePage extends HookConsumerWidget {
     if (!graphite || pure) {
       return scaffold;
     }
-    if (cyber) return scaffold;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
