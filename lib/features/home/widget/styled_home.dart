@@ -422,8 +422,14 @@ class _GraphiteRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
-        color: selected ? scheme.surfaceContainerHigh : Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        // the chosen one: a tint of the accent and an accent outline
+        color: selected
+            ? Color.alphaBlend(scheme.primary.withValues(alpha: dark ? .1 : .07), scheme.surfaceContainerHigh)
+            : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: selected ? BorderSide(color: scheme.primary.withValues(alpha: .65), width: 1.5) : BorderSide.none,
+        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: onTap,
@@ -438,7 +444,7 @@ class _GraphiteRow extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: selected
-                        ? scheme.primary.withValues(alpha: dark ? .16 : .1)
+                        ? scheme.primary.withValues(alpha: dark ? .22 : .14)
                         : scheme.surfaceContainerHighest.withValues(alpha: dark ? .7 : 1),
                     borderRadius: BorderRadius.circular(13),
                   ),
@@ -456,7 +462,10 @@ class _GraphiteRow extends StatelessWidget {
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 16.5),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                          fontSize: selected ? 17 : 16.5,
+                        ),
                       ),
                       const Gap(1),
                       Text(
