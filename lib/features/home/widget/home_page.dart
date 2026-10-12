@@ -127,7 +127,11 @@ class HomePage extends HookConsumerWidget {
         },
       ),
     );
-    if (!graphite) return scaffold;
+    // no glow on a true black (or white) OLED screen
+    final pure = theme.scaffoldBackgroundColor == Colors.black || theme.scaffoldBackgroundColor == Colors.white;
+    if (!graphite || pure) {
+      return scaffold;
+    }
     if (cyber) return scaffold;
     return DecoratedBox(
       decoration: BoxDecoration(

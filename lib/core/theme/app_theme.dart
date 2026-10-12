@@ -243,7 +243,22 @@ class AppTheme {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
     final cyber = style == AraStyle.cyberpunk;
-    final p = palette(style, brightness);
+    final styled = palette(style, brightness);
+    // the OLED theme in Graphite: true black by night (pixels off) and pure white by day, cards just off it
+    final p = accent.pure && style == AraStyle.graphite
+        ? AraPalette(
+            bg: dark ? Colors.black : Colors.white,
+            fg: styled.fg,
+            muted: styled.muted,
+            card: dark ? const Color(0xFF0A0A0B) : Colors.white,
+            container: dark ? const Color(0xFF0E0E10) : const Color(0xFFF7F7F8),
+            high: dark ? const Color(0xFF151517) : const Color(0xFFF0F0F2),
+            highest: dark ? const Color(0xFF1C1C1F) : const Color(0xFFE8E8EB),
+            line: dark ? const Color(0xFF1C1C1F) : const Color(0xFFE6E6EA),
+            strongLine: styled.strongLine,
+            nav: dark ? Colors.black : Colors.white,
+          )
+        : styled;
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
     final accentColour = cyber
         ? (dark ? const Color(0xFFFF7A00) : const Color(0xFFFF5A00))
@@ -432,6 +447,8 @@ class AppTheme {
         ? (dark
               ? const [Color(0xFF101018), Color(0xFF0A0A0F), Color(0xFF140A12)]
               : const [Color(0xFFFFFFFF), Color(0xFFFCFCFE), Color(0xFFF5F5FA)])
+        : accent.pure
+        ? [p.card, p.card]
         : dark
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
