@@ -63,3 +63,20 @@ class ConnectionQuality extends AutoDisposeNotifier<List<int?>> {
   final lost = samples.where((s) => s == null).length;
   return (ping: samples.lastWhere((s) => s != null, orElse: () => null), loss: lost * 100 / samples.length);
 }
+
+/// The answered probes' average, fastest and slowest ping, and the jitter: the average change from one answer to
+/// the next. Null when nothing answered.
+({int avg, int min, int max, int jitter})? pingSpread(List<int?> samples) {
+  final answered = samples.whereType<int>().toList();
+  if (answered.isEmpty) return null;
+  var change = 0;
+  for (var i = 1; i < answered.length; i++) {
+    change += (answered[i] - answered[i - 1]).abs();
+  }
+  return (
+    avg: (answered.reduce((a, b) => a + b) / answered.length).round(),
+    min: answered.reduce((a, b) => a < b ? a : b),
+    max: answered.reduce((a, b) => a > b ? a : b),
+    jitter: answered.length < 2 ? 0 : (change / (answered.length - 1)).round(),
+  );
+}

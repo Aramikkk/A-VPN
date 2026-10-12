@@ -77,3 +77,6 @@ windows/sign.cer
 /cert.pem
 /key.pem
 /sign.pfx
+
+# render previews (RENDER=1 flutter test --update-goldens)
+test/**/goldens/

@@ -29,6 +29,7 @@ import 'package:hiddify/features/settings/overview/sections/routing_options_page
 import 'package:hiddify/features/settings/overview/sections/themes_page.dart';
 import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
+import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/speed_page.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -39,6 +40,7 @@ part 'routing_config_notifier.g.dart';
 final branchesScope = <String, FocusScopeNode>{
   'home': FocusScopeNode(),
   'speed': FocusScopeNode(),
+  'connections': FocusScopeNode(),
   'profiles': FocusScopeNode(),
   'settings': FocusScopeNode(),
   'logs': FocusScopeNode(),
@@ -51,12 +53,12 @@ final loadingConfig = RoutingConfig(
 );
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
-    ? ['home', 'speed', 'settings'][index]
-    : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
+    ? ['home', 'speed', 'connections', 'settings'][index]
+    : ['home', 'connections', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
 
 int getIndexOfBranch(bool isMobileBreakpoint, bool showProfilesAction, String name) => isMobileBreakpoint
-    ? ['home', 'speed', 'settings'].indexOf(name)
-    : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'].indexOf(name);
+    ? ['home', 'speed', 'connections', 'settings'].indexOf(name)
+    : ['home', 'connections', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'].indexOf(name);
 
 @Riverpod(keepAlive: true)
 class RoutingConfigNotifier extends _$RoutingConfigNotifier {
@@ -162,6 +164,16 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   ),
                 ],
               ),
+            // which apps connected where: after Statistics on the phone, after Home on the desktop
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'connections',
+                  path: '/connections',
+                  builder: (_, _) => FocusScope(node: branchesScope['connections'], child: const ConnectionsPage()),
+                ),
+              ],
+            ),
             if (showProfilesAction)
               StatefulShellBranch(
                 routes: <GoRoute>[

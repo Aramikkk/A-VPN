@@ -48,6 +48,8 @@ class SideBarStatsOverview extends ConsumerWidget {
     final onSpeed = gradient != null ? theme.araLook.onGradient : scheme.onPrimaryContainer;
     final history = ref.watch(speedHistoryProvider);
     final quality = ref.watch(connectionQualityProvider);
+    final downColor = theme.araLook.graphDown ?? onSpeed;
+    final upColor = theme.araLook.graphUp ?? onSpeed.withValues(alpha: .7);
 
     final compact = !large || dense;
     final vpnTile = _Tile(
@@ -70,11 +72,12 @@ class SideBarStatsOverview extends ConsumerWidget {
       painter: _SpeedGraph(
         history,
         color: onSpeed,
+        downColor: downColor,
+        upColor: upColor,
         label: speed,
         detailed: large,
         textStyle: theme.textTheme.labelSmall!.copyWith(color: onSpeed.withValues(alpha: .75), fontSize: 10),
-        startLabel: t.avpn.graphStart,
-        nowLabel: t.avpn.graphNow,
+        ticks: [t.avpn.graphStart, '−45', '−30', '−15', t.avpn.graphNow],
       ),
     );
     final speedBlock = Container(
@@ -108,7 +111,14 @@ class SideBarStatsOverview extends ConsumerWidget {
             Gap(large && !dense ? 16 : 10),
             if (fill) Expanded(child: graph) else SizedBox(height: dense ? 92 : (large ? 130 : 64), child: graph),
             const Gap(8),
-            _GraphSummary(history: history, color: onSpeed, speed: speed, oneLine: dense),
+            _GraphSummary(
+              history: history,
+              color: onSpeed,
+              downColor: downColor,
+              upColor: upColor,
+              speed: speed,
+              oneLine: dense,
+            ),
           ],
         ],
       ),
@@ -335,15 +345,26 @@ class _SpeedRow extends StatelessWidget {
   }
 }
 
-/// The legend and the minute's peak and average download speed, under the graph.
+/// The legend in the graph's colours and the minute's peak and average download speed, under the graph.
 class _GraphSummary extends ConsumerWidget {
-  const _GraphSummary({required this.history, required this.color, required this.speed, this.oneLine = false});
+  const _GraphSummary({
+    required this.history,
+    required this.color,
+    required this.downColor,
+    required this.upColor,
+    required this.speed,
+    this.oneLine = false,
+  });
 
   final List<({int down, int up})> history;
+
+  /// the text colour on the block
   final Color color;
+  final Color downColor;
+  final Color upColor;
   final String Function(int) speed;
 
-  /// the legend and the figures side by side (they wrap when there's no room)
+  /// the legend and the figures side by side
   final bool oneLine;
 
   @override
@@ -354,43 +375,40 @@ class _GraphSummary extends ConsumerWidget {
     final downs = history.map((s) => s.down).toList();
     final peak = downs.isEmpty ? 0 : downs.reduce((a, b) => a > b ? a : b);
     final average = downs.isEmpty ? 0 : downs.reduce((a, b) => a + b) ~/ downs.length;
-    Widget legend(Widget mark, String text) => Row(
+    Widget swatch(Color c) => Container(
+      width: 12,
+      height: 8,
+      decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2)),
+    );
+    Widget legend(Color c, String text) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        mark,
+        swatch(c),
         const Gap(4),
         Text(text, style: style),
       ],
     );
-    final downMark = Container(
-      width: 12,
-      height: 8,
-      decoration: BoxDecoration(color: color.withValues(alpha: .55), borderRadius: BorderRadius.circular(2)),
+    final figures = Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '${t.avpn.graphPeak} ', style: style),
+          TextSpan(text: speed(peak), style: strong),
+          TextSpan(text: '  ${t.avpn.graphAverage} ', style: style),
+          TextSpan(text: speed(average), style: strong),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: oneLine ? TextAlign.end : TextAlign.start,
     );
-    final upMark = SizedBox(width: 14, height: 8, child: CustomPaint(painter: _DashSample(color)));
     if (oneLine) {
-      // the marks with arrows instead of words, and the figures beside them
       return Row(
         children: [
-          legend(downMark, '↓'),
+          legend(downColor, '↓'),
           const Gap(10),
-          legend(upMark, '↑'),
+          legend(upColor, '↑'),
           const Gap(12),
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: '${t.avpn.graphPeak} ', style: style),
-                  TextSpan(text: speed(peak), style: strong),
-                  TextSpan(text: '  ${t.avpn.graphAverage} ', style: style),
-                  TextSpan(text: speed(average), style: strong),
-                ],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
-            ),
-          ),
+          Expanded(child: figures),
         ],
       );
     }
@@ -400,79 +418,41 @@ class _GraphSummary extends ConsumerWidget {
         Wrap(
           spacing: 14,
           runSpacing: 4,
-          children: [
-            legend(
-              Container(
-                width: 12,
-                height: 8,
-                decoration: BoxDecoration(color: color.withValues(alpha: .55), borderRadius: BorderRadius.circular(2)),
-              ),
-              t.avpn.statsDownload,
-            ),
-            legend(
-              SizedBox(width: 14, height: 8, child: CustomPaint(painter: _DashSample(color))),
-              t.avpn.statsUpload,
-            ),
-          ],
+          children: [legend(downColor, t.avpn.statsDownload), legend(upColor, t.avpn.statsUpload)],
         ),
         const Gap(4),
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(text: '${t.avpn.graphPeak} ', style: style),
-              TextSpan(text: speed(peak), style: strong),
-              TextSpan(text: '   ${t.avpn.graphAverage} ', style: style),
-              TextSpan(text: speed(average), style: strong),
-            ],
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        figures,
       ],
     );
   }
 }
 
-/// The upload line's look, for the legend.
-class _DashSample extends CustomPainter {
-  _DashSample(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.6;
-    for (double x = 0; x < size.width; x += 5) {
-      canvas.drawLine(Offset(x, size.height / 2), Offset(x + 3, size.height / 2), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashSample old) => old.color != color;
-}
-
-/// The last minute of download (filled) and upload (dashed) speed, on a scale rounded to a readable number with
-/// its values on the side, and the time along the bottom.
+/// The last minute of download and upload speed as smooth filled curves in their own colours, on a scale
+/// rounded to a readable number with its values on the side, and a time axis marked every 15 seconds.
 class _SpeedGraph extends CustomPainter {
   _SpeedGraph(
     this.samples, {
     required this.color,
+    required this.downColor,
+    required this.upColor,
     required this.label,
     required this.detailed,
     required this.textStyle,
-    required this.startLabel,
-    required this.nowLabel,
+    required this.ticks,
   });
 
   final List<({int down, int up})> samples;
+
+  /// the grid and the labels
   final Color color;
+  final Color downColor;
+  final Color upColor;
   final String Function(int bytesPerSecond) label;
   final bool detailed;
   final TextStyle textStyle;
-  final String startLabel;
-  final String nowLabel;
+
+  /// the time axis labels, from 60 seconds ago to now (5 of them)
+  final List<String> ticks;
 
   /// The top of the scale: 1, 2 or 5 times a power of ten in the unit the value reads in (KB/s, MB/s…), at or
   /// above [value], so the scale says "10 MB/s" rather than "9.5 MB/s". At least 1 KB/s.
@@ -498,6 +478,19 @@ class _SpeedGraph extends CustomPainter {
     textDirection: TextDirection.ltr,
   )..layout();
 
+  /// A curve through [points] that never overshoots them: each segment bends towards the midpoint.
+  static Path _smooth(List<Offset> points) {
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var i = 1; i < points.length; i++) {
+      final a = points[i - 1];
+      final b = points[i];
+      final mid = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
+      path.quadraticBezierTo(a.dx, a.dy, mid.dx, mid.dy);
+      if (i == points.length - 1) path.lineTo(b.dx, b.dy);
+    }
+    return path;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final timeAxis = detailed ? 14.0 : 0.0;
@@ -510,68 +503,78 @@ class _SpeedGraph extends CustomPainter {
     final chart = Size(size.width - gutter, size.height - timeAxis);
 
     final grid = Paint()
-      ..color = color.withValues(alpha: .16)
+      ..color = color.withValues(alpha: .14)
       ..strokeWidth = 1;
     for (var i = 0; i <= rows; i++) {
       final y = chart.height * i / rows;
       canvas.drawLine(Offset(0, y), Offset(chart.width, y), grid);
-      if (i < rows) {
-        // each value hangs just below its line, so they're evenly spaced
-        labels[i].paint(canvas, Offset(size.width - labels[i].width, y + 1));
-      }
+      if (i < rows) labels[i].paint(canvas, Offset(size.width - labels[i].width, y + 1));
     }
-    if (detailed) {
-      _text(startLabel).paint(canvas, Offset(0, chart.height + 2));
-      final now = _text(nowLabel);
-      now.paint(canvas, Offset(chart.width - now.width, chart.height + 2));
+    // every 15 seconds: a faint line, and on the detailed graph its label
+    final step = chart.width / (SpeedHistory.length - 1);
+    var firstEnd = 0.0;
+    final lastStart = detailed && ticks.length > 4 ? chart.width - _text(ticks[4]).width : chart.width;
+    for (var k = 0; k <= 4; k++) {
+      final x = chart.width - step * 15 * (4 - k) * (SpeedHistory.length - 1) / 60;
+      if (k > 0 && k < 4) {
+        canvas.drawLine(Offset(x, 0), Offset(x, chart.height), grid);
+      }
+      if (detailed && k < ticks.length) {
+        final tick = _text(ticks[k]);
+        final dx = k == 0 ? 0.0 : (k == 4 ? x - tick.width : x - tick.width / 2);
+        // a mark that would run into the first or the last label is left out
+        final clear = k == 0 || k == 4 || (dx > firstEnd + 6 && dx + tick.width < lastStart - 6);
+        if (clear) tick.paint(canvas, Offset(dx, chart.height + 2));
+        if (k == 0) firstEnd = dx + tick.width;
+      }
     }
     if (samples.length < 2) return;
 
-    final step = chart.width / (SpeedHistory.length - 1);
     final start = chart.width - step * (samples.length - 1);
     Offset point(int i, int value) => Offset(start + step * i, chart.height - chart.height * value / top);
 
-    final down = Path()..moveTo(start, chart.height);
-    for (var i = 0; i < samples.length; i++) {
-      final p = point(i, samples[i].down);
-      down.lineTo(p.dx, p.dy);
-    }
-    final downLine = Path.from(down);
-    down
-      ..lineTo(chart.width, chart.height)
-      ..close();
-    canvas.drawPath(
-      down,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [color.withValues(alpha: .5), color.withValues(alpha: .04)],
-        ).createShader(Offset.zero & chart),
-    );
-    canvas.drawPath(
-      downLine,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeJoin = StrokeJoin.round,
-    );
-
-    // upload: dashed
-    final dash = Paint()
-      ..color = color.withValues(alpha: .85)
-      ..strokeWidth = 1.6;
-    for (var i = 0; i + 1 < samples.length; i++) {
-      if (i.isEven) canvas.drawLine(point(i, samples[i].up), point(i + 1, samples[i + 1].up), dash);
+    void series(List<int> values, Color c, double width, double fill) {
+      final points = [for (var i = 0; i < values.length; i++) point(i, values[i])];
+      final line = _smooth(points);
+      final area = Path.from(line)
+        ..lineTo(points.last.dx, chart.height)
+        ..lineTo(points.first.dx, chart.height)
+        ..close();
+      canvas.drawPath(
+        area,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              c.withValues(alpha: fill),
+              c.withValues(alpha: .02),
+            ],
+          ).createShader(Offset.zero & chart),
+      );
+      canvas.drawPath(
+        line,
+        Paint()
+          ..color = c
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
     }
 
-    // the latest download speed, marked
-    canvas.drawCircle(point(samples.length - 1, samples.last.down), 3.5, Paint()..color = color);
+    // upload under download, so the download (usually the bigger one) stays on top
+    series([for (final s in samples) s.up], upColor, 1.6, .35);
+    series([for (final s in samples) s.down], downColor, 2.2, .6);
+
+    // now: both values marked
+    canvas.drawCircle(point(samples.length - 1, samples.last.up), 3, Paint()..color = upColor);
+    canvas.drawCircle(point(samples.length - 1, samples.last.down), 3.8, Paint()..color = downColor);
   }
 
   @override
-  bool shouldRepaint(_SpeedGraph old) => old.samples != samples || old.color != color;
+  bool shouldRepaint(_SpeedGraph old) =>
+      old.samples != samples || old.color != color || old.downColor != downColor || old.upColor != upColor;
 }
 
 /// Ping through the VPN and packet loss over the last minute: the values, and a bar per probe (lost ones red).
@@ -589,6 +592,7 @@ class _QualityCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final summary = summarize(samples);
+    final spread = pingSpread(samples);
     final loss = summary.loss;
     final lossColor = loss == null || loss == 0
         ? theme.araLook.fastPing
@@ -655,6 +659,34 @@ class _QualityCard extends ConsumerWidget {
               samples.isEmpty ? t.avpn.statsNoData : t.avpn.statsPingHistory,
               style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
+          if (spread != null) ...[
+            Gap(compact ? 6 : 4),
+            Text.rich(
+              TextSpan(
+                children: [
+                  for (final (i, (label, ms)) in [
+                    (t.avpn.pingAvg, spread.avg),
+                    (t.avpn.pingMin, spread.min),
+                    (t.avpn.pingMax, spread.max),
+                    (t.avpn.pingJitter, spread.jitter),
+                  ].indexed) ...[
+                    TextSpan(text: '${i == 0 ? '' : '  ·  '}$label '),
+                    TextSpan(
+                      text: i == 3 ? '±$ms' : '$ms',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: i == 3 ? scheme.onSurface : theme.araLook.pingColor(ms, scheme.onSurface),
+                      ),
+                    ),
+                  ],
+                  if (!compact) const TextSpan(text: ' ms'),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ],
         ],
       ),
     );

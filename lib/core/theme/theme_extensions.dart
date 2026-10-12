@@ -38,7 +38,13 @@ class AraLook extends ThemeExtension<AraLook> {
     this.border,
     this.data,
     this.dark = false,
+    this.graphDown,
+    this.graphUp,
   });
+
+  /// the speed graph's download and upload colours on the speed block; null: the text colour on it
+  final Color? graphDown;
+  final Color? graphUp;
 
   /// a dark theme: the ping scale is kept readable on dark cards instead of light ones
   final bool dark;
@@ -61,7 +67,7 @@ class AraLook extends ThemeExtension<AraLook> {
   };
 
   /// Four steps from [base]: the hue turns a little warmer each step and the colour softens; a colourless accent
-  /// (Mono, OLED) steps in lightness instead, towards grey. Every step is darkened (light theme) or lightened
+  /// (Monochrome, OLED) gets green, yellow, orange and red instead. Every step is darkened (light theme) or lightened
   /// (dark theme) as far as needed to stay readable on the cards: contrast at least 3:1.
   static List<Color> pingScale(Color base, {bool dark = false}) {
     final hsl = HSLColor.fromColor(base);
@@ -71,13 +77,21 @@ class AraLook extends ThemeExtension<AraLook> {
       for (var i = 0; i < 4; i++)
         _readable(
           colourless
-              ? hsl.withLightness((dark ? hsl.lightness - i * .14 : hsl.lightness + i * .14).clamp(0.0, 1.0))
+              ? HSLColor.fromColor(_trafficLight[i])
               : hsl.withHue((hsl.hue + i * 18) % 360).withSaturation((hsl.saturation * (1 - i * .08)).clamp(0.0, 1.0)),
           card,
           dark: dark,
         ),
     ];
   }
+
+  /// [colour] lightened (on a dark [background]) or darkened (on a light one) until it reads on it: contrast at
+  /// least 3:1.
+  static Color readableOn(Color colour, Color background) =>
+      _readable(HSLColor.fromColor(colour), background, dark: background.computeLuminance() < .4);
+
+  /// a colourless accent's ping scale: green, yellow, orange, red
+  static const _trafficLight = [Color(0xFF16A34A), Color(0xFFCA8A04), Color(0xFFEA580C), Color(0xFFDC2626)];
 
   static Color _readable(HSLColor colour, Color card, {required bool dark}) {
     var c = colour;
@@ -108,6 +122,8 @@ class AraLook extends ThemeExtension<AraLook> {
     border: border ?? this.border,
     data: data ?? this.data,
     dark: dark,
+    graphDown: graphDown,
+    graphUp: graphUp,
   );
 
   @override
@@ -120,6 +136,8 @@ class AraLook extends ThemeExtension<AraLook> {
       border: Color.lerp(border, other.border, t),
       data: Color.lerp(data, other.data, t),
       dark: t < .5 ? dark : other.dark,
+      graphDown: Color.lerp(graphDown, other.graphDown, t),
+      graphUp: Color.lerp(graphUp, other.graphUp, t),
     );
   }
 }

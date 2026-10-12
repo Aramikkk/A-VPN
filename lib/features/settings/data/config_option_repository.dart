@@ -195,6 +195,9 @@ abstract class ConfigOptions {
 
   static final enableClashApi = PreferencesNotifier.create<bool, bool>("enable-clash-api", true);
 
+  /// the Clash API's key, made up once per install (bootstrap), so the Connections tab can read the core's list
+  static final clashApiSecret = PreferencesNotifier.create<String, String>("aravpn-clash-api-secret", "");
+
   static final clashApiPort = PreferencesNotifier.create<int, int>(
     "clash-api-port",
     16756,
@@ -527,6 +530,7 @@ abstract class ConfigOptions {
       urlTestTimeout: ref.watch(urlTestTimeout),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),
+      webSecret: ref.watch(clashApiSecret),
       enableTun: mode == ServiceMode.tun,
       // enableTunService: mode == false, //ServiceMode.tunService,
       setSystemProxy: mode == ServiceMode.systemProxy,

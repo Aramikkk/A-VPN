@@ -45,6 +45,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
     @IntervalInSecondsConverter() required Duration urlTestTimeout,
     required bool enableClashApi,
     required int clashApiPort,
+    // the Clash API's key, so the app can read the connection list (empty: the core makes up its own)
+    @Default('') String webSecret,
     required bool enableTun,
     // required bool enableTunService,
     required bool setSystemProxy,

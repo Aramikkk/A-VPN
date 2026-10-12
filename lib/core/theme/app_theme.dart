@@ -13,14 +13,46 @@ class AppTheme {
   /// the accent colour and gradient (Settings → General → Colour theme)
   final AraAccent accent;
 
-  AraLook _look(Brightness brightness) => AraLook(
-    gradient: accent.gradient(brightness),
-    onGradient: accent.onGradient(brightness),
-    // the ping's colour scale starts at the accent (red, orange… in the red theme)
-    fastPing: brightness == Brightness.dark ? accent.darkPrimary : accent.lightPrimary,
-    dark: brightness == Brightness.dark,
-    border: accent.pure ? (brightness == Brightness.dark ? Colors.white54 : Colors.black45) : null,
-  );
+  AraLook _look(Brightness brightness) {
+    final graph = graphColours(accent, brightness);
+    return AraLook(
+      gradient: accent.gradient(brightness),
+      onGradient: accent.onGradient(brightness),
+      // the ping's colour scale starts at the accent (red, orange… in the red theme)
+      fastPing: brightness == Brightness.dark ? accent.darkPrimary : accent.lightPrimary,
+      dark: brightness == Brightness.dark,
+      border: accent.pure ? (brightness == Brightness.dark ? Colors.white54 : Colors.black45) : null,
+      graphDown: graph.down,
+      graphUp: graph.up,
+    );
+  }
+
+  /// The speed graph's colours on the speed block: download in the accent colour and upload in a colour across
+  /// the colour wheel from it, both readable on the block. A colourless accent (Monochrome, OLED) gets blue and
+  /// orange; on a coloured gradient the download stays in the text colour and the upload gets the opposite hue.
+  static ({Color down, Color up}) graphColours(AraAccent accent, Brightness brightness) {
+    final colours = brightness == Brightness.dark ? accent.darkGradient : accent.lightGradient;
+    final block = colours[colours.length ~/ 2];
+    final blockDark = block.computeLuminance() < .4;
+    final seed = HSLColor.fromColor(accent.seed);
+    final colourless = seed.saturation < .12;
+    final neutralBlock = accent.pure || colourless || accent.icon != null;
+    final Color down;
+    final Color up;
+    if (colourless) {
+      down = blockDark ? const Color(0xFF3B9BFF) : const Color(0xFF1F66E5);
+      up = blockDark ? const Color(0xFFFF9F2E) : const Color(0xFFD9590B);
+    } else if (neutralBlock) {
+      final base = HSLColor.fromColor(blockDark ? accent.darkPrimary : accent.lightPrimary);
+      down = base.toColor();
+      up = base.withHue((base.hue + 150) % 360).toColor();
+    } else {
+      final hue = HSLColor.fromColor(block).hue;
+      down = accent.onGradient(brightness);
+      up = HSLColor.fromAHSL(1, (hue + 180) % 360, .95, blockDark ? .75 : .32).toColor();
+    }
+    return (down: AraLook.readableOn(down, block), up: AraLook.readableOn(up, block));
+  }
 
   /// Light: white backgrounds and the accent's deeper shade, whatever the wallpaper colours.
   ThemeData lightTheme(ColorScheme? lightColorScheme) {

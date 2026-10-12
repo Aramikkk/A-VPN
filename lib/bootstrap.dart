@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -76,6 +77,15 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
     }
   });
 
+  // the key for the core's connection list (the Connections tab), made up once
+  if (container.read(ConfigOptions.clashApiSecret).isEmpty) {
+    final random = Random.secure();
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    await container
+        .read(ConfigOptions.clashApiSecret.notifier)
+        .update(String.fromCharCodes([for (var i = 0; i < 24; i++) chars.codeUnitAt(random.nextInt(chars.length))]));
+  }
+
   // The log level decides this now. There is no second debug switch to keep in
   // sync, and the core reaches the same conclusion from the same value.
   final debug = kDebugMode || container.read(ConfigOptions.logLevel).isVerbose;
@@ -95,10 +105,7 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   }
   // phase 3 — a log file is worth its cost on desktop, or while debugging.
   // On a phone in release it only burns storage nobody reads.
-  await _init(
-    "logging",
-    () async => logFinish(keepFile: debug || PlatformUtils.isDesktop),
-  );
+  await _init("logging", () async => logFinish(keepFile: debug || PlatformUtils.isDesktop));
 
   // marks where this run begins, since the file now spans several
   logMarkRun(appInfo.format());

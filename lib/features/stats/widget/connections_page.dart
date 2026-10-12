@@ -1,0 +1,553 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:gap/gap.dart';
+import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/features/stats/model/vpn_traffic.dart';
+import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:installed_apps/installed_apps.dart';
+
+/// The phone's installed apps by package: their names and icons, for the connection list.
+final installedAppsProvider = FutureProvider<Map<String, ({String name, Uint8List? icon})>>((ref) async {
+  if (!Platform.isAndroid) return const {};
+  try {
+    final apps = await InstalledApps.getInstalledApps(false, true);
+    return {for (final a in apps) a.packageName: (name: a.name, icon: a.icon)};
+  } catch (_) {
+    return const {};
+  }
+});
+
+enum _View { apps, sites }
+
+enum _Filter { all, vpn, direct }
+
+/// The Connections tab: which apps connected to which sites, and whether each went through the VPN (and which
+/// server) or direct. Grouped by app or by site, the most traffic first; a group opens to its connections.
+class ConnectionsPage extends HookConsumerWidget {
+  const ConnectionsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final state = ref.watch(connectionsProvider);
+    final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+    final view = useState(_View.apps);
+    final filter = useState(_Filter.all);
+    final query = useState('');
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    String appName(String app) => app.isEmpty ? t.avpn.connUnknownApp : (apps[app]?.name ?? _shortApp(app));
+
+    final items = state.items.where((c) {
+      if (filter.value == _Filter.vpn && c.route != ConnectionRoute.vpn) return false;
+      if (filter.value == _Filter.direct && c.route == ConnectionRoute.vpn) return false;
+      final q = query.value.trim().toLowerCase();
+      return q.isEmpty ||
+          c.host.toLowerCase().contains(q) ||
+          appName(c.app).toLowerCase().contains(q) ||
+          c.app.toLowerCase().contains(q);
+    }).toList();
+    final groups = groupConnections(items, view.value == _View.apps ? (c) => c.app : (c) => c.host);
+    final all = state.items;
+    final open = all.where((c) => c.active).length;
+    final viaVpn = all.where((c) => c.route == ConnectionRoute.vpn).length;
+    final direct = all.where((c) => c.route == ConnectionRoute.direct).length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(t.avpn.connectionsTab),
+        actions: [
+          if (all.any((c) => !c.active))
+            IconButton(
+              tooltip: t.avpn.connClear,
+              icon: const Icon(Icons.cleaning_services_rounded),
+              onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
+            ),
+        ],
+      ),
+      body: !state.available && all.isEmpty
+          ? _Empty(icon: Icons.link_off_rounded, text: t.avpn.connNotConnected)
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      sliver: SliverList.list(
+                        children: [
+                          Row(
+                            children: [
+                              _Count(label: t.avpn.connOpen, value: open, color: scheme.onSurface),
+                              const Gap(8),
+                              _Count(label: t.avpn.statsViaVpn, value: viaVpn, color: scheme.primary),
+                              const Gap(8),
+                              _Count(label: t.avpn.statsDirect, value: direct, color: scheme.onSurfaceVariant),
+                            ],
+                          ),
+                          const Gap(12),
+                          SegmentedButton<_View>(
+                            segments: [
+                              ButtonSegment(
+                                value: _View.apps,
+                                icon: const Icon(Icons.apps_rounded),
+                                label: Text(t.avpn.connByApp),
+                              ),
+                              ButtonSegment(
+                                value: _View.sites,
+                                icon: const Icon(Icons.public_rounded),
+                                label: Text(t.avpn.connBySite),
+                              ),
+                            ],
+                            selected: {view.value},
+                            showSelectedIcon: false,
+                            onSelectionChanged: (s) => view.value = s.first,
+                          ),
+                          const Gap(10),
+                          Row(
+                            children: [
+                              for (final (f, label) in [
+                                (_Filter.all, t.avpn.connAll),
+                                (_Filter.vpn, 'VPN'),
+                                (_Filter.direct, t.avpn.statsDirect),
+                              ]) ...[
+                                ChoiceChip(
+                                  label: Text(label),
+                                  selected: filter.value == f,
+                                  onSelected: (_) => filter.value = f,
+                                ),
+                                const Gap(6),
+                              ],
+                            ],
+                          ),
+                          const Gap(10),
+                          TextField(
+                            onChanged: (v) => query.value = v,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              hintText: t.avpn.connSearch,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (groups.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _Empty(icon: Icons.hourglass_empty_rounded, text: t.avpn.connEmpty),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        sliver: SliverList.separated(
+                          itemCount: groups.length,
+                          separatorBuilder: (_, _) => const Gap(8),
+                          itemBuilder: (context, i) => _GroupCard(
+                            key: ValueKey('${view.value}:${groups[i].key}'),
+                            group: groups[i],
+                            byApp: view.value == _View.apps,
+                            appName: appName,
+                            iconOf: (app) => apps[app]?.icon,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+/// "C:\Program Files\Google\Chrome\Application\chrome.exe" → "chrome"; a package keeps its last parts.
+String _shortApp(String app) {
+  final file = app.split(RegExp(r'[\\/]')).last;
+  if (file.toLowerCase().endsWith('.exe')) return file.substring(0, file.length - 4);
+  return file;
+}
+
+class _Count extends StatelessWidget {
+  const _Count({required this.label, required this.value, required this.color});
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                letterSpacing: .3,
+              ),
+            ),
+            const Gap(2),
+            Text(
+              '$value',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Empty extends StatelessWidget {
+  const _Empty({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 40, color: scheme.onSurfaceVariant),
+            const Gap(12),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// An app (or a site) with its traffic and the way its connections went; tapped, the sites it connected to (or
+/// the apps that connected to it), each with its own way.
+class _GroupCard extends HookConsumerWidget {
+  const _GroupCard({super.key, required this.group, required this.byApp, required this.appName, required this.iconOf});
+
+  final ConnectionGroup group;
+  final bool byApp;
+  final String Function(String app) appName;
+  final Uint8List? Function(String app) iconOf;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final expanded = useState(false);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final units = t.avpn.bytesUnits.split(',');
+    String size(int bytes) => formatBytes(bytes, units);
+
+    final title = byApp ? appName(group.key) : (group.key.isEmpty ? '—' : group.key);
+    final subtitle = byApp
+        ? [
+            if (group.key.isNotEmpty && appName(group.key) != group.key) group.key,
+            t.avpn.connSites(n: {for (final c in group.items) c.host}.length),
+          ].join(' · ')
+        : {for (final c in group.items) appName(c.app)}.take(3).join(', ');
+    // inside: by site for an app, by app for a site
+    final inner = groupConnections(group.items, byApp ? (c) => c.host : (c) => c.app);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => expanded.value = !expanded.value,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Row(
+                children: [
+                  if (byApp)
+                    _AppIcon(icon: iconOf(group.key), name: title)
+                  else
+                    _RouteDot(route: group.mainRoute, size: 36),
+                  const Gap(12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const Gap(2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        const Gap(6),
+                        _RouteBadge(group: group),
+                      ],
+                    ),
+                  ),
+                  const Gap(8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        size(group.total),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const Gap(2),
+                      Text(
+                        group.open > 0
+                            ? t.avpn.connOpenCount(n: group.open)
+                            : t.avpn.connCount(n: group.items.length),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: group.open > 0 ? scheme.primary : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Icon(
+                        expanded.value ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                        size: 18,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded.value) ...[
+            Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: .6)),
+            for (final g in inner.take(50))
+              _InnerRow(title: byApp ? (g.key.isEmpty ? '—' : g.key) : appName(g.key), group: g, size: size),
+            if (inner.length > 50)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text('+${inner.length - 50}', style: theme.textTheme.labelSmall),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InnerRow extends ConsumerWidget {
+  const _InnerRow({required this.title, required this.group, required this.size});
+
+  final String title;
+  final ConnectionGroup group;
+  final String Function(int) size;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final ports = {for (final c in group.items) '${c.network}:${c.port}'}.take(3).join(', ');
+    final rules = {
+      for (final c in group.items)
+        if (_ruleText(c.rule) case final r?) r,
+    }.take(2).join(', ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
+      child: Row(
+        children: [
+          _RouteDot(route: group.mainRoute, size: 10),
+          const Gap(10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
+                Text(
+                  [_routeText(t, group), ports, if (rules.isNotEmpty) '${t.avpn.connRule}: $rules'].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const Gap(8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(size(group.total), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+              if (group.open > 0)
+                Text(
+                  t.avpn.connOpenCount(n: group.open),
+                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "rule_set=[blocked ru-blocked] => route(select)" → "blocked, ru-blocked"; "domain_suffix=[.ru] => …" → ".ru";
+/// null for the default route ("final").
+String? _ruleText(String rule) {
+  final match = rule.split('=>').first.trim();
+  if (match.isEmpty || match == 'final') return null;
+  final values = RegExp(
+    r'\[([^\]]*)\]',
+  ).allMatches(match).expand((m) => m.group(1)!.split(' ')).where((v) => v.isNotEmpty);
+  final text = values.isEmpty ? match : values.join(', ');
+  return text.length > 40 ? '${text.substring(0, 39)}…' : text;
+}
+
+String _routeText(Translations t, ConnectionGroup g) {
+  if (g.mixed) return t.avpn.connMixed;
+  return switch (g.mainRoute) {
+    ConnectionRoute.vpn => g.servers.isEmpty ? 'VPN' : 'VPN · ${g.servers.join(', ')}',
+    ConnectionRoute.direct => t.avpn.statsDirect,
+    ConnectionRoute.block => t.avpn.connBlocked,
+  };
+}
+
+Color _routeColor(ColorScheme scheme, ConnectionRoute route) => switch (route) {
+  ConnectionRoute.vpn => scheme.primary,
+  ConnectionRoute.direct => scheme.onSurfaceVariant,
+  ConnectionRoute.block => scheme.error,
+};
+
+/// "VPN · 🇸🇪 Швеция 2", "Напрямую", or both when an app went both ways.
+class _RouteBadge extends ConsumerWidget {
+  const _RouteBadge({required this.group});
+
+  final ConnectionGroup group;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    Widget pill(ConnectionRoute route, String text, int count) {
+      final color = _routeColor(scheme, route);
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: route == ConnectionRoute.vpn ? color.withValues(alpha: .16) : null,
+          border: Border.all(color: color.withValues(alpha: route == ConnectionRoute.vpn ? .0 : .6)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          group.mixed ? '$text $count' : text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+
+    final servers = group.servers;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        if (group.vpn > 0)
+          pill(
+            ConnectionRoute.vpn,
+            servers.isEmpty ? 'VPN' : 'VPN · ${servers.take(2).join(', ')}${servers.length > 2 ? '…' : ''}',
+            group.vpn,
+          ),
+        if (group.direct > 0) pill(ConnectionRoute.direct, t.avpn.statsDirect, group.direct),
+        if (group.blocked > 0) pill(ConnectionRoute.block, t.avpn.connBlocked, group.blocked),
+      ],
+    );
+  }
+}
+
+class _RouteDot extends StatelessWidget {
+  const _RouteDot({required this.route, required this.size});
+
+  final ConnectionRoute route;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _routeColor(Theme.of(context).colorScheme, route);
+    if (size < 16) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+    }
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color.withValues(alpha: .15), shape: BoxShape.circle),
+      child: Icon(
+        route == ConnectionRoute.vpn
+            ? Icons.shield_rounded
+            : (route == ConnectionRoute.block ? Icons.block_rounded : Icons.alt_route_rounded),
+        size: size * .5,
+        color: color,
+      ),
+    );
+  }
+}
+
+class _AppIcon extends StatelessWidget {
+  const _AppIcon({required this.icon, required this.name});
+
+  final Uint8List? icon;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (icon != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(icon!, width: 36, height: 36, gaplessPlayback: true),
+      );
+    }
+    return Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .14), borderRadius: BorderRadius.circular(10)),
+      child: Text(
+        name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+        style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w700, fontSize: 16),
+      ),
+    );
+  }
+}

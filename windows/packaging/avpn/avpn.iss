@@ -1,5 +1,7 @@
 ; A-VPN installer for Windows. Build: ISCC.exe avpn.iss (after flutter build windows)
 #define AppName "A-VPN"
+; the folder, the exe and the sign-in task keep the old name, so an update lands on the installed copy
+#define DirName "A-VPN"
 ; the release number: release.sh passes it from pubspec.yaml (/DAppVersion=…)
 #ifndef AppVersion
   #define AppVersion "5.1.0"
@@ -13,7 +15,7 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppName}
-DefaultDirName={autopf}\{#AppName}
+DefaultDirName={autopf}\{#DirName}
 DisableProgramGroupPage=yes
 ; admin rights: the sign-in task that starts A-VPN runs with highest privileges, so TUN needs no UAC prompt
 PrivilegesRequired=admin
@@ -46,6 +48,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#BuildDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "autostart.ps1"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; the shortcuts of the versions named A-VPN
+Type: files; Name: "{autoprograms}\A-VPN.lnk"
+Type: files; Name: "{autodesktop}\A-VPN.lnk"
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
