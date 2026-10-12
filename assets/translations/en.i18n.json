@@ -102,7 +102,7 @@
     "connShowSmall": "Show under 1 MB: $n",
     "connHideSmall": "Hide under 1 MB",
     "connHideSmallChip": "Hide small (< 1 MB)",
-    "ruleBlocked": "blocked sites, Google and AI",
+    "ruleBlocked": "other blocked",
     "ruleRuSites": "Russian sites",
     "ruleRuApps": "Russian apps",
     "stProtected": "Protected",
@@ -159,9 +159,9 @@
     "subUpdateNever": "Never by itself",
     "subUpdateEvery": "Every $n h",
     "statsPingPeriod": "Ping to the server over the chosen period",
-    "ruleBlockedIps": "blocked addresses (Telegram etc.)",
+    "ruleBlockedIps": "social networks and messengers (by address)",
     "ruleLocalNet": "local network",
-    "ruleAppsVpn": "Google and AI apps",
+    "ruleAppsVpn": "apps through the VPN",
     "topoRulesHint": "Each rule is a list of sites or apps; on the right, where it sent their traffic",
     "topoToVpn": "through VPN",
     "topoToDirect": "direct",
@@ -183,7 +183,11 @@
     "accentNeonIndigo": "Indigo",
     "accentNeonTurquoise": "Turquoise",
     "accentNeonMint": "Mint",
-    "accentNeonLavender": "Lavender"
+    "accentNeonLavender": "Lavender",
+    "global": "Global",
+    "ruleAi": "AI",
+    "ruleGoogle": "Google and YouTube",
+    "ruleSocial": "social networks and messengers"
   },
   "common": {
     "appTitle": "A-VPN",
@@ -524,13 +528,24 @@
         },
         "builtinRules": {
           "tag": "Built-in",
-          "bypassLan": "Bypass local network",
-          "blockAds": "Block ads and harmful sites",
-          "bypassRegion": "Bypass sites in $region",
-          "rknBlockedProxy": "Sites blocked in Russia via VPN",
-          "blockQuic": "Block QUIC (apps switch to TCP at once)",
-          "ruDomainsDirect": "Russian sites direct (.ru, .su, .рф, Yandex, VK, banks…)",
-          "ruAppsDirect": "Russian apps direct (Yandex, banks, Gosuslugi, Avito…)"
+          "bypassLan": "Local network",
+          "bypassLanHint": "The router, printer, TV and other devices at home",
+          "blockQuic": "QUIC (HTTP/3)",
+          "blockQuicHint": "Apps switch to TCP at once, which is faster through the VPN",
+          "blockAds": "Ads and harmful sites",
+          "blockAdsHint": "Works when everything else goes through the VPN",
+          "aiProxy": "AI",
+          "aiProxyHint": "ChatGPT, Claude, Gemini, NotebookLM, Perplexity, Grok, DeepSeek, Copilot, Cursor… — sites and apps",
+          "googleProxy": "Google and YouTube",
+          "googleProxyHint": "Play Store, YouTube, Gmail, Drive, Photos, Maps, Translate — every Google app",
+          "socialProxy": "Social networks and messengers",
+          "socialProxyHint": "Instagram, Facebook, WhatsApp, Telegram, Discord, X, TikTok, Snapchat, LinkedIn, Signal, Viber",
+          "blockedProxy": "Other blocked",
+          "blockedProxyHint": "The rest of the Russian block list: Netflix, Spotify, Twitch, Roblox, SoundCloud, Notion, Canva, media, torrents…",
+          "ruDomainsDirect": "Russian sites",
+          "ruDomainsDirectHint": ".ru, .su, .рф, Yandex, VK, Mail.ru, banks, Gosuslugi, marketplaces",
+          "ruAppsDirect": "Russian apps",
+          "ruAppsDirectHint": "Yandex, banks, Gosuslugi, Avito, Ozon, Wildberries, VK, MAX"
         },
         "appBasedRouting": {
           "title": "App-based routing",
@@ -579,8 +594,8 @@
             "clearAllSelections": "Clear all selections"
           },
           "modes": {
-            "proxy": "Proxy only",
-            "bypass": "Bypass"
+            "proxy": "Only these through the VPN",
+            "bypass": "These bypass the VPN"
           },
           "autoSelection": {
             "title": "Auto selection based on $region",
@@ -634,8 +649,16 @@
           "prefer": "Preferred",
           "only": "Exclusive"
         },
-        "blockedOnly": "Only blocked sites through the VPN",
-        "blockedOnlyHint": "Only sites and services blocked in Russia (YouTube, Instagram, Telegram, Discord, ChatGPT…) go through the VPN; everything else goes direct at full speed. On a phone on Wi-Fi only: on mobile data everything goes through the VPN because of operator whitelists"
+        "outcomeVpn": "through the VPN",
+        "outcomeDirect": "direct",
+        "outcomeBlock": "block",
+        "listHint": "Rules are checked top to bottom: the first that fits decides where a connection goes. Drag to reorder.",
+        "everythingElse": "Everything else",
+        "everythingElseVpnHint": "Whatever the rules above leave goes through the VPN.",
+        "everythingElseDirectHint": "Only the groups above take the VPN, the rest goes direct at full speed. A phone does this on Wi-Fi only: on mobile data everything goes through the VPN because of the operators' whitelists.",
+        "globalOn": "\"Global\" is on: all traffic goes through the VPN, the rules below don't apply (except the local network and QUIC).",
+        "serverOn": "\"Server\" is on: the home network through your WireGuard, the rest direct. The rules below don't apply.",
+        "advanced": "Advanced"
       },
       "dns": {
         "title": "DNS",

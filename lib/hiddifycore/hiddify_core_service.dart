@@ -10,6 +10,7 @@ import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
 import 'package:hiddify/features/proxy/data/blocked_only_routing.dart';
+import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -223,13 +224,15 @@ class HiddifyCoreService with InfraLogger {
     if (ref.read(ConfigOptions.homeNetwork)) {
       // Server mode decides every connection itself
       filtered = await HomeNetwork.attach(filtered, activeConfigPath: path);
-    } else if (ref.read(ConfigOptions.blockedOnlyViaVpn) &&
+    } else if (!ref.read(ConfigOptions.globalMode) &&
+        ref.read(ConfigOptions.blockedOnlyViaVpn) &&
         (PlatformUtils.isDesktop || current != NetworkKind.mobile)) {
       final testHost = Uri.tryParse(ref.read(ConfigOptions.connectionTestUrl))?.host;
       filtered = await BlockedOnlyRouting.attach(
         filtered,
         activeConfigPath: path,
         extraProxyHosts: [if (testHost != null && testHost.isNotEmpty) testHost],
+        list: ref.read(rulesNotifierProvider),
       );
     }
     return filtered;
@@ -621,4 +624,7 @@ class HiddifyCoreService with InfraLogger {
 
 /// "Only blocked through the VPN" on a phone applies on Wi-Fi only, so its rules follow the network.
 bool _blockedOnlyFollowsNetwork(Ref ref) =>
-    !PlatformUtils.isDesktop && ref.read(ConfigOptions.blockedOnlyViaVpn) && !ref.read(ConfigOptions.homeNetwork);
+    !PlatformUtils.isDesktop &&
+    ref.read(ConfigOptions.blockedOnlyViaVpn) &&
+    !ref.read(ConfigOptions.homeNetwork) &&
+    !ref.read(ConfigOptions.globalMode);

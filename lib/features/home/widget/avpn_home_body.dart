@@ -444,8 +444,16 @@ class _CheckRow extends HookConsumerWidget {
       }
     }
 
+    // Server and Global each decide every connection, so one turns the other off
     Future<void> toggleServer(bool on) async {
+      if (on) await ref.read(ConfigOptions.globalMode.notifier).update(false);
       await ref.read(ConfigOptions.homeNetwork.notifier).update(on);
+      await reconnectIfConnected();
+    }
+
+    Future<void> toggleGlobal(bool on) async {
+      if (on) await ref.read(ConfigOptions.homeNetwork.notifier).update(false);
+      await ref.read(ConfigOptions.globalMode.notifier).update(on);
       await reconnectIfConnected();
     }
 
@@ -458,24 +466,43 @@ class _CheckRow extends HookConsumerWidget {
     // the toggles on the left, the ping check (classic) on the right
     return Row(
       children: [
-        _ToggleChip(
-          icon: Icons.wifi_tethering_rounded,
-          label: t.avpn.sharing,
-          selected: sharingOn,
-          onSelected: toggleSharing,
-        ),
-        if (serverAvailable) ...[
-          const Gap(8),
-          _ToggleChip(icon: Icons.home_rounded, label: t.avpn.server, selected: serverOn, onSelected: toggleServer),
-        ],
-        if (sharingOn)
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: t.avpn.sharingTitle,
-            icon: const Icon(Icons.info_outline_rounded, size: 20),
-            onPressed: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+        // a narrow phone moves the last toggle to a second line rather than cut it
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _ToggleChip(
+                icon: Icons.wifi_tethering_rounded,
+                label: t.avpn.sharing,
+                selected: sharingOn,
+                onSelected: toggleSharing,
+              ),
+              _ToggleChip(
+                icon: Icons.public_rounded,
+                label: t.avpn.global,
+                selected: ref.watch(ConfigOptions.globalMode),
+                onSelected: toggleGlobal,
+              ),
+              if (serverAvailable) ...[
+                _ToggleChip(
+                  icon: Icons.home_rounded,
+                  label: t.avpn.server,
+                  selected: serverOn,
+                  onSelected: toggleServer,
+                ),
+              ],
+              if (sharingOn)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: t.avpn.sharingTitle,
+                  icon: const Icon(Icons.info_outline_rounded, size: 20),
+                  onPressed: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+                ),
+            ],
           ),
-        const Spacer(),
+        ),
         if (showCheck)
           TextButton.icon(
             onPressed: connected && !testing ? onCheck : null,

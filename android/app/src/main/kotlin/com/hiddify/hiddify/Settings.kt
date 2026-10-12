@@ -90,6 +90,9 @@ object Settings {
         set(value) =
             preferences.edit().putBoolean(SettingsKey.SYSTEM_PROXY_ENABLED, value).apply()
 
+    val globalMode: Boolean
+        get() = preferences.getBoolean(SettingsKey.GLOBAL_MODE, false)
+
     val autoPauseEnabled: Boolean
         get() = preferences.getBoolean(SettingsKey.AUTO_PAUSE_ENABLED, false)
 

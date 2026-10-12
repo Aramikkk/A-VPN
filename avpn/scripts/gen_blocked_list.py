@@ -17,6 +17,10 @@ SUBNETS = ["Subnets/IPv4/telegram.lst", "Subnets/IPv4/meta.lst", "Subnets/IPv4/t
 EXTRA_DOMAINS = [
     "telegram.org", "telegram.me", "t.me", "telesco.pe", "tdesktop.com", "telegra.ph", "telegram.dog",
     "cdn-telegram.org", "whatsapp.com", "whatsapp.net", "wa.me", "x.com", "twitter.com", "twimg.com", "t.co",
+    # blocked in December 2025 (Roblox, Snapchat), Twitch beyond its API hosts, packagist (October 2026)
+    "roblox.com", "rbxcdn.com", "rbx.com", "robloxlabs.com", "snapchat.com", "snap.com", "sc-cdn.net",
+    "snapkit.com", "sc-static.net", "twitch.tv", "twitchcdn.net", "jtvnw.net", "ttvnw.net", "twitchsvc.net",
+    "packagist.org",
 ]
 
 

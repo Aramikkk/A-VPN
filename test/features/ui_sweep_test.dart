@@ -10,6 +10,9 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/directories/directories_provider.dart';
+import 'package:hiddify/core/model/directories.dart';
+import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
@@ -26,7 +29,6 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/overview/sections/general_page.dart';
-import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/themes_page.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
@@ -199,6 +201,7 @@ final _screens = <_Screen>[
   (name: 'launch', page: () => const GeneralPage(connection: true), taps: []),
   (name: 'servers', page: ServersOptionsPage.new, taps: [() => find.byType(Switch)]),
   (name: 'themes', page: ThemesPage.new, taps: []),
+  (name: 'routing', page: () => const RoutingOptionsPage(routeRule: null), taps: []),
 ];
 
 void main() {
@@ -270,6 +273,7 @@ void main() {
                       connectionsProvider.overrideWith(_Connections.new),
                       installedAppsProvider.overrideWith((ref) async => const {}),
                       profilePathResolverProvider.overrideWithValue(ProfilePathResolver(Directory.systemTemp)),
+                      appDirectoriesProvider.overrideWith(_Dirs.new),
                     ],
                     child: MaterialApp.router(
                       debugShowCheckedModeBanner: false,
@@ -281,7 +285,8 @@ void main() {
                             builder: (_, _) => Consumer(
                               builder: (context, ref, _) =>
                                   !ref.watch(translationsProvider).hasValue ||
-                                      !ref.watch(sharedPreferencesProvider).hasValue
+                                      !ref.watch(sharedPreferencesProvider).hasValue ||
+                                      !ref.watch(appDirectoriesProvider).hasValue
                                   ? const SizedBox()
                                   : screen.page(),
                             ),
@@ -329,5 +334,14 @@ void main() {
         expect(problems.toSet().toList(), isEmpty);
       });
     }
+  }
+}
+
+/// A fresh folder each time, so the routing list starts as on a new install.
+class _Dirs extends AppDirectories {
+  @override
+  Future<Directories> build() async {
+    final dir = Directory.systemTemp.createTempSync('ara_sweep');
+    return (baseDir: dir, workingDir: dir, tempDir: dir);
   }
 }

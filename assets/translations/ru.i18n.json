@@ -102,7 +102,7 @@
     "connShowSmall": "Показать меньше 1 МБ: $n",
     "connHideSmall": "Скрыть меньше 1 МБ",
     "connHideSmallChip": "Без мелких (< 1 МБ)",
-    "ruleBlocked": "заблокированные сайты, Google и ИИ",
+    "ruleBlocked": "прочее заблокированное",
     "ruleRuSites": "российские сайты",
     "ruleRuApps": "российские приложения",
     "stProtected": "Защищено",
@@ -159,9 +159,9 @@
     "subUpdateNever": "Не обновлять сама",
     "subUpdateEvery": "Раз в $n ч",
     "statsPingPeriod": "Пинг до сервера за выбранный период",
-    "ruleBlockedIps": "заблокированные адреса (Telegram и др.)",
+    "ruleBlockedIps": "соцсети и мессенджеры (по адресам)",
     "ruleLocalNet": "локальная сеть",
-    "ruleAppsVpn": "приложения Google и ИИ",
+    "ruleAppsVpn": "приложения через VPN",
     "topoRulesHint": "Каждое правило — список сайтов или приложений; справа — куда оно отправило их трафик",
     "topoToVpn": "через VPN",
     "topoToDirect": "напрямую",
@@ -183,7 +183,11 @@
     "accentNeonIndigo": "Индиго",
     "accentNeonTurquoise": "Бирюзовый",
     "accentNeonMint": "Мятный",
-    "accentNeonLavender": "Лавандовый"
+    "accentNeonLavender": "Лавандовый",
+    "global": "Глобально",
+    "ruleAi": "ИИ",
+    "ruleGoogle": "Google и YouTube",
+    "ruleSocial": "соцсети и мессенджеры"
   },
   "common": {
     "appTitle": "A-VPN",
@@ -530,13 +534,24 @@
         },
         "builtinRules": {
           "tag": "Встроенное",
-          "bypassLan": "Обход локальной сети",
-          "blockAds": "Блокировать рекламу и вредные сайты",
-          "bypassRegion": "Обход сайтов региона $region",
-          "rknBlockedProxy": "Заблокированные РКН сайты через VPN",
-          "blockQuic": "Блокировать QUIC (приложения сразу переходят на TCP)",
-          "ruDomainsDirect": "Российские сайты напрямую (.ru, .su, .рф, Яндекс, VK, банки…)",
-          "ruAppsDirect": "Российские приложения напрямую (Яндекс, банки, Госуслуги, Авито…)"
+          "bypassLan": "Локальная сеть",
+          "bypassLanHint": "Роутер, принтер, телевизор и другие устройства дома",
+          "blockQuic": "QUIC (HTTP/3)",
+          "blockQuicHint": "Приложения сразу переходят на TCP — через VPN так быстрее",
+          "blockAds": "Реклама и вредные сайты",
+          "blockAdsHint": "Работает, когда всё остальное идёт через VPN",
+          "aiProxy": "ИИ",
+          "aiProxyHint": "ChatGPT, Claude, Gemini, NotebookLM, Perplexity, Grok, DeepSeek, Copilot, Cursor… — сайты и приложения",
+          "googleProxy": "Google и YouTube",
+          "googleProxyHint": "Play Маркет, YouTube, Gmail, Диск, Фото, Карты, Переводчик — все приложения Google",
+          "socialProxy": "Соцсети и мессенджеры",
+          "socialProxyHint": "Instagram, Facebook, WhatsApp, Telegram, Discord, X, TikTok, Snapchat, LinkedIn, Signal, Viber",
+          "blockedProxy": "Прочее заблокированное",
+          "blockedProxyHint": "Остальное из реестра РКН: Netflix, Spotify, Twitch, Roblox, SoundCloud, Notion, Canva, СМИ, торренты…",
+          "ruDomainsDirect": "Российские сайты",
+          "ruDomainsDirectHint": ".ru, .su, .рф, Яндекс, VK, Mail.ru, банки, Госуслуги, маркетплейсы",
+          "ruAppsDirect": "Российские приложения",
+          "ruAppsDirectHint": "Яндекс, банки, Госуслуги, Авито, Ozon, Wildberries, VK, MAX"
         },
         "appBasedRouting": {
           "title": "Маршрутизация по приложениям",
@@ -593,8 +608,8 @@
             "clearAllSelections": "Очистить весь выбор"
           },
           "modes": {
-            "proxy": "Только прокси",
-            "bypass": "В обход"
+            "proxy": "Только эти через VPN",
+            "bypass": "Эти мимо VPN"
           },
           "autoSelection": {
             "title": "Автовыбор по региону $region",
@@ -654,8 +669,16 @@
           "prefer": "Предпочтительно",
           "only": "Только"
         },
-        "blockedOnly": "Через VPN только заблокированное",
-        "blockedOnlyHint": "Через VPN идут только сайты и сервисы, заблокированные в России (YouTube, Instagram, Telegram, Discord, ChatGPT…), всё остальное — напрямую, на полной скорости. На телефоне — только в Wi-Fi: на мобильном интернете всё идёт через VPN из-за белых списков операторов"
+        "outcomeVpn": "через VPN",
+        "outcomeDirect": "напрямую",
+        "outcomeBlock": "блокировать",
+        "listHint": "Правила проверяются сверху вниз: первое подходящее решает, куда пойдёт соединение. Порядок можно менять перетаскиванием.",
+        "everythingElse": "Всё остальное",
+        "everythingElseVpnHint": "Всё, что не подошло под правила выше, идёт через VPN.",
+        "everythingElseDirectHint": "Через VPN — только группы выше, остальное на полной скорости напрямую. На телефоне так только в Wi-Fi: на мобильном интернете всё идёт через VPN из-за белых списков операторов.",
+        "globalOn": "Включено «Глобально»: весь трафик идёт через VPN, правила ниже не действуют (кроме локальной сети и QUIC).",
+        "serverOn": "Включён «Сервер»: домашняя сеть через ваш WireGuard, остальное напрямую. Правила ниже не действуют.",
+        "advanced": "Дополнительно"
       },
       "dns": {
         "title": "DNS",

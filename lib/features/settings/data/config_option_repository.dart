@@ -153,6 +153,10 @@ abstract class ConfigOptions {
   /// whitelisted sites through, so there everything keeps going through the VPN.
   static final blockedOnlyViaVpn = PreferencesNotifier.create<bool, bool>("blocked-only-via-vpn", true);
 
+  /// "Global" (the home screen's button): everything through the VPN, past the routing list, the "only blocked"
+  /// mode and the apps set to bypass it. Only the local network stays direct.
+  static final globalMode = PreferencesNotifier.create<bool, bool>("global-mode", false);
+
   /// On mobile data use only the provider's mobile-only ("LTE Only") servers, on Wi-Fi only the others.
   static final serversByNetwork = PreferencesNotifier.create<bool, bool>("servers-by-network", true);
 
@@ -582,7 +586,20 @@ abstract class ConfigOptions {
         ),
         profile: SingboxUnblockerProfileOption(id: ref.watch(unblockerProfileId)),
       ),
-      routeRule: RouteRule(rules: ref.watch(rulesNotifierProvider)).toProto3Json()! as Map<String, dynamic>,
+      routeRule:
+          RouteRule(
+                rules: splitGroups(
+                  ref.watch(globalMode)
+                      ? ref
+                            .watch(rulesNotifierProvider)
+                            .where(
+                              (rule) =>
+                                  const {BuiltinRule.bypassLan, BuiltinRule.blockQuic}.contains(BuiltinRule.of(rule)),
+                            )
+                      : ref.watch(rulesNotifierProvider),
+                ),
+              ).toProto3Json()!
+              as Map<String, dynamic>,
     );
   });
 }

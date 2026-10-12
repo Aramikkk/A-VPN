@@ -166,7 +166,7 @@ class VPNService : VpnService(), PlatformInterfaceWrapper {
                 }
             }
 
-            if (Settings.perAppProxyEnabled) {
+            if (Settings.perAppProxyEnabled && !Settings.globalMode) {
                 val appList = Settings.perAppProxyList
                 if (Settings.perAppProxyMode == PerAppProxyMode.INCLUDE) {
                     appList.forEach {

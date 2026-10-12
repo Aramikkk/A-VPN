@@ -24,8 +24,14 @@ void main() {
 
   test('blocked sites come before the direct rules', () {
     final order = BuiltinRule.values;
-    expect(order.indexOf(BuiltinRule.rknBlockedProxy), lessThan(order.indexOf(BuiltinRule.ruDomainsDirect)));
-    expect(order.indexOf(BuiltinRule.rknBlockedProxy), lessThan(order.indexOf(BuiltinRule.ruAppsDirect)));
+    for (final group in [
+      BuiltinRule.aiProxy,
+      BuiltinRule.googleProxy,
+      BuiltinRule.socialProxy,
+      BuiltinRule.blockedProxy,
+    ]) {
+      expect(order.indexOf(group), lessThan(order.indexOf(BuiltinRule.ruDomainsDirect)), reason: group.name);
+    }
     // none of the Russian services is on the blocked list
     expect(ruServiceDomains.where(rknRuDomains.contains), isEmpty);
   });

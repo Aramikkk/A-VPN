@@ -23,6 +23,9 @@ object SettingsKey {
     const val CONNECT_ON_BOOT = "${KEY_PREFIX}connect_on_boot"
 
     // A-VPN auto-pause: the VPN steps aside while one of these apps is on screen
+    // A-VPN "Global": everything through the VPN, the apps set to bypass it too
+    const val GLOBAL_MODE = "${KEY_PREFIX}global-mode"
+
     const val AUTO_PAUSE_ENABLED = "${KEY_PREFIX}auto_pause_enabled"
     const val AUTO_PAUSE_APPS = "${KEY_PREFIX}auto_pause_apps"
     const val CONFIG_OPTIONS = "config_options_json"

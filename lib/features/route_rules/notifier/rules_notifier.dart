@@ -9,8 +9,8 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/features/route_rules/notifier/rkn_ru_domains.dart';
 import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
+import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -22,15 +22,20 @@ const _geoUrl = 'https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set'
 
 /// Rules the app ships with, in the order a new list starts with. They are always in the list: the user can
 /// only switch and move them, and their content comes from here, so an update can change it.
+///
+/// The order is the routing in brief: the local network direct, QUIC (and ads) blocked, then the groups that
+/// always take the VPN (even on Russian domains, so they come first), then Russian sites and apps direct.
+/// Whatever is left goes by the mode: through the VPN, or direct with "only blocked through the VPN".
 enum BuiltinRule {
-  // sites blocked in Russia go through the VPN even on Russian domains, so this one comes first;
-  // then the local network and Russian domains go direct; everything else takes the VPN
-  rknBlockedProxy(enabledByDefault: true),
+  bypassLan(enabledByDefault: true),
   // QUIC (HTTP/3 over UDP) crawls through a TCP tunnel and is often throttled in Russia; blocking it makes apps
   // fall back to TCP at once instead of after a timeout
   blockQuic(enabledByDefault: true),
-  bypassLan(enabledByDefault: true),
   blockAds(enabledByDefault: false),
+  aiProxy(enabledByDefault: true),
+  googleProxy(enabledByDefault: true),
+  socialProxy(enabledByDefault: true),
+  blockedProxy(enabledByDefault: true),
   ruDomainsDirect(enabledByDefault: true),
   // Russian apps on the phone (Yandex Music, banks, Gosuslugi…) direct, whatever servers they use
   ruAppsDirect(enabledByDefault: true);
@@ -47,10 +52,26 @@ enum BuiltinRule {
   String present(Translations t, Region region) => switch (this) {
     bypassLan => t.pages.settings.routing.builtinRules.bypassLan,
     blockAds => t.pages.settings.routing.builtinRules.blockAds,
-    rknBlockedProxy => t.pages.settings.routing.builtinRules.rknBlockedProxy,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuic,
+    aiProxy => t.pages.settings.routing.builtinRules.aiProxy,
+    googleProxy => t.pages.settings.routing.builtinRules.googleProxy,
+    socialProxy => t.pages.settings.routing.builtinRules.socialProxy,
+    blockedProxy => t.pages.settings.routing.builtinRules.blockedProxy,
     ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirect,
     ruAppsDirect => t.pages.settings.routing.builtinRules.ruAppsDirect,
+  };
+
+  /// What the group holds, in a few names.
+  String examples(Translations t) => switch (this) {
+    bypassLan => t.pages.settings.routing.builtinRules.bypassLanHint,
+    blockAds => t.pages.settings.routing.builtinRules.blockAdsHint,
+    blockQuic => t.pages.settings.routing.builtinRules.blockQuicHint,
+    aiProxy => t.pages.settings.routing.builtinRules.aiProxyHint,
+    googleProxy => t.pages.settings.routing.builtinRules.googleProxyHint,
+    socialProxy => t.pages.settings.routing.builtinRules.socialProxyHint,
+    blockedProxy => t.pages.settings.routing.builtinRules.blockedProxyHint,
+    ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirectHint,
+    ruAppsDirect => t.pages.settings.routing.builtinRules.ruAppsDirectHint,
   };
 
   Rule get rule => switch (this) {
@@ -83,15 +104,30 @@ enum BuiltinRule {
         '$_geoUrl/block/geoip-phishing.srs',
       ],
     ),
-    // Only blocked sites in the Russian zones need a rule: everything else already takes the VPN. The list is
-    // inline because the core downloads rule-sets through the proxy before it starts, and a server that
-    // doesn't answer yet (an "LTE Only" one on Wi-Fi) stalls that download and the whole start with it.
-    rknBlockedProxy => Rule(outbound: Outbound.proxy, domainSuffixes: rknRuDomains),
     blockQuic => Rule(outbound: Outbound.block, protocols: [Protocol.quic]),
+    // The lists are inline because the core downloads rule-sets through the proxy before it starts, and a
+    // server that doesn't answer yet (an "LTE Only" one on Wi-Fi) stalls that download and the whole start.
+    aiProxy => Rule(outbound: Outbound.proxy, domainSuffixes: aiDomains, packageNames: aiApps),
+    googleProxy => Rule(outbound: Outbound.proxy, domainSuffixes: googleDomains, packageNames: googleApps),
+    socialProxy => Rule(outbound: Outbound.proxy, domainSuffixes: socialDomains, ipCidrs: socialCidrs),
+    blockedProxy => Rule(outbound: Outbound.proxy, domainSuffixes: otherBlockedDomains),
     ruDomainsDirect => Rule(outbound: Outbound.direct, domainSuffixes: ['ru', 'su', 'xn--p1ai', ...ruServiceDomains]),
     ruAppsDirect => Rule(outbound: Outbound.direct, packageNames: ruAppPackages),
   }..name = key;
 }
+
+/// The rules as the core gets them. A group with both sites and apps is two rules: sing-box ANDs a rule's
+/// apps with its sites, and the group means either. Both halves keep the group's place.
+List<Rule> splitGroups(Iterable<Rule> rules) => [
+  for (final rule in rules)
+    if (BuiltinRule.of(rule) != null && rule.packageNames.isNotEmpty && rule.domainSuffixes.isNotEmpty) ...[
+      rule.deepCopy()..packageNames.clear(),
+      rule.deepCopy()
+        ..domainSuffixes.clear()
+        ..ipCidrs.clear(),
+    ] else
+      rule,
+];
 
 @riverpod
 class RulesNotifier extends _$RulesNotifier with AppLogger {
@@ -115,6 +151,17 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
   List<Rule> _withBuiltins(List<Rule> saved) {
     // the built-ins the list needs, in their own order; each one found in the saved list is crossed off
     final missing = {...BuiltinRule.values};
+    // a list from before the groups (5.8.20 and older) had one "blocked through the VPN" rule: the built-ins
+    // go back to their order, under the user's own rules, keeping their switches
+    if (saved.any((rule) => rule.name == 'builtin:rknBlockedProxy')) {
+      final enabled = {for (final rule in saved) rule.name: rule.enabled};
+      enabled['builtin:blockedProxy'] = enabled['builtin:rknBlockedProxy'] ?? true;
+      return _updateListOrder([
+        ...saved.where((rule) => !rule.name.startsWith('builtin:')),
+        for (final builtin in BuiltinRule.values)
+          builtin.rule..enabled = enabled[builtin.key] ?? builtin.enabledByDefault,
+      ]);
+    }
     final rules = <Rule>[];
     for (final rule in saved) {
       final builtin = BuiltinRule.of(rule);

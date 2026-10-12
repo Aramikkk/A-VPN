@@ -33,6 +33,7 @@ class RoutingOptionsPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final rules = ref.watch(rulesNotifierProvider);
+    final overridden = ref.watch(ConfigOptions.globalMode) || ref.watch(ConfigOptions.homeNetwork);
 
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -77,8 +78,14 @@ class RoutingOptionsPage extends HookConsumerWidget {
             const _PinnedOptions(),
           ],
         ),
+        footer: const _ListFooter(),
         onReorder: ref.read(rulesNotifierProvider.notifier).reorder,
-        itemBuilder: (context, index) => RuleTile(key: Key('$index'), index: index, rule: rules[index]),
+        // Global and Server decide every connection themselves: the list waits, dimmed
+        itemBuilder: (context, index) => Opacity(
+          key: Key('$index'),
+          opacity: overridden ? .45 : 1,
+          child: RuleTile(index: index, rule: rules[index]),
+        ),
         itemCount: rules.length,
       ),
       floatingActionButton: FloatingActionButton(
@@ -487,36 +494,125 @@ class _AutoSelectionIssue extends StatelessWidget {
   }
 }
 
-/// Options for every rule, so they head the rules and can't be moved.
+/// Above the rules: Server mode, what overrides the list right now, and how the list reads.
 class _PinnedOptions extends ConsumerWidget {
   const _PinnedOptions();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
     final routing = t.pages.settings.routing;
-    const divider = Divider(height: 1, indent: 16, endIndent: 16);
+    final global = ref.watch(ConfigOptions.globalMode);
+    final server = ref.watch(ConfigOptions.homeNetwork);
+    Future<void> reconnect() async =>
+        ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile.adaptive(
-          title: Text(routing.blockedOnly),
-          subtitle: Text(routing.blockedOnlyHint),
-          value: ref.watch(ConfigOptions.blockedOnlyViaVpn),
-          onChanged: (value) async {
-            await ref.read(ConfigOptions.blockedOnlyViaVpn.notifier).update(value);
-            // the rules are in the start config: reconnect so they apply now
-            await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
-          },
-        ),
-        divider,
         SwitchListTile.adaptive(
           title: Text(routing.homeNetwork),
           subtitle: Text(routing.homeNetworkHint),
-          value: ref.watch(ConfigOptions.homeNetwork),
-          onChanged: ref.read(ConfigOptions.homeNetwork.notifier).update,
+          value: server,
+          onChanged: (value) async {
+            // Server and Global each decide every connection, so one turns the other off
+            if (value) await ref.read(ConfigOptions.globalMode.notifier).update(false);
+            await ref.read(ConfigOptions.homeNetwork.notifier).update(value);
+            await reconnect();
+          },
         ),
-        divider,
+        const Divider(height: 3, thickness: 3),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Text(
+            server
+                ? routing.serverOn
+                : global
+                ? routing.globalOn
+                : routing.listHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: server || global ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+              fontWeight: server || global ? FontWeight.w600 : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Under the rules: where everything they leave goes (the mode), then the rarely needed options.
+class _ListFooter extends ConsumerWidget {
+  const _ListFooter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final routing = t.pages.settings.routing;
+    final direct = ref.watch(ConfigOptions.blockedOnlyViaVpn);
+    final overridden = ref.watch(ConfigOptions.globalMode) || ref.watch(ConfigOptions.homeNetwork);
+    const divider = Divider(height: 1, indent: 16, endIndent: 16);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 1),
+        Opacity(
+          opacity: overridden ? .45 : 1,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        routing.everythingElse,
+                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                      segments: [
+                        ButtonSegment(value: false, label: Text(routing.outcomeVpn)),
+                        ButtonSegment(value: true, label: Text(routing.outcomeDirect)),
+                      ],
+                      selected: {direct},
+                      onSelectionChanged: (value) async {
+                        await ref.read(ConfigOptions.blockedOnlyViaVpn.notifier).update(value.first);
+                        // the rules are in the start config: reconnect so they apply now
+                        await ref
+                            .read(connectionNotifierProvider.notifier)
+                            .reconnect(await ref.read(activeProfileProvider.future));
+                      },
+                    ),
+                  ],
+                ),
+                const Gap(6),
+                Text(
+                  direct ? routing.everythingElseDirectHint : routing.everythingElseVpnHint,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const Divider(height: 3, thickness: 3),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+          child: Text(
+            routing.advanced.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              letterSpacing: .8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
         SwitchListTile.adaptive(
           title: Text(routing.resolveDestination),
           value: ref.watch(ConfigOptions.resolveDestination),
@@ -530,7 +626,6 @@ class _PinnedOptions extends ConsumerWidget {
           present: (value) => value.present(t),
           onSelected: ref.read(ConfigOptions.ipv6Mode.notifier).update,
         ),
-        const Divider(height: 3, thickness: 3),
       ],
     );
   }

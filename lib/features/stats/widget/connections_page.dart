@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/features/route_rules/notifier/rkn_ru_domains.dart';
 import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
+import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -484,9 +484,20 @@ class _InnerRow extends ConsumerWidget {
 String? ruleLabel(String rule, Translations t) {
   final match = rule.split('=>').first.trim();
   if (match.isEmpty || match == 'final') return null;
-  if (match.contains(rknRuDomains.first)) return t.avpn.ruleBlocked;
-  if (match.contains('xn--p1ai')) return t.avpn.ruleRuSites;
-  if (match.contains(ruAppPackages.first)) return t.avpn.ruleRuApps;
+  // the built-in groups, by their lists' first entries (the core prints a long list as its first few)
+  final groups = {
+    aiDomains.first: t.avpn.ruleAi,
+    aiApps.first: t.avpn.ruleAi,
+    googleDomains.first: t.avpn.ruleGoogle,
+    googleApps.first: t.avpn.ruleGoogle,
+    socialDomains.first: t.avpn.ruleSocial,
+    otherBlockedDomains.first: t.avpn.ruleBlocked,
+    'xn--p1ai': t.avpn.ruleRuSites,
+    ruAppPackages.first: t.avpn.ruleRuApps,
+  };
+  for (final MapEntry(key: first, value: label) in groups.entries) {
+    if (RegExp(r'[\[ ]' + RegExp.escape(first) + r'[ \]]').hasMatch(match)) return label;
+  }
   final action = rule.contains('=>') ? rule.split('=>').last : '';
   final listed = RegExp(r'\[([^\]]*)\]').allMatches(match).expand((m) => m.group(1)!.split(' ')).length;
   final direct = action.contains('direct');

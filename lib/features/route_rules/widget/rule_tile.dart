@@ -85,22 +85,28 @@ class RuleTile extends HookConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ListTile(
-              title: Text.rich(
-                TextSpan(
-                  text: t.pages.settings.routing.routeRule.rule.outbound[rule.outbound.name] ?? rule.outbound.name,
-                  children: [
-                    if (builtin != null) ...[
-                      const TextSpan(text: ' · '),
-                      TextSpan(
-                        text: t.pages.settings.routing.builtinRules.tag,
-                        style: TextStyle(color: theme.colorScheme.primary),
-                      ),
-                    ],
-                  ],
+              // where it sends, in the route's colour, over the rule's name and, for a built-in group, what it holds
+              title: Text(
+                _outcome(t, rule.outbound),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: _outcomeColour(theme.colorScheme, rule.outbound),
+                  fontWeight: FontWeight.w700,
                 ),
-                style: Theme.of(context).textTheme.labelMedium,
               ),
-              subtitle: Text(builtin?.present(t, region) ?? rule.name, style: Theme.of(context).textTheme.bodyLarge),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    builtin?.present(t, region) ?? rule.name,
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  if (builtin != null)
+                    Text(
+                      builtin.examples(t),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                ],
+              ),
               leading: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle_rounded)),
               trailing: Switch(
                 value: rule.enabled,
@@ -108,18 +114,32 @@ class RuleTile extends HookConsumerWidget {
                     await ref.read(rulesNotifierProvider.notifier).updateEnabled(value, rule.listOrder),
               ),
             ),
-            SettingDetailChips<MapEntry>(
-              values: detailChipsValue().entries.toList(),
-              scrollController: scrollController,
-              t: mergeTranslation([
-                t.pages.settings.routing.routeRule.rule.tileTitle,
-                t.pages.settings.routing.routeRule.rule.network,
-                t.pages.settings.routing.routeRule.rule.outbound,
-              ]),
-            ),
+            // a built-in group says what it holds in words; the user's own rules show their conditions
+            if (builtin == null)
+              SettingDetailChips<MapEntry>(
+                values: detailChipsValue().entries.toList(),
+                scrollController: scrollController,
+                t: mergeTranslation([
+                  t.pages.settings.routing.routeRule.rule.tileTitle,
+                  t.pages.settings.routing.routeRule.rule.network,
+                  t.pages.settings.routing.routeRule.rule.outbound,
+                ]),
+              ),
           ],
         ),
       ),
     );
   }
 }
+
+String _outcome(Translations t, Outbound outbound) => switch (outbound) {
+  Outbound.block => t.pages.settings.routing.outcomeBlock,
+  Outbound.proxy => t.pages.settings.routing.outcomeVpn,
+  _ => t.pages.settings.routing.outcomeDirect,
+};
+
+Color _outcomeColour(ColorScheme scheme, Outbound outbound) => switch (outbound) {
+  Outbound.block => scheme.error,
+  Outbound.proxy => scheme.primary,
+  _ => scheme.onSurfaceVariant,
+};
