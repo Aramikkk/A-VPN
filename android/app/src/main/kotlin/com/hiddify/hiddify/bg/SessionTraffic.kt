@@ -87,7 +87,7 @@ object SessionTraffic {
         val parts = currentOutbound.split("→")
         val auto = parts.size > 1 && parts[0].trim() in setOf("lowest", "balance")
         // without the core's "§ 15" numbering
-        var name = parts.last().replace("§hide§", "").replace(Regex("\s*§\s*\d+\s*$"), "")
+        var name = parts.last().replace("§hide§", "").replace(Regex("""\s*§\s*\d+\s*$"""), "")
             .replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma").trim()
         if (auto) {
             // the flag and the country, without the provider's prefix
