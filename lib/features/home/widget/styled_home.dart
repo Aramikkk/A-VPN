@@ -307,7 +307,6 @@ class _StyledServerList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final scheme = Theme.of(context).colorScheme;
     final list = LayoutBuilder(
       builder: (context, box) {
         final base = editorial ? 66.0 : 62.0;
@@ -687,28 +686,30 @@ class _GraphiteDock extends ConsumerWidget {
               ],
             ),
           ),
-          const Gap(8),
-          // connected: check the servers' ping (the ring button disconnects); off: connect
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: on ? scheme.surfaceContainerHighest : scheme.primary,
-              foregroundColor: on ? scheme.onSurface : scheme.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 14),
+          // connected: check the servers' ping (the ring button disconnects); off: the ring button connects
+          if (on) ...[
+            const Gap(8),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: on ? scheme.surfaceContainerHighest : scheme.primary,
+                foregroundColor: on ? scheme.onSurface : scheme.onPrimary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 14),
+              ),
+              onPressed: busy || (on && testing) ? null : (on ? onCheck : () => _toggleConnection(ref)),
+              icon: on && testing
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
+                    )
+                  : AraIconPaint(
+                      enabled: on,
+                      child: Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
+                    ),
+              label: Text(on ? t.avpn.stPingButton : t.avpn.stConnect),
             ),
-            onPressed: busy || (on && testing) ? null : (on ? onCheck : () => _toggleConnection(ref)),
-            icon: on && testing
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
-                  )
-                : AraIconPaint(
-                    enabled: on,
-                    child: Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
-                  ),
-            label: Text(on ? t.avpn.stPingButton : t.avpn.stConnect),
-          ),
+          ],
         ],
       ),
     );

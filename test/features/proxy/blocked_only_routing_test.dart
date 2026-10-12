@@ -59,5 +59,10 @@ void main() {
     final apps = (rules[4]['package_name'] as List).cast<String>();
     expect(apps, containsAll(['com.android.vending', 'com.google.android.gms', 'com.openai.chatgpt']));
     expect(apps.where((a) => a.startsWith('ru.yandex') || a.startsWith('com.yandex')), isEmpty);
+    final patterns = (rules[4]['package_name_regex'] as List).cast<String>().map(RegExp.new);
+    bool google(String app) => patterns.any((p) => p.hasMatch(app));
+    expect(google('com.google.android.apps.nbu.files'), isTrue);
+    expect(google('ru.yandex.searchplugin'), isFalse);
+    expect(google('com.yandex.browser'), isFalse);
   });
 }

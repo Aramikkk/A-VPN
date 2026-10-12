@@ -110,3 +110,6 @@ const foreignVpnApps = [
   'ai.character.app',
   'com.quora.poe',
 ];
+
+/// Every Google app (Files, Messages, Wallet, Lens, Home…), not only the ones named above.
+const foreignVpnAppPatterns = [r'^com\.google\.'];

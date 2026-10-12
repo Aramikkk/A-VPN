@@ -455,22 +455,9 @@ class _CheckRow extends HookConsumerWidget {
       if (on && context.mounted) await showDialog<void>(context: context, builder: (_) => const _SharingDialog());
     }
 
+    // the toggles on the left, the ping check (classic) on the right
     return Row(
       children: [
-        if (showCheck)
-          TextButton.icon(
-            onPressed: connected && !testing ? onCheck : null,
-            icon: const Icon(Icons.network_ping_rounded),
-            label: Text(t.avpn.check),
-          ),
-        const Spacer(),
-        if (sharingOn)
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: t.avpn.sharingTitle,
-            icon: const Icon(Icons.info_outline_rounded, size: 20),
-            onPressed: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
-          ),
         _ToggleChip(
           icon: Icons.wifi_tethering_rounded,
           label: t.avpn.sharing,
@@ -481,6 +468,20 @@ class _CheckRow extends HookConsumerWidget {
           const Gap(8),
           _ToggleChip(icon: Icons.home_rounded, label: t.avpn.server, selected: serverOn, onSelected: toggleServer),
         ],
+        if (sharingOn)
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: t.avpn.sharingTitle,
+            icon: const Icon(Icons.info_outline_rounded, size: 20),
+            onPressed: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+          ),
+        const Spacer(),
+        if (showCheck)
+          TextButton.icon(
+            onPressed: connected && !testing ? onCheck : null,
+            icon: const Icon(Icons.network_ping_rounded),
+            label: Text(t.avpn.check),
+          ),
       ],
     );
   }

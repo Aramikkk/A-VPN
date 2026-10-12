@@ -30,7 +30,12 @@ abstract class BlockedOnlyRouting {
       {'domain_suffix': domains, 'action': 'route', 'outbound': _proxyTag},
       {'ip_cidr': blockedCidrs, 'action': 'route', 'outbound': _proxyTag},
       // Google's and the AI services' apps on the phone, whatever servers they use
-      {'package_name': foreignVpnApps, 'action': 'route', 'outbound': _proxyTag},
+      {
+        'package_name': foreignVpnApps,
+        'package_name_regex': foreignVpnAppPatterns,
+        'action': 'route',
+        'outbound': _proxyTag,
+      },
       // the rest of the internet
       {
         'network': ['tcp', 'udp'],
