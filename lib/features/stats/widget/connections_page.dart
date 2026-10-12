@@ -35,7 +35,10 @@ class ConnectionsPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final state = ref.watch(connectionsProvider);
+    // a tab out of sight (another one is open) stops following the list, so it isn't worked out again every two
+    // seconds for nothing; it catches up when it's back on screen
+    final visible = TickerMode.of(context);
+    final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     final view = useState(_View.apps);
     final filter = useState(_Filter.all);

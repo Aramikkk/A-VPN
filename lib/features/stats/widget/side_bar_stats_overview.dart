@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
@@ -81,6 +82,9 @@ class SideBarStatsOverview extends ConsumerWidget {
     final quality = ref.watch(connectionQualityProvider);
     final downColor = theme.araLook.graphDown ?? onSpeed;
     final upColor = theme.araLook.graphUp ?? onSpeed.withValues(alpha: .7);
+    // on a neon fill the text stays solid black: faded black reads as grey mud on the colour
+    final solid = theme.araLook.neonFill != null;
+    Color soft(double alpha) => solid ? onSpeed : onSpeed.withValues(alpha: alpha);
 
     final compact = !large || dense;
     final vpnTile = _Tile(
@@ -99,9 +103,13 @@ class SideBarStatsOverview extends ConsumerWidget {
       compact: compact,
     );
 
-    final graph = CustomPaint(
-      painter: _SpeedGraph(
+    final graph = _SlidingGraph(
+      samples: history,
+      // the last minute slides on as each second comes in; longer periods just redraw
+      live: range == StatsRange.minute,
+      painter: (slide) => _SpeedGraph(
         history,
+        slide: slide,
         color: onSpeed,
         downColor: downColor,
         upColor: upColor,
@@ -121,7 +129,11 @@ class SideBarStatsOverview extends ConsumerWidget {
           return '$text ${units[unit]}${t.avpn.perSecond}';
         },
         detailed: large,
-        textStyle: theme.textTheme.labelSmall!.copyWith(color: onSpeed.withValues(alpha: .75), fontSize: 10),
+        textStyle: theme.textTheme.labelSmall!.copyWith(
+          color: soft(.75),
+          fontSize: 10,
+          fontWeight: solid ? FontWeight.w700 : null,
+        ),
         ticks: ticks,
         slots: slots,
       ),
@@ -137,7 +149,7 @@ class SideBarStatsOverview extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Caption(t.avpn.statsSpeed, color: onSpeed.withValues(alpha: .8)),
+          _Caption(t.avpn.statsSpeed, color: soft(.8)),
           const Gap(8),
           _SpeedRow(
             icon: Icons.south_rounded,
@@ -190,7 +202,7 @@ class SideBarStatsOverview extends ConsumerWidget {
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(color: onSpeed.withValues(alpha: .85)),
+                style: theme.textTheme.labelSmall?.copyWith(color: soft(.85)),
               ),
             ],
           ],
@@ -483,7 +495,11 @@ class _GraphSummary extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(color: color.withValues(alpha: .85));
+    final solid = Theme.of(context).araLook.neonFill != null;
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: solid ? color : color.withValues(alpha: .85),
+      fontWeight: solid ? FontWeight.w600 : null,
+    );
     final strong = style?.copyWith(color: color, fontWeight: FontWeight.w700);
     final downs = history.map((s) => s.down).toList();
     final peak = downs.isEmpty ? 0 : downs.reduce((a, b) => a > b ? a : b);
@@ -553,7 +569,11 @@ class _SpeedGraph extends CustomPainter {
     required this.textStyle,
     required this.ticks,
     this.slots = SpeedHistory.length,
-  });
+    this.slide,
+  }) : super(repaint: slide);
+
+  /// 0 → 1 over the second after a new sample: the lines slide one step to the left instead of jumping
+  final Animation<double>? slide;
 
   /// how many samples the graph's width holds (fewer samples sit at the right)
   final int slots;
@@ -656,7 +676,7 @@ class _SpeedGraph extends CustomPainter {
     // nothing draws outside the chart (the end dots may reach a little over its edges)
     canvas.clipRect(Rect.fromLTRB(-6, -6, chart.width + 6, chart.height + 6));
 
-    final start = chart.width - step * (samples.length - 1);
+    final start = chart.width - step * (samples.length - 1) + step * (1 - (slide?.value ?? 1));
     Offset point(int i, int value) => Offset(start + step * i, chart.height - chart.height * value / top);
 
     void series(List<int> values, Color c, double width, double fill) {
@@ -938,7 +958,9 @@ class _RangePicker extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: r == range ? color.withValues(alpha: .16) : Colors.transparent,
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: color.withValues(alpha: r == range ? .5 : .18)),
+                  border: Border.all(
+                    color: color.withValues(alpha: r == range ? .5 : (theme.araLook.neonFill != null ? .4 : .18)),
+                  ),
                 ),
                 child: Text(
                   short
@@ -951,7 +973,7 @@ class _RangePicker extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: color.withValues(alpha: r == range ? 1 : .7),
+                    color: theme.araLook.neonFill != null ? color : color.withValues(alpha: r == range ? 1 : .7),
                     fontWeight: r == range ? FontWeight.w800 : FontWeight.w600,
                   ),
                 ),
@@ -972,3 +994,24 @@ Widget _grow(bool grow, {required double height, required Widget child}) => grow
         ),
       )
     : SizedBox(height: height, child: child);
+
+/// The speed graph, sliding: when a new second's sample comes in, the lines glide one step to the left over that
+/// second instead of jumping (only while [live]; the hidden tabs' tickers stop it).
+class _SlidingGraph extends HookWidget {
+  const _SlidingGraph({required this.samples, required this.live, required this.painter});
+
+  final List<({int down, int up})> samples;
+  final bool live;
+  final CustomPainter Function(Animation<double>? slide) painter;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = useAnimationController(duration: const Duration(seconds: 1), initialValue: 1);
+    // a new sample is a new list (the same one on any other rebuild)
+    useEffect(() {
+      if (live && samples.length > 1) controller.forward(from: 0);
+      return null;
+    }, [samples, live]);
+    return CustomPaint(painter: painter(live ? controller : null));
+  }
+}

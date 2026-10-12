@@ -83,3 +83,58 @@ class _BranchSwiperState extends State<BranchSwiper> with SingleTickerProviderSt
     );
   }
 }
+
+/// The computer's tabs, kept alive like an indexed stack: the new tab fades in and rises a few pixels instead of
+/// appearing at once. The hidden tabs stop their animations (and the pages that check it stop following their
+/// data until they're back on screen).
+class BranchFader extends StatefulWidget {
+  const BranchFader({super.key, required this.navigationShell, required this.children});
+
+  final StatefulNavigationShell navigationShell;
+  final List<Widget> children;
+
+  @override
+  State<BranchFader> createState() => _BranchFaderState();
+}
+
+class _BranchFaderState extends State<BranchFader> with SingleTickerProviderStateMixin {
+  late final _fade = AnimationController(vsync: this, duration: const Duration(milliseconds: 200), value: 1);
+  late int _current = widget.navigationShell.currentIndex;
+
+  @override
+  void didUpdateWidget(BranchFader old) {
+    super.didUpdateWidget(old);
+    final index = widget.navigationShell.currentIndex;
+    if (index != _current) {
+      _current = index;
+      _fade.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curve = CurvedAnimation(parent: _fade, curve: Curves.easeOutCubic);
+    return Stack(
+      children: [
+        for (var i = 0; i < widget.children.length; i++)
+          if (i == _current)
+            AnimatedBuilder(
+              animation: curve,
+              builder: (context, child) => Opacity(
+                opacity: curve.value,
+                child: Transform.translate(offset: Offset(0, 10 * (1 - curve.value)), child: child),
+              ),
+              child: TickerMode(enabled: true, child: widget.children[i]),
+            )
+          else
+            Offstage(child: TickerMode(enabled: false, child: widget.children[i])),
+      ],
+    );
+  }
+}

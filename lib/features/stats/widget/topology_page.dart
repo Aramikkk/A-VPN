@@ -19,7 +19,10 @@ class TopologyPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final state = ref.watch(connectionsProvider);
+    // a tab out of sight (another one is open) stops following the list, so it isn't worked out again every two
+    // seconds for nothing; it catches up when it's back on screen
+    final visible = TickerMode.of(context);
+    final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     final byTraffic = useState(true);
     final openOnly = useState(false);
@@ -51,7 +54,7 @@ class TopologyPage extends HookConsumerWidget {
 
     // what the core counted for the whole session against what the list holds: connections shorter than one poll
     // and the ones while the app was closed aren't in the list
-    final info = ref.watch(statsNotifierProvider).valueOrNull;
+    final info = (visible ? ref.watch(statsNotifierProvider) : ref.read(statsNotifierProvider)).valueOrNull;
     final sessionVpn = (info?.vpnUplinkTotal ?? 0) + (info?.vpnDownlinkTotal ?? 0);
     final sessionAll = (info?.uplinkTotal.toInt() ?? 0) + (info?.downlinkTotal.toInt() ?? 0);
     final listed = state.items.where((c) => c.route != ConnectionRoute.block).fold<int>(0, (s, c) => s + c.total);

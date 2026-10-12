@@ -136,10 +136,10 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
             isMobileBreakpoint: isMobileBreakpoint,
             showProfilesAction: showProfilesAction,
           ),
-          // the phone's tabs slide and follow a swipe; the desktop just switches
+          // the phone's tabs slide and follow a swipe; the computer's fade in
           navigatorContainerBuilder: (context, navigationShell, children) => isMobileBreakpoint
               ? BranchSwiper(navigationShell: navigationShell, children: children)
-              : IndexedStack(index: navigationShell.currentIndex, children: children),
+              : BranchFader(navigationShell: navigationShell, children: children),
           branches: <StatefulShellBranch>[
             StatefulShellBranch(
               routes: <GoRoute>[
