@@ -9,8 +9,69 @@ enum AraAccent {
     seed: Color(0xFFEE4245),
     lightPrimary: Color(0xFFE0353A),
     darkPrimary: Color(0xFFFF5A5D),
-    lightGradient: [Color(0xFF0E0E0E), Color(0xFF2B2B2B), Color(0xFF474747)],
-    darkGradient: [Color(0xFF2B2B2B), Color(0xFF1C1C1C), Color(0xFF0E0E0E)],
+    lightGradient: _graphiteLight,
+    darkGradient: _graphiteDark,
+    icon: 'red',
+  ),
+
+  /// Mono in blue.
+  monoBlue(
+    seed: Color(0xFF2F7BFF),
+    lightPrimary: Color(0xFF1F66E5),
+    darkPrimary: Color(0xFF5C9BFF),
+    lightGradient: _graphiteLight,
+    darkGradient: _graphiteDark,
+    icon: 'blue',
+  ),
+
+  /// Mono in emerald.
+  monoEmerald(
+    seed: Color(0xFF16C47F),
+    lightPrimary: Color(0xFF0E9F66),
+    darkPrimary: Color(0xFF3DDC97),
+    lightGradient: _graphiteLight,
+    darkGradient: _graphiteDark,
+    icon: 'emerald',
+  ),
+
+  /// Mono in orange.
+  monoOrange(
+    seed: Color(0xFFFF7A1A),
+    lightPrimary: Color(0xFFE5650A),
+    darkPrimary: Color(0xFFFF9547),
+    lightGradient: _graphiteLight,
+    darkGradient: _graphiteDark,
+    icon: 'orange',
+  ),
+
+  /// Mono in violet.
+  monoViolet(
+    seed: Color(0xFF8B5CF6),
+    lightPrimary: Color(0xFF7341E6),
+    darkPrimary: Color(0xFFA78BFA),
+    lightGradient: _graphiteLight,
+    darkGradient: _graphiteDark,
+    icon: 'violet',
+  ),
+
+  /// Mono in teal.
+  monoTeal(
+    seed: Color(0xFF14C8D4),
+    lightPrimary: Color(0xFF0E9FAA),
+    darkPrimary: Color(0xFF3FDDE8),
+    lightGradient: _graphiteLight,
+    darkGradient: _graphiteDark,
+    icon: 'teal',
+  ),
+
+  /// Mono in gold.
+  monoGold(
+    seed: Color(0xFFE8B500),
+    lightPrimary: Color(0xFFB38A00),
+    darkPrimary: Color(0xFFF5C518),
+    lightGradient: _graphiteLight,
+    darkGradient: _graphiteDark,
+    icon: 'gold',
   ),
 
   /// A-VPN's earlier acid green; dark text on it.
@@ -121,6 +182,7 @@ enum AraAccent {
     this.lightOnGradient = Colors.white,
     this.darkOnGradient = Colors.white,
     this.pure = false,
+    this.icon,
   });
 
   final Color seed;
@@ -134,6 +196,9 @@ enum AraAccent {
   /// pure black / pure white backgrounds and outlined blocks (the OLED theme)
   final bool pure;
 
+  /// the home-screen icon in this colour (Android): one of the launcher aliases; other themes keep the red one
+  final String? icon;
+
   static AraAccent get platformDefault => monoRed;
 
   /// Text and icons on the gradient.
@@ -145,3 +210,7 @@ enum AraAccent {
     colors: brightness == Brightness.dark ? darkGradient : lightGradient,
   );
 }
+
+// the Mono themes' graphite blocks, white text on them by day and by night
+const _graphiteLight = [Color(0xFF0E0E0E), Color(0xFF2B2B2B), Color(0xFF474747)];
+const _graphiteDark = [Color(0xFF2B2B2B), Color(0xFF1C1C1C), Color(0xFF0E0E0E)];

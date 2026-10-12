@@ -78,7 +78,13 @@
     "graphPeak": "Peak",
     "graphAverage": "Average",
     "accentMonoRed": "Mono red",
-    "statsTitle": "Statistics"
+    "statsTitle": "Statistics",
+    "accentMonoBlue": "Mono blue",
+    "accentMonoEmerald": "Mono emerald",
+    "accentMonoOrange": "Mono orange",
+    "accentMonoViolet": "Mono violet",
+    "accentMonoTeal": "Mono teal",
+    "accentMonoGold": "Mono gold"
   },
   "common": {
     "appTitle": "A-VPN",

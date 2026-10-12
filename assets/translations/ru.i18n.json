@@ -78,7 +78,13 @@
     "graphPeak": "Пик",
     "graphAverage": "Средняя",
     "accentMonoRed": "Моно-красная",
-    "statsTitle": "Статистика"
+    "statsTitle": "Статистика",
+    "accentMonoBlue": "Моно-синяя",
+    "accentMonoEmerald": "Моно-изумрудная",
+    "accentMonoOrange": "Моно-оранжевая",
+    "accentMonoViolet": "Моно-фиолетовая",
+    "accentMonoTeal": "Моно-бирюзовая",
+    "accentMonoGold": "Моно-золотая"
   },
   "common": {
     "appTitle": "A-VPN",

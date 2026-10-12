@@ -13,6 +13,17 @@ MAIN = "#F5F5F5"     # the letter
 RED = "#EE4245"      # the lower right leg
 TILE = INK
 
+# the launcher icon follows the colour theme: one icon per Mono colour (the app switches between them)
+ICON_COLOURS = {
+    "red": "#EE4245",
+    "blue": "#2F7BFF",
+    "emerald": "#16C47F",
+    "orange": "#FF7A1A",
+    "violet": "#8B5CF6",
+    "teal": "#14C8D4",
+    "gold": "#E8B500",
+}
+
 
 def _fit(points):
     """The user's drawing (a 1254 px square) moved into the 512 box, centred, 440 wide."""
@@ -38,7 +49,7 @@ def render_mark(size, scale, ink=MAIN, red=RED):
     return img.resize((size, size), Image.LANCZOS)
 
 
-def render_launcher(size, round_=False, mark_scale=0.66, tile=TILE):
+def render_launcher(size, round_=False, mark_scale=0.56, tile=TILE, mark_colour=None):
     ss = 4
     big = size * ss
     shape = Image.new("L", (big, big), 0)
@@ -50,7 +61,7 @@ def render_launcher(size, round_=False, mark_scale=0.66, tile=TILE):
     shape = shape.resize((size, size), Image.LANCZOS)
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     img.paste(Image.new("RGBA", (size, size), tile), (0, 0), shape)
-    img.alpha_composite(render_mark(size, mark_scale))
+    img.alpha_composite(render_mark(size, mark_scale, MAIN, mark_colour or RED))
     return img
 
 
@@ -64,7 +75,7 @@ def _path(poly, k, shift):
         f"L{shift + x * k:.1f},{shift + y * k:.1f}" for x, y in rest) + " Z"
 
 
-def vector_mark(viewport, ink, red, scale=0.62):
+def vector_mark(viewport, ink, red, scale=0.46):  # ~60% of the visible tile, like other apps
     """Adaptive-icon foreground: the emblem inside the 66dp safe zone of a 108dp canvas."""
     k = viewport / 512 * scale
     shift = (viewport - 512 * k) / 2
@@ -106,8 +117,24 @@ def main(repo, preview):
 
     for folder, px in {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}.items():
         render_launcher(px).save(res / f"mipmap-{folder}/ic_launcher.webp", "WEBP", lossless=True)
-        render_launcher(px, round_=True, mark_scale=0.54).save(
+        render_launcher(px, round_=True, mark_scale=0.48).save(
             res / f"mipmap-{folder}/ic_launcher_round.webp", "WEBP", lossless=True)
+
+    # one launcher icon per colour theme: ic_launcher_<colour> (adaptive and legacy), used by the launcher aliases
+    for key, colour in ICON_COLOURS.items():
+        (res / f"drawable/ic_launcher_foreground_{key}.xml").write_text(vector_mark(680, MAIN, colour), encoding="utf-8")
+        for name in (f"ic_launcher_{key}", f"ic_launcher_{key}_round"):
+            (res / f"mipmap-anydpi-v26/{name}.xml").write_text(
+                '<?xml version="1.0" encoding="utf-8"?>\n'
+                '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+                '    <background android:drawable="@color/ic_launcher_background"/>\n'
+                f'    <foreground android:drawable="@drawable/ic_launcher_foreground_{key}"/>\n'
+                '</adaptive-icon>\n', encoding="utf-8")
+        for folder, px in {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}.items():
+            tile = render_launcher(px, mark_colour=colour)
+            tile.save(res / f"mipmap-{folder}/ic_launcher_{key}.webp", "WEBP", lossless=True)
+            render_launcher(px, round_=True, mark_scale=0.48, mark_colour=colour).save(
+                res / f"mipmap-{folder}/ic_launcher_{key}_round.webp", "WEBP", lossless=True)
 
     banner = Image.new("RGBA", (320, 180), (0, 0, 0, 255))
     banner.alpha_composite(render_launcher(150), (85, 15))
@@ -130,7 +157,7 @@ def main(repo, preview):
     # preview: launcher sizes on graphite, the bare emblem on white and on black
     prev = Image.new("RGBA", (980, 300), (60, 60, 64, 255))
     prev.alpha_composite(render_launcher(256), (20, 22))
-    prev.alpha_composite(render_launcher(160, round_=True, mark_scale=0.54), (300, 70))
+    prev.alpha_composite(render_launcher(160, round_=True, mark_scale=0.48), (300, 70))
     prev.alpha_composite(render_launcher(96), (490, 102))
     prev.alpha_composite(render_launcher(48), (610, 126))
     light = Image.new("RGBA", (150, 300), (255, 255, 255, 255))
