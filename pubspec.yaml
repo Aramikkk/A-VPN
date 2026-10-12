@@ -1,7 +1,7 @@
 name: hiddify
 description: Cross Platform Multi Protocol Proxy Frontend.
 publish_to: "none"
-version: 5.7.2+50702
+version: 5.8.0+50800
 
 environment:
   sdk: ^3.10.4
@@ -170,6 +170,44 @@ flutter:
     # - family: Roboto
     #   fonts:
     #     - asset: assets/fonts/Roboto.ttf
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-400.ttf
+          weight: 400
+        - asset: assets/fonts/Manrope-500.ttf
+          weight: 500
+        - asset: assets/fonts/Manrope-600.ttf
+          weight: 600
+        - asset: assets/fonts/Manrope-700.ttf
+          weight: 700
+        - asset: assets/fonts/Manrope-800.ttf
+          weight: 800
+    - family: Golos Text
+      fonts:
+        - asset: assets/fonts/GolosText-400.ttf
+          weight: 400
+        - asset: assets/fonts/GolosText-500.ttf
+          weight: 500
+        - asset: assets/fonts/GolosText-600.ttf
+          weight: 600
+        - asset: assets/fonts/GolosText-700.ttf
+          weight: 700
+        - asset: assets/fonts/GolosText-800.ttf
+          weight: 800
+    - family: Unbounded
+      fonts:
+        - asset: assets/fonts/Unbounded-600.ttf
+          weight: 600
+        - asset: assets/fonts/Unbounded-800.ttf
+          weight: 800
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-500.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-700.ttf
+          weight: 700
+        - asset: assets/fonts/JetBrainsMono-800.ttf
+          weight: 800
     - family: Emoji
       fonts:
         - asset: assets/fonts/Emoji.ttf

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 
 class ConnectionButtonTheme extends ThemeExtension<ConnectionButtonTheme> {
   const ConnectionButtonTheme({this.idleColor, this.connectedColor});
@@ -40,7 +41,11 @@ class AraLook extends ThemeExtension<AraLook> {
     this.dark = false,
     this.graphDown,
     this.graphUp,
+    this.style = AraStyle.classic,
   });
+
+  /// the look the theme was built for: the home screen and a few blocks draw themselves to match it
+  final AraStyle style;
 
   /// the speed graph's download and upload colours on the speed block; null: the text colour on it
   final Color? graphDown;
@@ -124,6 +129,7 @@ class AraLook extends ThemeExtension<AraLook> {
     dark: dark,
     graphDown: graphDown,
     graphUp: graphUp,
+    style: style,
   );
 
   @override
@@ -138,6 +144,7 @@ class AraLook extends ThemeExtension<AraLook> {
       dark: t < .5 ? dark : other.dark,
       graphDown: Color.lerp(graphDown, other.graphDown, t),
       graphUp: Color.lerp(graphUp, other.graphUp, t),
+      style: t < .5 ? style : other.style,
     );
   }
 }

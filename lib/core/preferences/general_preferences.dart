@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/actions_at_closing.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
 import 'package:hiddify/features/profile/model/profile_sort_enum.dart';
@@ -128,6 +129,14 @@ abstract class Preferences {
     "ara_accent",
     AraAccent.platformDefault,
     mapFrom: (value) => AraAccent.values.firstWhere((e) => e.name == value, orElse: () => AraAccent.platformDefault),
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: the look (Graphite, Editorial or the classic one).
+  static final araStyle = PreferencesNotifier.create<AraStyle, String>(
+    "ara_style",
+    AraStyle.fallback,
+    mapFrom: (value) => AraStyle.values.firstWhere((e) => e.name == value, orElse: () => AraStyle.fallback),
     mapTo: (value) => value.name,
   );
 

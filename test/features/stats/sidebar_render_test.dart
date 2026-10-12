@@ -13,6 +13,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
@@ -80,6 +81,7 @@ void main() {
         AppThemeMode.system,
         '',
         accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'lagoon'),
+        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
       );
       await tester.binding.setSurfaceSize(Size(width, dense ? 640 : (large ? 1100 : 760)));
       await tester.pumpWidget(
@@ -177,6 +179,7 @@ void main() {
       AppThemeMode.light,
       '',
       accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed'),
+      style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
     );
     await tester.binding.setSurfaceSize(const Size(880, 820));
     await tester.pumpWidget(

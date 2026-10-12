@@ -7,6 +7,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
@@ -145,7 +146,12 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(400, 1000));
     final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
     final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed');
-    final theme = AppTheme(AppThemeMode.dark, '', accent: accent);
+    final theme = AppTheme(
+      AppThemeMode.dark,
+      '',
+      accent: accent,
+      style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -185,7 +191,12 @@ void main() {
       await tester.binding.setSurfaceSize(size);
       final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
       final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'monoRed');
-      final theme = AppTheme(dark ? AppThemeMode.dark : AppThemeMode.light, '', accent: accent);
+      final theme = AppTheme(
+        dark ? AppThemeMode.dark : AppThemeMode.light,
+        '',
+        accent: accent,
+        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
+      );
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

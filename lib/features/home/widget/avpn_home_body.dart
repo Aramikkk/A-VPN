@@ -8,6 +8,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -25,6 +26,8 @@ import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+part 'styled_home.dart';
 
 /// Home screen: the provider card with the server list inside, a "check" row, and the connection card.
 class AraHomeBody extends HookConsumerWidget {
@@ -50,6 +53,10 @@ class AraHomeBody extends HookConsumerWidget {
       }
     }
 
+    final style = Theme.of(context).araLook.style;
+    if (style != AraStyle.classic) {
+      return _StyledHome(editorial: style == AraStyle.editorial, testing: testing.value, onCheck: pingAll);
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       child: Column(
@@ -408,10 +415,13 @@ class _Bars extends StatelessWidget {
 }
 
 class _CheckRow extends HookConsumerWidget {
-  const _CheckRow({required this.onCheck, required this.testing});
+  const _CheckRow({required this.onCheck, required this.testing, this.showCheck = true});
 
   final VoidCallback onCheck;
   final bool testing;
+
+  /// the "check" button (the styled homes have it over the list instead)
+  final bool showCheck;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -447,11 +457,12 @@ class _CheckRow extends HookConsumerWidget {
 
     return Row(
       children: [
-        TextButton.icon(
-          onPressed: connected && !testing ? onCheck : null,
-          icon: const Icon(Icons.network_ping_rounded),
-          label: Text(t.avpn.check),
-        ),
+        if (showCheck)
+          TextButton.icon(
+            onPressed: connected && !testing ? onCheck : null,
+            icon: const Icon(Icons.network_ping_rounded),
+            label: Text(t.avpn.check),
+          ),
         const Spacer(),
         if (sharingOn)
           IconButton(
@@ -493,7 +504,10 @@ class _ToggleChip extends StatelessWidget {
       showCheckmark: false,
       selectedColor: scheme.primary,
       labelStyle: TextStyle(color: selected ? scheme.onPrimary : null),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // the styled looks shape their chips themselves
+      shape: Theme.of(context).araLook.style == AraStyle.classic
+          ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+          : null,
       onSelected: onSelected,
     );
   }

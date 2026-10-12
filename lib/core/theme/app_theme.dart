@@ -2,16 +2,21 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 
 class AppTheme {
-  AppTheme(this.mode, this.fontFamily, {AraAccent? accent}) : accent = accent ?? AraAccent.platformDefault;
+  AppTheme(this.mode, this.fontFamily, {AraAccent? accent, this.style = AraStyle.classic})
+    : accent = accent ?? AraAccent.platformDefault;
   final AppThemeMode mode;
   final String fontFamily;
 
   /// the accent colour and gradient (Settings → General → Colour theme)
   final AraAccent accent;
+
+  /// Graphite, Editorial or the classic look (Settings → Themes)
+  final AraStyle style;
 
   AraLook _look(Brightness brightness) {
     final graph = graphColours(accent, brightness);
@@ -56,6 +61,7 @@ class AppTheme {
 
   /// Light: white backgrounds and the accent's deeper shade, whatever the wallpaper colours.
   ThemeData lightTheme(ColorScheme? lightColorScheme) {
+    if (style != AraStyle.classic) return _styledTheme(Brightness.light);
     if (PlatformUtils.isDesktop) return _windowsTheme(Brightness.light);
     const white = Colors.white;
     final scheme = ColorScheme.fromSeed(seedColor: accent.seed).copyWith(
@@ -83,6 +89,7 @@ class AppTheme {
   }
 
   ThemeData darkTheme(ColorScheme? darkColorScheme) {
+    if (style != AraStyle.classic) return _styledTheme(Brightness.dark);
     // the app's dark look is OLED black, also when the phone's dark mode picks it
     if (PlatformUtils.isDesktop) return _windowsTheme(Brightness.dark);
     if (mode != AppThemeMode.dark) return _oledTheme();
@@ -187,6 +194,232 @@ class AppTheme {
     );
   }
 
+  /// The palette of a style in day or night: background, cards, text, lines.
+  static AraPalette palette(AraStyle style, Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    return style == AraStyle.editorial
+        ? AraPalette(
+            bg: dark ? const Color(0xFF131211) : const Color(0xFFF3F1EC),
+            fg: dark ? const Color(0xFFECE8DF) : const Color(0xFF111111),
+            muted: dark ? const Color(0xFF8F8A80) : const Color(0xFF6D6A63),
+            card: dark ? const Color(0xFF1B1A18) : const Color(0xFFECE9E2),
+            container: dark ? const Color(0xFF211F1C) : const Color(0xFFE6E2D9),
+            high: dark ? const Color(0xFF282521) : const Color(0xFFDFDAD0),
+            highest: dark ? const Color(0xFF2F2C27) : const Color(0xFFD7D2C7),
+            line: dark ? const Color(0xFF34312C) : const Color(0xFFD3CFC5),
+            strongLine: dark ? const Color(0xFFECE8DF) : const Color(0xFF111111),
+            nav: dark ? const Color(0xFF131211) : const Color(0xFFF3F1EC),
+          )
+        : AraPalette(
+            bg: dark ? const Color(0xFF0B0B0D) : const Color(0xFFF4F4F6),
+            fg: dark ? const Color(0xFFF2F2F4) : const Color(0xFF16161A),
+            muted: dark ? const Color(0xFF8D8D95) : const Color(0xFF6F6F78),
+            card: dark ? const Color(0xFF151517) : Colors.white,
+            container: dark ? const Color(0xFF1A1A1D) : const Color(0xFFF8F8FA),
+            high: dark ? const Color(0xFF202024) : const Color(0xFFEFEFF2),
+            highest: dark ? const Color(0xFF26262B) : const Color(0xFFE8E8EC),
+            line: dark ? const Color(0xFF242428) : const Color(0xFFE4E4E9),
+            strongLine: dark ? const Color(0xFF4A4A52) : const Color(0xFFB9B9C2),
+            nav: dark ? const Color(0xFF0F0F12) : Colors.white,
+          );
+  }
+
+  /// Graphite and Editorial, by day or night, in the accent colour.
+  ThemeData _styledTheme(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    final editorial = style == AraStyle.editorial;
+    final p = palette(style, brightness);
+    final primary = AraLook.readableOn(dark ? accent.darkPrimary : accent.lightPrimary, p.bg);
+    final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
+    final scheme = ColorScheme.fromSeed(seedColor: accent.seed, brightness: brightness).copyWith(
+      primary: primary,
+      onPrimary: onPrimary,
+      primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
+      onPrimaryContainer: p.fg,
+      secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
+      onSecondaryContainer: p.fg,
+      surface: p.bg,
+      onSurface: p.fg,
+      onSurfaceVariant: p.muted,
+      surfaceDim: p.bg,
+      surfaceBright: p.card,
+      surfaceContainerLowest: p.bg,
+      surfaceContainerLow: p.card,
+      surfaceContainer: p.container,
+      surfaceContainerHigh: p.high,
+      surfaceContainerHighest: p.highest,
+      outline: p.strongLine,
+      outlineVariant: p.line,
+    );
+
+    // body text: Manrope (Graphite) or Golos Text (Editorial); headings in Unbounded; Editorial's small labels
+    // monospaced
+    final body = editorial ? 'Golos Text' : 'Manrope';
+    final base = (dark ? Typography.material2021().white : Typography.material2021().black).apply(
+      fontFamily: body,
+      bodyColor: p.fg,
+      displayColor: p.fg,
+    );
+    TextStyle? heading(TextStyle? s, double spacing) =>
+        s?.copyWith(fontFamily: 'Unbounded', fontWeight: FontWeight.w800, letterSpacing: spacing);
+    final text = base.copyWith(
+      displayLarge: heading(base.displayLarge, -2),
+      displayMedium: heading(base.displayMedium, -1.5),
+      displaySmall: heading(base.displaySmall, -1),
+      headlineLarge: heading(base.headlineLarge, -1),
+      headlineMedium: heading(base.headlineMedium, -.8),
+      headlineSmall: heading(base.headlineSmall, -.5),
+      titleLarge: heading(base.titleLarge, -.4)?.copyWith(fontSize: 21),
+      titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      titleSmall: base.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+      bodyMedium: base.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+      bodySmall: base.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+      labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      labelMedium: base.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+      labelSmall: editorial
+          ? base.labelSmall?.copyWith(fontFamily: 'JetBrains Mono', fontWeight: FontWeight.w700, fontSize: 10.5, letterSpacing: 0)
+          : base.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+    );
+
+    final radius = editorial ? 6.0 : 20.0;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+      side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide.none,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: scheme,
+      textTheme: text,
+      fontFamily: body,
+      // the bundled emoji font draws the servers' flags (Windows has none of its own)
+      fontFamilyFallback: [if (fontFamily.isNotEmpty) fontFamily, 'Emoji'],
+      scaffoldBackgroundColor: p.bg,
+      canvasColor: p.bg,
+      dividerTheme: DividerThemeData(color: p.line, space: 1, thickness: 1),
+      appBarTheme: AppBarTheme(
+        backgroundColor: p.bg,
+        foregroundColor: p.fg,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        titleTextStyle: text.titleLarge,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: p.nav,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: editorial ? Colors.transparent : primary.withValues(alpha: .16),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (s) => IconThemeData(color: s.contains(WidgetState.selected) ? primary : p.muted),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (s) => TextStyle(
+            fontFamily: body,
+            fontSize: 11.5,
+            color: s.contains(WidgetState.selected) ? primary : p.muted,
+            fontWeight: s.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
+          ),
+        ),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: p.nav,
+        indicatorColor: editorial ? p.fg : primary.withValues(alpha: .16),
+        selectedIconTheme: IconThemeData(color: editorial ? p.bg : primary),
+        unselectedIconTheme: IconThemeData(color: p.muted),
+        selectedLabelTextStyle: text.labelMedium?.copyWith(color: p.fg, fontWeight: FontWeight.w800),
+        unselectedLabelTextStyle: text.labelMedium?.copyWith(color: p.muted),
+      ),
+      cardTheme: CardThemeData(color: p.card, surfaceTintColor: Colors.transparent, elevation: 0, shape: shape),
+      dialogTheme: DialogThemeData(backgroundColor: p.card, surfaceTintColor: Colors.transparent, shape: shape),
+      bottomSheetTheme: BottomSheetThemeData(backgroundColor: p.card, surfaceTintColor: Colors.transparent),
+      popupMenuTheme: PopupMenuThemeData(color: p.card, surfaceTintColor: Colors.transparent),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(editorial ? 4 : 99),
+          side: BorderSide(color: editorial ? p.strongLine : p.line),
+        ),
+        selectedColor: editorial ? p.fg : primary.withValues(alpha: .18),
+        backgroundColor: Colors.transparent,
+        labelStyle: text.labelLarge,
+        secondaryLabelStyle: text.labelLarge?.copyWith(color: editorial ? p.bg : p.fg),
+        checkmarkColor: editorial ? p.bg : primary,
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99)),
+          ),
+          side: WidgetStatePropertyAll(BorderSide(color: editorial ? p.strongLine : p.line)),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? (editorial ? p.fg : primary.withValues(alpha: .18)) : null,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) && editorial ? p.bg : p.fg,
+          ),
+          iconColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) && editorial ? p.bg : p.fg,
+          ),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? (editorial ? primary : Colors.white) : p.muted,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? (editorial ? p.fg : primary) : p.highest,
+        ),
+        trackOutlineColor: WidgetStatePropertyAll(editorial ? p.strongLine : Colors.transparent),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 14)),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99)),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(iconColor: editorial ? p.fg : primary),
+      extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _styledLook(brightness, p, primary)},
+    );
+  }
+
+  /// The speed block and the graph's colours for a style: Graphite's block is a dark (or white) glass card with the
+  /// download in the accent and the upload across the colour wheel; Editorial's is flat with a rule round it, the
+  /// download in ink and the upload in the accent.
+  AraLook _styledLook(Brightness brightness, AraPalette p, Color primary) {
+    final dark = brightness == Brightness.dark;
+    final editorial = style == AraStyle.editorial;
+    final blockColours = editorial
+        ? [p.card, p.card]
+        : dark
+        ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
+        : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
+    final block = blockColours[blockColours.length ~/ 2];
+    final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
+    final Color down;
+    final Color up;
+    if (editorial) {
+      down = p.fg;
+      up = colourless ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A)) : primary;
+    } else if (colourless) {
+      down = dark ? const Color(0xFF3B9BFF) : const Color(0xFF1F66E5);
+      up = dark ? const Color(0xFFFF9F2E) : const Color(0xFFD9590B);
+    } else {
+      final hsl = HSLColor.fromColor(primary);
+      down = primary;
+      up = hsl.withHue((hsl.hue + 150) % 360).toColor();
+    }
+    return AraLook(
+      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: blockColours),
+      onGradient: p.fg,
+      fastPing: primary,
+      dark: dark,
+      border: editorial ? p.strongLine : p.line,
+      graphDown: AraLook.readableOn(down, block),
+      graphUp: AraLook.readableOn(up, block),
+      style: style,
+    );
+  }
+
   CupertinoThemeData cupertinoThemeData(bool sysDark, ColorScheme? lightColorScheme, ColorScheme? darkColorScheme) {
     final bool isDark = switch (mode) {
       AppThemeMode.system => sysDark,
@@ -218,4 +451,35 @@ class AppTheme {
       ),
     );
   }
+}
+
+/// A style's colours in day or night.
+class AraPalette {
+  const AraPalette({
+    required this.bg,
+    required this.fg,
+    required this.muted,
+    required this.card,
+    required this.container,
+    required this.high,
+    required this.highest,
+    required this.line,
+    required this.strongLine,
+    required this.nav,
+  });
+
+  final Color bg;
+  final Color fg;
+  final Color muted;
+  final Color card;
+  final Color container;
+  final Color high;
+  final Color highest;
+
+  /// a hairline between rows
+  final Color line;
+
+  /// Editorial's ink rules (Graphite: a stronger hairline)
+  final Color strongLine;
+  final Color nav;
 }

@@ -60,7 +60,12 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final router = ref.watch(goRouterNotiferProvider);
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
-    final theme = AppTheme(themeMode, locale.preferredFontFamily, accent: ref.watch(Preferences.araAccent));
+    final theme = AppTheme(
+      themeMode,
+      locale.preferredFontFamily,
+      accent: ref.watch(Preferences.araAccent),
+      style: ref.watch(Preferences.araStyle),
+    );
     final upgrader = ref.watch(upgraderProvider);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 

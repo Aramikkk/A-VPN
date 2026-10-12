@@ -7,6 +7,8 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
@@ -129,10 +131,24 @@ class MyAdaptiveLayout extends HookConsumerWidget {
             bottomNavigationBar: isMobileBreakpoint
                 ? FocusScope(
                     node: navScopeNode,
-                    child: NavigationBar(
-                      selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
-                      destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                      onDestinationSelected: (index) => _onTap(context, index),
+                    child: DecoratedBox(
+                      // Editorial rules the menu off with an ink line, Graphite with a hairline
+                      decoration: BoxDecoration(
+                        border: switch (Theme.of(context).araLook.style) {
+                          AraStyle.editorial => Border(
+                            top: BorderSide(color: Theme.of(context).colorScheme.outline, width: 2),
+                          ),
+                          AraStyle.graphite => Border(
+                            top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                          ),
+                          AraStyle.classic => null,
+                        },
+                      ),
+                      child: NavigationBar(
+                        selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
+                        destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+                        onDestinationSelected: (index) => _onTap(context, index),
+                      ),
                     ),
                   )
                 : null,
