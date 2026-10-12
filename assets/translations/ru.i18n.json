@@ -118,7 +118,7 @@
     "connShowSmall": "Показать меньше 1 МБ: $n",
     "connHideSmall": "Скрыть меньше 1 МБ",
     "connHideSmallChip": "Без мелких (< 1 МБ)",
-    "ruleBlocked": "заблокированные в РФ",
+    "ruleBlocked": "заблокированные сайты",
     "ruleRuSites": "российские сайты",
     "ruleRuApps": "российские приложения",
     "stProtected": "Защищено",
@@ -176,7 +176,10 @@
     "subUpdateAsProvider": "Как задаёт провайдер",
     "subUpdateNever": "Не обновлять сама",
     "subUpdateEvery": "Раз в $n ч",
-    "statsPingPeriod": "Пинг до сервера за выбранный период"
+    "statsPingPeriod": "Пинг до сервера за выбранный период",
+    "ruleBlockedIps": "заблокированные адреса (Telegram и др.)",
+    "ruleLocalNet": "локальная сеть",
+    "ruleAppsVpn": "приложения через VPN"
   },
   "common": {
     "appTitle": "A-VPN",

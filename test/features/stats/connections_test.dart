@@ -114,7 +114,19 @@ void main() {
     final t = await AppLocale.ru.build();
     expect(ruleLabel('domain_suffix=[ru su xn--p1ai yandex.net] => route(direct)', t), 'российские сайты');
     expect(ruleLabel('package_name=[ru.yandex.music ru.yandex.taxi] => route(direct)', t), 'российские приложения');
-    expect(ruleLabel('domain_suffix=[abook-club.ru x.ru] => route(select)', t), 'заблокированные в РФ');
+    expect(ruleLabel('domain_suffix=[abook-club.ru x.ru] => route(select)', t), 'заблокированные сайты');
+    expect(
+      ruleLabel('domain_suffix=[10minutemail.com 1337x.to 24.kg ...] => route(select)', t),
+      'заблокированные сайты',
+    );
+    expect(
+      ruleLabel('ip_cidr=[5.28.192.0/18 5.200.14.128/25 31.13.24.0/21 ...] => route(select)', t),
+      startsWith('заблокированные адреса'),
+    );
+    expect(
+      ruleLabel('ip_cidr=[10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.0/8 ...] => route(direct)', t),
+      'локальная сеть',
+    );
     expect(ruleLabel('final', t), isNull);
     expect(ruleLabel('rule_set=[ads] => reject', t), 'ads');
   });

@@ -118,7 +118,7 @@
     "connShowSmall": "Show under 1 MB: $n",
     "connHideSmall": "Hide under 1 MB",
     "connHideSmallChip": "Hide small (< 1 MB)",
-    "ruleBlocked": "blocked in Russia",
+    "ruleBlocked": "blocked sites",
     "ruleRuSites": "Russian sites",
     "ruleRuApps": "Russian apps",
     "stProtected": "Protected",
@@ -176,7 +176,10 @@
     "subUpdateAsProvider": "As the provider says",
     "subUpdateNever": "Never by itself",
     "subUpdateEvery": "Every $n h",
-    "statsPingPeriod": "Ping to the server over the chosen period"
+    "statsPingPeriod": "Ping to the server over the chosen period",
+    "ruleBlockedIps": "blocked addresses (Telegram etc.)",
+    "ruleLocalNet": "local network",
+    "ruleAppsVpn": "apps through the VPN"
   },
   "common": {
     "appTitle": "A-VPN",

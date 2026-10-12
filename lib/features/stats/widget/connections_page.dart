@@ -454,8 +454,15 @@ String? ruleLabel(String rule, Translations t) {
   if (match.contains(ruAppPackages.first)) return t.avpn.ruleRuApps;
   final action = rule.contains('=>') ? rule.split('=>').last : '';
   final listed = RegExp(r'\[([^\]]*)\]').allMatches(match).expand((m) => m.group(1)!.split(' ')).length;
-  // a long list of sites: the blocked ones (through the VPN) or the Russian ones (direct)
-  if (listed > 20) return action.contains('direct') ? t.avpn.ruleRuSites : t.avpn.ruleBlocked;
+  final direct = action.contains('direct');
+  // a list (the core shortens long ones to their first few and "..."): named by what it holds and where it sends
+  if (listed > 3 || match.contains('...')) {
+    if (match.contains('ip_cidr')) return direct ? t.avpn.ruleLocalNet : t.avpn.ruleBlockedIps;
+    if (match.contains('domain') || match.contains('rule_set')) {
+      return direct ? t.avpn.ruleRuSites : t.avpn.ruleBlocked;
+    }
+    if (match.contains('package_name')) return direct ? t.avpn.ruleRuApps : t.avpn.ruleAppsVpn;
+  }
   // only the protocol left to match: everything the other rules didn't take
   if (RegExp(r'^network=\[[a-z ]+\]$').hasMatch(match)) return t.avpn.ruleEverythingElse;
   final values = RegExp(
