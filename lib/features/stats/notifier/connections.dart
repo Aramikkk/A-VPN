@@ -7,6 +7,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
+import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -306,7 +307,7 @@ class Connections extends Notifier<ConnectionsState> {
       if (since != null) _since = DateTime.fromMillisecondsSinceEpoch(since);
       for (final item in (json['items'] as List).whereType<Map<String, dynamic>>()) {
         final c = SeenConnection.fromJson(item);
-        if (c != null) _seen[c.id] = c;
+        if (c != null && !isAdultHost(c.host)) _seen[c.id] = c;
       }
     } catch (_) {
       // an unreadable list is just not restored
@@ -355,7 +356,8 @@ class Connections extends Notifier<ConnectionsState> {
     for (final entry in list ?? const []) {
       if (entry is! Map<String, dynamic>) continue;
       final c = SeenConnection.fromClash(entry);
-      if (c == null) continue;
+      // adult sites go through the VPN but are never listed
+      if (c == null || isAdultHost(c.host)) continue;
       open.add(c.id);
       _seen[c.id] = c;
     }

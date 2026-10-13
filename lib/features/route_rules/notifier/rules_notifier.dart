@@ -36,6 +36,7 @@ enum BuiltinRule {
   googleProxy(enabledByDefault: true),
   socialProxy(enabledByDefault: true),
   chinaProxy(enabledByDefault: true),
+  adultProxy(enabledByDefault: true),
   blockedProxy(enabledByDefault: true),
   ruDomainsDirect(enabledByDefault: true),
   // Russian apps on the phone (Yandex Music, banks, Gosuslugi…) direct, whatever servers they use
@@ -58,6 +59,7 @@ enum BuiltinRule {
     googleProxy => t.pages.settings.routing.builtinRules.googleProxy,
     socialProxy => t.pages.settings.routing.builtinRules.socialProxy,
     chinaProxy => t.pages.settings.routing.builtinRules.chinaProxy,
+    adultProxy => t.pages.settings.routing.builtinRules.adultProxy,
     blockedProxy => t.pages.settings.routing.builtinRules.blockedProxy,
     ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirect,
     ruAppsDirect => t.pages.settings.routing.builtinRules.ruAppsDirect,
@@ -72,6 +74,7 @@ enum BuiltinRule {
     googleProxy => t.pages.settings.routing.builtinRules.googleProxyHint,
     socialProxy => t.pages.settings.routing.builtinRules.socialProxyHint,
     chinaProxy => t.pages.settings.routing.builtinRules.chinaProxyHint,
+    adultProxy => t.pages.settings.routing.builtinRules.adultProxyHint,
     blockedProxy => t.pages.settings.routing.builtinRules.blockedProxyHint,
     ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirectHint,
     ruAppsDirect => t.pages.settings.routing.builtinRules.ruAppsDirectHint,
@@ -119,6 +122,7 @@ enum BuiltinRule {
       packageNames: socialApps,
     ),
     chinaProxy => Rule(outbound: Outbound.proxy, domainSuffixes: chinaDomains, packageNames: chinaApps),
+    adultProxy => Rule(outbound: Outbound.proxy, domainSuffixes: adultDomains, domainKeywords: adultKeywords),
     blockedProxy => Rule(
       outbound: Outbound.proxy,
       domainSuffixes: otherBlockedDomains,

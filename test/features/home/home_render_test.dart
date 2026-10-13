@@ -25,6 +25,8 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
+import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -135,6 +137,10 @@ void main() {
         _connected = connected;
         SharedPreferences.setMockInitialValues({});
         await tester.binding.setSurfaceSize(const Size(390, 844));
+        // the screen size the app reads too (MediaQuery), not only the surface drawn on
+        tester.view.physicalSize = const Size(1170, 2532);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
         final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
         final prefs = await tester.runAsync(SharedPreferences.getInstance);
         final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
@@ -149,6 +155,16 @@ void main() {
               activeProfileProvider.overrideWith(_Profile.new),
               statsNotifierProvider.overrideWith(_Stats.new),
               profilePathResolverProvider.overrideWithValue(ProfilePathResolver(Directory.systemTemp)),
+              connectionsProvider.overrideWith(_Connections.new),
+              installedAppsProvider.overrideWith(
+                (ref) async => {
+                  'com.google.android.youtube': (name: 'YouTube', icon: null),
+                  'com.instagram.android': (name: 'Instagram', icon: null),
+                  'com.anthropic.claude': (name: 'Claude', icon: null),
+                  'ru.yandex.disk': (name: 'Яндекс Диск', icon: null),
+                  'ru.sberbankmobile': (name: 'СберБанк', icon: null),
+                },
+              ),
             ],
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
@@ -195,4 +211,35 @@ void main() {
       });
     }
   }
+}
+
+/// Today's connections, so the strip map under the servers has something to draw.
+class _Connections extends Connections {
+  @override
+  ConnectionsState build() => ConnectionsState(
+    items: [
+      for (final (i, (app, route, server, down)) in [
+        ('com.google.android.youtube', ConnectionRoute.vpn, '🇵🇱 Польша', 182e6),
+        ('com.instagram.android', ConnectionRoute.vpn, '🇵🇱 Польша', 41e6),
+        ('com.anthropic.claude', ConnectionRoute.vpn, '🇫🇮 Финляндия', 22e6),
+        ('ru.yandex.disk', ConnectionRoute.direct, '', 96e6),
+        ('ru.sberbankmobile', ConnectionRoute.direct, '', 8e6),
+      ].indexed)
+        SeenConnection(
+          id: '$i',
+          app: app,
+          host: 'example.com',
+          port: 443,
+          network: 'tcp',
+          route: route,
+          outbound: server,
+          rule: '',
+          start: DateTime(2026, 10, 13),
+          up: (down / 20).round(),
+          down: down.round(),
+          active: false,
+          count: 1,
+        ),
+    ],
+  );
 }

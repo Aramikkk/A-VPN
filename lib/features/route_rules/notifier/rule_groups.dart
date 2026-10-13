@@ -239,6 +239,94 @@ const _chinaSites = [
   'trip.com',
 ];
 
+/// Adult sites (18+): always through the VPN, and never shown in the statistics, Connections or Topology.
+/// Matched by name, not by fragments, which hit unrelated sites (Netflix's nflxvideo.net has "xvideo" in it).
+const _adultSites = [
+  'babepedia.com',
+  'beeg.com',
+  'bongacams.com',
+  'brazzers.com',
+  'cam4.com',
+  'camsoda.com',
+  'chaturbate.com',
+  'coomer.su',
+  'danbooru.donmai.us',
+  'e-hentai.org',
+  'e621.net',
+  'eporner.com',
+  'erome.com',
+  'exhentai.org',
+  'f95-zone.to',
+  'f95zone.to',
+  'fansly.com',
+  'fapello.com',
+  'freeones.com',
+  'gelbooru.com',
+  'hclips.com',
+  'hentai-foundry.com',
+  'hitomi.la',
+  'hqporner.com',
+  'imagefap.com',
+  'ixxx.com',
+  'kemono.su',
+  'literotica.com',
+  'livejasmin.com',
+  'manyvids.com',
+  'mmcdn.com',
+  'motherless.com',
+  'multporn.net',
+  'nhentai.com',
+  'nhentai.net',
+  'nude-moon.org',
+  'onlyfans.com',
+  'phncdn.com',
+  'playboy.com',
+  'porn.com',
+  'pornhub.com',
+  'pornhub.org',
+  'pornolab.net',
+  'porntrex.com',
+  'realbooru.com',
+  'reddxxx.com',
+  'redgifs.com',
+  'redtube.com',
+  'rule34.art',
+  'rule34.us',
+  'rule34.xxx',
+  'sex.com',
+  'spankbang.com',
+  'stripchat.com',
+  'sunporno.com',
+  'theporndude.com',
+  'thumbzilla.com',
+  'tnaflix.com',
+  'tube8.com',
+  'txxx.com',
+  'vipergirls.to',
+  'xhamster.com',
+  'xhamsterlive.com',
+  'xhcdn.com',
+  'xnxx-cdn.com',
+  'xnxx-ru.com',
+  'xnxx.com',
+  'xnxx.net',
+  'xnxx.tv',
+  'xnxx3.com',
+  'xvideos-cdn.com',
+  'xvideos.com',
+  'youjizz.com',
+  'youporn.com',
+];
+
+/// Words that mark an adult site safely enough, for the routing rule.
+const adultKeywords = ['porn', 'hentai', 'xxx'];
+
+/// Whether [host] is an adult site, so the statistics leave it out.
+bool isAdultHost(String host) {
+  final h = host.toLowerCase();
+  return _adultSites.any((site) => _under(h, site)) || adultKeywords.any(h.contains);
+}
+
 /// AnyDesk: its remote sessions get cut from Russia without the VPN.
 const _anydeskSites = ['anydesk.com', 'anydesk.net', 'net.anydesk.com'];
 
@@ -291,6 +379,8 @@ const socialApps = [
   'com.facebook.system',
 ];
 
+final adultDomains = _sorted([..._adultSites, ...blockedDomains.where(isAdultHost)]);
+
 final chinaDomains = _sorted([
   ..._chinaSites,
   ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d) && _isChina(d)),
@@ -298,8 +388,8 @@ final chinaDomains = _sorted([
 
 /// Everything else blocked in Russia, the .ru sites in the registry and AnyDesk among it.
 final otherBlockedDomains = _sorted([
-  ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d) && !_isChina(d)),
-  ...rknRuDomains,
+  ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d) && !_isChina(d) && !isAdultHost(d)),
+  ...rknRuDomains.where((d) => !isAdultHost(d)),
   ..._anydeskSites,
 ]);
 

@@ -89,7 +89,7 @@ void main() {
   });
 
   test('each blocked domain is in exactly one group', () {
-    final groups = [aiDomains, googleDomains, socialDomains, chinaDomains, otherBlockedDomains];
+    final groups = [aiDomains, googleDomains, socialDomains, chinaDomains, adultDomains, otherBlockedDomains];
     final all = groups.expand((g) => g).toList();
     expect(all.toSet().length, all.length);
     expect(aiDomains, contains('chatgpt.com'));
@@ -148,5 +148,19 @@ void main() {
     expect(ai[0].packageNames, isEmpty);
     expect(ai[1].domainSuffixes, isEmpty);
     expect(ai[0].listOrder, ai[1].listOrder);
+  });
+
+  test('adult sites go through the VPN and are known as such; Netflix is not one of them', () {
+    expect(route('www.pornhub.com'), 'select');
+    expect(route('onlyfans.com'), 'select');
+    expect(adultDomains, contains('xvideos.com'));
+    expect(adultDomains, isNot(contains('nflxvideo.net')));
+    expect(otherBlockedDomains, contains('nflxvideo.net'));
+    expect(isAdultHost('cdn.xhamster.com'), isTrue);
+    expect(isAdultHost('some-porn-site.example'), isTrue);
+    expect(isAdultHost('nflxvideo.net'), isFalse);
+    expect(isAdultHost('ya.ru'), isFalse);
+    final adult = rules.where((r) => (r['domain_keyword'] as List?)?.contains('porn') ?? false);
+    expect(adult.single['outbound'], 'select');
   });
 }

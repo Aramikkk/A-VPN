@@ -81,11 +81,14 @@ class RoutingOptionsPage extends HookConsumerWidget {
         footer: const _ListFooter(),
         onReorder: ref.read(rulesNotifierProvider.notifier).reorder,
         // Global and Server decide every connection themselves: the list waits, dimmed
-        itemBuilder: (context, index) => Opacity(
-          key: Key('$index'),
-          opacity: overridden ? .45 : 1,
-          child: RuleTile(index: index, rule: rules[index]),
-        ),
+        // the adult sites' rule works without a row: it's never shown, here or in the statistics
+        itemBuilder: (context, index) => BuiltinRule.of(rules[index]) == BuiltinRule.adultProxy
+            ? SizedBox.shrink(key: Key('$index'))
+            : Opacity(
+                key: Key('$index'),
+                opacity: overridden ? .45 : 1,
+                child: RuleTile(index: index, rule: rules[index]),
+              ),
         itemCount: rules.length,
       ),
       floatingActionButton: FloatingActionButton(
@@ -556,53 +559,18 @@ class _ListFooter extends ConsumerWidget {
     final theme = Theme.of(context);
     final routing = t.pages.settings.routing;
     final direct = ref.watch(ConfigOptions.blockedOnlyViaVpn);
-    final overridden = ref.watch(ConfigOptions.globalMode) || ref.watch(ConfigOptions.homeNetwork);
     const divider = Divider(height: 1, indent: 16, endIndent: 16);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Divider(height: 1),
-        Opacity(
-          opacity: overridden ? .45 : 1,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        routing.everythingElse,
-                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    SegmentedButton<bool>(
-                      showSelectedIcon: false,
-                      style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                      segments: [
-                        ButtonSegment(value: false, label: Text(routing.outcomeVpn)),
-                        ButtonSegment(value: true, label: Text(routing.outcomeDirect)),
-                      ],
-                      selected: {direct},
-                      onSelectionChanged: (value) async {
-                        await ref.read(ConfigOptions.blockedOnlyViaVpn.notifier).update(value.first);
-                        // the rules are in the start config: reconnect so they apply now
-                        await ref
-                            .read(connectionNotifierProvider.notifier)
-                            .reconnect(await ref.read(activeProfileProvider.future));
-                      },
-                    ),
-                  ],
-                ),
-                const Gap(6),
-                Text(
-                  direct ? routing.everythingElseDirectHint : routing.everythingElseVpnHint,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-              ],
-            ),
+        // the switch itself is in Settings, next to Routing
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Text(
+            '${routing.everythingElse}: ${direct ? routing.outcomeDirect : routing.outcomeVpn}. ${routing.everythingElseWhere}',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ),
         const Divider(height: 3, thickness: 3),
@@ -731,6 +699,81 @@ class ServersOptionsPage extends ConsumerWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Where everything the rules leave goes: through the VPN, or direct ("only blocked through the VPN"). A
+/// setting of its own on the Settings list.
+class EverythingElseTile extends ConsumerWidget {
+  const EverythingElseTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final routing = t.pages.settings.routing;
+    final direct = ref.watch(ConfigOptions.blockedOnlyViaVpn);
+    final overridden = ref.watch(ConfigOptions.globalMode) || ref.watch(ConfigOptions.homeNetwork);
+    return Material(
+      type: MaterialType.transparency,
+      child: Opacity(
+        opacity: overridden ? .45 : 1,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LayoutBuilder(
+                builder: (context, box) {
+                  final choice = SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                    segments: [
+                      const ButtonSegment(value: false, label: Text('VPN')),
+                      ButtonSegment(value: true, label: Text(routing.outcomeDirect)),
+                    ],
+                    selected: {direct},
+                    onSelectionChanged: (value) async {
+                      await ref.read(ConfigOptions.blockedOnlyViaVpn.notifier).update(value.first);
+                      // the rules are in the start config: reconnect so they apply now
+                      await ref
+                          .read(connectionNotifierProvider.notifier)
+                          .reconnect(await ref.read(activeProfileProvider.future));
+                    },
+                  );
+                  final title = Row(
+                    children: [
+                      Icon(Icons.call_split_rounded, color: theme.colorScheme.primary),
+                      const Gap(16),
+                      Expanded(child: Text(routing.everythingElse, style: theme.textTheme.bodyLarge)),
+                      if (box.maxWidth >= 340) choice,
+                    ],
+                  );
+                  // a narrow screen puts the choice under the name
+                  if (box.maxWidth >= 340) return title;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      title,
+                      const Gap(6),
+                      Padding(padding: const EdgeInsets.only(left: 40), child: choice),
+                    ],
+                  );
+                },
+              ),
+              const Gap(6),
+              Padding(
+                padding: const EdgeInsets.only(left: 40),
+                child: Text(
+                  direct ? routing.everythingElseDirectSettingsHint : routing.everythingElseVpnSettingsHint,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

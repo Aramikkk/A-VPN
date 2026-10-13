@@ -51,34 +51,49 @@ class _StyledHome extends HookConsumerWidget {
             showCheck: editorial,
           ),
           const Gap(6),
-          Expanded(
-            child: profile == null
-                ? _EmptyCard(text: t.avpn.noProfile)
-                : servers.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        t.avpn.connectToSeeServers,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          if (profile != null && servers.isNotEmpty) ...[
+            // four rows in sight (Auto and three countries), the rest a scroll away
+            SizedBox(
+              height: (servers.length < 4 ? servers.length : 4) * (editorial ? 66.0 : 62.0),
+              child: _StyledServerList(
+                editorial: editorial,
+                servers: servers,
+                selectedTag: group?.selected,
+                autoNow: autoNow,
+                testing: testing,
+              ),
+            ),
+            const Gap(12),
+            // where the traffic went, under the servers (as on the Topology tab)
+            Expanded(child: _HomeTraffic(editorial: editorial)),
+          ] else
+            Expanded(
+              child: profile == null
+                  ? _EmptyCard(text: t.avpn.noProfile)
+                  : Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          t.avpn.connectToSeeServers,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
                       ),
                     ),
-                  )
-                : _StyledServerList(
-                    editorial: editorial,
-                    servers: servers,
-                    selectedTag: group?.selected,
-                    autoNow: autoNow,
-                    testing: testing,
-                  ),
-          ),
+            ),
           const Gap(6),
           _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
           if (editorial)
             _EditorialDock(status: status)
           else
-            _GraphiteDock(status: status, server: connected ? currentName : null, testing: testing, onCheck: onCheck),
+            _GraphiteDock(
+              status: status,
+              server: connected ? currentName : null,
+              testing: testing,
+              onCheck: onCheck,
+              // only a very tall screen has room to spare for a bigger connect panel; the strip map needs it first
+              large: MediaQuery.sizeOf(context).height >= 1000,
+            ),
         ],
       ),
     );
@@ -148,32 +163,72 @@ class _StatusBlock extends HookConsumerWidget {
       );
     }
     final big = theme.textTheme.titleMedium?.copyWith(
-      fontSize: 18,
+      fontSize: 15,
       fontWeight: FontWeight.w800,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     Widget item(IconData icon, String text, {Color? colour}) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AraIconPaint(child: Icon(icon, size: 18, color: colour ?? scheme.onSurfaceVariant)),
-        const Gap(4),
+        AraIconPaint(child: Icon(icon, size: 15, color: colour ?? scheme.onSurfaceVariant)),
+        const Gap(3),
         Text(text, style: big?.copyWith(color: colour)),
       ],
     );
+    // what moved this session, through the VPN and direct
+    final session = ref.watch(sessionTotalsProvider);
+    final vpn = (session.vpnUp ?? 0) + (session.vpnDown ?? 0);
+    final direct = (session.up + session.down - vpn).clamp(0, 1 << 62);
+    final small = theme.textTheme.labelMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    final accent = theme.araLook.neonFill ?? scheme.primary;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Row(
-          children: [
-            item(Icons.schedule_rounded, time, colour: scheme.primary),
-            const Gap(18),
-            item(Icons.south_rounded, down),
-            const Gap(14),
-            item(Icons.north_rounded, up),
-          ],
-        ),
+      child: Row(
+        children: [
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  item(Icons.schedule_rounded, time, colour: scheme.primary),
+                  const Gap(12),
+                  item(Icons.south_rounded, down),
+                  const Gap(10),
+                  item(Icons.north_rounded, up),
+                ],
+              ),
+            ),
+          ),
+          const Gap(10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.shield_rounded, size: 12, color: AraLook.readableOn(accent, scheme.surface)),
+                  const Gap(3),
+                  Text('VPN ${formatBytes(vpn, units)}', style: small),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.alt_route_rounded, size: 12, color: scheme.onSurfaceVariant),
+                  const Gap(3),
+                  Text(
+                    '${t.avpn.statsDirect} ${formatBytes(direct, units)}',
+                    style: small?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -643,7 +698,15 @@ Future<void> _toggleConnection(WidgetRef ref) async {
 
 /// Graphite's connect panel: the glowing ring button, the state and server, and a pill button.
 class _GraphiteDock extends ConsumerWidget {
-  const _GraphiteDock({required this.status, required this.server, required this.testing, required this.onCheck});
+  const _GraphiteDock({
+    required this.status,
+    required this.server,
+    required this.testing,
+    required this.onCheck,
+    this.large = false,
+  });
+
+  final bool large;
 
   final ConnectionStatus status;
   final String? server;
@@ -666,10 +729,10 @@ class _GraphiteDock extends ConsumerWidget {
     };
     return Container(
       margin: const EdgeInsets.fromLTRB(0, 6, 0, 12),
-      padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+      padding: large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow.withValues(alpha: dark ? .85 : 1),
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(large ? 40 : 32),
         border: Border.all(color: scheme.outlineVariant),
         boxShadow: dark
             ? null
@@ -677,7 +740,7 @@ class _GraphiteDock extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          _Orb(on: on, busy: busy, onTap: busy ? null : () => _toggleConnection(ref)),
+          _Orb(on: on, busy: busy, size: large ? 92 : 74, onTap: busy ? null : () => _toggleConnection(ref)),
           const Gap(14),
           Expanded(
             child: Column(
@@ -687,13 +750,14 @@ class _GraphiteDock extends ConsumerWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  // ON / OFF are short: the larger size fits either way
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 Text(
                   server ?? t.avpn.stNotProtected,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: (large ? theme.textTheme.bodyMedium : theme.textTheme.bodySmall)?.copyWith(
                     color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
@@ -708,8 +772,10 @@ class _GraphiteDock extends ConsumerWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: on ? scheme.surfaceContainerHighest : scheme.primary,
                 foregroundColor: on ? scheme.onSurface : scheme.onPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 14),
+                padding: large
+                    ? const EdgeInsets.symmetric(horizontal: 14, vertical: 18)
+                    : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: large ? 15 : 14),
               ),
               onPressed: busy || (on && testing) ? null : (on ? onCheck : () => _toggleConnection(ref)),
               icon: on && testing
@@ -734,7 +800,9 @@ class _GraphiteDock extends ConsumerWidget {
 /// The round button: a dark (or white) sphere with a ring in the accent that glows while connected and turns
 /// while connecting.
 class _Orb extends HookWidget {
-  const _Orb({required this.on, required this.busy, this.onTap});
+  const _Orb({required this.on, required this.busy, this.onTap, this.size = 74});
+
+  final double size;
 
   final bool on;
   final bool busy;
@@ -759,8 +827,8 @@ class _Orb extends HookWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: 74,
-        height: 74,
+        width: size,
+        height: size,
         child: AnimatedBuilder(
           animation: spin,
           builder: (context, _) => CustomPaint(
@@ -773,7 +841,7 @@ class _Orb extends HookWidget {
               rotation: spin.value,
             ),
             child: Padding(
-              padding: const EdgeInsets.all(7),
+              padding: EdgeInsets.all(size * .095),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -784,7 +852,7 @@ class _Orb extends HookWidget {
                 child: Center(
                   child: Icon(
                     Icons.power_settings_new_rounded,
-                    size: 30,
+                    size: size * .4,
                     // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
                     // it goes black there, as the chosen server's text does
                     color: on
@@ -919,3 +987,50 @@ class _EditorialDock extends ConsumerWidget {
 /// The accent where it sits on ink (the chosen row, the switch's knob): itself when it reads there, else paper.
 Color _onInk(ColorScheme scheme) =>
     AraLook.contrast(scheme.primary, scheme.onSurface) >= 2.6 ? scheme.primary : scheme.surface;
+
+/// The home screen's strip map: where today's traffic went, the apps under a megabyte left out.
+class _HomeTraffic extends ConsumerWidget {
+  const _HomeTraffic({required this.editorial});
+
+  final bool editorial;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final units = t.avpn.bytesUnits.split(',');
+    // followed only while the home screen is in sight
+    final visible = TickerMode.of(context);
+    final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
+    final big = {
+      for (final g in groupConnections(state.items, (c) => c.app))
+        if (g.total >= smallTraffic) g.key,
+    };
+    final items = state.items.where((c) => big.contains(c.app)).toList();
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            t.avpn.topoFlow.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              color: scheme.onSurface,
+            ),
+          ),
+          const Gap(8),
+          TrafficStrips(
+            items: items,
+            weight: (c) => c.total.toDouble(),
+            value: (w) => formatBytes(w.round(), units),
+            compact: true,
+          ),
+        ],
+      ),
+    );
+  }
+}

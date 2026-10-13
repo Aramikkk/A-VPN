@@ -115,8 +115,8 @@
     "stPingMs": "пинг, ms",
     "stUpdateSub": "Обновить подписку",
     "stNow": "сейчас",
-    "stOn": "Включён",
-    "stOffShort": "Выключен",
+    "stOn": "ON",
+    "stOffShort": "OFF",
     "stTapToConnect": "нажмите, чтобы подключить",
     "stConnect": "Подключить",
     "stDisconnect": "Отключить",
@@ -194,7 +194,9 @@
     "statsSpeedNow": "Скорость сейчас",
     "statsTrafficFor": "Трафик за $period",
     "statsSpeedFor": "Скорость за $period",
-    "periodAllTime": "всё время"
+    "periodAllTime": "всё время",
+    "serversAll": "Все серверы · $n",
+    "serversCollapse": "Свернуть"
   },
   "common": {
     "appTitle": "A-VPN",
@@ -562,7 +564,9 @@
           "ruAppsDirect": "Российские приложения",
           "ruAppsDirectHint": "Яндекс, банки, Госуслуги, Авито, Ozon, Wildberries, VK, MAX",
           "chinaProxy": "Китайские сервисы",
-          "chinaProxyHint": "Сайты .cn, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…"
+          "chinaProxyHint": "Сайты .cn, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…",
+          "adultProxy": "Сайты 18+",
+          "adultProxyHint": "Всегда через VPN; в статистике, «Соединениях» и «Топологии» не показываются"
         },
         "appBasedRouting": {
           "title": "Маршрутизация по приложениям",
@@ -689,7 +693,10 @@
         "everythingElseDirectHint": "Через VPN — только группы выше, остальное на полной скорости напрямую. На телефоне так только в Wi-Fi: на мобильном интернете всё идёт через VPN из-за белых списков операторов.",
         "globalOn": "Включено «Глобально»: весь трафик идёт через VPN, правила ниже не действуют (кроме локальной сети и QUIC).",
         "serverOn": "Включён «Сервер»: домашняя сеть через ваш WireGuard, остальное напрямую. Правила ниже не действуют.",
-        "advanced": "Дополнительно"
+        "advanced": "Дополнительно",
+        "everythingElseWhere": "Переключается в Настройках, строка «Всё остальное».",
+        "everythingElseVpnSettingsHint": "Всё, чего нет в правилах маршрутизации, идёт через VPN.",
+        "everythingElseDirectSettingsHint": "Через VPN — только то, что в правилах маршрутизации (заблокированное, Google, ИИ, соцсети…), остальное напрямую на полной скорости. На телефоне так только в Wi-Fi: на мобильном интернете всё идёт через VPN из-за белых списков операторов."
       },
       "dns": {
         "title": "DNS",

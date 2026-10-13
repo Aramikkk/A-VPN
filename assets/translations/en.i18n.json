@@ -115,8 +115,8 @@
     "stPingMs": "ping, ms",
     "stUpdateSub": "Update the subscription",
     "stNow": "now",
-    "stOn": "On",
-    "stOffShort": "Off",
+    "stOn": "ON",
+    "stOffShort": "OFF",
     "stTapToConnect": "tap to connect",
     "stConnect": "Connect",
     "stDisconnect": "Disconnect",
@@ -194,7 +194,9 @@
     "statsSpeedNow": "Speed now",
     "statsTrafficFor": "Traffic in $period",
     "statsSpeedFor": "Speed over $period",
-    "periodAllTime": "all time"
+    "periodAllTime": "all time",
+    "serversAll": "All servers · $n",
+    "serversCollapse": "Show less"
   },
   "common": {
     "appTitle": "A-VPN",
@@ -556,7 +558,9 @@
           "ruAppsDirect": "Russian apps",
           "ruAppsDirectHint": "Yandex, banks, Gosuslugi, Avito, Ozon, Wildberries, VK, MAX",
           "chinaProxy": "Chinese services",
-          "chinaProxyHint": ".cn sites, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…"
+          "chinaProxyHint": ".cn sites, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…",
+          "adultProxy": "Adult sites (18+)",
+          "adultProxyHint": "Always through the VPN; never shown in the statistics, Connections or Topology"
         },
         "appBasedRouting": {
           "title": "App-based routing",
@@ -669,7 +673,10 @@
         "everythingElseDirectHint": "Only the groups above take the VPN, the rest goes direct at full speed. A phone does this on Wi-Fi only: on mobile data everything goes through the VPN because of the operators' whitelists.",
         "globalOn": "\"Global\" is on: all traffic goes through the VPN, the rules below don't apply (except the local network and QUIC).",
         "serverOn": "\"Server\" is on: the home network through your WireGuard, the rest direct. The rules below don't apply.",
-        "advanced": "Advanced"
+        "advanced": "Advanced",
+        "everythingElseWhere": "Switched in Settings, the \"Everything else\" row.",
+        "everythingElseVpnSettingsHint": "Whatever the routing rules don't cover goes through the VPN.",
+        "everythingElseDirectSettingsHint": "Only what the routing rules send (blocked sites, Google, AI, social networks…) takes the VPN, the rest goes direct at full speed. A phone does this on Wi-Fi only: on mobile data everything goes through the VPN because of the operators' whitelists."
       },
       "dns": {
         "title": "DNS",

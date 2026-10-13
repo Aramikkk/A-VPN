@@ -290,6 +290,22 @@ void main() {
                                   ? const SizedBox()
                                   : screen.page(),
                             ),
+                            // the settings' sections by name, as blank pages: the settings list links to them
+                            routes: [
+                              for (final name in const [
+                                'profiles',
+                                'general',
+                                'connectionOptions',
+                                'themes',
+                                'routingOptions',
+                                'serversOptions',
+                                'dnsOptions',
+                                'inboundOptions',
+                                'logs',
+                                'about',
+                              ])
+                                GoRoute(name: name, path: name, builder: (_, _) => const SizedBox()),
+                            ],
                           ),
                         ],
                       ),
