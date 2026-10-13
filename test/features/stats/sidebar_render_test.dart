@@ -168,41 +168,44 @@ void main() {
     }
   });
 
-  testWidgets('the Statistics tab fits the unfolded phone in two columns', (tester) async {
-    await _loadFont('Segoe UI', [
-      r'C:/Windows/Fonts/segoeui.ttf',
-      r'C:/Windows/Fonts/seguisb.ttf',
-      r'C:/Windows/Fonts/segoeuib.ttf',
-    ]);
-    final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
-    final theme = AppTheme(
-      AppThemeMode.light,
-      '',
-      accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed'),
-      style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
-    );
-    await tester.binding.setSurfaceSize(const Size(880, 820));
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          translationsProvider.overrideWith((ref) async => t),
-          statsNotifierProvider.overrideWith(_Stats.new),
-          connectionQualityProvider.overrideWith(_Quality.new),
-          speedHistoryProvider.overrideWith(_History.new),
-        ],
-        child: MaterialApp(
-          theme: theme.lightTheme(null),
-          home: Consumer(
-            builder: (context, ref, _) =>
-                !ref.watch(translationsProvider).hasValue ? const SizedBox() : const SpeedPage(),
+  // the screen less the status bar and the bottom navigation: the unfolded Fold 7 in two columns, the folded one
+  // in one; neither scrolls
+  for (final (name, size) in [('unfolded', Size(750, 720)), ('folded', Size(411, 850))])
+    testWidgets('the Statistics tab fits the $name phone with no scroll', (tester) async {
+      await _loadFont('Segoe UI', [
+        r'C:/Windows/Fonts/segoeui.ttf',
+        r'C:/Windows/Fonts/seguisb.ttf',
+        r'C:/Windows/Fonts/segoeuib.ttf',
+      ]);
+      final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
+      final theme = AppTheme(
+        AppThemeMode.light,
+        '',
+        accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed'),
+        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
+      );
+      await tester.binding.setSurfaceSize(size);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            translationsProvider.overrideWith((ref) async => t),
+            statsNotifierProvider.overrideWith(_Stats.new),
+            connectionQualityProvider.overrideWith(_Quality.new),
+            speedHistoryProvider.overrideWith(_History.new),
+          ],
+          child: MaterialApp(
+            theme: theme.lightTheme(null),
+            home: Consumer(
+              builder: (context, ref, _) =>
+                  !ref.watch(translationsProvider).hasValue ? const SizedBox() : const SpeedPage(),
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byType(Scrollable), findsOneWidget); // one scroll for the page: both columns move together
-    if (Platform.environment['RENDER'] == '1') {
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/speed_unfolded.png'));
-    }
-  });
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(Scrollable), findsNothing);
+      if (Platform.environment['RENDER'] == '1') {
+        await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/speed_$name.png'));
+      }
+    });
 }

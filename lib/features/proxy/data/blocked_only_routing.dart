@@ -32,15 +32,17 @@ abstract class BlockedOnlyRouting {
     },
   ];
 
-  /// A rule of the list as a sing-box route rule; null when it has nothing this mode can match on (a rule-set
-  /// needs its download set up, which only the normal mode does: blocking ads works there only).
+  /// A rule of the list as a sing-box route rule; null when it has nothing this mode can match on. Its rule-sets
+  /// are named by the core's tags (the file's name without .srs): the core sets up their download for the
+  /// same list, so blocking ads works here too. One with a region in its address is left out.
   static Map<String, dynamic>? ruleJson(Rule rule) {
-    if (rule.ruleSets.isNotEmpty) return null;
+    if (rule.ruleSets.any((url) => url.contains('{region}'))) return null;
     final json = <String, dynamic>{};
     void put(String key, Iterable<Object> values) {
       if (values.isNotEmpty) json[key] = values.toList();
     }
 
+    put('rule_set', rule.ruleSets.map(ruleSetTag));
     put('domain', rule.domains);
     put('domain_suffix', rule.domainSuffixes);
     put('domain_keyword', rule.domainKeywords);
@@ -76,6 +78,12 @@ abstract class BlockedOnlyRouting {
       Outbound.proxy => {...json, 'action': 'route', 'outbound': _proxyTag},
       _ => {...json, 'action': 'route', 'outbound': _directTag},
     };
+  }
+
+  /// The core's tag for a rule-set at [url]: the file's name without its extension.
+  static String ruleSetTag(String url) {
+    final name = url.trim().split('?').first.split('#').first.split('/').last;
+    return name.endsWith('.srs') || name.endsWith('.json') ? name.substring(0, name.lastIndexOf('.')) : name;
   }
 
   /// Writes the config at [path] with the rules added, next to [activeConfigPath], and returns its path;

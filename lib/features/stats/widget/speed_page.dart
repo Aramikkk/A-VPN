@@ -12,11 +12,21 @@ class SpeedPage extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.speedTab)),
-      // on a wide window the panel stays a readable width
-      // a wide screen (the unfolded phone) shows it all at once in two columns; otherwise one column that scrolls
+      // it all at once, no scroll: two columns on a wide screen (the unfolded phone), otherwise one column whose
+      // graph takes the height the rest leaves; a short window (landscape) still scrolls
       body: LayoutBuilder(
         builder: (context, constraints) => constraints.maxWidth >= 640 && constraints.maxHeight >= 480
             ? const SideBarStatsOverview(large: true, split: true)
+            : constraints.maxHeight >= 600
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: SideBarStatsOverview(large: true, fill: true),
+                  ),
+                ),
+              )
             : SingleChildScrollView(
                 child: Center(
                   child: ConstrainedBox(

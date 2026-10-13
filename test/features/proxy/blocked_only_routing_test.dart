@@ -41,8 +41,18 @@ void main() {
       'action': 'route',
       'outbound': 'direct §hide§',
     });
-    // ads are a rule-set, which this mode can't load
-    expect(rules.where((r) => r.containsKey('rule_set')), isEmpty);
+    // ads are rule-sets, named by the core's tags (it sets up their download)
+    expect(rules[3], {
+      'rule_set': [
+        'geosite-category-ads-all',
+        'geosite-malware',
+        'geosite-phishing',
+        'geosite-cryptominers',
+        'geoip-malware',
+        'geoip-phishing',
+      ],
+      'action': 'reject',
+    });
   });
 
   test('AI, Google, social networks and blocked sites through the VPN; Russian ones direct', () {
@@ -138,7 +148,12 @@ void main() {
       'port_range': ['1000:2000'],
       'action': 'reject',
     });
-    expect(withUser.length, rules.length + 1); // two added, the ping host's rule not there
+    expect(withUser[2], {
+      'rule_set': ['x'],
+      'action': 'route',
+      'outbound': 'select',
+    });
+    expect(withUser.length, rules.length + 2); // three added, the ping host's rule not there
   });
 
   test('the core gets a group as two rules in the group place', () {

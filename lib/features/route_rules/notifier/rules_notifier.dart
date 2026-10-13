@@ -23,24 +23,24 @@ const _geoUrl = 'https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set'
 /// Rules the app ships with, in the order a new list starts with. They are always in the list: the user can
 /// only switch and move them, and their content comes from here, so an update can change it.
 ///
-/// The order is the routing in brief: the local network direct, QUIC (and ads) blocked, then the groups that
-/// always take the VPN (even on Russian domains, so they come first), then Russian sites and apps direct.
+/// The order is the routing in brief: the local network direct, QUIC and ads blocked, then the groups that
+/// always take the VPN (even on Russian domains, so they come first), then Russian apps and sites direct.
 /// Whatever is left goes by the mode: through the VPN, or direct with "only blocked through the VPN".
 enum BuiltinRule {
   bypassLan(enabledByDefault: true),
   // QUIC (HTTP/3 over UDP) crawls through a TCP tunnel and is often throttled in Russia; blocking it makes apps
   // fall back to TCP at once instead of after a timeout
   blockQuic(enabledByDefault: true),
-  blockAds(enabledByDefault: false),
+  blockAds(enabledByDefault: true),
   aiProxy(enabledByDefault: true),
   googleProxy(enabledByDefault: true),
   socialProxy(enabledByDefault: true),
   chinaProxy(enabledByDefault: true),
   adultProxy(enabledByDefault: true),
   blockedProxy(enabledByDefault: true),
-  ruDomainsDirect(enabledByDefault: true),
   // Russian apps on the phone (Yandex Music, banks, Gosuslugi…) direct, whatever servers they use
-  ruAppsDirect(enabledByDefault: true);
+  ruAppsDirect(enabledByDefault: true),
+  ruDomainsDirect(enabledByDefault: true);
 
   const BuiltinRule({required this.enabledByDefault});
 

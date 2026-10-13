@@ -546,7 +546,7 @@
           "blockQuic": "QUIC (HTTP/3)",
           "blockQuicHint": "Apps switch to TCP at once, which is faster through the VPN",
           "blockAds": "Ads and harmful sites",
-          "blockAdsHint": "Works when everything else goes through the VPN",
+          "blockAdsHint": "Ads, malware, phishing, hidden miners",
           "aiProxy": "AI",
           "aiProxyHint": "ChatGPT, Claude, Gemini, NotebookLM, Perplexity, Grok, DeepSeek, Copilot, Cursor… — sites and apps",
           "googleProxy": "Google and YouTube",

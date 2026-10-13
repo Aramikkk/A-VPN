@@ -552,7 +552,7 @@
           "blockQuic": "QUIC (HTTP/3)",
           "blockQuicHint": "Приложения сразу переходят на TCP — через VPN так быстрее",
           "blockAds": "Реклама и вредные сайты",
-          "blockAdsHint": "Работает, когда всё остальное идёт через VPN",
+          "blockAdsHint": "Реклама, вирусы, фишинг, скрытые майнеры",
           "aiProxy": "ИИ",
           "aiProxyHint": "ChatGPT, Claude, Gemini, NotebookLM, Perplexity, Grok, DeepSeek, Copilot, Cursor… — сайты и приложения",
           "googleProxy": "Google и YouTube",

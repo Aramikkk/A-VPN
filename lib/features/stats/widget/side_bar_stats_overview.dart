@@ -253,39 +253,30 @@ class SideBarStatsOverview extends ConsumerWidget {
     );
 
     if (split) {
-      // both columns end on the same line: the speed block is as tall as the cards beside it, its graph taking
-      // what the header leaves (the page scrolls when the screen is shorter)
-      return LayoutBuilder(
-        builder: (context, box) => SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: ConstrainedBox(
-            // at least the screen's height: the graph and the ping bars grow into it
-            constraints: BoxConstraints(minHeight: box.maxHeight.isFinite ? box.maxHeight - 24 : 0),
-            child: IntrinsicHeight(
-              child: Row(
+      // both columns end on the same line, filling the screen with no scroll: the graph and the ping bars take
+      // what the rest leaves
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: speedBlock),
+            const Gap(12),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: speedBlock),
-                  const Gap(12),
                   Expanded(
-                    flex: 1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: _QualityCard(samples: quality, range: range, fill: true),
-                        ),
-                        const Gap(10),
-                        sessionPair,
-                        const Gap(10),
-                        _pair(vpnTile, directTile),
-                      ],
-                    ),
+                    child: _QualityCard(samples: quality, range: range, fill: true),
                   ),
+                  const Gap(10),
+                  sessionPair,
+                  const Gap(10),
+                  _pair(vpnTile, directTile),
                 ],
               ),
             ),
-          ),
+          ],
         ),
       );
     }
