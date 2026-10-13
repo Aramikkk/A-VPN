@@ -95,11 +95,6 @@ class TrafficPanel extends ConsumerWidget {
       ),
     );
 
-    if (groups.isEmpty) {
-      return Center(
-        child: Text(t.avpn.connEmpty, style: TextStyle(color: scheme.onSurfaceVariant)),
-      );
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -111,103 +106,124 @@ class TrafficPanel extends ConsumerWidget {
           ],
         ),
         const Gap(14),
-        _glassCard(
-          context,
-          TrafficStrips(
-            items: items,
-            weight: (c) => c.total.toDouble(),
-            value: (w) => size(w),
-            compact: true,
-            barHeight: 54,
-            headers: false,
-            directLabel: t.avpn.homeBypass,
-          ),
-        ),
-        const Gap(14),
-        // every app with where it went, filling the rest of the half
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: scheme.outlineVariant),
+        // nothing over a megabyte yet: the totals stay on top and the message sits in the list's card, the panel
+        // keeping its shape
+        if (groups.isEmpty)
+          Expanded(
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Text(
+                current.isEmpty ? t.avpn.connEmpty : t.avpn.homeTrafficSmall,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              itemCount: groups.length,
-              separatorBuilder: (_, _) => Divider(height: 1, indent: 52, color: scheme.outlineVariant),
-              itemBuilder: (context, i) {
-                final g = groups[i];
-                final name = connectionAppName(t, apps, g.key);
-                final colour = g.mainRoute == ConnectionRoute.vpn
-                    ? accent
-                    : (g.mainRoute == ConnectionRoute.block ? scheme.error : const Color(0xFF9AA0A6));
-                final route = switch (g.mainRoute) {
-                  ConnectionRoute.vpn => g.servers.isEmpty ? 'VPN' : 'VPN · ${serverFlags(g.servers)}',
-                  ConnectionRoute.direct => t.avpn.homeBypass,
-                  ConnectionRoute.block => t.avpn.connBlocked,
-                };
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
-                  child: Row(
-                    children: [
-                      ConnectionAppIcon(icon: apps[g.key]?.icon, name: name, size: 28),
-                      const Gap(12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                                Text(
-                                  size(g.total),
-                                  style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                              ],
-                            ),
-                            const Gap(2),
-                            Row(
-                              children: [
-                                Text(
-                                  route,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: AraLook.readableOn(colour, scheme.surfaceContainerLow),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const Gap(8),
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(2),
-                                    child: LinearProgressIndicator(
-                                      value: listed == 0 ? 0 : (g.total / listed).clamp(.02, 1.0),
-                                      minHeight: 3,
-                                      color: colour,
-                                      backgroundColor: scheme.outlineVariant.withValues(alpha: .3),
+          )
+        else ...[
+          _glassCard(
+            context,
+            TrafficStrips(
+              items: items,
+              weight: (c) => c.total.toDouble(),
+              value: (w) => size(w),
+              compact: true,
+              barHeight: 54,
+              headers: false,
+              directLabel: t.avpn.homeBypass,
+            ),
+          ),
+          const Gap(14),
+          // every app with where it went, filling the rest of the half
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                itemCount: groups.length,
+                separatorBuilder: (_, _) => Divider(height: 1, indent: 52, color: scheme.outlineVariant),
+                itemBuilder: (context, i) {
+                  final g = groups[i];
+                  final name = connectionAppName(t, apps, g.key);
+                  final colour = g.mainRoute == ConnectionRoute.vpn
+                      ? accent
+                      : (g.mainRoute == ConnectionRoute.block ? scheme.error : const Color(0xFF9AA0A6));
+                  final route = switch (g.mainRoute) {
+                    ConnectionRoute.vpn => g.servers.isEmpty ? 'VPN' : 'VPN · ${serverFlags(g.servers)}',
+                    ConnectionRoute.direct => t.avpn.homeBypass,
+                    ConnectionRoute.block => t.avpn.connBlocked,
+                  };
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
+                    child: Row(
+                      children: [
+                        ConnectionAppIcon(icon: apps[g.key]?.icon, name: name, size: 28),
+                        const Gap(12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                  Text(
+                                    size(g.total),
+                                    style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                              const Gap(2),
+                              Row(
+                                children: [
+                                  Text(
+                                    route,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: AraLook.readableOn(colour, scheme.surfaceContainerLow),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const Gap(8),
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(2),
+                                      child: LinearProgressIndicator(
+                                        value: listed == 0 ? 0 : (g.total / listed).clamp(.02, 1.0),
+                                        minHeight: 3,
+                                        color: colour,
+                                        backgroundColor: scheme.outlineVariant.withValues(alpha: .3),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }

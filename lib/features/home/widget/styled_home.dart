@@ -1102,7 +1102,9 @@ class _HomeTraffic extends ConsumerWidget {
         child: items.isEmpty
             ? Center(
                 child: Text(
-                  t.avpn.connEmpty,
+                  // traffic this session, all of it from apps under a megabyte (they're left out)
+                  current.isEmpty ? t.avpn.connEmpty : t.avpn.homeTrafficSmall,
+                  textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               )

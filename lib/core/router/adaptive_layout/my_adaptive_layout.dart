@@ -152,6 +152,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                         child: GlassPane(
                           look: glass,
                           radius: 34,
+                          // room inside the pane's ends, so the first and the last tab's pill sit as far from its
+                          // edge as the pills are from each other
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           // icons only, the chosen tab on a pill of the scheme's colour, as in the preview; its icon in the
                           // text's colour, readable on the pill
                           child: NavigationBarTheme(

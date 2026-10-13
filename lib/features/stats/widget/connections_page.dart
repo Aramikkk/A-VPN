@@ -531,7 +531,21 @@ class _InnerRow extends ConsumerWidget {
 /// null for the default route ("final").
 ///
 /// The app's own rules read by name: the blocked-sites list, the Russian sites and the Russian apps.
+///
+/// Worked out once per rule: there are a few dozen of them and thousands of connections, and each label took a
+/// dozen regular expressions (the Topology tab lost frames redoing them on every update).
 String? ruleLabel(String rule, Translations t) {
+  if (!identical(_ruleLabelsIn, t)) {
+    _ruleLabels.clear();
+    _ruleLabelsIn = t;
+  }
+  return _ruleLabels.putIfAbsent(rule, () => _ruleLabel(rule, t));
+}
+
+final _ruleLabels = <String, String?>{};
+Translations? _ruleLabelsIn;
+
+String? _ruleLabel(String rule, Translations t) {
   final match = rule.split('=>').first.trim();
   if (match.isEmpty || match == 'final') return null;
   // the built-in groups, by their lists' first entries (the core prints a long list as its first few)

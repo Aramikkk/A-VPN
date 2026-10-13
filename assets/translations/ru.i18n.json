@@ -39,6 +39,7 @@
     "statsViaVpn": "Через VPN",
     "statsDirect": "Напрямую",
     "homeBypass": "Обход",
+    "homeTrafficSmall": "Трафик за сессию пока меньше 1 МБ на приложение",
     "statsDownload": "Загрузка",
     "statsUpload": "Отдача",
     "bytesUnits": "Б,КБ,МБ,ГБ,ТБ",

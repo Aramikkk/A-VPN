@@ -39,6 +39,7 @@
     "statsViaVpn": "Through VPN",
     "statsDirect": "Direct",
     "homeBypass": "Bypass",
+    "homeTrafficSmall": "This session’s traffic is under 1 MB per app so far",
     "statsDownload": "Download",
     "statsUpload": "Upload",
     "bytesUnits": "B,KB,MB,GB,TB",
