@@ -67,8 +67,12 @@ class _StyledHome extends HookConsumerWidget {
     // one gap between every block, folded and unfolded: the session line, the servers, the traffic, the toggles, the
     // connect panel, and under it the same gap again (the panel stands clear of the menu)
     const gap = Gap(16);
+    // the unfolded phone (the traffic in its own column) has room to spare under the servers: it goes in equal
+    // shares to the three gaps under them, servers to toggles, toggles to the connect panel, the panel to the menu
+    final spread = !traffic && profile != null && servers.isNotEmpty;
+    Widget share() => spread ? const Spacer() : const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 2, 18, 16),
+      padding: EdgeInsets.fromLTRB(18, 2, 18, spread ? 0 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -96,7 +100,7 @@ class _StyledHome extends HookConsumerWidget {
             gap,
             // where the traffic went, under the servers (as on the Topology tab): always the same place and size,
             // all the room between the servers and the toggles; the unfolded phone has it in a column of its own
-            if (traffic) Expanded(child: _HomeTraffic(editorial: editorial)) else const Spacer(),
+            if (traffic) Expanded(child: _HomeTraffic(editorial: editorial)) else share(),
           ] else ...[
             Gap(roomy ? 20 : 14),
             header,
@@ -116,10 +120,13 @@ class _StyledHome extends HookConsumerWidget {
                     ),
             ),
           ],
-          gap,
+          // (spread: the gap under the servers is already there, before their share)
+          if (!spread) gap,
           _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
+          share(),
           gap,
           dock,
+          if (spread) ...[share(), gap],
         ],
       ),
     );

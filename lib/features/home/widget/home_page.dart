@@ -80,7 +80,7 @@ class HomePage extends HookConsumerWidget {
             // the right column mirrors the left one: a heading like "Current provider", the same outer margin, and
             // the panel stretched to end level with the connection card (when the screen is tall enough for it)
             final heading = Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
               child: Text(
                 t.avpn.trafficThisSession.toUpperCase(),
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 1.2),
@@ -95,7 +95,8 @@ class HomePage extends HookConsumerWidget {
                 Expanded(
                   flex: 9,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 4, 16, 16),
+                    // level with the left column: its top on the session line's, its foot on the connect panel's
+                    padding: const EdgeInsets.fromLTRB(0, 2, 18, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [

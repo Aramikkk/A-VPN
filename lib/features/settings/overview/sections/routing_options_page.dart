@@ -47,6 +47,12 @@ class RoutingOptionsPage extends HookConsumerWidget {
         title: Text(t.pages.settings.routing.title),
         actions: [
           const _RegionChip(),
+          // a new rule from the title bar: a floating button covered the switch of the row under it
+          IconButton(
+            tooltip: t.pages.settings.routing.routeRule.add,
+            onPressed: () => context.goNamed('rule', pathParameters: {'orderId': 'new'}),
+            icon: const Icon(Icons.add_rounded),
+          ),
           PopupMenuButton(
             icon: const Icon(Icons.more_vert_rounded),
             itemBuilder: (_) {
@@ -68,7 +74,7 @@ class RoutingOptionsPage extends HookConsumerWidget {
       ),
       // the built-in rules are always there, so the list is never empty
       body: ReorderableListView.builder(
-        padding: const EdgeInsets.only(bottom: 56 + 16 + 16),
+        padding: const EdgeInsets.only(bottom: 16),
         buildDefaultDragHandles: false,
         header: Column(
           mainAxisSize: MainAxisSize.min,
@@ -90,11 +96,6 @@ class RoutingOptionsPage extends HookConsumerWidget {
                 child: RuleTile(index: index, rule: rules[index]),
               ),
         itemCount: rules.length,
-      ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: t.pages.settings.routing.routeRule.add,
-        onPressed: () => context.goNamed('rule', pathParameters: {'orderId': 'new'}),
-        child: const Icon(Icons.add_rounded),
       ),
     );
   }
