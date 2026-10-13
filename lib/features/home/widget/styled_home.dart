@@ -1090,7 +1090,7 @@ class _HomeTraffic extends ConsumerWidget {
     // Glass: the strips on a pane of glass, as the rows above them
     final glass = theme.araLook.glass;
     if (glass == null) return strips;
-    // the card always fills its place (the strips at its top), empty or not
+    // the card always fills its place, empty or not
     return DecoratedBox(
       decoration: BoxDecoration(
         color: glass.panel,
@@ -1106,7 +1106,8 @@ class _HomeTraffic extends ConsumerWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               )
-            : strips,
+            // in the middle of the card when they take less room than it has; cut at its foot when more
+            : Center(child: strips),
       ),
     );
   }

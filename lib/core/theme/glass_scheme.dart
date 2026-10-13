@@ -43,6 +43,56 @@ enum GlassScheme {
     Color(0xFFFFE27A),
     Color(0xFFFF8A80),
   ]),
+  citrus(GlassVariant.liquid, Color(0xFFFF8A00), Color(0xFFF8F2EA), [
+    Color(0xFFFFB347),
+    Color(0xFFFFE66D),
+    Color(0xFF7BE0AD),
+  ]),
+  bubblegum(GlassVariant.liquid, Color(0xFFFF4FB8), Color(0xFFF9EFF5), [
+    Color(0xFFFF9ED8),
+    Color(0xFF9EC8FF),
+    Color(0xFFFFE29A),
+  ]),
+  sky(GlassVariant.liquid, Color(0xFF2E9BFF), Color(0xFFEEF4FA), [
+    Color(0xFF7CC4FF),
+    Color(0xFFB5E8FF),
+    Color(0xFFC8B8FF),
+  ]),
+  berry(GlassVariant.liquid, Color(0xFFC2185B), Color(0xFFF7EEF2), [
+    Color(0xFFFF6FA8),
+    Color(0xFFB07CFF),
+    Color(0xFFFF9E80),
+  ]),
+  tropic(GlassVariant.liquid, Color(0xFF00C2A8), Color(0xFFEEF7F3), [
+    Color(0xFF4FF0C8),
+    Color(0xFFFFE066),
+    Color(0xFFFF8FA3),
+  ]),
+  coral(GlassVariant.liquid, Color(0xFFFF5A5F), Color(0xFFF9F0EE), [
+    Color(0xFFFF9A8B),
+    Color(0xFFFFD3A5),
+    Color(0xFF8EC5FF),
+  ]),
+  grape(GlassVariant.liquid, Color(0xFF7B3FE4), Color(0xFFF3EFFA), [
+    Color(0xFFB48CFF),
+    Color(0xFFFF9ED8),
+    Color(0xFF8FD3FF),
+  ]),
+  kiwi(GlassVariant.liquid, Color(0xFF5FAE22), Color(0xFFF2F7EC), [
+    Color(0xFFB8F06A),
+    Color(0xFFFFE46D),
+    Color(0xFF7FD8C8),
+  ]),
+  candy(GlassVariant.liquid, Color(0xFFFF6F91), Color(0xFFF9F1F3), [
+    Color(0xFFFFC0CB),
+    Color(0xFFB5EAD7),
+    Color(0xFFC7CEEA),
+  ]),
+  rainbow(GlassVariant.liquid, Color(0xFF5B6CFF), Color(0xFFF4F2F0), [
+    Color(0xFFFF8A80),
+    Color(0xFFFFE57F),
+    Color(0xFF80D8FF),
+  ]),
   // Frost: smoky panels over black, the colour glowing through
   midnight(GlassVariant.frost, Color(0xFFFFE600), Color(0xFF07070B), [
     Color(0xFFFFE600),
@@ -79,6 +129,56 @@ enum GlassScheme {
     Color(0xFF9B3DFF),
     Color(0xFFFF7A5C),
   ]),
+  ember(GlassVariant.frost, Color(0xFFFF7A1A), Color(0xFF0B0705), [
+    Color(0xFFFF5A1F),
+    Color(0xFFFFB01F),
+    Color(0xFF8A1F00),
+  ]),
+  cyber(GlassVariant.frost, Color(0xFFFF2BD6), Color(0xFF07050C), [
+    Color(0xFFFF2BD6),
+    Color(0xFF00E0FF),
+    Color(0xFF6A00FF),
+  ]),
+  emerald(GlassVariant.frost, Color(0xFF00E676), Color(0xFF050A07), [
+    Color(0xFF00C853),
+    Color(0xFF00BFA5),
+    Color(0xFF1DE9B6),
+  ]),
+  abyss(GlassVariant.frost, Color(0xFF00B0FF), Color(0xFF04070D), [
+    Color(0xFF0040FF),
+    Color(0xFF00B0FF),
+    Color(0xFF00E5FF),
+  ]),
+  crimson(GlassVariant.frost, Color(0xFFFF3D5A), Color(0xFF0B0507), [
+    Color(0xFFD50000),
+    Color(0xFFFF4081),
+    Color(0xFF7B0000),
+  ]),
+  gold(GlassVariant.frost, Color(0xFFFFC400), Color(0xFF0A0805), [
+    Color(0xFFFFAB00),
+    Color(0xFFFF6D00),
+    Color(0xFFFFD740),
+  ]),
+  nebula(GlassVariant.frost, Color(0xFFD05CFF), Color(0xFF07050D), [
+    Color(0xFF7C4DFF),
+    Color(0xFFFF4081),
+    Color(0xFF448AFF),
+  ]),
+  toxic(GlassVariant.frost, Color(0xFFC6FF00), Color(0xFF060905), [
+    Color(0xFF76FF03),
+    Color(0xFFC6FF00),
+    Color(0xFF00E676),
+  ]),
+  ice(GlassVariant.frost, Color(0xFF80D8FF), Color(0xFF05080C), [
+    Color(0xFF40C4FF),
+    Color(0xFFB388FF),
+    Color(0xFF84FFFF),
+  ]),
+  dusk(GlassVariant.frost, Color(0xFFFF6E40), Color(0xFF09060A), [
+    Color(0xFFFF6E40),
+    Color(0xFFAB47BC),
+    Color(0xFF5C6BC0),
+  ]),
   // Clear: nearly clear panels with bright edges over a calm backdrop
   frostbite(GlassVariant.clear, Color(0xFF2F7BFF), Color(0xFFDCE3EE), [
     Color(0xFF8FB8FF),
@@ -109,6 +209,56 @@ enum GlassScheme {
     Color(0xFFC8B0FF),
     Color(0xFFE6C8F0),
     Color(0xFFD0D8F0),
+  ]),
+  mist(GlassVariant.clear, Color(0xFF5C7CFA), Color(0xFFE3E7EF), [
+    Color(0xFFC5D0F0),
+    Color(0xFFE0E6F5),
+    Color(0xFFB8C4E0),
+  ]),
+  linen(GlassVariant.clear, Color(0xFFC08A4A), Color(0xFFEDE6DC), [
+    Color(0xFFE8D5BC),
+    Color(0xFFF2E8DA),
+    Color(0xFFD8C8B4),
+  ]),
+  slate(GlassVariant.clear, Color(0xFF3D5A80), Color(0xFFD8DEE6), [
+    Color(0xFFA9B8CC),
+    Color(0xFFD5DDE8),
+    Color(0xFF8FA3BC),
+  ]),
+  quartz(GlassVariant.clear, Color(0xFFD9668A), Color(0xFFEEDFE4), [
+    Color(0xFFF2C4D2),
+    Color(0xFFF8E1E8),
+    Color(0xFFE0C4D8),
+  ]),
+  seafoam(GlassVariant.clear, Color(0xFF2BAE9B), Color(0xFFDCE9E6), [
+    Color(0xFFA8E0D4),
+    Color(0xFFD6F0EA),
+    Color(0xFFB8D8E0),
+  ]),
+  cloud(GlassVariant.clear, Color(0xFF6A7FA8), Color(0xFFE4E8EE), [
+    Color(0xFFD0D8E4),
+    Color(0xFFECEFF4),
+    Color(0xFFBCC6D6),
+  ]),
+  apricot(GlassVariant.clear, Color(0xFFF08C4A), Color(0xFFEFE4DC), [
+    Color(0xFFF6CBA8),
+    Color(0xFFFBE3D0),
+    Color(0xFFE8C8B8),
+  ]),
+  haze(GlassVariant.clear, Color(0xFF7E6BD9), Color(0xFFE4E0EE), [
+    Color(0xFFD2C8F0),
+    Color(0xFFECE6FA),
+    Color(0xFFC8D0F0),
+  ]),
+  glacier(GlassVariant.clear, Color(0xFF3AA6C9), Color(0xFFDDE9EE), [
+    Color(0xFFB8DFEC),
+    Color(0xFFE2F2F7),
+    Color(0xFFC0D8E4),
+  ]),
+  moss(GlassVariant.clear, Color(0xFF6B8E3A), Color(0xFFE0E6D8), [
+    Color(0xFFC8D8B0),
+    Color(0xFFE6EED8),
+    Color(0xFFB8C8A0),
   ]);
 
   const GlassScheme(this.variant, this.accent, this.base, this.spots);
