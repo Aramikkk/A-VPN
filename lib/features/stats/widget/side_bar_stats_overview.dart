@@ -67,6 +67,13 @@ class SideBarStatsOverview extends ConsumerWidget {
     ref.watch(trafficHistoryProvider);
     final series = range == StatsRange.minute ? null : ref.read(trafficHistoryProvider.notifier).series(range);
     final history = series?.points ?? minute;
+    final periodName = switch (range) {
+      StatsRange.minute => t.avpn.rangeMinute,
+      StatsRange.tenMinutes => t.avpn.rangeTenMinutes,
+      StatsRange.hour => t.avpn.rangeHour,
+      StatsRange.day => t.avpn.rangeDay,
+      StatsRange.all => t.avpn.periodAllTime,
+    };
     final period = pickRange ? (series ?? ref.read(trafficHistoryProvider.notifier).series(range)).total : null;
     final slots = series?.slots ?? SpeedHistory.length;
     String two(int n) => n.toString().padLeft(2, '0');
@@ -150,23 +157,33 @@ class SideBarStatsOverview extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // the period's traffic in the top corner: how much moved in the time the graph shows
+          // two different things, each named: the speed right now on the left, and on the right how much traffic
+          // moved in the period the graph shows
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _Caption(t.avpn.statsSpeed, color: soft(.8))),
+              Expanded(child: _Caption(pickRange ? t.avpn.statsSpeedNow : t.avpn.statsSpeed, color: soft(.8))),
               if (period != null)
-                Text.rich(
-                  TextSpan(
-                    children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _Caption(t.avpn.statsTrafficFor(period: periodName), color: soft(.8)),
+                    const Gap(2),
+                    Text.rich(
                       TextSpan(
-                        text: size(period.total),
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        children: [
+                          TextSpan(
+                            text: size(period.total),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          if (period.total > 0)
+                            TextSpan(text: '  ·  VPN ${(period.vpn * 100 / period.total).round()}%'),
+                        ],
                       ),
-                      if (period.total > 0) TextSpan(text: '  ·  VPN ${(period.vpn * 100 / period.total).round()}%'),
-                    ],
-                  ),
-                  maxLines: 1,
-                  style: theme.textTheme.labelMedium?.copyWith(color: soft(.9)),
+                      maxLines: 1,
+                      style: theme.textTheme.labelMedium?.copyWith(color: soft(.9)),
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -189,6 +206,9 @@ class SideBarStatsOverview extends ConsumerWidget {
             if (pickRange) ...[
               Gap(dense || !large ? 8 : 12),
               _RangePicker(range: range, color: onSpeed, short: !large),
+              Gap(dense || !large ? 6 : 10),
+              // what the graph is: the speed over the period
+              _Caption(t.avpn.statsSpeedFor(period: periodName), color: soft(.8)),
             ],
             Gap(large && !dense ? 12 : 10),
             if (fill || split)

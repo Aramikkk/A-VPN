@@ -190,7 +190,11 @@
     "ruleSocial": "Соцсети и мессенджеры",
     "ruleChina": "Китайские сервисы",
     "aboutBasedOn": "Основано на Hiddify (открытый код)",
-    "stUpdateServers": "Обновить"
+    "stUpdateServers": "Обновить",
+    "statsSpeedNow": "Скорость сейчас",
+    "statsTrafficFor": "Трафик за $period",
+    "statsSpeedFor": "Скорость за $period",
+    "periodAllTime": "всё время"
   },
   "common": {
     "appTitle": "A-VPN",
