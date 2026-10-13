@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -77,19 +76,18 @@ class TopologyPage extends HookConsumerWidget {
       );
     }
 
-    // app -> route -> server, one line per app, the biggest first; the rest added up in one line
-    final byApp = groupConnections(items, (c) => c.app)..sort((a, b) => sum(b.items).compareTo(sum(a.items)));
-    const shown = 7;
-    final flowRows = <_Flow>[
-      for (final g in byApp.take(shown)) _Flow(g.key, sum(g.items), g),
-      if (byApp.length > shown)
-        _Flow(
-          null,
-          sum(byApp.skip(shown).expand((g) => g.items)),
-          groupConnections(byApp.skip(shown).expand((g) => g.items), (_) => '').first,
-          others: byApp.length - shown,
-        ),
-    ];
+    // the strip map: a strip per route (through the VPN, direct, blocked), each split into its apps by traffic
+    final strips = <_Strip>[
+      for (final route in ConnectionRoute.values)
+        if (items.where((c) => c.route == route).toList() case final inRoute when inRoute.isNotEmpty)
+          _Strip(route, sum(inRoute), [
+            for (final g in groupConnections(
+              inRoute,
+              (c) => c.app,
+            )..sort((a, b) => sum(b.items).compareTo(sum(a.items))))
+              (app: g.key, weight: sum(g.items)),
+          ]),
+    ]..sort((a, b) => b.weight.compareTo(a.weight));
 
     return Scaffold(
       appBar: AppBar(
@@ -169,7 +167,7 @@ class TopologyPage extends HookConsumerWidget {
               const Gap(12),
               _Section(
                 title: t.avpn.topoFlow,
-                child: flowRows.isEmpty
+                child: strips.isEmpty
                     ? SizedBox(
                         height: 120,
                         child: Center(
@@ -179,14 +177,15 @@ class TopologyPage extends HookConsumerWidget {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          for (final row in flowRows)
-                            _FlowRow(
-                              row: row,
-                              name: row.app == null ? t.avpn.connOther : connectionAppName(t, apps, row.app!),
-                              icon: row.app == null ? null : apps[row.app!]?.icon,
-                              value: value(row.weight),
-                              share: total == 0 ? 0 : row.weight / total,
+                          for (final (i, strip) in strips.indexed) ...[
+                            if (i > 0) const Gap(16),
+                            _StripMap(
+                              strip: strip,
+                              total: total,
+                              value: value,
+                              appName: (app) => app == null ? t.avpn.connOther : connectionAppName(t, apps, app),
                             ),
+                          ],
                         ],
                       ),
               ),
@@ -500,129 +499,145 @@ class _RuleRows extends ConsumerWidget {
   }
 }
 
-class _Flow {
-  _Flow(this.app, this.weight, this.group, {this.others = 0});
+class _Strip {
+  _Strip(this.route, this.weight, this.apps);
 
-  /// null: the other apps added up
-  final String? app;
+  final ConnectionRoute route;
   final double weight;
-  final ConnectionGroup group;
-  final int others;
+
+  /// biggest first
+  final List<({String app, double weight})> apps;
 }
 
-/// One app's way out: the app with its amount and a bar for its share, an arrow to the route (VPN, direct,
-/// blocked, or both), and for the VPN an arrow on to its server or servers.
-class _FlowRow extends ConsumerWidget {
-  const _FlowRow({required this.row, required this.name, required this.icon, required this.value, required this.share});
+/// One route as a strip: its name, share and amount over it; the strip split into its apps, the biggest in the
+/// strongest shade of the route's colour; under it each piece named with its amount, so the thin ones read too.
+class _StripMap extends ConsumerWidget {
+  const _StripMap({required this.strip, required this.total, required this.value, required this.appName});
 
-  final _Flow row;
-  final String name;
-  final Uint8List? icon;
-  final String value;
-  final double share;
+  final _Strip strip;
+  final double total;
+  final String Function(double) value;
+  final String Function(String? app) appName;
+
+  static const _shown = 5;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final g = row.group;
-    final route = g.mainRoute;
-    final colour = routeColor(scheme, route);
-    final routeText = g.mixed
-        ? [
-            if (g.vpn > 0) 'VPN',
-            if (g.direct > 0) t.avpn.statsDirect.toLowerCase(),
-            if (g.blocked > 0) t.avpn.connBlocked.toLowerCase(),
-          ].join(' + ')
-        : switch (route) {
-            ConnectionRoute.vpn => 'VPN',
-            ConnectionRoute.direct => t.avpn.statsDirect,
-            ConnectionRoute.block => t.avpn.connBlocked,
-          };
-    final servers = g.vpn > 0 ? serverFlags(g.servers) : '';
+    final base = switch (strip.route) {
+      // the theme's own colour, as on the chosen server and the power button
+      ConnectionRoute.vpn => theme.araLook.neonFill ?? scheme.primary,
+      ConnectionRoute.direct => const Color(0xFF9AA0A6),
+      ConnectionRoute.block => scheme.error,
+    };
+    final title = switch (strip.route) {
+      ConnectionRoute.vpn => t.avpn.statsViaVpn,
+      ConnectionRoute.direct => t.avpn.statsDirect,
+      ConnectionRoute.block => t.avpn.connBlocked,
+    };
+    // the biggest apps, the rest added up in one piece
+    final pieces = <({String? app, double weight})>[
+      for (final a in strip.apps.take(_shown)) (app: a.app, weight: a.weight),
+      if (strip.apps.length > _shown)
+        (app: null, weight: strip.apps.skip(_shown).fold<double>(0, (s, a) => s + a.weight)),
+    ];
+    // the shades step down from the route's own colour
+    Color shade(int i) => Color.lerp(base, scheme.surfaceContainerLow, (i * .16).clamp(0, .7))!;
+    Color ink(Color fill) => AraLook.contrast(Colors.white, fill) >= 3 ? Colors.white : Colors.black;
+    final share = total == 0 ? 0 : (strip.weight / total * 100).round();
     final small = theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant);
-    Widget pill(String text, {required bool accent}) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: accent ? colour.withValues(alpha: .14) : null,
-        border: Border.all(color: accent ? colour.withValues(alpha: .5) : scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: accent ? AraLook.readableOn(colour, scheme.surfaceContainerLow) : scheme.onSurface,
-          fontWeight: FontWeight.w700,
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '$title · $share%',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AraLook.readableOn(base, scheme.surfaceContainerLow),
+                ),
+              ),
+            ),
+            Text(value(strip.weight), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+          ],
         ),
-      ),
-    );
-    Widget arrow() => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Icon(Icons.arrow_forward_rounded, size: 15, color: scheme.onSurfaceVariant),
-    );
-    // the app and its amount on top, its share as a bar, and under it where it went: → VPN → 🇸🇪 Швеция 2
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (row.app == null)
-            Container(
-              width: 30,
-              height: 30,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(9)),
-              child: Icon(Icons.more_horiz_rounded, size: 18, color: scheme.onSurfaceVariant),
-            )
-          else
-            ConnectionAppIcon(icon: icon, name: name, size: 30),
-          const Gap(10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        const Gap(6),
+        // the strip itself: each app as wide as its traffic, its name inside when there is room
+        ClipRRect(
+          borderRadius: BorderRadius.circular(9),
+          child: SizedBox(
+            height: 34,
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final gaps = (pieces.length - 1) * 2.0;
+                final room = box.maxWidth - gaps;
+                // every piece at least a sliver, the rest shared by traffic
+                const least = 4.0;
+                final spare = room - least * pieces.length;
+                return Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        row.app == null ? '$name · ${row.others}' : name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                    for (final (i, piece) in pieces.indexed) ...[
+                      if (i > 0) const SizedBox(width: 2),
+                      Container(
+                        width: least + (strip.weight == 0 ? 0 : spare * piece.weight / strip.weight),
+                        color: shade(i),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: least + spare * piece.weight / (strip.weight == 0 ? 1 : strip.weight) > 56
+                            ? Text(
+                                appName(piece.app),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: ink(shade(i)),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            : null,
                       ),
-                    ),
-                    const Gap(8),
-                    Text('$value · ${(share * 100).round()}%', maxLines: 1, style: small),
+                    ],
                   ],
-                ),
-                const Gap(4),
-                // the share of all the traffic, in the route's colour
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: share.clamp(.02, 1.0),
-                    minHeight: 4,
-                    color: colour,
-                    backgroundColor: scheme.outlineVariant.withValues(alpha: .4),
-                  ),
-                ),
-                const Gap(6),
-                Row(
-                  children: [
-                    Icon(Icons.subdirectory_arrow_right_rounded, size: 15, color: scheme.onSurfaceVariant),
-                    const Gap(4),
-                    pill(routeText, accent: true),
-                    if (servers.isNotEmpty) ...[arrow(), Flexible(child: pill(servers, accent: false))],
-                  ],
-                ),
-              ],
+                );
+              },
             ),
           ),
-        ],
-      ),
+        ),
+        const Gap(8),
+        // every piece named, with its colour, amount and share of the route
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            for (final (i, piece) in pieces.indexed)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: shade(i), borderRadius: BorderRadius.circular(3)),
+                  ),
+                  const Gap(5),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    child: Text(
+                      appName(piece.app),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Text(' ${value(piece.weight)}', style: small),
+                ],
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
