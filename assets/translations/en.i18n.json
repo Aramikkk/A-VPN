@@ -196,7 +196,9 @@
     "statsSpeedFor": "Speed over $period",
     "periodAllTime": "all time",
     "serversAll": "All servers · $n",
-    "serversCollapse": "Show less"
+    "serversCollapse": "Show less",
+    "trafficThisSession": "Traffic this session",
+    "topoPeriod": "today (since 03:00)"
   },
   "common": {
     "appTitle": "A-VPN",

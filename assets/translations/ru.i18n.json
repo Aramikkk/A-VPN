@@ -196,7 +196,9 @@
     "statsSpeedFor": "Скорость за $period",
     "periodAllTime": "всё время",
     "serversAll": "Все серверы · $n",
-    "serversCollapse": "Свернуть"
+    "serversCollapse": "Свернуть",
+    "trafficThisSession": "Трафик текущей сессии",
+    "topoPeriod": "за сутки (с 03:00)"
   },
   "common": {
     "appTitle": "A-VPN",

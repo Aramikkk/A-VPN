@@ -1024,11 +1024,17 @@ class _HomeTraffic extends ConsumerWidget {
     // followed only while the home screen is in sight
     final visible = TickerMode.of(context);
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
+    // this session's connections only, as the totals at the top
+    final sessionStart = ref.watch(statsNotifierProvider).valueOrNull?.sessionStartedAt;
+    final current = [
+      for (final c in state.items)
+        if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
+    ];
     final big = {
-      for (final g in groupConnections(state.items, (c) => c.app))
+      for (final g in groupConnections(current, (c) => c.app))
         if (g.total >= smallTraffic) g.key,
     };
-    final items = state.items.where((c) => big.contains(c.app)).toList();
+    final items = current.where((c) => big.contains(c.app)).toList();
     // fixed in place (no scroll) and without a heading, so the strips have the room; what doesn't fit is cut
     return ClipRect(
       child: SingleChildScrollView(

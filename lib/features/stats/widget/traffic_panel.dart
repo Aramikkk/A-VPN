@@ -4,6 +4,8 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/session_totals.dart';
+import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -25,12 +27,21 @@ class TrafficPanel extends ConsumerWidget {
     final visible = TickerMode.of(context);
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
-    final groups = groupConnections(state.items, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
+    // this session's connections only, as the heading says
+    final sessionStart = ref.watch(statsNotifierProvider).valueOrNull?.sessionStartedAt;
+    final current = [
+      for (final c in state.items)
+        if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
+    ];
+    final groups = groupConnections(current, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
     final items = [for (final g in groups) ...g.items];
-    final total = items.fold<int>(0, (s, c) => s + c.total);
-    final vpn = items.where((c) => c.route == ConnectionRoute.vpn).fold<int>(0, (s, c) => s + c.total);
+    // the tiles: the current session's traffic, as the heading says
+    final session = ref.watch(sessionTotalsProvider);
+    final total = session.up + session.down;
+    final vpn = ((session.vpnUp ?? 0) + (session.vpnDown ?? 0)).clamp(0, total);
     final direct = total - vpn;
+    final listed = items.fold<int>(0, (s, c) => s + c.total);
     final accent = theme.araLook.neonFill ?? scheme.primary;
 
     Widget tile(String title, int bytes, Color colour, {required bool strong}) => Expanded(
@@ -174,7 +185,7 @@ class TrafficPanel extends ConsumerWidget {
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(2),
                                     child: LinearProgressIndicator(
-                                      value: total == 0 ? 0 : (g.total / total).clamp(.02, 1.0),
+                                      value: listed == 0 ? 0 : (g.total / listed).clamp(.02, 1.0),
                                       minHeight: 3,
                                       color: colour,
                                       backgroundColor: scheme.outlineVariant.withValues(alpha: .3),

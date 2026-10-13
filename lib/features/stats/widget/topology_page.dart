@@ -78,7 +78,15 @@ class TopologyPage extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.avpn.topologyTab),
+        // the period the tab covers, under its name
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(t.avpn.topologyTab),
+            Text(t.avpn.topoPeriod, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          ],
+        ),
         actions: [
           // starts the picture over from now; it starts over by itself at 03:00
           if (state.items.any((c) => !c.active))

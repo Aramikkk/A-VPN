@@ -82,7 +82,7 @@ class HomePage extends HookConsumerWidget {
             final heading = Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
               child: Text(
-                t.avpn.topoFlow.toUpperCase(),
+                t.avpn.trafficThisSession.toUpperCase(),
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 1.2),
               ),
             );
