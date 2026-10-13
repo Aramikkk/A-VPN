@@ -114,22 +114,22 @@ void main() {
 
   test('the app own rules read by name', () async {
     final t = await AppLocale.ru.build();
-    expect(ruleLabel('domain_suffix=[ru su xn--p1ai yandex.net] => route(direct)', t), 'российские сайты');
-    expect(ruleLabel('package_name=[ru.yandex.music ru.yandex.taxi] => route(direct)', t), 'российские приложения');
+    expect(ruleLabel('domain_suffix=[ru su xn--p1ai yandex.net] => route(direct)', t), 'Российские сайты');
+    expect(ruleLabel('package_name=[ru.yandex.music ru.yandex.taxi] => route(direct)', t), 'Российские приложения');
     String first(List<String> list) => 'domain_suffix=[${list.take(3).join(' ')} ...] => route(select)';
     expect(ruleLabel(first(aiDomains), t), 'ИИ');
     expect(ruleLabel(first(googleDomains), t), 'Google и YouTube');
-    expect(ruleLabel(first(socialDomains), t), 'соцсети и мессенджеры');
-    expect(ruleLabel(first(otherBlockedDomains), t), 'прочее заблокированное');
+    expect(ruleLabel(first(socialDomains), t), 'Соцсети и мессенджеры');
+    expect(ruleLabel(first(otherBlockedDomains), t), 'Прочее заблокированное');
     expect(ruleLabel('package_name=[${aiApps.take(3).join(' ')} ...] => route(select)', t), 'ИИ');
     expect(ruleLabel('package_name=[${googleApps.take(3).join(' ')} ...] => route(select)', t), 'Google и YouTube');
     expect(
       ruleLabel('ip_cidr=[5.28.192.0/18 5.200.14.128/25 31.13.24.0/21 ...] => route(select)', t),
-      startsWith('соцсети и мессенджеры'),
+      startsWith('Соцсети и мессенджеры'),
     );
     expect(
       ruleLabel('ip_cidr=[10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.0/8 ...] => route(direct)', t),
-      'локальная сеть',
+      'Локальная сеть',
     );
     expect(ruleLabel('final', t), isNull);
     expect(ruleLabel('rule_set=[ads] => reject', t), 'ads');
