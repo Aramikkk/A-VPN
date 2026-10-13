@@ -261,4 +261,11 @@ void main() {
     expect(statsDayStart(DateTime(2026, 10, 13, 23, 59)), DateTime(2026, 10, 13, 3));
     expect(statsDayStart(DateTime(2026, 11, 1, 1)), DateTime(2026, 10, 31, 3));
   });
+
+  test('a whitelist server keeps its mark next to the country', () {
+    expect(SeenConnection.serverName('🇸🇪 LTE Only - Швеция'), '🇸🇪 Швеция · БС');
+    expect(SeenConnection.serverName('🇸🇪 БС - Швеция'), '🇸🇪 Швеция · БС');
+    expect(SeenConnection.serverName('🇸🇪 Доступ - Швеция 2'), '🇸🇪 Швеция 2');
+    expect(serverFlags(['🇸🇪 Швеция · БС', '🇸🇪 Швеция 2', '🇫🇮 Финляндия']), '🇸🇪БС 🇸🇪 🇫🇮');
+  });
 }

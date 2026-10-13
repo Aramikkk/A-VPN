@@ -325,7 +325,9 @@ class _StyledServerList extends ConsumerWidget {
             final auto = server.tag == 'lowest';
             // "Финляндия" with "Sigma · VLESS" under it, rather than "Sigma - Финляндия"
             final dash = name.title.indexOf(' - ');
-            final title = auto ? t.avpn.auto : (dash < 0 ? name.title : name.title.substring(dash + 3).trim());
+            final title = auto
+                ? t.avpn.auto
+                : _marked(dash < 0 ? name.title : name.title.substring(dash + 3).trim(), name.title);
             final subtitle = auto
                 ? (autoNow == null ? t.avpn.autoBestHint : '${t.avpn.stNow}: ${_withFlag(serverName(autoNow!))}')
                 : [if (dash > 0) name.title.substring(0, dash).trim(), server.type.toUpperCase()].join(' · ');

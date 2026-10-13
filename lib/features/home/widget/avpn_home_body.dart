@@ -18,6 +18,7 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
 import 'package:hiddify/features/proxy/data/lan_sharing.dart';
+import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -795,8 +796,16 @@ OutboundInfo? autoPick(OutboundInfo group, List<OutboundInfo> items) {
 String _withFlag(({String? flag, String title}) name) {
   final dash = name.title.indexOf(' - ');
   final country = dash < 0 ? name.title : name.title.substring(dash + 3).trim();
-  return [name.flag, country].whereType<String>().join(' ');
+  return [name.flag, _marked(country, name.title)].whereType<String>().join(' ');
 }
+
+/// [text] with "· БС" after it when [name] is a whitelist server (the provider's "LTE Only" or "БС" ones, for
+/// mobile data with operator whitelists), so a bare country never hides which kind it is.
+String _marked(String text, String name) =>
+    ServerRegionFilter.isMobileOnly(name) && !text.contains('БС') ? '$text · $whitelistMark' : text;
+
+/// How a whitelist server is marked wherever only its country shows.
+const whitelistMark = 'БС';
 
 /// The provider calls its regular servers and its profile "Доступ"; A-VPN shows them as Sigma (Sigma Gate).
 String sigmaName(String name) =>

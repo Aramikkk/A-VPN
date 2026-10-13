@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -187,7 +188,9 @@ class SeenConnection {
     if (dash < 0) return name;
     final flag = RegExp(r'^(\S+)\s').firstMatch(name)?.group(1);
     final isFlag = flag != null && flag.runes.any((r) => r >= 0x1F1E6 && r <= 0x1F1FF);
-    final country = name.substring(dash + 3).trim();
+    var country = name.substring(dash + 3).trim();
+    // a whitelist server ("LTE Only", "БС") keeps a mark, or it reads like the regular one of that country
+    if (ServerRegionFilter.isMobileOnly(name) && !country.contains('БС')) country = '$country · БС';
     return isFlag ? '$flag $country' : country;
   }
 }
@@ -451,7 +454,8 @@ String serverFlags(Iterable<String> servers) {
   for (final server in list) {
     final flag = RegExp(r'^(\S+)\s').firstMatch(server)?.group(1);
     final isFlag = flag != null && flag.runes.any((r) => r >= 0x1F1E6 && r <= 0x1F1FF);
-    shown.add(isFlag ? flag : server);
+    // a whitelist server's flag carries the mark: 🇸🇪БС next to a plain 🇸🇪
+    shown.add(isFlag ? (server.contains('БС') ? '$flagБС' : flag) : server);
   }
   return shown.join(' ');
 }
