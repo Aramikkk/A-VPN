@@ -468,7 +468,7 @@ class HiddifyCoreService with InfraLogger {
       () => cc
           .coreInfoListener(Empty(), options: grpcOptions)
           .doOnCancel(() {
-            loggy.error("status", "Canceld");
+            loggy.debug("status listener cancelled (the core restarts)");
             if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
           })
           .doOnData((event) {
@@ -476,7 +476,7 @@ class HiddifyCoreService with InfraLogger {
             if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
           })
           .doOnDone(() {
-            loggy.error("status", "done");
+            loggy.debug("status listener ended (the core restarts)");
             if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
           })
           .endWith(CoreInfoResponse(coreState: CoreStates.STOPPED))

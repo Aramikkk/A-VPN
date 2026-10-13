@@ -531,7 +531,9 @@ class _ToggleChip extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       padding: const EdgeInsets.symmetric(horizontal: 2),
-      labelPadding: const EdgeInsetsDirectional.only(start: 2, end: 6),
+      labelPadding: const EdgeInsetsDirectional.only(start: 4, end: 6),
+      // the icon right next to its word, without the chip's wide avatar box
+      avatarBoxConstraints: const BoxConstraints.tightFor(width: 20, height: 20),
       avatar: Icon(icon, size: 16, color: selected ? scheme.onPrimary : null),
       label: Text(label),
       selected: selected,

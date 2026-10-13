@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
+import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
@@ -15,13 +18,59 @@ import 'package:installed_apps/installed_apps.dart';
 /// The phone's installed apps by package: their names and icons, for the connection list.
 final installedAppsProvider = FutureProvider<Map<String, ({String name, Uint8List? icon})>>((ref) async {
   if (!Platform.isAndroid) return const {};
-  try {
-    final apps = await InstalledApps.getInstalledApps(false, true);
-    return {for (final a in apps) a.packageName: (name: a.name, icon: a.icon)};
-  } catch (_) {
-    return const {};
+  // reading every app with its icon holds up the phone's main thread for seconds (the interface freezes): the
+  // saved list shows at once, and a fresh one is read only when it's a day old (a new app shows by its package
+  // until then)
+  if (_freshApps != null) return _freshApps!;
+  final dirs = await ref.watch(appDirectoriesProvider.future);
+  final file = File('${dirs.baseDir.path}/installed_apps.json');
+  Future<Map<String, ({String name, Uint8List? icon})>> fresh() async {
+    try {
+      final apps = await InstalledApps.getInstalledApps(false, true);
+      final map = {for (final a in apps) a.packageName: (name: a.name, icon: a.icon)};
+      unawaited(
+        file
+            .writeAsString(
+              jsonEncode({
+                '@at': DateTime.now().millisecondsSinceEpoch,
+                for (final e in map.entries)
+                  e.key: [e.value.name, if (e.value.icon != null) base64Encode(e.value.icon!)],
+              }),
+            )
+            .then((_) {}, onError: (_) {}),
+      );
+      return _freshApps = map;
+    } catch (_) {
+      return _freshApps = const {};
+    }
   }
+
+  try {
+    if (file.existsSync()) {
+      final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final cached = <String, ({String name, Uint8List? icon})>{
+        for (final e in json.entries)
+          if (e.value is List && (e.value as List).isNotEmpty)
+            e.key: (
+              name: (e.value as List)[0] as String,
+              icon: (e.value as List).length > 1 ? base64Decode((e.value as List)[1] as String) : null,
+            ),
+      };
+      final at = json['@at'] is int ? DateTime.fromMillisecondsSinceEpoch(json['@at'] as int) : DateTime(2000);
+      if (DateTime.now().difference(at) > const Duration(days: 1)) {
+        unawaited(fresh().then((_) => ref.invalidateSelf()));
+      } else {
+        _freshApps = cached;
+      }
+      return cached;
+    }
+  } catch (_) {
+    // an unreadable copy: wait for the fresh list
+  }
+  return fresh();
 });
+
+Map<String, ({String name, Uint8List? icon})>? _freshApps;
 
 enum _View { apps, sites }
 
@@ -300,7 +349,6 @@ class _GroupCard extends HookConsumerWidget {
     final title = byApp ? appName(group.key) : (group.key.isEmpty ? '—' : group.key);
     final subtitle = byApp
         ? [
-            if (group.key.isNotEmpty && appName(group.key) != group.key) group.key,
             t.avpn.connSites(n: {for (final c in group.items) c.host}.length),
           ].join(' · ')
         : {for (final c in group.items) appName(c.app)}.take(3).join(', ');

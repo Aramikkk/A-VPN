@@ -144,11 +144,15 @@ class _RegionChip extends ConsumerWidget {
               size: 30,
               borderRadius: const BorderRadiusDirectional.horizontal(start: Radius.circular(7)),
             ),
-            const Gap(8),
-            Text(
-              t.pages.settings.routing.region,
-              style: theme.textTheme.labelLarge?.copyWith(color: colorScheme.onSurface),
-            ),
+            // a phone shows the flag alone, so the page's title fits
+            if (MediaQuery.sizeOf(context).width >= 500) ...[
+              const Gap(8),
+              Text(
+                t.pages.settings.routing.region,
+                style: theme.textTheme.labelLarge?.copyWith(color: colorScheme.onSurface),
+              ),
+            ] else
+              const Gap(2),
             Icon(Icons.arrow_drop_down_rounded, size: 20, color: colorScheme.onSurfaceVariant),
             const Gap(4),
           ],

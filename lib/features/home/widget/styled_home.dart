@@ -226,25 +226,37 @@ class _ServersHeader extends ConsumerWidget {
               style: label?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
+        // the subscription refresh, with a word so it's clear what it does
         if (remote != null)
-          SizedBox(
-            width: 30,
-            height: 26,
-            child: updating
-                ? Center(
-                    child: SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 1.6, color: scheme.onSurfaceVariant),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 6),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: updating
+                  ? null
+                  : () => ref.read(updateProfileNotifierProvider(remote.id).notifier).updateProfile(remote),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (updating)
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.6, color: scheme.onSurfaceVariant),
+                      )
+                    else
+                      Icon(Icons.sync_rounded, size: 15, color: scheme.onSurfaceVariant),
+                    const Gap(4),
+                    Text(
+                      t.avpn.stUpdateServers.toUpperCase(),
+                      style: label?.copyWith(color: scheme.onSurfaceVariant),
                     ),
-                  )
-                : IconButton(
-                    padding: EdgeInsets.zero,
-                    iconSize: 16,
-                    tooltip: t.avpn.stUpdateSub,
-                    icon: Icon(Icons.sync_rounded, color: scheme.onSurfaceVariant),
-                    onPressed: () => ref.read(updateProfileNotifierProvider(remote.id).notifier).updateProfile(remote),
-                  ),
+                  ],
+                ),
+              ),
+            ),
           ),
         const Spacer(),
         if (showCheck)
@@ -467,9 +479,10 @@ class _GraphiteRow extends StatelessWidget {
             : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: selected && !flooded
-              ? BorderSide(color: scheme.primary.withValues(alpha: .65), width: 1.5)
-              : BorderSide.none,
+          // a thin frame round every server, so the rows don't run into one; the chosen one's is thicker
+          side: selected
+              ? BorderSide(color: flooded ? (dark ? Colors.white : Colors.black) : scheme.primary, width: 2.2)
+              : BorderSide(color: dark ? Colors.white.withValues(alpha: .2) : Colors.black.withValues(alpha: .75)),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -741,6 +754,8 @@ class _Orb extends HookWidget {
       }
       return null;
     }, [busy]);
+    // the theme's own colour, the same as the chosen server (not the darker one text uses on white)
+    final accent = theme.araLook.neonFill ?? scheme.primary;
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -752,7 +767,7 @@ class _Orb extends HookWidget {
             painter: _RingPainter(
               colors: on || busy
                   // one colour, the accent
-                  ? [scheme.primary, scheme.primary]
+                  ? [accent, accent]
                   : [scheme.outlineVariant, scheme.outlineVariant],
               sweep: on ? 1 : (busy ? .3 : 1),
               rotation: spin.value,
@@ -764,21 +779,18 @@ class _Orb extends HookWidget {
                   shape: BoxShape.circle,
                   // one colour, no gradient
                   color: dark ? const Color(0xFF16161A) : Colors.white,
-                  boxShadow: on
-                      ? [BoxShadow(color: scheme.primary.withValues(alpha: dark ? .45 : .3), blurRadius: 28)]
-                      : null,
+                  boxShadow: on ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)] : null,
                 ),
                 child: Center(
                   child: Icon(
                     Icons.power_settings_new_rounded,
                     size: 30,
-                    // the neon themes: the ring and the icon in the neon, the middle dark
+                    // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
+                    // it goes black there, as the chosen server's text does
                     color: on
                         ? (theme.araLook.neonFill == null
                               ? (dark ? Colors.white : scheme.primary)
-                              : (dark
-                                    ? theme.araLook.neonFill!
-                                    : AraLook.readableOn(theme.araLook.neonFill!, Colors.white)))
+                              : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
                         : scheme.onSurfaceVariant,
                   ),
                 ),

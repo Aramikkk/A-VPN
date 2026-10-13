@@ -188,7 +188,9 @@
     "ruleAi": "ИИ",
     "ruleGoogle": "Google и YouTube",
     "ruleSocial": "соцсети и мессенджеры",
-    "ruleChina": "китайские сервисы"
+    "ruleChina": "китайские сервисы",
+    "aboutBasedOn": "Основано на Hiddify (открытый код)",
+    "stUpdateServers": "Обновить"
   },
   "common": {
     "appTitle": "A-VPN",

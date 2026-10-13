@@ -140,7 +140,10 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                         val started = mainActivity.serviceStatus.value == Status.Started
                         if (!started) {
                             Log.w(TAG, "service is not running")
-                            //    return@launch success(true)
+                            // a core set up but never started (a start that failed, or one cut short when the app
+                            // was killed and opened again) still holds its port: close it, or every later start
+                            // waits for that port and fails with "createService - null" until the app is killed
+                            runCatching { Mobile.close(4L) }
                         }
                         BoxService.stop()
                         success(true)
