@@ -29,6 +29,7 @@ class _StyledHome extends HookConsumerWidget {
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
     final picked = current != null && current.isGroup ? autoPick(current, group!.items) : null;
     final serverMode = ref.watch(ConfigOptions.homeNetwork);
+    final rowsInSight = MediaQuery.sizeOf(context).height >= 900 ? 4 : 3;
     final currentName = switch (current?.tag) {
       _ when serverMode => '🏠 ${t.avpn.server}',
       'lowest' || 'balance' => picked == null ? t.avpn.auto : '${t.avpn.auto} · ${_withFlag(serverName(picked))}',
@@ -52,9 +53,10 @@ class _StyledHome extends HookConsumerWidget {
           ),
           const Gap(6),
           if (profile != null && servers.isNotEmpty) ...[
-            // four rows in sight (Auto and three countries), the rest a scroll away
+            // four rows in sight (Auto and three countries), three on a lower screen (the unfolded phone), so the
+            // strip map under them fits; the rest a scroll away
             SizedBox(
-              height: (servers.length < 4 ? servers.length : 4) * (editorial ? 66.0 : 62.0),
+              height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
               child: _StyledServerList(
                 editorial: editorial,
                 servers: servers,
@@ -63,7 +65,7 @@ class _StyledHome extends HookConsumerWidget {
                 testing: testing,
               ),
             ),
-            const Gap(12),
+            const Gap(10),
             // where the traffic went, under the servers (as on the Topology tab)
             Expanded(child: _HomeTraffic(editorial: editorial)),
           ] else
