@@ -57,19 +57,11 @@ final loadingConfig = RoutingConfig(
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
     ? ['home', 'speed', 'connections', 'topology', 'settings'][index]
-    : ['home', 'connections', 'topology', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
+    : ['home', 'connections', 'topology', if (showProfilesAction) 'profiles', 'settings'][index];
 
 int getIndexOfBranch(bool isMobileBreakpoint, bool showProfilesAction, String name) => isMobileBreakpoint
     ? ['home', 'speed', 'connections', 'topology', 'settings'].indexOf(name)
-    : [
-        'home',
-        'connections',
-        'topology',
-        if (showProfilesAction) 'profiles',
-        'settings',
-        'logs',
-        'about',
-      ].indexOf(name);
+    : ['home', 'connections', 'topology', if (showProfilesAction) 'profiles', 'settings'].indexOf(name);
 
 @Riverpod(keepAlive: true)
 class RoutingConfigNotifier extends _$RoutingConfigNotifier {
@@ -374,7 +366,8 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         settingsWidth(const ChainOptionsPage()),
                       ),
                     ),
-                    if (isMobileBreakpoint) ...[
+                    // the logs and About are on the settings list everywhere, the computer's side menu included
+                    ...[
                       GoRoute(
                         name: 'logs',
                         path: 'logs',
@@ -392,26 +385,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 ),
               ],
             ),
-            if (!isMobileBreakpoint) ...[
-              StatefulShellBranch(
-                routes: <GoRoute>[
-                  GoRoute(
-                    name: 'logs',
-                    path: '/logs',
-                    builder: (_, _) => FocusScope(node: branchesScope['logs'], child: const LogsPage()),
-                  ),
-                ],
-              ),
-              StatefulShellBranch(
-                routes: <GoRoute>[
-                  GoRoute(
-                    name: 'about',
-                    path: '/about',
-                    builder: (_, _) => FocusScope(node: branchesScope['about'], child: const AboutPage()),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
         GoRoute(name: 'intro', path: '/intro', builder: (_, _) => const IntroPage()),

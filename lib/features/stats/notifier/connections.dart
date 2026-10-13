@@ -307,7 +307,7 @@ class Connections extends Notifier<ConnectionsState> {
       if (since != null) _since = DateTime.fromMillisecondsSinceEpoch(since);
       for (final item in (json['items'] as List).whereType<Map<String, dynamic>>()) {
         final c = SeenConnection.fromJson(item);
-        if (c != null && !isAdultHost(c.host)) _seen[c.id] = c;
+        if (c != null && !isAdultHost(c.host) && !_hidden(c.app)) _seen[c.id] = c;
       }
     } catch (_) {
       // an unreadable list is just not restored
@@ -357,7 +357,7 @@ class Connections extends Notifier<ConnectionsState> {
       if (entry is! Map<String, dynamic>) continue;
       final c = SeenConnection.fromClash(entry);
       // adult sites go through the VPN but are never listed
-      if (c == null || isAdultHost(c.host)) continue;
+      if (c == null || isAdultHost(c.host) || _hidden(c.app)) continue;
       open.add(c.id);
       _seen[c.id] = c;
     }
@@ -482,3 +482,6 @@ String serverFlags(Iterable<String> servers) {
   }
   return shown.join(' ');
 }
+
+/// Programs left out of the traffic lists: Google Drive for desktop syncs in the background and would fill them.
+bool _hidden(String app) => app.toLowerCase().contains('googledrivefs');

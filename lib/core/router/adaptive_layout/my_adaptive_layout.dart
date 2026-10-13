@@ -119,7 +119,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                                     alignment: Alignment.bottomCenter,
                                     // scrolls when the window is too short for the whole panel
                                     child: SingleChildScrollView(
-                                      child: SizedBox(width: 248, child: SideBarStatsOverview()),
+                                      // 15% wider than it was (248)
+                                      child: SizedBox(width: 285, child: SideBarStatsOverview()),
                                     ),
                                   ),
                                 )
@@ -172,8 +173,6 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     if (showProfilesAction && !isMobileBreakpoint)
       ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title, svg: NavIcons.profiles),
     ShellRouteAction(Icons.settings_rounded, t.pages.settings.title, svg: NavIcons.settings),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title, svg: NavIcons.logs),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title, svg: NavIcons.about),
   ];
 
   Widget _icon(ShellRouteAction e, {bool selected = false}) =>
