@@ -542,7 +542,7 @@ class _GraphiteRow extends StatelessWidget {
         // Glass: every row a see-through pane, the chosen one tinted with the scheme's colour
         color: glass != null
             ? (selected
-                  ? Color.alphaBlend(glass.accent.withValues(alpha: glass.dark ? .22 : .5), glass.panel)
+                  ? Color.alphaBlend(glass.tint(scheme.onSurface, glass.dark ? .22 : .5), glass.panel)
                   : glass.panel)
             : flooded
             ? scheme.surfaceContainerHigh

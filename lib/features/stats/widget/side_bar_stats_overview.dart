@@ -44,7 +44,11 @@ class SideBarStatsOverview extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final stats = ref.watch(statsNotifierProvider).asData?.value ?? SystemInfo.create();
+    // followed only while in sight: the phone's Statistics tab, hidden behind another tab, rebuilt every second
+    // and could cost a swipe a frame (it comes back up to date when shown again)
+    final visible = TickerMode.of(context);
+    T follow<T>(ProviderListenable<T> provider) => visible ? ref.watch(provider) : ref.read(provider);
+    final stats = follow(statsNotifierProvider).asData?.value ?? SystemInfo.create();
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final gradient = theme.araLook.gradient;
@@ -53,7 +57,7 @@ class SideBarStatsOverview extends ConsumerWidget {
     String speed(int bytes) => '${formatBytes(bytes, units)}${t.avpn.perSecond}';
 
     // the whole session's totals: the core's own counters restart at every reload (network or server change)
-    final session = ref.watch(sessionTotalsProvider);
+    final session = follow(sessionTotalsProvider);
     final total = session.up + session.down;
     final vpnUp = session.vpnUp;
     final vpnDown = session.vpnDown;
@@ -61,12 +65,12 @@ class SideBarStatsOverview extends ConsumerWidget {
     final direct = vpn == null ? null : (total - vpn).clamp(0, total);
     final share = vpn == null || total == 0 ? null : (vpn / total).clamp(0.0, 1.0);
     final onSpeed = gradient != null ? theme.araLook.onGradient : scheme.onPrimaryContainer;
-    final minute = ref.watch(speedHistoryProvider);
+    final minute = follow(speedHistoryProvider);
     // the Statistics tab picks the period; the sidebar always shows the last minute
     // the Statistics tab and the computer's sidebar pick the period; elsewhere it's the last minute
     final pickRange = large || PlatformUtils.isDesktop;
     final range = pickRange ? ref.watch(statsRangeProvider) : StatsRange.minute;
-    ref.watch(trafficHistoryProvider);
+    follow(trafficHistoryProvider);
     final series = range == StatsRange.minute ? null : ref.read(trafficHistoryProvider.notifier).series(range);
     final history = series?.points ?? minute;
     final periodName = switch (range) {
@@ -89,7 +93,7 @@ class SideBarStatsOverview extends ConsumerWidget {
       StatsRange.day => ['−24 ч', '−18', '−12', '−6', t.avpn.graphNow],
       StatsRange.all => [sinceLabel, '', '', '', t.avpn.graphToday],
     };
-    final quality = ref.watch(connectionQualityProvider);
+    final quality = follow(connectionQualityProvider);
     final downColor = theme.araLook.graphDown ?? onSpeed;
     final upColor = theme.araLook.graphUp ?? onSpeed.withValues(alpha: .7);
     // on a neon fill the text stays solid black: faded black reads as grey mud on the colour

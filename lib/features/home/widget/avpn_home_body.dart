@@ -584,7 +584,7 @@ class _GlassToggles extends StatelessWidget {
               child: GestureDetector(
                 onLongPress: item.hold,
                 child: Material(
-                  color: item.on ? look.accent.withValues(alpha: look.dark ? .3 : .75) : Colors.transparent,
+                  color: item.on ? look.tint(scheme.onSurface, look.dark ? .3 : .75) : Colors.transparent,
                   shape: const StadiumBorder(),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(

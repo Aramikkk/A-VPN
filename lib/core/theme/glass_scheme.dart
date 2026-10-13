@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
@@ -350,6 +348,24 @@ class GlassLook {
   final Color panel;
   final Color edge;
 
+  /// The accent laid over a pane at [alpha] (the chosen server's row, a toggle that's on), as strong as it can be
+  /// while [ink] (the text on it) still reads at 4.5:1: a dark accent by day or a light one by night is let fainter.
+  Color tint(Color ink, double alpha) {
+    var a = alpha;
+    var fill = Color.alphaBlend(accent.withValues(alpha: a), panelOnBase);
+    while (a > .05 && _contrast(ink, fill) < 4.5) {
+      a -= .03;
+      fill = Color.alphaBlend(accent.withValues(alpha: a), panelOnBase);
+    }
+    return accent.withValues(alpha: a);
+  }
+
+  static double _contrast(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    return ((la > lb ? la : lb) + .05) / ((la > lb ? lb : la) + .05);
+  }
+
   /// What a panel looks like laid on the backdrop, for working out readable colours on it.
   Color get panelOnBase => Color.alphaBlend(panel, Color.lerp(base, spots.first, dark ? .15 : .25)!);
 
@@ -418,9 +434,8 @@ class _BackdropPainter extends CustomPainter {
   bool shouldRepaint(_BackdropPainter old) => old.look != look;
 }
 
-/// A floating pane of glass: what's behind it blurred, the scheme's fill, a bright edge and a soft shadow. The menu
-/// and the connect panel are drawn on it; the cards in the pages are plain see-through fills (blurring each one
-/// would cost too much on a long list).
+/// A floating pane of glass: the scheme's fill lit along its top and a bright edge. The menu, the toggles and the
+/// connect panel are drawn on it.
 class GlassPane extends StatelessWidget {
   const GlassPane({super.key, required this.look, required this.child, this.radius = 30, this.padding});
 
@@ -432,29 +447,25 @@ class GlassPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shape = BorderRadius.circular(radius);
-    // no shadow: it shows through the see-through pane as a dirty band along its bottom
-    return ClipRRect(
-      borderRadius: shape,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: shape,
-            border: Border.all(color: look.edge),
-            // the light catching the top edge
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.alphaBlend(Colors.white.withValues(alpha: look.dark ? .05 : .12), look.panel),
-                look.panel,
-              ],
-            ),
-          ),
-          child: child,
+    // no shadow (it shows through the see-through pane as a dirty band along its bottom) and no live blur: the
+    // backdrop under the panes is soft already, and a blur redone every frame made swipes stutter (the connect
+    // panel slides with its tab)
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        borderRadius: shape,
+        border: Border.all(color: look.edge),
+        // the light catching the top edge
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.alphaBlend(Colors.white.withValues(alpha: look.dark ? .05 : .12), look.panel),
+            look.panel,
+          ],
         ),
       ),
+      child: child,
     );
   }
 }

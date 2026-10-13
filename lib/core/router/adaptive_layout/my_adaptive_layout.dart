@@ -152,17 +152,32 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                         child: GlassPane(
                           look: glass,
                           radius: 34,
-                          // icons only, the chosen tab on a pill of the scheme's colour, as in the preview
-                          child: NavigationBar(
-                            height: 64,
-                            backgroundColor: Colors.transparent,
-                            elevation: 0,
-                            labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-                            indicatorColor: glass.accent.withValues(alpha: glass.dark ? .28 : .75),
-                            indicatorShape: const StadiumBorder(),
-                            selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
-                            destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                            onDestinationSelected: (index) => _onTap(context, index),
+                          // icons only, the chosen tab on a pill of the scheme's colour, as in the preview; its icon in the
+                          // text's colour, readable on the pill
+                          child: NavigationBarTheme(
+                            data: NavigationBarTheme.of(context).copyWith(
+                              iconTheme: WidgetStateProperty.resolveWith(
+                                (s) => IconThemeData(
+                                  color: s.contains(WidgetState.selected)
+                                      ? Theme.of(context).colorScheme.onSurface
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            child: NavigationBar(
+                              height: 64,
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+                              indicatorColor: glass.tint(
+                                Theme.of(context).colorScheme.onSurface,
+                                glass.dark ? .28 : .75,
+                              ),
+                              indicatorShape: const StadiumBorder(),
+                              selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
+                              destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+                              onDestinationSelected: (index) => _onTap(context, index),
+                            ),
                           ),
                         ),
                       ),
