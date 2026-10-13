@@ -14,7 +14,8 @@ enum AraStyle {
   /// The look before 5.8: cards on white or black, the accent gradient on the speed block.
   classic;
 
-  static const fallback = graphite;
+  // a new install opens in Glass (its scheme: GlassScheme.fallback)
+  static const fallback = glass;
 }
 
 /// The three kinds of glass (each scheme has a day and a night look; by night Liquid turns smoky like Frost).

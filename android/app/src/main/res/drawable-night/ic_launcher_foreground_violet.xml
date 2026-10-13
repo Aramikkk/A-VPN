@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="680"
+    android:viewportHeight="680">
+    <!-- the peak: a mountain with a pass cut under it and a coloured summit, rounded; within the adaptive icon's
+         safe zone -->
+    <group android:pivotX="340" android:pivotY="345" android:scaleX="0.72" android:scaleY="0.72">
+        <path android:fillColor="#F5F5F5" android:strokeColor="#F5F5F5" android:strokeWidth="40"
+            android:strokeLineJoin="round" android:pathData="M120,520 L340,150 L560,520 Z"/>
+        <path android:fillColor="#111111" android:strokeColor="#111111" android:strokeWidth="16"
+            android:strokeLineJoin="round" android:pathData="M265,548 L340,395 L415,548 Z"/>
+        <path android:fillColor="#8B5CF6" android:strokeColor="#8B5CF6" android:strokeWidth="40"
+            android:strokeLineJoin="round" android:pathData="M340,150 L400.1,251 L279.9,251 Z"/>
+    </group>
+</vector>

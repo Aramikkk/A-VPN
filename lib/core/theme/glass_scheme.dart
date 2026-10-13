@@ -362,7 +362,8 @@ enum GlassScheme {
   /// the soft colour spots on the backdrop: top left, right, bottom left
   final List<Color> spots;
 
-  static const fallback = lemonade;
+  // a new install's scheme: the calm dark one with the light blue accent
+  static const fallback = azure;
 
   /// The scheme by day or by night: every scheme has both. By night the backdrop goes near-black with the same
   /// colour spots glowing through smoky glass (Clear keeps its brighter edges); by day it goes light with milky
