@@ -41,6 +41,16 @@ class LogPathResolver {
     return File(p.join(directory.path, "app.log"));
   }
 
+  /// The log kept on every device: a file a day, the last three days (see `file_sink_io.dart`).
+  Directory logsDir() {
+    return Directory(p.join(directory.path, "logs"));
+  }
+
+  /// Where the three days are put together when the user shares them.
+  File daysExportFile() {
+    return File(p.join(directory.path, "a-vpn-logs-3-days.txt"));
+  }
+
   /// Where the in-memory history is written when the user shares it. A
   /// separate name, so it never collides with the app.log the sink is still
   /// writing to on desktop.

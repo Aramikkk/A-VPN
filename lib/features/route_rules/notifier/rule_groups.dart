@@ -265,6 +265,32 @@ final socialDomains = _sorted([
 /// The social networks' addresses: their apps often connect by IP.
 const socialCidrs = blockedCidrs;
 
+/// The social networks' and messengers' apps on the phone.
+const socialApps = [
+  'com.instagram.android',
+  'com.instagram.barcelona', // Threads
+  'com.facebook.katana',
+  'com.facebook.orca', // Messenger
+  'com.facebook.lite',
+  'com.whatsapp',
+  'com.whatsapp.w4b',
+  'org.telegram.messenger',
+  'org.telegram.messenger.web',
+  'org.thunderdog.challegram', // Telegram X
+  'com.twitter.android',
+  'com.discord',
+  'com.zhiliaoapp.musically', // TikTok
+  'com.ss.android.ugc.trill',
+  'com.snapchat.android',
+  'com.linkedin.android',
+  'org.thoughtcrime.securesms', // Signal
+  'com.viber.voip',
+  // Meta's services preinstalled on the phone: they reach the same blocked servers
+  'com.facebook.appmanager',
+  'com.facebook.services',
+  'com.facebook.system',
+];
+
 final chinaDomains = _sorted([
   ..._chinaSites,
   ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d) && _isChina(d)),
@@ -278,7 +304,25 @@ final otherBlockedDomains = _sorted([
 ]);
 
 /// AnyDesk on the phone and on the computer.
-const otherBlockedApps = ['com.anydesk.anydeskandroid'];
+const otherBlockedApps = [
+  'com.anydesk.anydeskandroid',
+  'com.anydesk.adcontrol.ad1',
+  'com.adobe.lrmobile', // Lightroom
+  'com.adobe.psmobile', // Photoshop Express
+  'com.adobe.scan.android',
+  'com.adobe.reader',
+  'notion.id',
+  'com.soundcloud.android',
+  'tv.twitch.android.app',
+  'com.roblox.client',
+  'com.spotify.music',
+  'com.netflix.mediaclient',
+  'com.lemon.lvoverseas', // CapCut
+  'ru.fourpda.client', // 4PDA, blocked though Russian
+  'llc.itdev.incy',
+  'com.teslamotors.tesla', // Tesla's servers refuse Russian addresses
+  'io.tessie.app',
+];
 const otherBlockedProcesses = ['AnyDesk.exe', 'anydesk.exe'];
 
 /// The Chinese apps on the phone.
@@ -306,6 +350,13 @@ const chinaApps = [
   'com.qiyi.video',
   'com.youku.phone',
   'ctrip.english', // Trip.com
+  'com.alibaba.wireless', // 1688
+  'com.byd.bydautolink',
+  'com.midea.ai.overseas',
+  'com.roborock.smart',
+  'com.xiaomi.smarthome', // Mi Home
+  'com.cmlink.esim',
+  'com.multibyte.esender.jiedian',
 ];
 
 /// The AI apps on the phone: all their traffic through the VPN, whatever servers they use.
@@ -320,6 +371,8 @@ const aiApps = [
   'com.deepseek.chat',
   'ai.character.app',
   'com.quora.poe',
+  'ai.mainfunc.genspark',
+  'com.rokid.sprite.global.aiapp',
 ];
 
 /// Google's apps on the phone. The list is for the normal mode; "only blocked through the VPN" takes every

@@ -101,15 +101,18 @@ void main() {
 
   test('a group of sites and apps is two rules; every Google app goes by pattern', () {
     final apps = rules.where((r) => r.containsKey('package_name')).toList();
-    expect(apps.length, 5); // AI, Google, Chinese, AnyDesk, Russian
+    expect(apps.length, 6); // AI, Google, social, Chinese, the rest blocked, Russian
     expect(apps[0]['package_name'], containsAll(['com.openai.chatgpt', 'com.anthropic.claude']));
     expect(apps[1]['package_name'], contains('com.android.vending'));
     final pattern = RegExp((apps[1]['package_name_regex'] as List).single as String);
     expect(pattern.hasMatch('com.google.android.apps.nbu.files'), isTrue);
     expect(pattern.hasMatch('com.android.chrome'), isFalse);
-    expect(apps[2]['package_name'], containsAll(['com.tencent.mm', 'com.alibaba.aliexpresshd']));
-    expect(apps[3]['package_name'], ['com.anydesk.anydeskandroid']);
-    expect(apps[4]['outbound'], 'direct §hide§');
+    expect(apps[2]['package_name'], containsAll(['org.telegram.messenger', 'com.whatsapp', 'com.instagram.android']));
+    expect(apps[3]['package_name'], containsAll(['com.tencent.mm', 'com.alibaba.aliexpresshd']));
+    expect(apps[4]['package_name'], containsAll(['com.anydesk.anydeskandroid', 'notion.id', 'ru.fourpda.client']));
+    expect(apps[5]['outbound'], 'direct §hide§');
+    expect(apps[5]['package_name'], containsAll(['com.yandex.aliceapp', 'ru.sberbank_sbbol']));
+    expect(apps[5]['package_name'], isNot(contains('ru.fourpda.client')));
     // AnyDesk on the computer, by its program
     expect(rules.where((r) => r['process_name'] != null).single['process_name'], contains('AnyDesk.exe'));
     expect(rules.where((r) => r.containsKey('package_name') && r.containsKey('domain_suffix')), isEmpty);

@@ -12,6 +12,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/logger/logger.dart';
 import 'package:hiddify/core/logger/logger_setup.dart';
+import 'package:hiddify/core/logger/sinks/file_sink.dart';
 import 'package:hiddify/core/model/environment.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_migration.dart';
@@ -59,8 +60,8 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   );
 
   await _init("directories", () => container.read(appDirectoriesProvider.future));
-  // phase 2 — the folders exist, so app.log can be opened
-  logAddFile(container.read(logPathResolverProvider).appFile().path);
+  // phase 2 — the folders exist, so the log's folder can be opened
+  logAddFile(container.read(logPathResolverProvider).logsDir().path);
 
   final appInfo = await _init("app info", () => container.read(appInfoProvider.future));
   await _init("preferences", () => container.read(sharedPreferencesProvider.future));
@@ -93,10 +94,6 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
         .update(String.fromCharCodes([for (var i = 0; i < 24; i++) chars.codeUnitAt(random.nextInt(chars.length))]));
   }
 
-  // The log level decides this now. There is no second debug switch to keep in
-  // sync, and the core reaches the same conclusion from the same value.
-  final debug = kDebugMode || container.read(ConfigOptions.logLevel).isVerbose;
-
   if (PlatformUtils.isDesktop) {
     await _init("window controller", () => container.read(windowNotifierProvider.future));
 
@@ -110,12 +107,13 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
     }
     await _init("auto start service", () => container.read(autoStartNotifierProvider.future));
   }
-  // phase 3 — a log file is worth its cost on desktop, or while debugging.
-  // On a phone in release it only burns storage nobody reads.
-  await _init("logging", () async => logFinish(keepFile: debug || PlatformUtils.isDesktop));
+  // phase 3 — the log is kept everywhere, a file a day for three days, so a problem can be looked at later
+  await _init("logging", () async => logFinish(keepFile: true));
 
   // marks where this run begins, since the file now spans several
   logMarkRun(appInfo.format());
+  // what is still gathering goes to the file whenever the app leaves the screen: Android may close it after
+  AppLifecycleListener(onHide: flushLog, onPause: flushLog, onDetach: flushLog);
   Logger.bootstrap.info(appInfo.format());
 
   await _init("profile repository", () => container.read(profileRepositoryProvider.future));

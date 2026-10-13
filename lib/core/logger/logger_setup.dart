@@ -146,16 +146,14 @@ void _toConsole(LogRecord r) {
 
 // ---------------------------------------------------------------------- file
 
-/// Errors only.
-///
-/// The file exists to survive a crash, and everything quieter than an error is
-/// already somewhere better: the page reads the in-memory ring, and the engine
-/// keeps its own complete log in data/box.log. Narrowing it to errors is also
-/// what lets the file stay unbounded — it grows by the handful, not by the
-/// thousand.
+/// The engine's own records (sing-box and Xray: every connection at info) — only its warnings and errors go to
+/// the file; the app's from info up.
+const _engineLoggers = {'core.core', 'core.service', 'core.config'};
+
 void _toFile(LogRecord r) {
-  if (r.level < Level.SEVERE) return;
-  writeLogLine(formatRecord(r));
+  final engine = _engineLoggers.contains(r.loggerName);
+  if (r.level < (engine ? Level.WARNING : Level.INFO)) return;
+  writeLogLine(formatRecord(r), urgent: r.level >= Level.SEVERE);
 }
 
 /// Marks where a run begins, since the file now spans several of them.

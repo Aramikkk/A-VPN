@@ -112,7 +112,12 @@ enum BuiltinRule {
     // server that doesn't answer yet (an "LTE Only" one on Wi-Fi) stalls that download and the whole start.
     aiProxy => Rule(outbound: Outbound.proxy, domainSuffixes: aiDomains, packageNames: aiApps),
     googleProxy => Rule(outbound: Outbound.proxy, domainSuffixes: googleDomains, packageNames: googleApps),
-    socialProxy => Rule(outbound: Outbound.proxy, domainSuffixes: socialDomains, ipCidrs: socialCidrs),
+    socialProxy => Rule(
+      outbound: Outbound.proxy,
+      domainSuffixes: socialDomains,
+      ipCidrs: socialCidrs,
+      packageNames: socialApps,
+    ),
     chinaProxy => Rule(outbound: Outbound.proxy, domainSuffixes: chinaDomains, packageNames: chinaApps),
     blockedProxy => Rule(
       outbound: Outbound.proxy,

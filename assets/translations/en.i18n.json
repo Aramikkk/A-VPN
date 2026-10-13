@@ -396,7 +396,9 @@
       "fileSaveFailed": "Could not save the file",
       "coreLogLevel": "Core level",
       "coreLogLevelMsg": "Takes effect after reconnecting",
-      "buffer": "Buffer"
+      "buffer": "Buffer",
+      "daysLog": "Log of the last 3 days",
+      "daysLogMsg": "What the app and the core wrote in the last three days, in one file"
     },
     "about": {
       "title": "About",

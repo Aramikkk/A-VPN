@@ -191,4 +191,73 @@ const ruAppPackages = [
   'ru.sbcs.store',
   'ru.vk.store',
   'com.kaspersky.security.cloud',
+  // the ones on the owner's phone the list above missed
+  'com.yandex.aliceapp',
+  'com.yandex.searchapp',
+  'com.yandex.iot',
+  'com.yandex.internetometer',
+  'ru.yandex.androidkeyboard',
+  'ru.yandex.travel',
+  'ru.plus.bookmate',
+  'ru.zen.android',
+  'com.sdkit.search.app', // Салют / GigaChat
+  'ru.sberbank_sbbol',
+  'ru.sberins.insureapp.android',
+  'ru.tinkoff.sme',
+  'ru.vtb.smb',
+  'ru.mw', // QIWI
+  'ru.cardsmobile.mw3', // Кошелёк
+  'com.gnivts.selfemployed', // Мой налог
+  'ru.gosuslugi.auto',
+  'ru.gosuslugi.goskey',
+  'ru.sitesoft.fssp',
+  'ru.rt.key',
+  'ru.crptech.mark', // Честный знак
+  'platformaofd.ru',
+  'ru.tensor.sbis.droid.saby',
+  'com.ncloudtech.cloudoffice', // МойОфис
+  'ru.desktop.flutter_hbb', // RuDesktop
+  'com.ertelecom.agent', // Дом.ру
+  'com.ertelecom.smarthome',
+  'lc.deck.tattelecom',
+  'com.octopod.russianpost.client.android',
+  'com.logistic.sdek',
+  'ru.dellin.cabinet',
+  'ru.pecom.android',
+  'com.deliveryclub',
+  'com.apegroup.mcdonaldsrussia', // Вкусно — и точка
+  'ru.burgerking',
+  'ru.dodopizza.app',
+  'com.loyaltyplant.partner.frankbybasta',
+  'ru.napoleonit.kb', // Красное&Белое
+  'ru.x5.omni',
+  'ru.myspar',
+  'com.icemobile.lenta.prod',
+  'com.kazanexpress.ke_app', // Магнит Маркет
+  'travel.ozon.mobile',
+  'ru.citilink',
+  'ru.detmir.dmbonus',
+  'ru.apteka',
+  'com.sebbia.youdo',
+  'ru.hh.employer.android',
+  'ru.auto.ara',
+  'ru.autoteka.app',
+  'ru.drom.numbers',
+  'com.drive2',
+  'ru.haraba.new',
+  'ru.gorparkovki.federal',
+  'ru.parkomatica',
+  'com.hippoparking',
+  'com.carshering',
+  'com.punicapp.whoosh',
+  'ru.electrifly.facade',
+  'ru.nonstoppower.car',
+  'ru.gridcomrt.car',
+  'ru.kareta.app',
+  'lc.deck.airkazan',
+  'ru.kinomax',
+  'ru.korston.app',
+  'com.thermex.ru',
+  'com.polaris.iot',
+  'su.wrf.android.new',
 ];

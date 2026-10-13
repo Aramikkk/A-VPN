@@ -42,7 +42,6 @@ class LogsShareModal extends ConsumerWidget {
     final crash = paths.coreCrashFile();
 
     final files = <(String, String, File)>[
-      if (PlatformUtils.isDesktop) (t.pages.logs.errorLog, t.pages.logs.errorLogMsg, paths.appFile()),
       (t.pages.logs.coreLog, t.pages.logs.coreLogMsg, paths.coreFile()),
       // Absent until the core actually crashes, which is the point of it.
       if (crash != null) (t.pages.logs.coreCrash, t.pages.logs.coreCrashMsg, crash),
@@ -62,6 +61,22 @@ class LogsShareModal extends ConsumerWidget {
               ref.read(bottomSheetsNotifierProvider.notifier).showLogsRecent();
             },
           ),
+          // the last three days, put together in one file
+          if (logDayFiles().isNotEmpty)
+            ListTile(
+              leading: const Icon(FluentIcons.calendar_ltr_20_regular),
+              title: Text(t.pages.logs.daysLog),
+              subtitle: Text(t.pages.logs.daysLogMsg),
+              onTap: () async {
+                Navigator.of(context).pop();
+                final out = paths.daysExportFile();
+                final days = logDayFiles();
+                await out.writeAsString(
+                  [for (final f in days) '==== ${f.uri.pathSegments.last} ====\n${await f.readAsString()}'].join('\n'),
+                );
+                await _saveFileAs(out, t: t, notifications: notifications);
+              },
+            ),
           for (final (title, subtitle, file) in files)
             ListTile(
               leading: const Icon(FluentIcons.document_20_regular),

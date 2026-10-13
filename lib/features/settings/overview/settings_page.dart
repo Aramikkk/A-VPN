@@ -154,6 +154,11 @@ class SettingsPage extends HookConsumerWidget {
                 children: [
                   // TipCard(message: t.settings.experimentalMsg),
                   SettingsSection(
+                    title: t.pages.profiles.title,
+                    icon: Icons.view_list_rounded,
+                    namedLocation: context.namedLocation('profiles'),
+                  ),
+                  SettingsSection(
                     title: t.pages.settings.general.title,
                     icon: Icons.layers_rounded,
                     namedLocation: context.namedLocation('general'),

@@ -226,6 +226,25 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   path: '/settings',
                   builder: (_, _) => FocusScope(node: branchesScope['settings'], child: settingsWidth(SettingsPage())),
                   routes: <GoRoute>[
+                    // the profiles, from Settings, where there's no tab of their own (the phone, or no profile yet)
+                    if (!showProfilesAction)
+                      GoRoute(
+                        name: 'profiles',
+                        path: 'profiles',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.fade, state.pageKey, const ProfilesPage()),
+                        routes: <GoRoute>[
+                          GoRoute(
+                            name: 'profileDetails',
+                            path: 'profile-details/:id',
+                            pageBuilder: (_, state) => customTransition(
+                              TransitionType.fade,
+                              state.pageKey,
+                              ProfileDetailsPage(id: state.pathParameters['id']!),
+                            ),
+                          ),
+                        ],
+                      ),
                     GoRoute(
                       name: 'general',
                       path: 'general',
