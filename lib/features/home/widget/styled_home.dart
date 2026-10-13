@@ -765,35 +765,46 @@ class _GraphiteDock extends ConsumerWidget {
     final delay = inUse?.urlTestDelay ?? 0;
     final pinged = on && delay > 0 && delay < 65000;
     final accent = theme.araLook.neonFill ?? scheme.primary;
-    final buttonSize = large ? 56.0 : 50.0;
-    Widget round({required Widget icon, VoidCallback? onTap}) => IconButton.filledTonal(
-      style: IconButton.styleFrom(
-        backgroundColor: scheme.surfaceContainerHighest,
-        foregroundColor: scheme.onSurface,
-        disabledBackgroundColor: scheme.surfaceContainerHighest.withValues(alpha: .5),
-        disabledForegroundColor: scheme.onSurfaceVariant,
-        fixedSize: Size.square(buttonSize),
+    // the side icons and the ping in the accent (by day a light accent goes to the text colour); grey while off
+    final ink = on
+        ? (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface)
+        : scheme.onSurfaceVariant;
+    final caption = theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant);
+    final iconSize = large ? 28.0 : 26.0;
+    // no plates: an icon (or a number) over a small caption, pressed as one
+    Widget side({required Widget top, required String label, VoidCallback? onTap}) => InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        // shrinks rather than overflows on the narrowest screens
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: iconSize + 2,
+                child: Center(child: top),
+              ),
+              const Gap(4),
+              Text(label, style: caption),
+            ],
+          ),
+        ),
       ),
-      onPressed: onTap,
-      icon: icon,
     );
-    // the gauge ring in the middle; the ping check on its left and the servers answering on its right
+    // the glowing gauge in the middle; the ping check on its left and the servers answering on its right
     final content = Row(
       children: [
         Expanded(
           child: Center(
-            child: Tooltip(
-              message: t.avpn.stPingButton,
-              child: round(
-                icon: on && testing
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
-                      )
-                    : AraIconPaint(enabled: on, child: const Icon(Icons.network_ping_rounded, size: 22)),
-                onTap: on && !busy && !testing ? onCheck : null,
-              ),
+            child: side(
+              top: on && testing
+                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: ink))
+                  : Icon(Icons.network_ping_rounded, size: iconSize, color: ink),
+              label: t.avpn.stPingButton,
+              onTap: on && !busy && !testing ? onCheck : null,
             ),
           ),
         ),
@@ -810,27 +821,29 @@ class _GraphiteDock extends ConsumerWidget {
             child: Semantics(
               label: t.avpn.dockServersAnswering(count: answering),
               child: ExcludeSemantics(
-                child: Badge(
-                  isLabelVisible: on && answering > 0,
-                  label: Text('$answering', style: const TextStyle(fontWeight: FontWeight.w900)),
-                  backgroundColor: accent,
-                  textColor: AraLook.contrast(accent, Colors.black) >= AraLook.contrast(accent, Colors.white)
-                      ? Colors.black
-                      : Colors.white,
-                  offset: const Offset(2, -2),
-                  child: round(
-                    icon: AraIconPaint(enabled: on, child: const Icon(Icons.dns_rounded, size: 22)),
-                    // the answering servers in a compact list, the fastest first; one tapped is chosen
-                    onTap: on && answering > 0
-                        ? () => showModalBottomSheet<void>(
-                            context: context,
-                            showDragHandle: true,
-                            isScrollControlled: true,
-                            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
-                            builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
-                          )
-                        : null,
+                child: side(
+                  top: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.dns_rounded, size: iconSize - 2, color: ink),
+                      const Gap(6),
+                      Text(
+                        on ? '$answering' : '—',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1),
+                      ),
+                    ],
                   ),
+                  label: t.avpn.dockActive,
+                  // the answering servers in a compact list, the fastest first; one tapped is chosen
+                  onTap: on && answering > 0
+                      ? () => showModalBottomSheet<void>(
+                          context: context,
+                          showDragHandle: true,
+                          isScrollControlled: true,
+                          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
+                          builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
+                        )
+                      : null,
                 ),
               ),
             ),
@@ -918,7 +931,7 @@ class _Orb extends HookWidget {
                 fill: filled,
                 busy: busy,
                 rotation: spin.value,
-                width: size * .07,
+                width: size * .085,
               ),
               child: child,
             ),
@@ -997,14 +1010,29 @@ class _RingPainter extends CustomPainter {
       ..strokeWidth = width
       ..strokeCap = StrokeCap.round
       ..color = c;
+    // no gauge until a ping is in: off, or connected and not pinged yet, just the button; it fades in as the
+    // fill grows from nothing (a ping always fills at least .06)
+    final shown = (fill / .06).clamp(0.0, 1.0);
+    if (shown > 0) canvas.drawArc(ring, _start, _sweep, false, stroke(track.withValues(alpha: track.a * shown)));
     if (busy) {
-      // connecting: the whole circle as the track, a short arc going round
-      canvas.drawArc(ring, 0, math.pi * 2, false, stroke(track));
-      canvas.drawArc(ring, rotation * 2 * math.pi - math.pi / 2, math.pi * .6, false, stroke(color));
+      // connecting: a short arc running along the gauge's path there and back, no track under it
+      const piece = _sweep * .25;
+      final there = rotation < .5 ? rotation * 2 : 2 - rotation * 2;
+      final at = Curves.easeInOut.transform(there);
+      canvas.drawArc(ring, _start + (_sweep - piece) * at, piece, false, stroke(color));
       return;
     }
-    canvas.drawArc(ring, _start, _sweep, false, stroke(track));
-    if (fill > 0.001) canvas.drawArc(ring, _start, _sweep * fill, false, stroke(color));
+    if (fill > 0.001) {
+      // a soft neon glow under the fill, then the fill itself
+      canvas.drawArc(
+        ring,
+        _start,
+        _sweep * fill,
+        false,
+        stroke(color.withValues(alpha: .55))..maskFilter = MaskFilter.blur(BlurStyle.normal, width * .7),
+      );
+      canvas.drawArc(ring, _start, _sweep * fill, false, stroke(color));
+    }
   }
 
   @override

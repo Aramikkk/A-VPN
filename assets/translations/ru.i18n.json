@@ -212,6 +212,7 @@
     "daysShort": "$days дн.",
     "stNotProtected": "не защищено",
     "stPingButton": "Пинг",
+    "dockActive": "активных",
     "dockServersAnswering": "Отвечают на пинг: $count",
     "topoServerCount": "Серверов",
     "topoFlow": "Трафик",

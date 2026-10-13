@@ -212,6 +212,7 @@
     "daysShort": "$days d",
     "stNotProtected": "not protected",
     "stPingButton": "Ping",
+    "dockActive": "active",
     "dockServersAnswering": "Answering their ping: $count",
     "topoServerCount": "Servers",
     "topoFlow": "Traffic",
