@@ -733,7 +733,11 @@ class EverythingElseTile extends ConsumerWidget {
                     style: const ButtonStyle(visualDensity: VisualDensity.compact),
                     segments: [
                       const ButtonSegment(value: false, label: Text('VPN')),
-                      ButtonSegment(value: true, label: Text(routing.outcomeDirect)),
+                      // a label of its own, so a capital letter, as «VPN» beside it (in a sentence it's «напрямую»)
+                      ButtonSegment(
+                        value: true,
+                        label: Text(routing.outcomeDirect[0].toUpperCase() + routing.outcomeDirect.substring(1)),
+                      ),
                     ],
                     selected: {direct},
                     onSelectionChanged: (value) async {

@@ -106,6 +106,16 @@ enum GlassScheme {
     Color(0xFFDDE0E4),
     Color(0xFFC2C7CD),
   ], calm: true),
+  tangerine(GlassVariant.liquid, Color(0xFFFF8A00), Color(0xFFEDEDEF), [
+    Color(0xFFD5D6DA),
+    Color(0xFFE6E6E9),
+    Color(0xFFC9CACF),
+  ], calm: true),
+  sunflower(GlassVariant.liquid, Color(0xFFFFC107), Color(0xFFEEEDEF), [
+    Color(0xFFD8D5DA),
+    Color(0xFFE8E6E9),
+    Color(0xFFCCC8CF),
+  ], calm: true),
   // Frost: smoky panels over black, the colour glowing through
   midnight(GlassVariant.frost, Color(0xFFFFE600), Color(0xFF07070B), [
     Color(0xFFFFE600),
@@ -207,6 +217,26 @@ enum GlassScheme {
     Color(0xFF222222),
     Color(0xFF3A3A3A),
   ], calm: true),
+  ruby(GlassVariant.frost, Color(0xFFFF453A), Color(0xFF0B0A0A), [
+    Color(0xFF2E2A2A),
+    Color(0xFF1E1C1C),
+    Color(0xFF363232),
+  ], calm: true),
+  orchid(GlassVariant.frost, Color(0xFFBF5AF2), Color(0xFF0A0A0C), [
+    Color(0xFF2B2A30),
+    Color(0xFF1C1C21),
+    Color(0xFF34333A),
+  ], calm: true),
+  azure(GlassVariant.frost, Color(0xFF40C8FF), Color(0xFF0A0B0C), [
+    Color(0xFF272A2E),
+    Color(0xFF1B1D20),
+    Color(0xFF31353A),
+  ], calm: true),
+  turquoise(GlassVariant.frost, Color(0xFF2EE6C9), Color(0xFF0A0B0B), [
+    Color(0xFF282C2C),
+    Color(0xFF1B1F1F),
+    Color(0xFF323737),
+  ], calm: true),
   // Clear: nearly clear panels with bright edges over a calm backdrop
   frostbite(GlassVariant.clear, Color(0xFF2F7BFF), Color(0xFFDCE3EE), [
     Color(0xFF8FB8FF),
@@ -302,6 +332,16 @@ enum GlassScheme {
     Color(0xFFC8CBD0),
     Color(0xFFE8E9EC),
     Color(0xFFBFC3C9),
+  ], calm: true),
+  jade(GlassVariant.clear, Color(0xFF1FA855), Color(0xFFD9DBDA), [
+    Color(0xFFC3C8C5),
+    Color(0xFFE2E4E3),
+    Color(0xFFB8BEBB),
+  ], calm: true),
+  lime(GlassVariant.clear, Color(0xFF8BC926), Color(0xFFDADAE0), [
+    Color(0xFFC5C5CE),
+    Color(0xFFE3E3E8),
+    Color(0xFFBABAC4),
   ], calm: true);
 
   const GlassScheme(this.variant, this.accent, this.base, this.spots, {this.calm = false});

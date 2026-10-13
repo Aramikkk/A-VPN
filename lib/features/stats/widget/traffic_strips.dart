@@ -125,13 +125,18 @@ class _StripMap extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    // a calm Glass scheme keeps its colour to the text: the VPN strip in a light grey (dark one by day), the
-    // direct one in the usual grey
-    final calm = theme.araLook.glass?.calm ?? false;
+    // Glass: both strips in the scheme's colour, the VPN one a little deeper, the direct one a little lighter
+    final glass = theme.araLook.glass;
+    final calm = glass?.calm ?? false;
+    Color deeper(Color c) {
+      final hsl = HSLColor.fromColor(c);
+      return hsl.withLightness((hsl.lightness - .08).clamp(0.0, 1.0)).toColor();
+    }
+
     final base = switch (strip.route) {
+      ConnectionRoute.vpn when glass != null => deeper(glass.accent),
+      ConnectionRoute.direct when glass != null => Color.lerp(glass.accent, Colors.white, .45)!,
       // the theme's own colour, as on the chosen server and the power button
-      ConnectionRoute.vpn when calm =>
-        theme.brightness == Brightness.dark ? const Color(0xFFD6D6DC) : const Color(0xFF4E4E57),
       ConnectionRoute.vpn => theme.araLook.neonFill ?? scheme.primary,
       ConnectionRoute.direct => const Color(0xFF9AA0A6),
       ConnectionRoute.block => scheme.error,

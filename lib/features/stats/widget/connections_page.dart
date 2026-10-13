@@ -262,10 +262,44 @@ String connectionAppName(Translations t, Map<String, InstalledApp> apps, String 
     app.isEmpty ? t.avpn.connUnknownApp : (apps[app]?.name ?? _shortApp(app));
 
 /// "C:\Program Files\Google\Chrome\Application\chrome.exe" → "chrome"; a package keeps its last parts.
+///
+/// Two programs with the same file name (Claude's app and Claude Code are both claude.exe) are told apart by a
+/// folder in their paths: "Claude" and "Claude Code".
 String _shortApp(String app) {
-  final file = app.split(RegExp(r'[\\/]')).last;
-  if (file.toLowerCase().endsWith('.exe')) return file.substring(0, file.length - 4);
-  return file;
+  final parts = app.split(RegExp(r'[\\/]'));
+  final file = parts.last;
+  if (!file.toLowerCase().endsWith('.exe')) return file;
+  final stem = file.substring(0, file.length - 4);
+  final same = _byStem.putIfAbsent(stem.toLowerCase(), () => <String>{})..add(app);
+  if (same.length < 2) return stem;
+  final hint = _folderHint(parts.sublist(0, parts.length - 1));
+  if (hint == null) return stem;
+  final pretty = hint
+      .split(RegExp(r'[-_ ]+'))
+      .where((w) => w.isNotEmpty)
+      .map((w) => w[0].toUpperCase() + w.substring(1))
+      .join(' ');
+  return pretty.toLowerCase().contains(stem.toLowerCase()) ? pretty : '$stem ($pretty)';
+}
+
+/// The programs seen, by their file name without .exe
+final _byStem = <String, Set<String>>{};
+
+/// The nearest folder above a program that names it: not a version, a hash or a generic one ("app", "bin"…); a
+/// Store package's folder ("Claude_2.31226.1.0_x64__pzs8…") by its name's start.
+String? _folderHint(List<String> folders) {
+  const generic = {
+    'app', 'bin', 'application', 'resources', 'current', 'x64', 'x86', 'localcache', 'roaming', 'local', //
+    'packages', 'appdata', 'program files', 'program files (x86)', 'windowsapps', 'users', 'programs',
+  };
+  for (final folder in folders.reversed) {
+    final name = folder.contains('__') ? folder.split('_').first : folder;
+    final lower = name.toLowerCase();
+    if (lower.isEmpty || generic.contains(lower) || lower.endsWith(':')) continue;
+    if (RegExp(r'^(app-)?v?[\d.]+$').hasMatch(lower) || RegExp(r'^[0-9a-f]{8,}$').hasMatch(lower)) continue;
+    return name;
+  }
+  return null;
 }
 
 class _Count extends StatelessWidget {

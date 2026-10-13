@@ -168,7 +168,10 @@ class SideBarStatsOverview extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _Caption(pickRange ? t.avpn.statsSpeedNow : t.avpn.statsSpeed, color: soft(.8))),
+              // the narrow sidebar says just «Скорость»: «Скорость сейчас» ran into «Трафик за 1 мин» and was cut
+              Expanded(
+                child: _Caption(pickRange && large ? t.avpn.statsSpeedNow : t.avpn.statsSpeed, color: soft(.8)),
+              ),
               if (period != null)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,

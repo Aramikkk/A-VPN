@@ -135,6 +135,18 @@ void main() {
     expect(ruleLabel('rule_set=[ads] => reject', t), 'ads');
   });
 
+  test('two programs with the same file name are told apart by their folders', () async {
+    final t = await AppLocale.ru.build();
+    const desktop = r'C:\Program Files\WindowsApps\Claude_2.31226.1.0_x64__pzs8sxrjxfjjc\app\claude.exe';
+    const code =
+        r'C:\Users\u\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\2.1.295\d2e29494ec83\claude.exe';
+    expect(connectionAppName(t, const {}, r'C:\Program Files\Google\Chrome\Application\chrome.exe'), 'chrome');
+    connectionAppName(t, const {}, desktop);
+    connectionAppName(t, const {}, code);
+    expect(connectionAppName(t, const {}, desktop), 'Claude');
+    expect(connectionAppName(t, const {}, code), 'Claude Code');
+  });
+
   test('older closed connections added up keep their traffic and their count', () {
     final a = _sample[3].closed();
     final b = _sample[4].closed();

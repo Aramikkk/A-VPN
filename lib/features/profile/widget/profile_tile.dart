@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -171,7 +172,8 @@ class ProfileTile extends HookConsumerWidget {
   /// pin badge on list rows when the profile is pinned.
   Widget _title(TranslationsEn t, ThemeData theme) {
     final nameText = Text(
-      profile.name,
+      // the provider calls the profile «Доступ»; the app calls it Sigma, as on the home screen
+      sigmaName(profile.name),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       style: theme.textTheme.titleMedium?.copyWith(fontFamily: PlatformUtils.isWindows ? FontFamily.emoji : null),

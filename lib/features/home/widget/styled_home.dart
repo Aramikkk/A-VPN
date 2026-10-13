@@ -410,12 +410,17 @@ class _StyledServerList extends ConsumerWidget {
             final auto = server.tag == 'lowest';
             // "Финляндия" with "Sigma · VLESS" under it, rather than "Sigma - Финляндия"
             final dash = name.title.indexOf(' - ');
-            final title = auto
-                ? t.avpn.auto
-                : _marked(dash < 0 ? name.title : name.title.substring(dash + 3).trim(), name.title);
+            // a note in brackets at the end ("Финляндия (Тестовый)") goes to the line under: "Тестовый · Sigma · VLESS"
+            final full = _marked(dash < 0 ? name.title : name.title.substring(dash + 3).trim(), name.title);
+            final note = RegExp(r'\s*\(([^()]*)\)$').firstMatch(full);
+            final title = auto ? t.avpn.auto : (note == null ? full : full.substring(0, note.start).trim());
             final subtitle = auto
                 ? (autoNow == null ? t.avpn.autoBestHint : '${t.avpn.stNow}: ${_withFlag(serverName(autoNow!))}')
-                : [if (dash > 0) name.title.substring(0, dash).trim(), server.type.toUpperCase()].join(' · ');
+                : [
+                    if (note != null) note[1]!,
+                    if (dash > 0) name.title.substring(0, dash).trim(),
+                    server.type.toUpperCase(),
+                  ].join(' · ');
             void select() => ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
             return editorial
                 ? _EditorialRow(
@@ -781,10 +786,12 @@ class _GraphiteDock extends ConsumerWidget {
                 // ON / OFF are short: the larger size fits either way
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              // "Авто" on one line and the country under it, so a long name isn't cut
+              // "Авто" on one line and the country under it, so a long name isn't cut; a note in brackets at the
+              // end ("Финляндия (Тестовый)") on a line of its own
               Text(
-                server?.replaceFirst(' · ', '\n') ?? t.avpn.stNotProtected,
-                maxLines: 2,
+                server?.replaceFirst(' · ', '\n').replaceFirstMapped(RegExp(r' (\([^()]*\))$'), (m) => '\n${m[1]}') ??
+                    t.avpn.stNotProtected,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: (large ? theme.textTheme.bodyMedium : theme.textTheme.bodySmall)?.copyWith(
                   color: scheme.onSurfaceVariant,
