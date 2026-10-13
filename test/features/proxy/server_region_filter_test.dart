@@ -61,19 +61,17 @@ void main() {
     }
   });
 
-  test('CIS only: the CIS with Kazakhstan, and the whitelist servers but the Russian and Belarusian ones', () {
+  test('World and CIS: every country but Russia and Belarus, the whitelist servers too', () {
     bool keep(String tag) => ServerRegionFilter.keepCis(tag);
     expect(keep('🇰🇿 Доступ - Казахстан § 48'), isTrue);
-    expect(keep('🇦🇲 Доступ - Армения § 35'), isTrue);
-    expect(keep('🇺🇿 Доступ - Узбекистан § 43'), isTrue);
-    expect(keep('🇬🇪 Доступ - Грузия § 42'), isTrue);
+    expect(keep('🇺🇸 Доступ - США Atlanta § 44'), isTrue);
+    expect(keep('🇩🇪 Доступ - Германия § 36'), isTrue);
     expect(keep('🇷🇺 Доступ - Россия § 7'), isFalse);
     expect(keep('🇧🇾 Доступ - Беларусь § 8'), isFalse);
-    expect(keep('🇩🇪 Доступ - Германия § 36'), isFalse);
     expect(keep('🇪🇪 LTE Only - Эстония § 2'), isTrue);
-    expect(keep('🇩🇪 LTE Only -  Германия § 3'), isTrue);
     expect(keep('🇷🇺 LTE Only - Россия § 0'), isFalse);
     expect(keep('🇧🇾 LTE Only - Беларусь § 1'), isFalse);
+    expect(keep('🇷🇺 Белый список - Россия § 53'), isFalse);
   });
 
   test('keeps servers whose country is unknown', () {

@@ -21,15 +21,12 @@ abstract class ServerRegionFilter {
     'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'SM', 'UA', 'VA', 'XK',
   };
 
-  /// The CIS and its neighbours without Russia and Belarus: Armenia, Azerbaijan, Georgia, Kazakhstan,
-  /// Kyrgyzstan, Moldova, Tajikistan, Turkmenistan, Uzbekistan.
-  static const cis = {'AM', 'AZ', 'GE', 'KZ', 'KG', 'MD', 'TJ', 'TM', 'UZ'};
-
-  /// Whether a server stays in CIS only: one of [cis]; a mobile-only (whitelist) one from anywhere but Russia
-  /// and Belarus, so a mobile network still switches to the whitelist servers.
+  /// "World and CIS": every country of the subscription but Russia and Belarus, the regular servers and the
+  /// whitelist ones alike (a mobile network still switches to the whitelist servers). A server whose country
+  /// can't be told stays.
   static bool keepCis(String tag) {
     final code = countryCode(tag);
-    return isMobileOnly(tag) ? code != 'RU' && code != 'BY' : cis.contains(code);
+    return code != 'RU' && code != 'BY';
   }
 
   /// For names without a flag: country name (lower case, Russian or English) to ISO code.
@@ -235,7 +232,7 @@ abstract class ServerRegionFilter {
       }
 
       if (cisOnly) {
-        shown = narrow(shown, keepCis, 'CIS');
+        shown = narrow(shown, keepCis, 'World and CIS');
       } else if (europeOnly) {
         shown = narrow(shown, keep, 'European');
       }

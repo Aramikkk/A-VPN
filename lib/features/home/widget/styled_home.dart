@@ -750,70 +750,74 @@ class _GraphiteDock extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final on = status.isConnected;
     final busy = status.isSwitching;
-    final title = switch (status) {
-      Connected() => t.avpn.stOn,
-      Connecting() => t.avpn.connecting,
-      Disconnecting() => t.avpn.disconnecting,
-      Disconnected() => t.avpn.stOffShort,
-    };
     final glass = theme.araLook.glass;
     final padding = large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10);
+    // the servers answering their ping right now (a test that timed out or never ran doesn't count)
+    final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    final answeringServers = [
+      for (final item in group?.items ?? <OutboundInfo>[])
+        if (!item.isGroup && item.isVisible && item.urlTestDelay > 0 && item.urlTestDelay < 65000) item,
+    ]..sort((a, b) => a.urlTestDelay.compareTo(b.urlTestDelay));
+    final answering = answeringServers.length;
+    final side = theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: large ? 15 : 14);
+    Widget pill({required Widget icon, required String label, VoidCallback? onTap}) => FilledButton.icon(
+      style: FilledButton.styleFrom(
+        backgroundColor: scheme.surfaceContainerHighest,
+        foregroundColor: scheme.onSurface,
+        disabledBackgroundColor: scheme.surfaceContainerHighest.withValues(alpha: .5),
+        disabledForegroundColor: scheme.onSurfaceVariant,
+        minimumSize: Size(large ? 118 : 104, large ? 54 : 48),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        textStyle: side,
+      ),
+      onPressed: onTap,
+      icon: icon,
+      label: Text(label),
+    );
+    // the ring button in the middle; the ping check on its left and the servers answering on its right, the same
+    // size, so the panel is even
     final content = Row(
       children: [
-        _Orb(on: on, busy: busy, size: large ? 92 : 74, onTap: busy ? null : () => _toggleConnection(ref)),
-        const Gap(14),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                // ON / OFF are short: the larger size fits either way
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              // "Авто" on one line and the country under it, so a long name isn't cut; a note in brackets at the
-              // end ("Финляндия (Тестовый)") on a line of its own
-              Text(
-                server?.replaceFirst(' · ', '\n').replaceFirstMapped(RegExp(r' (\([^()]*\))$'), (m) => '\n${m[1]}') ??
-                    t.avpn.stNotProtected,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: (large ? theme.textTheme.bodyMedium : theme.textTheme.bodySmall)?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          child: Center(
+            child: pill(
+              icon: on && testing
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
+                    )
+                  : AraIconPaint(enabled: on, child: const Icon(Icons.network_ping_rounded, size: 18)),
+              label: t.avpn.stPingButton,
+              onTap: on && !busy && !testing ? onCheck : null,
+            ),
           ),
         ),
-        // connected: check the servers' ping (the ring button disconnects); off: the ring button connects
-        if (on) ...[
-          const Gap(8),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: on ? scheme.surfaceContainerHighest : scheme.primary,
-              foregroundColor: on ? scheme.onSurface : scheme.onPrimary,
-              padding: large
-                  ? const EdgeInsets.symmetric(horizontal: 14, vertical: 18)
-                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: large ? 15 : 14),
+        _Orb(on: on, busy: busy, size: large ? 92 : 74, onTap: busy ? null : () => _toggleConnection(ref)),
+        Expanded(
+          child: Center(
+            child: Semantics(
+              label: t.avpn.dockServersAnswering(count: answering),
+              child: ExcludeSemantics(
+                child: pill(
+                  icon: AraIconPaint(enabled: on, child: const Icon(Icons.dns_rounded, size: 18)),
+                  label: on ? '$answering' : '—',
+                  // shown, not pressed: it only counts
+                  // the answering servers in a compact list, the fastest first; one tapped is chosen
+                  onTap: on && answering > 0
+                      ? () => showModalBottomSheet<void>(
+                          context: context,
+                          showDragHandle: true,
+                          isScrollControlled: true,
+                          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
+                          builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
+                        )
+                      : null,
+                ),
+              ),
             ),
-            onPressed: busy || (on && testing) ? null : (on ? onCheck : () => _toggleConnection(ref)),
-            icon: on && testing
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
-                  )
-                : AraIconPaint(
-                    enabled: on,
-                    child: Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
-                  ),
-            label: Text(on ? t.avpn.stPingButton : t.avpn.stConnect),
           ),
-        ],
+        ),
       ],
     );
     // Glass: floating over the backdrop, what's behind it blurred
@@ -1117,6 +1121,69 @@ class _HomeTraffic extends ConsumerWidget {
             // in the middle of the card when they take less room than it has; cut at its foot when more
             : Center(child: strips),
       ),
+    );
+  }
+}
+
+/// The servers answering their ping, the fastest first, compact: a flag, the name and the ping on one line each.
+/// Tapping one chooses it (the Auto group stops choosing for you) and closes the list.
+class _AnsweringSheet extends ConsumerWidget {
+  const _AnsweringSheet({required this.servers, required this.selected});
+
+  final List<OutboundInfo> servers;
+  final String? selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+          child: Text(
+            t.avpn.dockServersAnswering(count: servers.length),
+            style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        Flexible(
+          child: ListView.builder(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+            itemCount: servers.length,
+            itemBuilder: (context, i) {
+              final server = servers[i];
+              final name = serverName(server);
+              final chosen = server.tag == selected;
+              return ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                selected: chosen,
+                selectedTileColor: scheme.primary.withValues(alpha: .12),
+                leading: Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 22, fontFamilyFallback: ['Emoji'])),
+                title: Text(
+                  _marked(name.title.contains(' - ') ? name.title.split(' - ').last.trim() : name.title, name.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: chosen ? FontWeight.w800 : FontWeight.w600,
+                    color: chosen ? scheme.primary : null,
+                  ),
+                ),
+                trailing: _Delay(delay: server.urlTestDelay, testing: false),
+                onTap: () {
+                  ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
+                  Navigator.of(context).pop();
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
