@@ -125,8 +125,13 @@ class _StripMap extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    // a calm Glass scheme keeps its colour to the text: the VPN strip in a light grey (dark one by day), the
+    // direct one in the usual grey
+    final calm = theme.araLook.glass?.calm ?? false;
     final base = switch (strip.route) {
       // the theme's own colour, as on the chosen server and the power button
+      ConnectionRoute.vpn when calm =>
+        theme.brightness == Brightness.dark ? const Color(0xFFD6D6DC) : const Color(0xFF4E4E57),
       ConnectionRoute.vpn => theme.araLook.neonFill ?? scheme.primary,
       ConnectionRoute.direct => const Color(0xFF9AA0A6),
       ConnectionRoute.block => scheme.error,
@@ -155,7 +160,9 @@ class _StripMap extends ConsumerWidget {
             '$title · $share%',
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w800,
-              color: AraLook.readableOn(base, scheme.surfaceContainerLow),
+              color: calm && strip.route == ConnectionRoute.vpn
+                  ? scheme.primary
+                  : AraLook.readableOn(base, scheme.surfaceContainerLow),
             ),
           ),
         ),

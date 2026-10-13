@@ -562,7 +562,12 @@ class _GraphiteRow extends StatelessWidget {
           // by day soft grey frames (black ones looked heavy), the chosen one a darker grey and thicker
           side: glass != null
               ? (selected
-                    ? BorderSide(color: glass.dark ? glass.accent : Colors.white, width: 1.8)
+                    ? BorderSide(
+                        color: glass.calm
+                            ? glass.edge.withValues(alpha: 1)
+                            : (glass.dark ? glass.accent : Colors.white),
+                        width: 1.8,
+                      )
                     : BorderSide(color: glass.edge, width: 1.2))
               : selected
               ? BorderSide(
@@ -584,7 +589,7 @@ class _GraphiteRow extends StatelessWidget {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: selected
+                    color: selected && !(glass?.calm ?? false)
                         ? scheme.primary.withValues(alpha: dark ? .22 : .14)
                         : scheme.surfaceContainerHighest.withValues(alpha: dark ? .7 : 1),
                     borderRadius: BorderRadius.circular(13),

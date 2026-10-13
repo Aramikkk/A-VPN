@@ -91,6 +91,21 @@ enum GlassScheme {
     Color(0xFFFFE57F),
     Color(0xFF80D8FF),
   ]),
+  ash(GlassVariant.liquid, Color(0xFF2B6CF0), Color(0xFFEDEDEF), [
+    Color(0xFFD5D6DA),
+    Color(0xFFE6E6E9),
+    Color(0xFFC9CACF),
+  ], calm: true),
+  chalk(GlassVariant.liquid, Color(0xFFB58900), Color(0xFFF1F0EC), [
+    Color(0xFFDEDCD5),
+    Color(0xFFE9E8E3),
+    Color(0xFFD2D0C8),
+  ], calm: true),
+  steel(GlassVariant.liquid, Color(0xFF1E7FD8), Color(0xFFE6E8EB), [
+    Color(0xFFCDD1D6),
+    Color(0xFFDDE0E4),
+    Color(0xFFC2C7CD),
+  ], calm: true),
   // Frost: smoky panels over black, the colour glowing through
   midnight(GlassVariant.frost, Color(0xFFFFE600), Color(0xFF07070B), [
     Color(0xFFFFE600),
@@ -177,6 +192,21 @@ enum GlassScheme {
     Color(0xFFAB47BC),
     Color(0xFF5C6BC0),
   ]),
+  onyx(GlassVariant.frost, Color(0xFFFFD60A), Color(0xFF0A0A0B), [
+    Color(0xFF2A2A2E),
+    Color(0xFF1C1C20),
+    Color(0xFF333338),
+  ], calm: true),
+  carbon(GlassVariant.frost, Color(0xFF4DA3FF), Color(0xFF0B0C0E), [
+    Color(0xFF25282D),
+    Color(0xFF1A1C20),
+    Color(0xFF30343A),
+  ], calm: true),
+  smoke(GlassVariant.frost, Color(0xFFFFB020), Color(0xFF0C0C0C), [
+    Color(0xFF303030),
+    Color(0xFF222222),
+    Color(0xFF3A3A3A),
+  ], calm: true),
   // Clear: nearly clear panels with bright edges over a calm backdrop
   frostbite(GlassVariant.clear, Color(0xFF2F7BFF), Color(0xFFDCE3EE), [
     Color(0xFF8FB8FF),
@@ -257,9 +287,28 @@ enum GlassScheme {
     Color(0xFFC8D8B0),
     Color(0xFFE6EED8),
     Color(0xFFB8C8A0),
-  ]);
+  ]),
+  fog(GlassVariant.clear, Color(0xFF2563EB), Color(0xFFD9DADD), [
+    Color(0xFFC4C6CB),
+    Color(0xFFE2E3E6),
+    Color(0xFFB9BCC2),
+  ], calm: true),
+  stone(GlassVariant.clear, Color(0xFFA87A00), Color(0xFFDAD8D3), [
+    Color(0xFFC6C3BC),
+    Color(0xFFE3E1DC),
+    Color(0xFFBCB8B0),
+  ], calm: true),
+  silver(GlassVariant.clear, Color(0xFF0A74E0), Color(0xFFDEE0E3), [
+    Color(0xFFC8CBD0),
+    Color(0xFFE8E9EC),
+    Color(0xFFBFC3C9),
+  ], calm: true);
 
-  const GlassScheme(this.variant, this.accent, this.base, this.spots);
+  const GlassScheme(this.variant, this.accent, this.base, this.spots, {this.calm = false});
+
+  /// a quiet one: grey or black, the colour only on the text and the lines (a chosen row, a toggle that's on and the
+  /// chosen tab are lit in grey, not in the colour)
+  final bool calm;
 
   /// the scheme's own kind of glass: milky (Liquid), smoky (Frost) or clear
   final GlassVariant variant;
@@ -293,6 +342,7 @@ enum GlassScheme {
     final accent = dark && this.accent.computeLuminance() < .05 ? const Color(0xFFE8E8EE) : this.accent;
     return GlassLook(
       dark: dark,
+      calm: calm,
       kind: kind,
       accent: accent,
       base: base,
@@ -321,6 +371,7 @@ enum GlassScheme {
 class GlassLook {
   const GlassLook({
     required this.dark,
+    this.calm = false,
     required this.kind,
     required this.accent,
     required this.base,
@@ -331,6 +382,9 @@ class GlassLook {
   });
 
   final bool dark;
+
+  /// lit in grey rather than in the accent (see [GlassScheme.calm])
+  final bool calm;
 
   /// the glass drawn: milky, smoky or clear
   final GlassVariant kind;
@@ -351,13 +405,15 @@ class GlassLook {
   /// The accent laid over a pane at [alpha] (the chosen server's row, a toggle that's on), as strong as it can be
   /// while [ink] (the text on it) still reads at 4.5:1: a dark accent by day or a light one by night is let fainter.
   Color tint(Color ink, double alpha) {
-    var a = alpha;
-    var fill = Color.alphaBlend(accent.withValues(alpha: a), panelOnBase);
+    // a calm scheme lights them in grey: white on the dark glass, a shade on the light
+    final colour = calm ? (dark ? Colors.white : Colors.black) : accent;
+    var a = calm ? alpha * (dark ? .45 : .14) : alpha;
+    var fill = Color.alphaBlend(colour.withValues(alpha: a), panelOnBase);
     while (a > .05 && _contrast(ink, fill) < 4.5) {
       a -= .03;
-      fill = Color.alphaBlend(accent.withValues(alpha: a), panelOnBase);
+      fill = Color.alphaBlend(colour.withValues(alpha: a), panelOnBase);
     }
-    return accent.withValues(alpha: a);
+    return colour.withValues(alpha: a);
   }
 
   static double _contrast(Color a, Color b) {
@@ -373,6 +429,7 @@ class GlassLook {
   bool operator ==(Object other) =>
       other is GlassLook &&
       other.dark == dark &&
+      other.calm == calm &&
       other.kind == kind &&
       other.accent == accent &&
       other.base == base &&

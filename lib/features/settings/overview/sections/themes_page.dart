@@ -95,6 +95,15 @@ class GlassSchemePicker extends ConsumerWidget {
       GlassScheme.haze => t.avpn.glassHaze,
       GlassScheme.glacier => t.avpn.glassGlacier,
       GlassScheme.moss => t.avpn.glassMoss,
+      GlassScheme.ash => t.avpn.glassAsh,
+      GlassScheme.chalk => t.avpn.glassChalk,
+      GlassScheme.steel => t.avpn.glassSteel,
+      GlassScheme.onyx => t.avpn.glassOnyx,
+      GlassScheme.carbon => t.avpn.glassCarbon,
+      GlassScheme.smoke => t.avpn.glassSmoke,
+      GlassScheme.fog => t.avpn.glassFog,
+      GlassScheme.stone => t.avpn.glassStone,
+      GlassScheme.silver => t.avpn.glassSilver,
     };
     String kind(GlassVariant v) => switch (v) {
       GlassVariant.liquid => t.avpn.glassLiquid,
