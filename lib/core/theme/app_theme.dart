@@ -4,12 +4,23 @@ import 'package:flutter/services.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 
 class AppTheme {
-  AppTheme(this.mode, this.fontFamily, {AraAccent? accent, this.style = AraStyle.classic})
-    : accent = accent ?? AraAccent.platformDefault;
+  AppTheme(
+    this.mode,
+    this.fontFamily, {
+    AraAccent? accent,
+    this.style = AraStyle.classic,
+    this.glassScheme = GlassScheme.fallback,
+  }) : accent = accent ?? AraAccent.platformDefault;
+
+  /// Glass's own colour scheme (the accent above doesn't colour Glass)
+  final GlassScheme glassScheme;
+
+  bool get _glass => style == AraStyle.glass;
   final AppThemeMode mode;
   final String fontFamily;
 
@@ -196,7 +207,8 @@ class AppTheme {
   }
 
   /// The palette of a style in day or night: background, cards, text, lines.
-  static AraPalette palette(AraStyle style, Brightness brightness) {
+  static AraPalette palette(AraStyle style, Brightness brightness, {GlassScheme glass = GlassScheme.fallback}) {
+    if (style == AraStyle.glass) return glassPalette(glass);
     final dark = brightness == Brightness.dark;
     return style == AraStyle.editorial
         ? AraPalette(
@@ -225,11 +237,35 @@ class AppTheme {
           );
   }
 
-  /// Graphite and Editorial, by day or night, in the accent colour.
+  /// Glass's colours: see-through panels and lines over the backdrop ([AraPalette.bg] is the backdrop's own colour,
+  /// for working out readable colours; the pages themselves are clear so the backdrop shows).
+  static AraPalette glassPalette(GlassScheme s) {
+    final dark = s.dark;
+    Color more(double alpha) => Colors.white.withValues(alpha: (s.panel.a + alpha).clamp(0.0, 1.0));
+    return AraPalette(
+      bg: s.base,
+      fg: dark ? const Color(0xFFF4F4F7) : const Color(0xFF15151A),
+      muted: dark ? const Color(0xFFA4A4AE) : const Color(0xFF55555F),
+      card: s.panel,
+      container: more(dark ? .02 : .05),
+      high: more(dark ? .05 : .12),
+      highest: more(dark ? .09 : .2),
+      line: s.edge,
+      strongLine: dark ? Colors.white.withValues(alpha: .3) : Colors.white,
+      nav: Colors.transparent,
+    );
+  }
+
+  /// Graphite, Editorial and Glass, by day or night, in the accent colour (Glass: its scheme's).
   ThemeData _styledTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
-    final styled = palette(style, brightness);
+    final styled = palette(style, brightness, glass: glassScheme);
+    final glass = _glass;
+    // a dialog, a sheet or a menu lies over the page's content: a solid version of the glass
+    final solid = glass
+        ? Color.alphaBlend(glassScheme.dark ? const Color(0x24FFFFFF) : const Color(0xE6FFFFFF), glassScheme.base)
+        : styled.card;
     // the OLED theme in Graphite: true black by night (pixels off) and pure white by day, cards just off it
     final p = accent.pure && style == AraStyle.graphite
         ? AraPalette(
@@ -246,31 +282,34 @@ class AppTheme {
           )
         : styled;
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
-    final accentColour = editorial && colourless
+    final accentColour = glass
+        ? glassScheme.accent
+        : editorial && colourless
         ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A))
         : (dark ? accent.darkPrimary : accent.lightPrimary);
-    final primary = AraLook.readableOn(accentColour, p.bg);
+    final primary = AraLook.readableOn(accentColour, glass ? glassScheme.panelOnBase : p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
-    final scheme = ColorScheme.fromSeed(seedColor: accent.seed, brightness: brightness).copyWith(
-      primary: primary,
-      onPrimary: onPrimary,
-      primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
-      onPrimaryContainer: p.fg,
-      secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
-      onSecondaryContainer: p.fg,
-      surface: p.bg,
-      onSurface: p.fg,
-      onSurfaceVariant: p.muted,
-      surfaceDim: p.bg,
-      surfaceBright: p.card,
-      surfaceContainerLowest: p.bg,
-      surfaceContainerLow: p.card,
-      surfaceContainer: p.container,
-      surfaceContainerHigh: p.high,
-      surfaceContainerHighest: p.highest,
-      outline: p.strongLine,
-      outlineVariant: p.line,
-    );
+    final scheme = ColorScheme.fromSeed(seedColor: glass ? glassScheme.accent : accent.seed, brightness: brightness)
+        .copyWith(
+          primary: primary,
+          onPrimary: onPrimary,
+          primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
+          onPrimaryContainer: p.fg,
+          secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
+          onSecondaryContainer: p.fg,
+          surface: p.bg,
+          onSurface: p.fg,
+          onSurfaceVariant: p.muted,
+          surfaceDim: p.bg,
+          surfaceBright: p.card,
+          surfaceContainerLowest: p.bg,
+          surfaceContainerLow: p.card,
+          surfaceContainer: p.container,
+          surfaceContainerHigh: p.high,
+          surfaceContainerHighest: p.highest,
+          outline: p.strongLine,
+          outlineVariant: p.line,
+        );
 
     // body text: Manrope (Graphite) or Golos Text (Editorial); headings in Unbounded; Editorial's small labels
     // monospaced
@@ -306,7 +345,7 @@ class AppTheme {
           : base.labelSmall?.copyWith(fontWeight: FontWeight.w600),
     );
 
-    final radius = editorial ? 6.0 : 20.0;
+    final radius = editorial ? 6.0 : (glass ? 24.0 : 20.0);
     final ShapeBorder shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
       side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide(color: p.line),
@@ -320,11 +359,12 @@ class AppTheme {
       fontFamily: body,
       // the bundled emoji font draws the servers' flags (Windows has none of its own)
       fontFamilyFallback: [if (fontFamily.isNotEmpty) fontFamily, 'Emoji'],
-      scaffoldBackgroundColor: p.bg,
-      canvasColor: p.bg,
+      // Glass: every page clear, the backdrop behind the whole app showing through
+      scaffoldBackgroundColor: glass ? Colors.transparent : p.bg,
+      canvasColor: glass ? Colors.transparent : p.bg,
       dividerTheme: DividerThemeData(color: p.line, space: 1, thickness: 1),
       appBarTheme: AppBarTheme(
-        backgroundColor: p.bg,
+        backgroundColor: glass ? Colors.transparent : p.bg,
         foregroundColor: p.fg,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
@@ -361,9 +401,16 @@ class AppTheme {
         unselectedLabelTextStyle: text.labelMedium?.copyWith(color: p.muted),
       ),
       cardTheme: CardThemeData(color: p.card, surfaceTintColor: Colors.transparent, elevation: 0, shape: shape),
-      dialogTheme: DialogThemeData(backgroundColor: p.card, surfaceTintColor: Colors.transparent, shape: shape),
-      bottomSheetTheme: BottomSheetThemeData(backgroundColor: p.card, surfaceTintColor: Colors.transparent),
-      popupMenuTheme: PopupMenuThemeData(color: p.card, surfaceTintColor: Colors.transparent),
+      dialogTheme: DialogThemeData(backgroundColor: solid, surfaceTintColor: Colors.transparent, shape: shape),
+      bottomSheetTheme: BottomSheetThemeData(backgroundColor: solid, surfaceTintColor: Colors.transparent),
+      popupMenuTheme: PopupMenuThemeData(color: solid, surfaceTintColor: Colors.transparent),
+      menuTheme: MenuThemeData(style: MenuStyle(backgroundColor: WidgetStatePropertyAll(solid))),
+      snackBarTheme: glass
+          ? SnackBarThemeData(
+              backgroundColor: solid,
+              contentTextStyle: TextStyle(color: p.fg),
+            )
+          : null,
       chipTheme: ChipThemeData(
         shape: small.copyWith(side: BorderSide(color: editorial ? p.strongLine : p.line)),
         // a selected chip keeps its text colour, so its fill is a tint (Editorial's ink would hide the text)
@@ -421,7 +468,10 @@ class AppTheme {
   AraLook _styledLook(Brightness brightness, AraPalette p, Color primary) {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
-    final blockColours = editorial
+    final glass = _glass;
+    final blockColours = glass
+        ? [p.high, p.card]
+        : editorial
         ? [p.card, p.card]
         : accent.filled
         ? [accent.darkPrimary, accent.darkPrimary]
@@ -430,11 +480,11 @@ class AppTheme {
         : dark
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
-    final block = blockColours[blockColours.length ~/ 2];
-    final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
+    final block = glass ? glassScheme.panelOnBase : blockColours[blockColours.length ~/ 2];
+    final colourless = HSLColor.fromColor(glass ? glassScheme.accent : accent.seed).saturation < .12;
     final Color down;
     final Color up;
-    final filled = accent.filled && !editorial;
+    final filled = accent.filled && !editorial && !glass;
     if (filled) {
       // on the neon block: black lines, upload a lighter shade of it
       down = Colors.black;
@@ -460,7 +510,8 @@ class AppTheme {
       graphDown: filled ? down : AraLook.readableOn(down, block),
       graphUp: filled ? up : AraLook.readableOn(up, block),
       style: style,
-      pingOn: p.card,
+      pingOn: glass ? glassScheme.panelOnBase : p.card,
+      glass: glass ? glassScheme : null,
     );
   }
 
@@ -469,7 +520,6 @@ class AppTheme {
       AppThemeMode.system => sysDark,
       AppThemeMode.light => false,
       AppThemeMode.dark => true,
-      AppThemeMode.black => true,
     };
     final def = CupertinoThemeData(brightness: isDark ? Brightness.dark : Brightness.light);
     // final def = CupertinoThemeData(brightness: Brightness.dark);

@@ -16,6 +16,7 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
@@ -131,7 +132,7 @@ void main() {
     ]);
   });
 
-  for (final style in [AraStyle.graphite, AraStyle.editorial]) {
+  for (final style in [AraStyle.graphite, AraStyle.editorial, AraStyle.glass]) {
     for (final (dark, connected) in [(true, true), (false, false), (false, true), (true, false)]) {
       final name = '${style.name}_${dark ? 'night' : 'day'}_${connected ? 'on' : 'off'}';
       testWidgets('home: $name', (tester) async {
@@ -154,7 +155,10 @@ void main() {
         final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
         final prefs = await tester.runAsync(SharedPreferences.getInstance);
         final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
-        final theme = AppTheme(AppThemeMode.system, '', accent: accent, style: style);
+        // GLASS=<scheme>: Glass in that scheme (it brings its own brightness)
+        final glassScheme = GlassScheme.values.byName(Platform.environment['GLASS'] ?? 'lemonade');
+        final glass = style == AraStyle.glass;
+        final theme = AppTheme(AppThemeMode.system, '', accent: accent, style: style, glassScheme: glassScheme);
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
@@ -178,7 +182,15 @@ void main() {
             ],
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
-              theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
+              theme: (glass ? glassScheme.dark : dark) ? theme.darkTheme(null) : theme.lightTheme(null),
+              builder: (context, child) => glass
+                  ? Stack(
+                      children: [
+                        Positioned.fill(child: GlassBackdrop(scheme: glassScheme)),
+                        child!,
+                      ],
+                    )
+                  : child!,
               home: Consumer(
                 builder: (context, ref, _) =>
                     !ref.watch(translationsProvider).hasValue || !ref.watch(sharedPreferencesProvider).hasValue

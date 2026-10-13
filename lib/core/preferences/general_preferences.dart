@@ -4,6 +4,7 @@ import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/actions_at_closing.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
 import 'package:hiddify/features/profile/model/profile_sort_enum.dart';
@@ -148,6 +149,14 @@ abstract class Preferences {
     "ara_style",
     AraStyle.fallback,
     mapFrom: (value) => AraStyle.values.firstWhere((e) => e.name == value, orElse: () => AraStyle.fallback),
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: Glass's own colour scheme, when the look is Glass.
+  static final glassScheme = PreferencesNotifier.create<GlassScheme, String>(
+    "glass_scheme",
+    GlassScheme.fallback,
+    mapFrom: (value) => GlassScheme.values.firstWhere((e) => e.name == value, orElse: () => GlassScheme.fallback),
     mapTo: (value) => value.name,
   );
 

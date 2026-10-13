@@ -4,6 +4,8 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/settings/widget/settings_block.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -15,17 +17,162 @@ class ThemesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    // Glass has its own colour schemes, each light or dark by itself: no day/night and no shared colour themes
+    final glass = !PlatformUtils.isDesktop && ref.watch(Preferences.araStyle) == AraStyle.glass;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.themes)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-        children: const [
+        children: [
           // the colour themes are all true black now: OLED and the neon colours
-          SettingsBlock(children: [StylePicker(), ThemeModePrefTile(), AccentPicker(oled: true)]),
+          SettingsBlock(
+            children: glass
+                ? const [StylePicker(), GlassSchemePicker()]
+                : const [StylePicker(), ThemeModePrefTile(), AccentPicker(oled: true)],
+          ),
         ],
       ),
     );
   }
+}
+
+/// Glass's own colour schemes in their three kinds of glass, each as a little backdrop with a pane on it.
+class GlassSchemePicker extends ConsumerWidget {
+  const GlassSchemePicker({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final selected = ref.watch(Preferences.glassScheme);
+    final theme = Theme.of(context);
+    String name(GlassScheme s) => switch (s) {
+      GlassScheme.lemonade => t.avpn.glassLemonade,
+      GlassScheme.lagoon => t.avpn.glassLagoon,
+      GlassScheme.sunset => t.avpn.glassSunset,
+      GlassScheme.sakura => t.avpn.glassSakura,
+      GlassScheme.mint => t.avpn.glassMint,
+      GlassScheme.lavender => t.avpn.glassLavender,
+      GlassScheme.peach => t.avpn.glassPeach,
+      GlassScheme.midnight => t.avpn.glassMidnight,
+      GlassScheme.neon => t.avpn.glassNeon,
+      GlassScheme.aurora => t.avpn.glassAurora,
+      GlassScheme.magma => t.avpn.glassMagma,
+      GlassScheme.violet => t.avpn.glassViolet,
+      GlassScheme.ocean => t.avpn.glassOcean,
+      GlassScheme.rose => t.avpn.glassRose,
+      GlassScheme.frostbite => t.avpn.glassFrostbite,
+      GlassScheme.pearl => t.avpn.glassPearl,
+      GlassScheme.sage => t.avpn.glassSage,
+      GlassScheme.sand => t.avpn.glassSand,
+      GlassScheme.graphite => t.avpn.glassGraphite,
+      GlassScheme.lilac => t.avpn.glassLilac,
+    };
+    String kind(GlassVariant v) => switch (v) {
+      GlassVariant.liquid => t.avpn.glassLiquid,
+      GlassVariant.frost => t.avpn.glassFrost,
+      GlassVariant.clear => t.avpn.glassClear,
+    };
+    return ListTile(
+      leading: const Icon(Icons.blur_on_rounded),
+      title: Text(t.avpn.glassSchemeTitle),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(t.avpn.glassSchemeMsg),
+          for (final variant in GlassVariant.values) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 14, bottom: 8),
+              child: Text(
+                kind(variant),
+                style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface),
+              ),
+            ),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final scheme in GlassScheme.values.where((s) => s.variant == variant))
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => ref.read(Preferences.glassScheme.notifier).update(scheme),
+                    child: SizedBox(
+                      width: 66,
+                      child: Column(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(2.5),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: scheme == selected ? theme.colorScheme.onSurface : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: _GlassSwatch(scheme: scheme, selected: scheme == selected),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(name(scheme), maxLines: 1, style: theme.textTheme.labelSmall),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A scheme in small: its backdrop with a pane of its glass and a dot of its colour.
+class _GlassSwatch extends StatelessWidget {
+  const _GlassSwatch({required this.scheme, required this.selected});
+
+  final GlassScheme scheme;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: SizedBox(
+      width: 56,
+      height: 56,
+      child: Stack(
+        children: [
+          Positioned.fill(child: GlassBackdrop(scheme: scheme)),
+          Positioned(
+            left: 7,
+            right: 7,
+            bottom: 7,
+            height: 22,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: scheme.panel,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: scheme.edge),
+              ),
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(color: scheme.accent, shape: BoxShape.circle),
+                child: selected
+                    ? Icon(
+                        Icons.check_rounded,
+                        size: 10,
+                        color: scheme.accent.computeLuminance() > .45 ? Colors.black : Colors.white,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// The colour themes as gradient swatches, the chosen one ringed: the coloured ones, or ([oled]) the true-black
@@ -145,6 +292,7 @@ class StylePicker extends ConsumerWidget {
     (String, String) names(AraStyle style) => switch (style) {
       AraStyle.graphite => (t.avpn.styleGraphite, t.avpn.styleGraphiteHint),
       AraStyle.editorial => (t.avpn.styleEditorial, t.avpn.styleEditorialHint),
+      AraStyle.glass => (t.avpn.styleGlass, t.avpn.styleGlassHint),
       AraStyle.classic => (t.avpn.styleClassic, t.avpn.styleClassicHint),
     };
     return ListTile(
@@ -156,7 +304,7 @@ class StylePicker extends ConsumerWidget {
           spacing: 12,
           runSpacing: 12,
           children: [
-            for (final style in AraStyle.values)
+            for (final style in AraStyle.available(desktop: PlatformUtils.isDesktop))
               InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: () => ref.read(Preferences.araStyle.notifier).update(style),
@@ -175,7 +323,9 @@ class StylePicker extends ConsumerWidget {
                             width: 2,
                           ),
                         ),
-                        child: _StylePreview(style: style, brightness: brightness, accent: accentColour),
+                        child: style == AraStyle.glass
+                            ? _GlassStylePreview(scheme: ref.watch(Preferences.glassScheme))
+                            : _StylePreview(style: style, brightness: brightness, accent: accentColour),
                       ),
                       const SizedBox(height: 6),
                       Text(names(style).$1, style: theme.textTheme.titleSmall),
@@ -310,6 +460,64 @@ class _StylePreview extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Glass's thumbnail: the chosen scheme's backdrop with see-through rows and a floating pane.
+class _GlassStylePreview extends StatelessWidget {
+  const _GlassStylePreview({required this.scheme});
+
+  final GlassScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row(bool selected) => Container(
+      height: 10,
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: selected ? scheme.accent.withValues(alpha: scheme.dark ? .35 : .6) : scheme.panel,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: selected ? scheme.accent : scheme.edge, width: .8),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 86,
+        child: Stack(
+          children: [
+            Positioned.fill(child: GlassBackdrop(scheme: scheme)),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  row(true),
+                  row(false),
+                  row(false),
+                  const Spacer(),
+                  Container(
+                    height: 20,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
+                      color: scheme.panel,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: scheme.edge),
+                    ),
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.accent),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

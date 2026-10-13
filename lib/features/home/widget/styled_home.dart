@@ -541,20 +541,30 @@ class _GraphiteRow extends StatelessWidget {
         ),
       );
     }
+    final glass = theme.araLook.glass;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
         // the chosen one: a tint of the accent and an accent outline
-        color: flooded
+        // Glass: every row a see-through pane, the chosen one tinted with the scheme's colour
+        color: glass != null
+            ? (selected
+                  ? Color.alphaBlend(glass.accent.withValues(alpha: glass.dark ? .22 : .5), glass.panel)
+                  : glass.panel)
+            : flooded
             ? scheme.surfaceContainerHigh
             : selected
             ? Color.alphaBlend(scheme.primary.withValues(alpha: dark ? .1 : .07), scheme.surfaceContainerHigh)
             : Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(glass != null ? 22 : 18),
           // a thin frame round every server, so the rows don't run into one; the chosen one's is thicker
           // by day soft grey frames (black ones looked heavy), the chosen one a darker grey and thicker
-          side: selected
+          side: glass != null
+              ? (selected
+                    ? BorderSide(color: glass.dark ? glass.accent : Colors.white, width: 1.8)
+                    : BorderSide(color: glass.edge, width: 1.2))
+              : selected
               ? BorderSide(
                   color: flooded ? (dark ? Colors.white : const Color(0xFF8E8E96)) : scheme.primary,
                   width: 2.2,
@@ -562,7 +572,7 @@ class _GraphiteRow extends StatelessWidget {
               : BorderSide(color: dark ? Colors.white.withValues(alpha: .2) : const Color(0xFFD3D3D9), width: 1.2),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(glass != null ? 22 : 18),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -749,9 +759,74 @@ class _GraphiteDock extends ConsumerWidget {
       Disconnecting() => t.avpn.disconnecting,
       Disconnected() => t.avpn.stOffShort,
     };
+    final glass = theme.araLook.glass;
+    final padding = large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10);
+    final content = Row(
+      children: [
+        _Orb(on: on, busy: busy, size: large ? 92 : 74, onTap: busy ? null : () => _toggleConnection(ref)),
+        const Gap(14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                // ON / OFF are short: the larger size fits either way
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              // "Авто" on one line and the country under it, so a long name isn't cut
+              Text(
+                server?.replaceFirst(' · ', '\n') ?? t.avpn.stNotProtected,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: (large ? theme.textTheme.bodyMedium : theme.textTheme.bodySmall)?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // connected: check the servers' ping (the ring button disconnects); off: the ring button connects
+        if (on) ...[
+          const Gap(8),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: on ? scheme.surfaceContainerHighest : scheme.primary,
+              foregroundColor: on ? scheme.onSurface : scheme.onPrimary,
+              padding: large
+                  ? const EdgeInsets.symmetric(horizontal: 14, vertical: 18)
+                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: large ? 15 : 14),
+            ),
+            onPressed: busy || (on && testing) ? null : (on ? onCheck : () => _toggleConnection(ref)),
+            icon: on && testing
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
+                  )
+                : AraIconPaint(
+                    enabled: on,
+                    child: Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
+                  ),
+            label: Text(on ? t.avpn.stPingButton : t.avpn.stConnect),
+          ),
+        ],
+      ],
+    );
+    // Glass: floating over the backdrop, what's behind it blurred
+    if (glass != null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(0, 6, 0, 12),
+        child: GlassPane(scheme: glass, radius: large ? 40 : 32, padding: padding, child: content),
+      );
+    }
     return Container(
       margin: const EdgeInsets.fromLTRB(0, 6, 0, 12),
-      padding: large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10),
+      padding: padding,
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow.withValues(alpha: dark ? .85 : 1),
         borderRadius: BorderRadius.circular(large ? 40 : 32),
@@ -760,62 +835,7 @@ class _GraphiteDock extends ConsumerWidget {
             ? null
             : [BoxShadow(color: Colors.black.withValues(alpha: .08), blurRadius: 30, offset: const Offset(0, 10))],
       ),
-      child: Row(
-        children: [
-          _Orb(on: on, busy: busy, size: large ? 92 : 74, onTap: busy ? null : () => _toggleConnection(ref)),
-          const Gap(14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  // ON / OFF are short: the larger size fits either way
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                // "Авто" on one line and the country under it, so a long name isn't cut
-                Text(
-                  server?.replaceFirst(' · ', '\n') ?? t.avpn.stNotProtected,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: (large ? theme.textTheme.bodyMedium : theme.textTheme.bodySmall)?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // connected: check the servers' ping (the ring button disconnects); off: the ring button connects
-          if (on) ...[
-            const Gap(8),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: on ? scheme.surfaceContainerHighest : scheme.primary,
-                foregroundColor: on ? scheme.onSurface : scheme.onPrimary,
-                padding: large
-                    ? const EdgeInsets.symmetric(horizontal: 14, vertical: 18)
-                    : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                textStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: large ? 15 : 14),
-              ),
-              onPressed: busy || (on && testing) ? null : (on ? onCheck : () => _toggleConnection(ref)),
-              icon: on && testing
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
-                    )
-                  : AraIconPaint(
-                      enabled: on,
-                      child: Icon(on ? Icons.network_ping_rounded : Icons.power_settings_new_rounded, size: 18),
-                    ),
-              label: Text(on ? t.avpn.stPingButton : t.avpn.stConnect),
-            ),
-          ],
-        ],
-      ),
+      child: content,
     );
   }
 }

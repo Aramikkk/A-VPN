@@ -10,7 +10,8 @@ class ThemePreferences extends _$ThemePreferences {
   AppThemeMode build() {
     final persisted = ref.watch(sharedPreferencesProvider).requireValue.getString("theme_mode");
     if (persisted == null) return AppThemeMode.system;
-    return AppThemeMode.values.byName(persisted);
+    // "black" was a theme of its own once, the same as the dark one
+    return AppThemeMode.values.asNameMap()[persisted] ?? AppThemeMode.dark;
   }
 
   Future<void> changeThemeMode(AppThemeMode value) async {

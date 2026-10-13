@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
 
 class ConnectionButtonTheme extends ThemeExtension<ConnectionButtonTheme> {
   const ConnectionButtonTheme({this.idleColor, this.connectedColor});
@@ -45,7 +46,12 @@ class AraLook extends ThemeExtension<AraLook> {
     this.iconGradient,
     this.pingOn,
     this.neonFill,
+    this.glass,
   });
+
+  /// the Glass scheme the theme was built for: panels see-through, the menu and the connect panel floating;
+  /// null: not Glass
+  final GlassScheme? glass;
 
   /// the neon the chosen server and the connect button are filled with (black text on it); null: not filled
   final Color? neonFill;
@@ -105,10 +111,18 @@ class AraLook extends ThemeExtension<AraLook> {
 
   /// [colour] lightened (on a dark [background]) or darkened (on a light one) until it reads on it: contrast at
   /// least 3:1.
-  static Color readableOn(Color colour, Color background) =>
-      _readable(HSLColor.fromColor(colour), background, dark: background.computeLuminance() < .4);
+  static Color readableOn(Color colour, Color background) {
+    final bg = _solid(background);
+    return _readable(HSLColor.fromColor(colour), bg, dark: bg.computeLuminance() < .4);
+  }
 
-  static Color _readable(HSLColor colour, Color card, {required bool dark}) {
+  /// A see-through colour (Glass's panels) as it reads: a faint white wash lies on a dark backdrop, a milky one
+  /// on a light backdrop.
+  static Color _solid(Color c) =>
+      c.a >= 1 ? c : Color.alphaBlend(c, c.a < .25 ? const Color(0xFF0E0E12) : const Color(0xFFEDEDF0));
+
+  static Color _readable(HSLColor colour, Color background, {required bool dark}) {
+    final card = _solid(background);
     var c = colour;
     for (var i = 0; i < 40 && _contrast(c.toColor(), card) < 3.0; i++) {
       c = c.withLightness((c.lightness + (dark ? .02 : -.02)).clamp(0.0, 1.0));
@@ -120,8 +134,8 @@ class AraLook extends ThemeExtension<AraLook> {
   static double contrast(Color a, Color b) => _contrast(a, b);
 
   static double _contrast(Color a, Color b) {
-    final la = a.computeLuminance();
-    final lb = b.computeLuminance();
+    final la = _solid(a).computeLuminance();
+    final lb = _solid(b).computeLuminance();
     return ((la > lb ? la : lb) + .05) / ((la > lb ? lb : la) + .05);
   }
 
@@ -146,6 +160,7 @@ class AraLook extends ThemeExtension<AraLook> {
     iconGradient: iconGradient,
     pingOn: pingOn,
     neonFill: neonFill,
+    glass: glass,
   );
 
   @override
@@ -164,6 +179,7 @@ class AraLook extends ThemeExtension<AraLook> {
       iconGradient: Gradient.lerp(iconGradient, other.iconGradient, t),
       pingOn: Color.lerp(pingOn, other.pingOn, t),
       neonFill: Color.lerp(neonFill, other.neonFill, t),
+      glass: t < .5 ? glass : other.glass,
     );
   }
 }

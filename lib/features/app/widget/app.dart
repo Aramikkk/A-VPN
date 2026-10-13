@@ -15,6 +15,8 @@ import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.
 import 'package:hiddify/core/theme/app_icon.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
 import 'package:hiddify/features/app_update/notifier/app_update_notifier.dart';
 import 'package:hiddify/features/connection/widget/connection_wrapper.dart';
@@ -60,12 +62,18 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final router = ref.watch(goRouterNotiferProvider);
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
+    // Glass is the phone's only: a computer that has it saved (a copied profile) shows Graphite
+    final savedStyle = ref.watch(Preferences.araStyle);
+    final style = PlatformUtils.isDesktop && savedStyle == AraStyle.glass ? AraStyle.graphite : savedStyle;
+    final glassScheme = ref.watch(Preferences.glassScheme);
     final theme = AppTheme(
       themeMode,
       locale.preferredFontFamily,
       accent: ref.watch(Preferences.araAccent),
-      style: ref.watch(Preferences.araStyle),
+      style: style,
+      glassScheme: glassScheme,
     );
+    final glass = style == AraStyle.glass;
     final upgrader = ref.watch(upgraderProvider);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
@@ -98,7 +106,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                   supportedLocales: AppLocaleUtils.supportedLocales,
                   localizationsDelegates: GlobalMaterialLocalizations.delegates,
                   debugShowCheckedModeBanner: false,
-                  themeMode: themeMode.flutterThemeMode,
+                  // Glass's scheme brings its own brightness
+                  themeMode: glass ? (glassScheme.dark ? ThemeMode.dark : ThemeMode.light) : themeMode.flutterThemeMode,
                   theme: theme.lightTheme(lightColorScheme),
                   darkTheme: theme.darkTheme(darkColorScheme),
                   title: Constants.appName,
@@ -109,18 +118,27 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                       navigatorKey: router.routerDelegate.navigatorKey,
                       child: child ?? const SizedBox(),
                     );
+                    // Glass: the backdrop behind every page, the clear pages over it
+                    if (glass) {
+                      child = Stack(
+                        children: [
+                          Positioned.fill(child: GlassBackdrop(scheme: glassScheme)),
+                          child,
+                        ],
+                      );
+                    }
                     if (kDebugMode && _debugAccessibility) {
                       return AccessibilityTools(checkFontOverflows: true, child: child);
                     }
                     return AnnotatedRegion<SystemUiOverlayStyle>(
                       value: SystemUiOverlayStyle(
-                        statusBarColor: theme.scaffoldBackgroundColor,
+                        statusBarColor: glass ? Colors.transparent : theme.scaffoldBackgroundColor,
                         // dark icons on a light page, light ones on a dark page
                         statusBarIconBrightness: theme.brightness == Brightness.dark
                             ? Brightness.light
                             : Brightness.dark,
                         statusBarBrightness: theme.brightness,
-                        systemNavigationBarColor: theme.scaffoldBackgroundColor,
+                        systemNavigationBarColor: glass ? glassScheme.base : theme.scaffoldBackgroundColor,
                         systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
                             ? Brightness.light
                             : Brightness.dark,

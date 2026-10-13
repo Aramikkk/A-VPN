@@ -9,6 +9,7 @@ import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
@@ -74,6 +75,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     // no callback of ours ever runs. A press that a branch can handle is popped
     // by go router before it reaches here, so this only sees presses at the
     // root of a branch.
+    final glass = Theme.of(context).araLook.glass;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -101,6 +103,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           return true;
         },
         child: Material(
+          type: glass != null ? MaterialType.transparency : MaterialType.canvas,
           child: Scaffold(
             body: isMobileBreakpoint
                 ? navigationShell
@@ -130,7 +133,34 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       Expanded(child: navigationShell),
                     ],
                   ),
-            bottomNavigationBar: isMobileBreakpoint
+            // Glass: the menu floats under the page as a pane of glass, the backdrop round it
+            bottomNavigationBar: isMobileBreakpoint && glass != null
+                ? FocusScope(
+                    node: navScopeNode,
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                        child: GlassPane(
+                          scheme: glass,
+                          radius: 34,
+                          // icons only, the chosen tab on a pill of the scheme's colour, as in the preview
+                          child: NavigationBar(
+                            height: 64,
+                            backgroundColor: Colors.transparent,
+                            elevation: 0,
+                            labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+                            indicatorColor: glass.accent.withValues(alpha: glass.dark ? .28 : .75),
+                            indicatorShape: const StadiumBorder(),
+                            selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
+                            destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+                            onDestinationSelected: (index) => _onTap(context, index),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : isMobileBreakpoint
                 ? FocusScope(
                     node: navScopeNode,
                     child: DecoratedBox(
@@ -143,7 +173,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                           AraStyle.graphite => Border(
                             top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
                           ),
-                          AraStyle.classic => null,
+                          AraStyle.glass || AraStyle.classic => null,
                         },
                       ),
                       child: NavigationBar(
