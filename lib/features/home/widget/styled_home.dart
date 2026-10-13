@@ -716,7 +716,23 @@ class _EditorialRow extends StatelessWidget {
   }
 }
 
+/// A tap while the last one is still connecting or disconnecting is dropped: off and straight on again used to
+/// stack the two, and the button flipped between them.
+/// It also shows as switching from the tap on: right after turning off, the core takes a few seconds to start
+/// again before it says "connecting", and the button looked dead meanwhile.
+final _toggling = ValueNotifier(false);
+
 Future<void> _toggleConnection(WidgetRef ref) async {
+  if (_toggling.value) return;
+  _toggling.value = true;
+  try {
+    await _toggleConnectionNow(ref);
+  } finally {
+    _toggling.value = false;
+  }
+}
+
+Future<void> _toggleConnectionNow(WidgetRef ref) async {
   if (ref.read(activeProfileProvider).valueOrNull == null) {
     await ref.read(dialogNotifierProvider.notifier).showNoActiveProfile();
     ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
@@ -726,7 +742,7 @@ Future<void> _toggleConnection(WidgetRef ref) async {
 }
 
 /// Graphite's connect panel: the glowing ring button, the state and server, and a pill button.
-class _GraphiteDock extends ConsumerWidget {
+class _GraphiteDock extends HookConsumerWidget {
   const _GraphiteDock({
     required this.status,
     required this.server,
@@ -749,7 +765,7 @@ class _GraphiteDock extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final on = status.isConnected;
-    final busy = status.isSwitching;
+    final busy = status.isSwitching || useValueListenable(_toggling);
     final glass = theme.araLook.glass;
     final padding = large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10);
     // the servers answering their ping right now (a test that timed out or never ran doesn't count)
@@ -762,8 +778,19 @@ class _GraphiteDock extends ConsumerWidget {
     // the ping of the server in use (Auto: of the one it picked), shown in the ring
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
     final inUse = current != null && current.isGroup ? (autoPick(current, group!.items) ?? current) : current;
-    final delay = inUse?.urlTestDelay ?? 0;
-    final pinged = on && delay > 0 && delay < 65000;
+    // held steady: a re-test zeroes the delays for a moment and the reconnect brings them in one by one, so the
+    // gauge keeps the last real ping until a new one comes, and forgets it only when the VPN is off
+    // a ping counts only once this connection has servers answering: right after connecting the group still
+    // carries the last session's delays for a moment, and they flashed the gauge before going to zero
+    final held = useRef(0);
+    final fresh = inUse?.urlTestDelay ?? 0;
+    if (!on) {
+      held.value = 0;
+    } else if (answering > 0 && fresh > 0 && fresh < 65000) {
+      held.value = fresh;
+    }
+    final delay = held.value;
+    final pinged = on && delay > 0;
     final accent = theme.araLook.neonFill ?? scheme.primary;
     // the side icons and the ping in the accent (by day a light accent goes to the text colour); grey while off
     final ink = on
@@ -919,7 +946,7 @@ class _Orb extends HookWidget {
         height: size,
         child: TweenAnimationBuilder<double>(
           // the fill glides to a new ping
-          tween: Tween(end: on ? fill : 0),
+          tween: Tween(end: on && !busy ? fill : 0),
           duration: const Duration(milliseconds: 700),
           curve: Curves.easeOutCubic,
           builder: (context, filled, child) => AnimatedBuilder(
