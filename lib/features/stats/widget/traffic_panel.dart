@@ -1,0 +1,199 @@
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
+import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/stats/model/vpn_traffic.dart';
+import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/features/stats/widget/traffic_strips.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+/// The right half of the unfolded phone's home screen: where today's traffic went. The two totals (through the
+/// VPN, direct) on top, the strips with the apps' icons under them, and every app with its way out filling the
+/// rest. The apps under a megabyte are left out, as everywhere.
+class TrafficPanel extends ConsumerWidget {
+  const TrafficPanel({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final units = t.avpn.bytesUnits.split(',');
+    String size(num bytes) => formatBytes(bytes.round(), units);
+    // followed only while the home screen is in sight
+    final visible = TickerMode.of(context);
+    final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
+    final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+    final groups = groupConnections(state.items, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
+      ..sort((a, b) => b.total.compareTo(a.total));
+    final items = [for (final g in groups) ...g.items];
+    final total = items.fold<int>(0, (s, c) => s + c.total);
+    final vpn = items.where((c) => c.route == ConnectionRoute.vpn).fold<int>(0, (s, c) => s + c.total);
+    final direct = total - vpn;
+    final accent = theme.araLook.neonFill ?? scheme.primary;
+
+    Widget tile(String title, int bytes, Color colour, {required bool strong}) => Expanded(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  total == 0 ? '' : '${(bytes * 100 / total).round()}%',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AraLook.readableOn(colour, scheme.surfaceContainerLow),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const Gap(4),
+            Text(
+              size(bytes),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: strong ? AraLook.readableOn(colour, scheme.surfaceContainerLow) : null,
+              ),
+            ),
+            const Gap(6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: total == 0 ? 0 : bytes / total,
+                minHeight: 5,
+                color: colour,
+                backgroundColor: scheme.outlineVariant.withValues(alpha: .4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (groups.isEmpty) {
+      return Center(
+        child: Text(t.avpn.connEmpty, style: TextStyle(color: scheme.onSurfaceVariant)),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            tile(t.avpn.statsViaVpn, vpn, accent, strong: true),
+            const Gap(10),
+            tile(t.avpn.statsDirect, direct, const Color(0xFF9AA0A6), strong: false),
+          ],
+        ),
+        const Gap(14),
+        TrafficStrips(
+          items: items,
+          weight: (c) => c.total.toDouble(),
+          value: (w) => size(w),
+          compact: true,
+          barHeight: 54,
+          headers: false,
+        ),
+        const Gap(14),
+        // every app with where it went, filling the rest of the half
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              itemCount: groups.length,
+              separatorBuilder: (_, _) => Divider(height: 1, indent: 52, color: scheme.outlineVariant),
+              itemBuilder: (context, i) {
+                final g = groups[i];
+                final name = connectionAppName(t, apps, g.key);
+                final colour = g.mainRoute == ConnectionRoute.vpn
+                    ? accent
+                    : (g.mainRoute == ConnectionRoute.block ? scheme.error : const Color(0xFF9AA0A6));
+                final route = switch (g.mainRoute) {
+                  ConnectionRoute.vpn => g.servers.isEmpty ? 'VPN' : 'VPN · ${serverFlags(g.servers)}',
+                  ConnectionRoute.direct => t.avpn.statsDirect,
+                  ConnectionRoute.block => t.avpn.connBlocked,
+                };
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
+                  child: Row(
+                    children: [
+                      ConnectionAppIcon(icon: apps[g.key]?.icon, name: name, size: 28),
+                      const Gap(12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                Text(
+                                  size(g.total),
+                                  style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                            const Gap(2),
+                            Row(
+                              children: [
+                                Text(
+                                  route,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: AraLook.readableOn(colour, scheme.surfaceContainerLow),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const Gap(8),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(2),
+                                    child: LinearProgressIndicator(
+                                      value: total == 0 ? 0 : (g.total / total).clamp(.02, 1.0),
+                                      minHeight: 3,
+                                      color: colour,
+                                      backgroundColor: scheme.outlineVariant.withValues(alpha: .3),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

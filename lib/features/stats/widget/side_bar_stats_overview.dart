@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -263,10 +265,10 @@ class SideBarStatsOverview extends ConsumerWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(flex: 3, child: speedBlock),
+                  Expanded(child: speedBlock),
                   const Gap(12),
                   Expanded(
-                    flex: 2,
+                    flex: 1,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -672,7 +674,11 @@ class _SpeedGraph extends CustomPainter {
       // each mark centred on its line (the top one just under the edge)
       if (i < rows) {
         final h = labels[i].height;
-        labels[i].paint(canvas, Offset(size.width - labels[i].width, (y - h / 2).clamp(0, chart.height - h)));
+        // a graph squeezed lower than a label (folding, unfolding) would make the range upside down and throw
+        labels[i].paint(
+          canvas,
+          Offset(size.width - labels[i].width, (y - h / 2).clamp(0, math.max(0.0, chart.height - h))),
+        );
       }
     }
     // every 15 seconds: a faint line, and on the detailed graph its label
@@ -927,7 +933,9 @@ class _PingBars extends CustomPainter {
       if (i < offset) continue;
       final sample = shown[i - offset];
       if (sample == 0) continue;
-      final height = sample == null ? size.height : (size.height * (sample / peak)).clamp(3.0, size.height);
+      final height = sample == null
+          ? size.height
+          : (size.height * (sample / peak)).clamp(math.min(3.0, size.height), size.height).toDouble();
       canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height - height, barWidth, height), const Radius.circular(2)),
         Paint()..color = sample == null ? lost : (colorOf?.call(sample) ?? ok),

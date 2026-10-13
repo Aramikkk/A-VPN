@@ -3,7 +3,9 @@ part of 'avpn_home_body.dart';
 /// The home screen in Graphite or Editorial: the state at the top, the servers in the middle, and the connect
 /// control at the bottom, under the thumb.
 class _StyledHome extends HookConsumerWidget {
-  const _StyledHome({required this.editorial, required this.testing, required this.onCheck});
+  const _StyledHome({required this.editorial, required this.testing, required this.onCheck, this.traffic = true});
+
+  final bool traffic;
 
   final bool editorial;
   final bool testing;
@@ -55,7 +57,7 @@ class _StyledHome extends HookConsumerWidget {
             showCheck: editorial,
           ),
           Gap(roomy ? 10 : 6),
-          if (profile != null && servers.isNotEmpty) ...[
+          if (profile != null && servers.isNotEmpty && traffic) ...[
             // four rows in sight (Auto and three countries), three on a lower screen (the unfolded phone), so the
             // strip map under them fits; the rest a scroll away
             SizedBox(
@@ -75,6 +77,15 @@ class _StyledHome extends HookConsumerWidget {
             Expanded(
               child: profile == null
                   ? _EmptyCard(text: t.avpn.noProfile)
+                  // the whole list where the traffic has a column of its own
+                  : servers.isNotEmpty
+                  ? _StyledServerList(
+                      editorial: editorial,
+                      servers: servers,
+                      selectedTag: group?.selected,
+                      autoNow: autoNow,
+                      testing: testing,
+                    )
                   : Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -194,16 +205,16 @@ class _StatusBlock extends HookConsumerWidget {
       child: Row(
         children: [
           Expanded(
+            // two lines, as the totals on the right: the session's time, then the speed down and up
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   item(Icons.schedule_rounded, time, colour: scheme.primary),
-                  const Gap(12),
-                  item(Icons.south_rounded, down),
-                  const Gap(10),
-                  item(Icons.north_rounded, up),
+                  const Gap(2),
+                  Row(children: [item(Icons.south_rounded, down), const Gap(10), item(Icons.north_rounded, up)]),
                 ],
               ),
             ),
@@ -540,9 +551,13 @@ class _GraphiteRow extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
           // a thin frame round every server, so the rows don't run into one; the chosen one's is thicker
+          // by day soft grey frames (black ones looked heavy), the chosen one a darker grey and thicker
           side: selected
-              ? BorderSide(color: flooded ? (dark ? Colors.white : Colors.black) : scheme.primary, width: 2.2)
-              : BorderSide(color: dark ? Colors.white.withValues(alpha: .2) : Colors.black.withValues(alpha: .75)),
+              ? BorderSide(
+                  color: flooded ? (dark ? Colors.white : const Color(0xFF8E8E96)) : scheme.primary,
+                  width: 2.2,
+                )
+              : BorderSide(color: dark ? Colors.white.withValues(alpha: .2) : const Color(0xFFD3D3D9), width: 1.2),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -1013,29 +1028,34 @@ class _HomeTraffic extends ConsumerWidget {
         if (g.total >= smallTraffic) g.key,
     };
     final items = state.items.where((c) => big.contains(c.app)).toList();
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(top: 4, bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            t.avpn.topoFlow.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              letterSpacing: 1.1,
-              fontWeight: FontWeight.w800,
-              fontSize: 11,
-              color: scheme.onSurface,
-            ),
+    // a scroll when the strips and their names don't fit under the servers
+    return LayoutBuilder(
+      builder: (context, box) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                t.avpn.topoFlow.toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  letterSpacing: 1.1,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  color: scheme.onSurface,
+                ),
+              ),
+              const Gap(8),
+              TrafficStrips(
+                items: items,
+                weight: (c) => c.total.toDouble(),
+                value: (w) => formatBytes(w.round(), units),
+                compact: true,
+              ),
+            ],
           ),
-          const Gap(8),
-          TrafficStrips(
-            items: items,
-            weight: (c) => c.total.toDouble(),
-            value: (w) => formatBytes(w.round(), units),
-            compact: true,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

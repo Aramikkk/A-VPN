@@ -115,6 +115,11 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                     return AnnotatedRegion<SystemUiOverlayStyle>(
                       value: SystemUiOverlayStyle(
                         statusBarColor: theme.scaffoldBackgroundColor,
+                        // dark icons on a light page, light ones on a dark page
+                        statusBarIconBrightness: theme.brightness == Brightness.dark
+                            ? Brightness.light
+                            : Brightness.dark,
+                        statusBarBrightness: theme.brightness,
                         systemNavigationBarColor: theme.scaffoldBackgroundColor,
                         systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
                             ? Brightness.light

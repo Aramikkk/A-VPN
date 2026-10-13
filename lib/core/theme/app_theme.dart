@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
@@ -328,6 +329,12 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         titleTextStyle: text.titleLarge,
+        // the status bar's icons in the opposite of the page: on white they were white too, all but the battery
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: p.nav,

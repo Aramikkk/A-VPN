@@ -487,7 +487,12 @@ class HiddifyCoreService with InfraLogger {
           }),
       // .endWith(const CoreStatus.stopped())
       onError: (error) {
-        loggy.error("Stream error in ${key}StatusListener: $error");
+        // the core not up yet, or closing on a restart: expected, not worth an error
+        if (_expectedStreamEnd(error)) {
+          loggy.info("status listener ($key) waiting for the core: $error");
+        } else {
+          loggy.error("Stream error in ${key}StatusListener: $error");
+        }
 
         // currentState = const CoreStatus.stopped();
         // statusController.add(currentState);
@@ -546,7 +551,11 @@ class HiddifyCoreService with InfraLogger {
       },
       cancelOnError: true,
       onError: (error) {
-        loggy.error('Stream error: $error');
+        if (_expectedStreamEnd(error)) {
+          loggy.info('stream waiting for the core: $error');
+        } else {
+          loggy.error('Stream error: $error');
+        }
         onError?.call(error);
         subscriptions[key]?.cancel();
         subscriptions.remove(key);
@@ -628,3 +637,12 @@ bool _blockedOnlyFollowsNetwork(Ref ref) =>
     ref.read(ConfigOptions.blockedOnlyViaVpn) &&
     !ref.read(ConfigOptions.homeNetwork) &&
     !ref.read(ConfigOptions.globalMode);
+
+/// A gRPC stream that ends because the core isn't listening yet (it starts after the app) or is shutting down for a
+/// restart: part of every start and reconnect, not a fault.
+bool _expectedStreamEnd(Object? error) {
+  final text = '$error';
+  return text.contains('UNAVAILABLE') ||
+      text.contains('forcefully terminated') ||
+      text.contains('transport is closing');
+}

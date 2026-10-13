@@ -7,7 +7,7 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
-import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
+import 'package:hiddify/features/stats/widget/traffic_panel.dart';
 import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -82,33 +82,27 @@ class HomePage extends HookConsumerWidget {
             final heading = Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
               child: Text(
-                t.avpn.statsTitle.toUpperCase(),
+                t.avpn.topoFlow.toUpperCase(),
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 1.2),
               ),
             );
-            final tall = constraints.maxHeight >= 560;
             return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Expanded(flex: 11, child: AraHomeBody()),
+                // the servers on the left, the whole list; where the traffic goes on the right (the speed and the
+                // ping are on the Statistics tab)
+                const Expanded(flex: 11, child: AraHomeBody(traffic: false)),
                 Expanded(
                   flex: 9,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(0, 4, 16, 16),
-                    child: tall
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              heading,
-                              const Expanded(child: SideBarStatsOverview(large: true, dense: true, fill: true)),
-                            ],
-                          )
-                        : SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [heading, const SideBarStatsOverview(large: true, dense: true)],
-                            ),
-                          ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        heading,
+                        const Expanded(child: TrafficPanel()),
+                      ],
+                    ),
                   ),
                 ),
               ],

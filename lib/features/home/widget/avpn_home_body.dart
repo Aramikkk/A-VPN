@@ -35,7 +35,10 @@ part 'styled_home.dart';
 
 /// Home screen: the provider card with the server list inside, a "check" row, and the connection card.
 class AraHomeBody extends HookConsumerWidget {
-  const AraHomeBody({super.key});
+  const AraHomeBody({super.key, this.traffic = true});
+
+  /// the traffic strips under the servers; the unfolded phone shows them in the right half instead
+  final bool traffic;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,7 +62,12 @@ class AraHomeBody extends HookConsumerWidget {
 
     final style = Theme.of(context).araLook.style;
     if (style != AraStyle.classic) {
-      return _StyledHome(editorial: style == AraStyle.editorial, testing: testing.value, onCheck: pingAll);
+      return _StyledHome(
+        editorial: style == AraStyle.editorial,
+        testing: testing.value,
+        onCheck: pingAll,
+        traffic: traffic,
+      );
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -434,11 +442,14 @@ class _CheckRow extends HookConsumerWidget {
     final profile = ref.watch(activeProfileProvider).valueOrNull;
     final configPath = profile == null ? null : ref.watch(profilePathResolverProvider).file(profile.id).path;
     // the button shows only once a WireGuard profile (the user's own server) is added next to the active one
-    final serverAvailable =
-        useFuture(
-          useMemoized(() => configPath == null ? Future.value(false) : HomeNetwork.available(configPath), [configPath]),
-        ).data ??
-        false;
+    // the last answer is kept while the profile reloads (a reconnect): the button doesn't drop out for a moment
+    // and the row of toggles doesn't jump
+    final lastAvailable = useRef(false);
+    final checked = useFuture(
+      useMemoized(() => configPath == null ? null : HomeNetwork.available(configPath), [configPath]),
+    ).data;
+    if (checked != null) lastAvailable.value = checked;
+    final serverAvailable = lastAvailable.value;
     final serverOn = ref.watch(ConfigOptions.homeNetwork);
     final sharingOn = ref.watch(ConfigOptions.allowConnectionFromLan);
 
@@ -477,11 +488,15 @@ class _CheckRow extends HookConsumerWidget {
             child: Row(
               spacing: 6,
               children: [
-                _ToggleChip(
-                  icon: Icons.wifi_tethering_rounded,
-                  label: t.avpn.sharing,
-                  selected: sharingOn,
-                  onSelected: toggleSharing,
+                // how to use sharing on a long press (no extra button in the row: it would shift the others)
+                GestureDetector(
+                  onLongPress: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+                  child: _ToggleChip(
+                    icon: Icons.wifi_tethering_rounded,
+                    label: t.avpn.sharing,
+                    selected: sharingOn,
+                    onSelected: toggleSharing,
+                  ),
                 ),
                 _ToggleChip(
                   icon: Icons.public_rounded,
@@ -497,13 +512,6 @@ class _CheckRow extends HookConsumerWidget {
                     onSelected: toggleServer,
                   ),
                 ],
-                if (sharingOn)
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: t.avpn.sharingTitle,
-                    icon: const Icon(Icons.info_outline_rounded, size: 20),
-                    onPressed: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
-                  ),
               ],
             ),
           ),

@@ -26,6 +26,8 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/features/stats/widget/traffic_panel.dart';
+import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -136,10 +138,14 @@ void main() {
       testWidgets('home: $name', (tester) async {
         _connected = connected;
         SharedPreferences.setMockInitialValues({});
-        await tester.binding.setSurfaceSize(const Size(390, 844));
+        // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
+        final unfolded = Platform.environment['UNFOLDED'] == '1';
+        await tester.binding.setSurfaceSize(unfolded ? const Size(750, 832) : const Size(411, 960));
         // the screen size the app reads too (MediaQuery), not only the surface drawn on
-        tester.view.physicalSize = const Size(1170, 2532);
-        tester.view.devicePixelRatio = 3;
+        // the folded Fold 7: 1080 x 2520 at 2.625, about 411 x 960
+        tester.view.physicalSize = unfolded ? const Size(1968, 2184) : const Size(1080, 2520);
+        tester.view.devicePixelRatio = 2.625;
+        debugIconStrips = true;
         addTearDown(tester.view.reset);
         final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
         final prefs = await tester.runAsync(SharedPreferences.getInstance);
@@ -175,7 +181,27 @@ void main() {
                     ? const SizedBox()
                     : Scaffold(
                         appBar: AppBar(title: const Text('A-VPN')),
-                        body: const AraHomeBody(),
+                        body: unfolded
+                            ? const Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(flex: 11, child: AraHomeBody(traffic: false)),
+                                  Expanded(
+                                    flex: 9,
+                                    child: Padding(
+                                      padding: EdgeInsets.fromLTRB(0, 4, 16, 16),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Padding(padding: EdgeInsets.fromLTRB(8, 8, 8, 10), child: Text('ТРАФИК')),
+                                          Expanded(child: TrafficPanel()),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const AraHomeBody(),
                         bottomNavigationBar: NavigationBar(
                           destinations: [
                             for (final (svg, label) in [
@@ -222,6 +248,13 @@ class _Connections extends Connections {
         ('com.google.android.youtube', ConnectionRoute.vpn, '🇵🇱 Польша', 182e6),
         ('com.instagram.android', ConnectionRoute.vpn, '🇵🇱 Польша', 41e6),
         ('com.anthropic.claude', ConnectionRoute.vpn, '🇫🇮 Финляндия', 22e6),
+        ('org.telegram.messenger', ConnectionRoute.vpn, '🇵🇱 Польша', 14e6),
+        ('com.openai.chatgpt', ConnectionRoute.vpn, '🇵🇱 Польша', 9e6),
+        ('com.whatsapp', ConnectionRoute.vpn, '🇵🇱 Польша', 6e6),
+        ('com.spotify.music', ConnectionRoute.vpn, '🇵🇱 Польша', 4e6),
+        ('com.discord', ConnectionRoute.vpn, '🇵🇱 Польша', 3e6),
+        ('com.pinterest', ConnectionRoute.vpn, '🇵🇱 Польша', 2e6),
+        ('ru.ozon.app.android', ConnectionRoute.direct, '', 5e6),
         ('ru.yandex.disk', ConnectionRoute.direct, '', 96e6),
         ('ru.sberbankmobile', ConnectionRoute.direct, '', 8e6),
       ].indexed)

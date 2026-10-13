@@ -134,7 +134,7 @@
     "stNotProtected": "not protected",
     "stPingButton": "Ping",
     "topoServerCount": "Servers",
-    "topoFlow": "Where the traffic goes",
+    "topoFlow": "Traffic",
     "topoServersTitle": "VPN servers",
     "topoRulesTitle": "Why the traffic went that way",
     "ruleEverythingElse": "Everything else (on no list)",

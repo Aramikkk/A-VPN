@@ -105,12 +105,9 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
-        ) { isGranted ->
-            if (Settings.dynamicNotification && !isGranted) {
-                onServiceAlert(Alert.RequestNotificationPermission, null)
-            } else {
-                startService0()
-            }
+        ) { _ ->
+            // A-VPN: the VPN starts either way; without the permission Android only hides its notification
+            startService0()
         }
 
     private val prepareLauncher =
@@ -157,9 +154,8 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
         grantResults: IntArray
     ) {
         if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startService()
-            } else onServiceAlert(Alert.RequestNotificationPermission, null)
+            // the VPN starts with or without the notification
+            startService()
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
@@ -170,8 +166,7 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
             if (resultCode == RESULT_OK) startService()
             else onServiceAlert(Alert.RequestVPNPermission, null)
         } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            if (resultCode == RESULT_OK) startService()
-            else onServiceAlert(Alert.RequestNotificationPermission, null)
+            startService()
         }
     }
 }

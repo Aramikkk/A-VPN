@@ -57,7 +57,8 @@ class RuleTile extends HookConsumerWidget {
     final region = ref.watch(ConfigOptions.region);
     final scrollController = useScrollController();
     ref.listen(rulesNotifierProvider, (_, _) {
-      if (scrollController.offset > 0) scrollController.jumpTo(0);
+      // a built-in group has no chips, so nothing scrolls
+      if (scrollController.hasClients && scrollController.offset > 0) scrollController.jumpTo(0);
     });
     return Material(
       child: InkWell(
