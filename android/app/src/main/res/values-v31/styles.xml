@@ -18,4 +18,14 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+    <!-- The launch screen in the app's own brightness (MainActivity picks one for the next start: the phone's
+         dark mode setting can differ from the app's) -->
+    <style name="LaunchThemeAppLight" parent="LaunchTheme">
+        <item name="android:windowSplashScreenBackground">#F4F4F6</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash</item>
+    </style>
+    <style name="LaunchThemeAppDark" parent="LaunchTheme">
+        <item name="android:windowSplashScreenBackground">#0B0B0F</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash_dark</item>
+    </style>
 </resources>

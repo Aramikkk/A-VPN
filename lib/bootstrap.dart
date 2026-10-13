@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hiddify/core/analytics/analytics_controller.dart';
@@ -56,7 +57,10 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   final container = ProviderContainer(
     overrides: [environmentProvider.overrideWithValue(env)],
-    observers: [RiverpodObserver()],
+    // debug builds only: it wrote every provider's old and new value as text on every change (the groups, the
+    // stats, the connection list…), many times a second, and the release build paid for those strings in garbage:
+    // a cold start stalled a second on it and swipes lost frames
+    observers: [if (kDebugMode) RiverpodObserver()],
   );
 
   await _init("directories", () => container.read(appDirectoriesProvider.future));
@@ -184,6 +188,7 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   if (!kIsWeb) {
     FlutterNativeSplash.remove();
   }
+  _watchStartFrames();
   // SentryFlutter.s(DateTime.now().toUtc());
 }
 
@@ -209,4 +214,32 @@ Future<T?> _safeInit<T>(String name, Future<T> Function() initializer, {int? tim
   } catch (e) {
     return null;
   }
+}
+
+/// The first seconds after the start in the log: how long the first frame took, and every frame slower than 50 ms
+/// (a cold start showed the first frame and then nothing new for a second).
+void _watchStartFrames() {
+  final started = DateTime.now();
+  unawaited(
+    WidgetsBinding.instance.waitUntilFirstFrameRasterized.then(
+      (_) => Logger.bootstrap.info(
+        'first frame shown ${DateTime.now().difference(started).inMilliseconds} ms after runApp',
+      ),
+    ),
+  );
+  late final TimingsCallback watch;
+  watch = (timings) {
+    for (final t in timings) {
+      if (t.totalSpan.inMilliseconds > 50) {
+        Logger.bootstrap.info(
+          'slow start frame: build ${t.buildDuration.inMilliseconds} ms, raster ${t.rasterDuration.inMilliseconds} ms, '
+          'total ${t.totalSpan.inMilliseconds} ms',
+        );
+      }
+    }
+    if (DateTime.now().difference(started) > const Duration(seconds: 15)) {
+      SchedulerBinding.instance.removeTimingsCallback(watch);
+    }
+  };
+  SchedulerBinding.instance.addTimingsCallback(watch);
 }

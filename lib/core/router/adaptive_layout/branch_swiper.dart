@@ -99,11 +99,17 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final neighbour = _previous == null ? _neighbour(_drag) : null;
-    Widget at(int i, double x, {required bool live}) => FractionalTranslation(
-      translation: Offset(x, 0),
-      child: live
-          ? TickerMode(enabled: true, child: widget.children[i])
-          : IgnorePointer(child: TickerMode(enabled: false, child: widget.children[i])),
+    // every tab in the same wrapping, only its place and state changing: a tab that came into sight was rebuilt
+    // in a new wrapping and stayed blank for the first frames of a drag
+    Widget tab(int i, {double x = 0, bool shown = false, bool live = false}) => Offstage(
+      offstage: !shown,
+      child: FractionalTranslation(
+        translation: Offset(x, 0),
+        child: IgnorePointer(
+          ignoring: !live,
+          child: TickerMode(enabled: live, child: widget.children[i]),
+        ),
+      ),
     );
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -119,13 +125,13 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
               children: [
                 for (var i = 0; i < widget.children.length; i++)
                   if (i == _current)
-                    at(i, _previous != null ? _direction * (1 - t) : _drag, live: true)
+                    tab(i, x: _previous != null ? _direction * (1 - t) : _drag, shown: true, live: true)
                   else if (i == _previous)
-                    at(i, -_direction * t, live: false)
+                    tab(i, x: -_direction * t, shown: true)
                   else if (i == neighbour)
-                    at(i, _drag + (_drag < 0 ? 1 : -1), live: false)
+                    tab(i, x: _drag + (_drag < 0 ? 1 : -1), shown: true)
                   else
-                    Offstage(child: TickerMode(enabled: false, child: widget.children[i])),
+                    tab(i),
               ],
             );
           },

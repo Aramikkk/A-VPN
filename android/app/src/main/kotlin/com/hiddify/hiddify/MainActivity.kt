@@ -132,6 +132,30 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
 
 
 
+    override fun onPause() {
+        super.onPause()
+        followAppBrightnessOnLaunch()
+    }
+
+    /// The next start's launch screen in the app's brightness, not the phone's: a dark app on a phone in light mode
+    /// flashed a white screen. The app keeps its choice in Flutter's preferences ("theme_mode": system, light, dark).
+    private fun followAppBrightnessOnLaunch() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        try {
+            val mode = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+                .getString("flutter.theme_mode", "system")
+            val dark = when (mode) {
+                "dark" -> true
+                "light" -> false
+                else -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                    android.content.res.Configuration.UI_MODE_NIGHT_YES
+            }
+            splashScreen.setSplashScreenTheme(if (dark) R.style.LaunchThemeAppDark else R.style.LaunchThemeAppLight)
+        } catch (e: Exception) {
+            Log.w(TAG, "launch screen theme", e)
+        }
+    }
+
     override fun onDestroy() {
         connection.disconnect()
         super.onDestroy()
