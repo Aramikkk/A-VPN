@@ -1061,7 +1061,7 @@ class _HomeTraffic extends ConsumerWidget {
     )..sort((a, b) => b.total.compareTo(a.total));
     final theme = Theme.of(context);
     // fixed in place (no scroll) and without a heading, so the strips have the room; what doesn't fit is cut
-    return ClipRect(
+    final strips = ClipRect(
       child: SingleChildScrollView(
         physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 4),
@@ -1095,6 +1095,20 @@ class _HomeTraffic extends ConsumerWidget {
             ],
           ],
         ),
+      ),
+    );
+    // Glass: the strips on a pane of glass, as the rows above them
+    final glass = theme.araLook.glass;
+    if (glass == null) return strips;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 2),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: glass.panel,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: glass.edge, width: 1.2),
+        ),
+        child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 10), child: strips),
       ),
     );
   }
