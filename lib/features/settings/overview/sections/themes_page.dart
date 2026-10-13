@@ -5,7 +5,6 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
-import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/settings/widget/settings_block.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -18,7 +17,7 @@ class ThemesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     // Glass has its own colour schemes (each by day and by night), not the colour themes the others share
-    final glass = !PlatformUtils.isDesktop && ref.watch(Preferences.araStyle) == AraStyle.glass;
+    final glass = ref.watch(Preferences.araStyle) == AraStyle.glass;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.themes)),
       body: ListView(
@@ -304,7 +303,7 @@ class StylePicker extends ConsumerWidget {
           spacing: 12,
           runSpacing: 12,
           children: [
-            for (final style in AraStyle.available(desktop: PlatformUtils.isDesktop))
+            for (final style in AraStyle.values)
               InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: () => ref.read(Preferences.araStyle.notifier).update(style),

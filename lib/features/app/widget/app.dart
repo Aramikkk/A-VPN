@@ -62,9 +62,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final router = ref.watch(goRouterNotiferProvider);
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
-    // Glass is the phone's only: a computer that has it saved (a copied profile) shows Graphite
-    final savedStyle = ref.watch(Preferences.araStyle);
-    final style = PlatformUtils.isDesktop && savedStyle == AraStyle.glass ? AraStyle.graphite : savedStyle;
+    final style = ref.watch(Preferences.araStyle);
     final glassScheme = ref.watch(Preferences.glassScheme);
     final theme = AppTheme(
       themeMode,

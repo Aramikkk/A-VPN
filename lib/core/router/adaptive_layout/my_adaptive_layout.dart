@@ -76,6 +76,27 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     // by go router before it reaches here, so this only sees presses at the
     // root of a branch.
     final glass = Theme.of(context).araLook.glass;
+    final rail = FocusScope(
+      node: navScopeNode,
+      child: NavigationRail(
+        extended: Breakpoint(context).isDesktop(),
+        destinations: _navRailDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (index) => _onTap(context, index),
+        trailing: Breakpoint(context).isDesktop()
+            ? const Expanded(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  // scrolls when the window is too short for the whole panel
+                  child: SingleChildScrollView(
+                    // 15% wider than it was (248)
+                    child: SizedBox(width: 285, child: SideBarStatsOverview()),
+                  ),
+                ),
+              )
+            : null,
+      ),
+    );
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -109,27 +130,14 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                 ? navigationShell
                 : Row(
                     children: [
-                      FocusScope(
-                        node: navScopeNode,
-                        child: NavigationRail(
-                          extended: Breakpoint(context).isDesktop(),
-                          destinations: _navRailDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                          selectedIndex: navigationShell.currentIndex,
-                          onDestinationSelected: (index) => _onTap(context, index),
-                          trailing: Breakpoint(context).isDesktop()
-                              ? const Expanded(
-                                  child: Align(
-                                    alignment: Alignment.bottomCenter,
-                                    // scrolls when the window is too short for the whole panel
-                                    child: SingleChildScrollView(
-                                      // 15% wider than it was (248)
-                                      child: SizedBox(width: 285, child: SideBarStatsOverview()),
-                                    ),
-                                  ),
-                                )
-                              : null,
-                        ),
-                      ),
+                      // Glass: the menu and the stats on a pane of glass, floating over the backdrop
+                      if (glass != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+                          child: GlassPane(look: glass, radius: 26, child: rail),
+                        )
+                      else
+                        rail,
                       Expanded(child: navigationShell),
                     ],
                   ),

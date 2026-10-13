@@ -7,7 +7,7 @@ enum AraStyle {
   /// Editorial: paper (or dark paper), black and one accent colour, huge type, monospaced labels and thin rules.
   editorial,
 
-  /// Glass (the phone only): see-through panels over a soft coloured backdrop, the menu and the connect panel
+  /// Glass: see-through panels over a soft coloured backdrop, the menu and the connect panel
   /// floating over it, in one of its own colour schemes (GlassScheme).
   glass,
 
@@ -15,12 +15,6 @@ enum AraStyle {
   classic;
 
   static const fallback = graphite;
-
-  /// The looks a device offers: Glass is the phone's only.
-  static List<AraStyle> available({required bool desktop}) => [
-    for (final style in values)
-      if (!desktop || style != glass) style,
-  ];
 }
 
 /// The three kinds of glass (each scheme has a day and a night look; by night Liquid turns smoky like Frost).
