@@ -153,12 +153,20 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
         receiverRegistered = true
     }
 
+    private var lastContent: String? = null
+    private var lastTitle: String? = null
+
     fun updateStatus(previous:SystemInfo,status: SystemInfo) {
         // A-VPN: the session's traffic through the VPN and direct, then the server ("Авто: 🇸🇪 Швеция 2")
         val (vpn, direct) = SessionTraffic.add(status)
         val content = "VPN ${SessionTraffic.format(vpn)} · напрямую ${SessionTraffic.format(direct)}\n" +
             SessionTraffic.serverLine(status.current_outbound)
         val title = SessionTraffic.profileName(status.current_profile)
+        // posted only when the text changes: every post wakes the status bar and the always-on display, and the
+        // totals change far less often than the core reports (once a second)
+        if (content == lastContent && title == lastTitle) return
+        lastContent = content
+        lastTitle = title
         Application.notificationManager.notify(
                 notificationId,
                 notificationBuilder.setContentTitle(title).setContentText(content).build()

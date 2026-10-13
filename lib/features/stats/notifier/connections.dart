@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -217,6 +218,10 @@ final connectionsProvider = NotifierProvider<Connections, ConnectionsState>(Conn
 
 class Connections extends Notifier<ConnectionsState> {
   static const interval = Duration(seconds: 2);
+
+  /// while A-VPN is in the background (or the screen is off): fewer wake-ups, the battery lasts longer; the
+  /// traffic still adds up from the core's own totals
+  static const backgroundInterval = Duration(seconds: 15);
   static const keepClosed = 400;
   static const saveEvery = Duration(seconds: 10);
 
@@ -248,8 +253,24 @@ class Connections extends Notifier<ConnectionsState> {
       ..findProxy = ((_) => 'DIRECT');
     _client = client;
     final url = Uri.parse('http://127.0.0.1:$port/connections');
-    final timer = Timer.periodic(interval, (_) => _poll(client, url, secret));
+    var last = DateTime.fromMillisecondsSinceEpoch(0);
+    var foreground = true;
+    final lifecycle = AppLifecycleListener(
+      onResume: () {
+        foreground = true;
+        unawaited(_poll(client, url, secret));
+      },
+      onHide: () => foreground = false,
+      onPause: () => foreground = false,
+    );
+    final timer = Timer.periodic(interval, (_) {
+      final now = DateTime.now();
+      if (!foreground && now.difference(last) < backgroundInterval) return;
+      last = now;
+      unawaited(_poll(client, url, secret));
+    });
     ref.onDispose(() {
+      lifecycle.dispose();
       timer.cancel();
       client.close(force: true);
       _client = null;
