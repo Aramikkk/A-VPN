@@ -34,7 +34,10 @@ class _StyledHome extends HookConsumerWidget {
     // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one
     // (about 830) keeps everything tight
     final roomy = MediaQuery.sizeOf(context).height >= 900;
-    final rowsInSight = roomy ? 4 : 3;
+    // Auto and two countries folded (three on a lower screen would crowd the strips), Auto and three in the
+    // unfolded phone's servers column; the rest a scroll away
+    final rowsInSight = traffic ? 3 : 4;
+    final glassLook = theme.araLook.glass;
     final currentName = switch (current?.tag) {
       _ when serverMode => '🏠 ${t.avpn.server}',
       'lowest' || 'balance' => picked == null ? t.avpn.auto : '${t.avpn.auto} · ${_withFlag(serverName(picked))}',
@@ -57,9 +60,7 @@ class _StyledHome extends HookConsumerWidget {
             showCheck: editorial,
           ),
           Gap(roomy ? 10 : 6),
-          if (profile != null && servers.isNotEmpty && traffic) ...[
-            // four rows in sight (Auto and three countries), three on a lower screen (the unfolded phone), so the
-            // strip map under them fits; the rest a scroll away
+          if (profile != null && servers.isNotEmpty) ...[
             SizedBox(
               height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
               child: _StyledServerList(
@@ -70,9 +71,13 @@ class _StyledHome extends HookConsumerWidget {
                 testing: testing,
               ),
             ),
-            Gap(roomy ? 20 : 10),
-            // where the traffic went, under the servers (as on the Topology tab)
-            Expanded(child: _HomeTraffic(editorial: editorial)),
+            // where the traffic went, under the servers (as on the Topology tab); Glass's card sits in the middle of
+            // the room between the servers and the toggles, the same space above and below it
+            if (traffic) ...[
+              Gap(glassLook != null ? 0 : (roomy ? 20 : 10)),
+              Expanded(child: _HomeTraffic(editorial: editorial)),
+            ] else
+              const Spacer(),
           ] else
             Expanded(
               child: profile == null
@@ -97,7 +102,7 @@ class _StyledHome extends HookConsumerWidget {
                       ),
                     ),
             ),
-          const Gap(6),
+          Gap(glassLook != null ? 12 : 6),
           _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
           if (editorial)
             _EditorialDock(status: status)
@@ -196,55 +201,38 @@ class _StatusBlock extends HookConsumerWidget {
     final today = ref.read(trafficHistoryProvider.notifier).amountFrom(statsDayStart(DateTime.now()));
     final vpn = today.vpn;
     final direct = (today.total - vpn).clamp(0, 1 << 62);
-    final small = theme.textTheme.labelMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
     final accent = theme.araLook.neonFill ?? scheme.primary;
+    // one line each side, the same size and height: the time against VPN, the speed against direct
+    Widget line(Widget left, Widget right) => Row(
+      children: [
+        Expanded(
+          child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: left),
+        ),
+        const Gap(10),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: right),
+      ],
+    );
     return Padding(
       // no space of its own on top: the gap under the title bar matches the one above the servers
       padding: EdgeInsets.zero,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            // two lines, as the totals on the right: the session's time, then the speed down and up
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  item(Icons.schedule_rounded, time, colour: scheme.primary),
-                  const Gap(2),
-                  Row(children: [item(Icons.south_rounded, down), const Gap(10), item(Icons.north_rounded, up)]),
-                ],
-              ),
+          line(
+            item(Icons.schedule_rounded, time, colour: scheme.primary),
+            item(
+              Icons.shield_rounded,
+              'VPN ${formatBytes(vpn, units)}',
+              colour: AraLook.readableOn(accent, scheme.surface),
             ),
           ),
-          const Gap(10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.shield_rounded, size: 12, color: AraLook.readableOn(accent, scheme.surface)),
-                  const Gap(3),
-                  Text('VPN ${formatBytes(vpn, units)}', style: small),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.alt_route_rounded, size: 12, color: scheme.onSurfaceVariant),
-                  const Gap(3),
-                  Text(
-                    '${t.avpn.statsDirect} ${formatBytes(direct, units)}',
-                    style: small?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ],
+          const Gap(2),
+          line(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [item(Icons.south_rounded, down), const Gap(10), item(Icons.north_rounded, up)],
+            ),
+            item(Icons.alt_route_rounded, '${t.avpn.statsDirect} ${formatBytes(direct, units)}'),
           ),
         ],
       ),
@@ -820,7 +808,7 @@ class _GraphiteDock extends ConsumerWidget {
     // Glass: floating over the backdrop, what's behind it blurred
     if (glass != null) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(0, 6, 0, 12),
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
         child: GlassPane(look: glass, radius: large ? 40 : 32, padding: padding, child: content),
       );
     }
@@ -1101,11 +1089,10 @@ class _HomeTraffic extends ConsumerWidget {
     final glass = theme.araLook.glass;
     if (glass == null) return strips;
     if (items.isEmpty) return const SizedBox.shrink();
-    // as tall as the strips, not the whole room down to the connect panel
+    // as tall as the strips, not the whole room down to the connect panel, and in the middle of that room
     return Align(
-      alignment: Alignment.topCenter,
       child: Padding(
-        padding: const EdgeInsets.only(top: 6, bottom: 2),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: glass.panel,
