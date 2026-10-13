@@ -333,11 +333,17 @@ enum GlassScheme {
     final kind = dark
         ? (variant == GlassVariant.clear ? GlassVariant.clear : GlassVariant.frost)
         : (variant == GlassVariant.clear ? GlassVariant.clear : GlassVariant.liquid);
+    // a calm dark scheme by day: its spots are dark greys, laid on light glass they were dirty smudges the text
+    // got lost in; they go pale and faint, on near-white
+    final paleDay = calm && !dark && !native;
     final base = native
         ? this.base
+        : paleDay
+        ? const Color(0xFFF2F2F4)
         : dark
         ? Color.lerp(const Color(0xFF07070B), spots.first, .05)!
         : Color.lerp(const Color(0xFFF6F5F2), spots.first, .07)!;
+    final shownSpots = paleDay ? [for (final s in spots) Color.lerp(s, Colors.white, .8)!] : spots;
     // a near-black accent (Graphite) turns near-white by night
     final accent = dark && this.accent.computeLuminance() < .05 ? const Color(0xFFE8E8EE) : this.accent;
     return GlassLook(
@@ -346,8 +352,10 @@ enum GlassScheme {
       kind: kind,
       accent: accent,
       base: base,
-      spots: spots,
-      strength: dark
+      spots: shownSpots,
+      strength: paleDay
+          ? const [.6, .7, .55]
+          : dark
           ? (kind == GlassVariant.clear ? const [.32, .4, .28] : const [.4, .45, .22])
           : (kind == GlassVariant.clear ? const [.55, .7, .6] : const [.85, .75, .6]),
       panel: switch ((kind, dark)) {
