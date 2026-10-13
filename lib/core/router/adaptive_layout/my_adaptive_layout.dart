@@ -142,7 +142,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                         child: GlassPane(
-                          scheme: glass,
+                          look: glass,
                           radius: 34,
                           // icons only, the chosen tab on a pill of the scheme's colour, as in the preview
                           child: NavigationBar(

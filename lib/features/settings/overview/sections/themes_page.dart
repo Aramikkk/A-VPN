@@ -17,7 +17,7 @@ class ThemesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    // Glass has its own colour schemes, each light or dark by itself: no day/night and no shared colour themes
+    // Glass has its own colour schemes (each by day and by night), not the colour themes the others share
     final glass = !PlatformUtils.isDesktop && ref.watch(Preferences.araStyle) == AraStyle.glass;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.themes)),
@@ -27,7 +27,7 @@ class ThemesPage extends ConsumerWidget {
           // the colour themes are all true black now: OLED and the neon colours
           SettingsBlock(
             children: glass
-                ? const [StylePicker(), GlassSchemePicker()]
+                ? const [StylePicker(), ThemeModePrefTile(), GlassSchemePicker()]
                 : const [StylePicker(), ThemeModePrefTile(), AccentPicker(oled: true)],
           ),
         ],
@@ -109,7 +109,7 @@ class GlassSchemePicker extends ConsumerWidget {
                                 width: 2,
                               ),
                             ),
-                            child: _GlassSwatch(scheme: scheme, selected: scheme == selected),
+                            child: _GlassSwatch(look: scheme.look(theme.brightness), selected: scheme == selected),
                           ),
                           const SizedBox(height: 4),
                           Text(name(scheme), maxLines: 1, style: theme.textTheme.labelSmall),
@@ -128,9 +128,9 @@ class GlassSchemePicker extends ConsumerWidget {
 
 /// A scheme in small: its backdrop with a pane of its glass and a dot of its colour.
 class _GlassSwatch extends StatelessWidget {
-  const _GlassSwatch({required this.scheme, required this.selected});
+  const _GlassSwatch({required this.look, required this.selected});
 
-  final GlassScheme scheme;
+  final GlassLook look;
   final bool selected;
 
   @override
@@ -141,7 +141,7 @@ class _GlassSwatch extends StatelessWidget {
       height: 56,
       child: Stack(
         children: [
-          Positioned.fill(child: GlassBackdrop(scheme: scheme)),
+          Positioned.fill(child: GlassBackdrop(look: look)),
           Positioned(
             left: 7,
             right: 7,
@@ -151,19 +151,19 @@ class _GlassSwatch extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 5),
               alignment: Alignment.centerLeft,
               decoration: BoxDecoration(
-                color: scheme.panel,
+                color: look.panel,
                 borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: scheme.edge),
+                border: Border.all(color: look.edge),
               ),
               child: Container(
                 width: 12,
                 height: 12,
-                decoration: BoxDecoration(color: scheme.accent, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: look.accent, shape: BoxShape.circle),
                 child: selected
                     ? Icon(
                         Icons.check_rounded,
                         size: 10,
-                        color: scheme.accent.computeLuminance() > .45 ? Colors.black : Colors.white,
+                        color: look.accent.computeLuminance() > .45 ? Colors.black : Colors.white,
                       )
                     : null,
               ),
@@ -324,7 +324,7 @@ class StylePicker extends ConsumerWidget {
                           ),
                         ),
                         child: style == AraStyle.glass
-                            ? _GlassStylePreview(scheme: ref.watch(Preferences.glassScheme))
+                            ? _GlassStylePreview(look: ref.watch(Preferences.glassScheme).look(brightness))
                             : _StylePreview(style: style, brightness: brightness, accent: accentColour),
                       ),
                       const SizedBox(height: 6),
@@ -467,9 +467,9 @@ class _StylePreview extends StatelessWidget {
 
 /// Glass's thumbnail: the chosen scheme's backdrop with see-through rows and a floating pane.
 class _GlassStylePreview extends StatelessWidget {
-  const _GlassStylePreview({required this.scheme});
+  const _GlassStylePreview({required this.look});
 
-  final GlassScheme scheme;
+  final GlassLook look;
 
   @override
   Widget build(BuildContext context) {
@@ -477,9 +477,9 @@ class _GlassStylePreview extends StatelessWidget {
       height: 10,
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: selected ? scheme.accent.withValues(alpha: scheme.dark ? .35 : .6) : scheme.panel,
+        color: selected ? look.accent.withValues(alpha: look.dark ? .35 : .6) : look.panel,
         borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: selected ? scheme.accent : scheme.edge, width: .8),
+        border: Border.all(color: selected ? look.accent : look.edge, width: .8),
       ),
     );
     return ClipRRect(
@@ -488,7 +488,7 @@ class _GlassStylePreview extends StatelessWidget {
         height: 86,
         child: Stack(
           children: [
-            Positioned.fill(child: GlassBackdrop(scheme: scheme)),
+            Positioned.fill(child: GlassBackdrop(look: look)),
             Padding(
               padding: const EdgeInsets.all(8),
               child: Column(
@@ -503,14 +503,14 @@ class _GlassStylePreview extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     alignment: Alignment.centerLeft,
                     decoration: BoxDecoration(
-                      color: scheme.panel,
+                      color: look.panel,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: scheme.edge),
+                      border: Border.all(color: look.edge),
                     ),
                     child: Container(
                       width: 13,
                       height: 13,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.accent),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: look.accent),
                     ),
                   ),
                 ],

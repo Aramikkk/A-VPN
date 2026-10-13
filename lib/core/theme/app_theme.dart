@@ -208,7 +208,7 @@ class AppTheme {
 
   /// The palette of a style in day or night: background, cards, text, lines.
   static AraPalette palette(AraStyle style, Brightness brightness, {GlassScheme glass = GlassScheme.fallback}) {
-    if (style == AraStyle.glass) return glassPalette(glass);
+    if (style == AraStyle.glass) return glassPalette(glass.look(brightness));
     final dark = brightness == Brightness.dark;
     return style == AraStyle.editorial
         ? AraPalette(
@@ -239,7 +239,7 @@ class AppTheme {
 
   /// Glass's colours: see-through panels and lines over the backdrop ([AraPalette.bg] is the backdrop's own colour,
   /// for working out readable colours; the pages themselves are clear so the backdrop shows).
-  static AraPalette glassPalette(GlassScheme s) {
+  static AraPalette glassPalette(GlassLook s) {
     final dark = s.dark;
     Color more(double alpha) => Colors.white.withValues(alpha: (s.panel.a + alpha).clamp(0.0, 1.0));
     return AraPalette(
@@ -262,9 +262,10 @@ class AppTheme {
     final editorial = style == AraStyle.editorial;
     final styled = palette(style, brightness, glass: glassScheme);
     final glass = _glass;
+    final look = glassScheme.look(brightness);
     // a dialog, a sheet or a menu lies over the page's content: a solid version of the glass
     final solid = glass
-        ? Color.alphaBlend(glassScheme.dark ? const Color(0x24FFFFFF) : const Color(0xE6FFFFFF), glassScheme.base)
+        ? Color.alphaBlend(look.dark ? const Color(0x24FFFFFF) : const Color(0xE6FFFFFF), look.base)
         : styled.card;
     // the OLED theme in Graphite: true black by night (pixels off) and pure white by day, cards just off it
     final p = accent.pure && style == AraStyle.graphite
@@ -283,33 +284,32 @@ class AppTheme {
         : styled;
     final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
     final accentColour = glass
-        ? glassScheme.accent
+        ? look.accent
         : editorial && colourless
         ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A))
         : (dark ? accent.darkPrimary : accent.lightPrimary);
-    final primary = AraLook.readableOn(accentColour, glass ? glassScheme.panelOnBase : p.bg);
+    final primary = AraLook.readableOn(accentColour, glass ? look.panelOnBase : p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
-    final scheme = ColorScheme.fromSeed(seedColor: glass ? glassScheme.accent : accent.seed, brightness: brightness)
-        .copyWith(
-          primary: primary,
-          onPrimary: onPrimary,
-          primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
-          onPrimaryContainer: p.fg,
-          secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
-          onSecondaryContainer: p.fg,
-          surface: p.bg,
-          onSurface: p.fg,
-          onSurfaceVariant: p.muted,
-          surfaceDim: p.bg,
-          surfaceBright: p.card,
-          surfaceContainerLowest: p.bg,
-          surfaceContainerLow: p.card,
-          surfaceContainer: p.container,
-          surfaceContainerHigh: p.high,
-          surfaceContainerHighest: p.highest,
-          outline: p.strongLine,
-          outlineVariant: p.line,
-        );
+    final scheme = ColorScheme.fromSeed(seedColor: glass ? look.accent : accent.seed, brightness: brightness).copyWith(
+      primary: primary,
+      onPrimary: onPrimary,
+      primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
+      onPrimaryContainer: p.fg,
+      secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
+      onSecondaryContainer: p.fg,
+      surface: p.bg,
+      onSurface: p.fg,
+      onSurfaceVariant: p.muted,
+      surfaceDim: p.bg,
+      surfaceBright: p.card,
+      surfaceContainerLowest: p.bg,
+      surfaceContainerLow: p.card,
+      surfaceContainer: p.container,
+      surfaceContainerHigh: p.high,
+      surfaceContainerHighest: p.highest,
+      outline: p.strongLine,
+      outlineVariant: p.line,
+    );
 
     // body text: Manrope (Graphite) or Golos Text (Editorial); headings in Unbounded; Editorial's small labels
     // monospaced
@@ -469,6 +469,7 @@ class AppTheme {
     final dark = brightness == Brightness.dark;
     final editorial = style == AraStyle.editorial;
     final glass = _glass;
+    final look = glassScheme.look(brightness);
     final blockColours = glass
         ? [p.high, p.card]
         : editorial
@@ -480,8 +481,8 @@ class AppTheme {
         : dark
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
-    final block = glass ? glassScheme.panelOnBase : blockColours[blockColours.length ~/ 2];
-    final colourless = HSLColor.fromColor(glass ? glassScheme.accent : accent.seed).saturation < .12;
+    final block = glass ? look.panelOnBase : blockColours[blockColours.length ~/ 2];
+    final colourless = HSLColor.fromColor(glass ? look.accent : accent.seed).saturation < .12;
     final Color down;
     final Color up;
     final filled = accent.filled && !editorial && !glass;
@@ -510,8 +511,8 @@ class AppTheme {
       graphDown: filled ? down : AraLook.readableOn(down, block),
       graphUp: filled ? up : AraLook.readableOn(up, block),
       style: style,
-      pingOn: glass ? glassScheme.panelOnBase : p.card,
-      glass: glass ? glassScheme : null,
+      pingOn: glass ? look.panelOnBase : p.card,
+      glass: glass ? look : null,
     );
   }
 

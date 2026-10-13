@@ -23,7 +23,7 @@ enum AraStyle {
   ];
 }
 
-/// The three kinds of glass; each has its own brightness, whatever the day/night setting.
+/// The three kinds of glass (each scheme has a day and a night look; by night Liquid turns smoky like Frost).
 enum GlassVariant {
   /// milky white panels over bright colour spots (the accent, blue and pink)
   liquid,

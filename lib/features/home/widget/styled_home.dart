@@ -821,7 +821,7 @@ class _GraphiteDock extends ConsumerWidget {
     if (glass != null) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(0, 6, 0, 12),
-        child: GlassPane(scheme: glass, radius: large ? 40 : 32, padding: padding, child: content),
+        child: GlassPane(look: glass, radius: large ? 40 : 32, padding: padding, child: content),
       );
     }
     return Container(

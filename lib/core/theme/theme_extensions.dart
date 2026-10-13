@@ -51,7 +51,7 @@ class AraLook extends ThemeExtension<AraLook> {
 
   /// the Glass scheme the theme was built for: panels see-through, the menu and the connect panel floating;
   /// null: not Glass
-  final GlassScheme? glass;
+  final GlassLook? glass;
 
   /// the neon the chosen server and the connect button are filled with (black text on it); null: not filled
   final Color? neonFill;

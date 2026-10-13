@@ -155,7 +155,7 @@ void main() {
         final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
         final prefs = await tester.runAsync(SharedPreferences.getInstance);
         final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
-        // GLASS=<scheme>: Glass in that scheme (it brings its own brightness)
+        // GLASS=<scheme>: Glass in that scheme, by day or by night as the others
         final glassScheme = GlassScheme.values.byName(Platform.environment['GLASS'] ?? 'lemonade');
         final glass = style == AraStyle.glass;
         final theme = AppTheme(AppThemeMode.system, '', accent: accent, style: style, glassScheme: glassScheme);
@@ -182,11 +182,13 @@ void main() {
             ],
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
-              theme: (glass ? glassScheme.dark : dark) ? theme.darkTheme(null) : theme.lightTheme(null),
+              theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
               builder: (context, child) => glass
                   ? Stack(
                       children: [
-                        Positioned.fill(child: GlassBackdrop(scheme: glassScheme)),
+                        Positioned.fill(
+                          child: GlassBackdrop(look: glassScheme.look(dark ? Brightness.dark : Brightness.light)),
+                        ),
                         child!,
                       ],
                     )

@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 
@@ -112,65 +113,133 @@ enum GlassScheme {
 
   const GlassScheme(this.variant, this.accent, this.base, this.spots);
 
-  /// the kind of glass: milky (Liquid), smoky (Frost) or clear
+  /// the scheme's own kind of glass: milky (Liquid), smoky (Frost) or clear
   final GlassVariant variant;
 
   /// the colour of the chosen server, the connect button, the menu's chosen tab and the figures
   final Color accent;
 
-  /// the backdrop's own colour
+  /// the backdrop's own colour, in the scheme's own brightness (Frost dark, the others light)
   final Color base;
 
   /// the soft colour spots on the backdrop: top left, right, bottom left
   final List<Color> spots;
 
-  bool get dark => variant.dark;
-
   static const fallback = lemonade;
 
-  /// The panels' fill: milky white, smoky, or nearly clear.
-  Color get panel => switch (variant) {
-    GlassVariant.liquid => Colors.white.withValues(alpha: .4),
-    GlassVariant.frost => Colors.white.withValues(alpha: .08),
-    GlassVariant.clear => Colors.white.withValues(alpha: .3),
-  };
+  /// The scheme by day or by night: every scheme has both. By night the backdrop goes near-black with the same
+  /// colour spots glowing through smoky glass (Clear keeps its brighter edges); by day it goes light with milky
+  /// glass (Clear: nearly clear).
+  GlassLook look(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    final native = variant.dark == dark;
+    final kind = dark
+        ? (variant == GlassVariant.clear ? GlassVariant.clear : GlassVariant.frost)
+        : (variant == GlassVariant.clear ? GlassVariant.clear : GlassVariant.liquid);
+    final base = native
+        ? this.base
+        : dark
+        ? Color.lerp(const Color(0xFF07070B), spots.first, .05)!
+        : Color.lerp(const Color(0xFFF6F5F2), spots.first, .07)!;
+    // a near-black accent (Graphite) turns near-white by night
+    final accent = dark && this.accent.computeLuminance() < .05 ? const Color(0xFFE8E8EE) : this.accent;
+    return GlassLook(
+      dark: dark,
+      kind: kind,
+      accent: accent,
+      base: base,
+      spots: spots,
+      strength: dark
+          ? (kind == GlassVariant.clear ? const [.32, .4, .28] : const [.4, .45, .22])
+          : (kind == GlassVariant.clear ? const [.55, .7, .6] : const [.85, .75, .6]),
+      panel: switch ((kind, dark)) {
+        (GlassVariant.clear, true) => Colors.white.withValues(alpha: .06),
+        (_, true) => Colors.white.withValues(alpha: .08),
+        (GlassVariant.clear, false) => Colors.white.withValues(alpha: .3),
+        (_, false) => Colors.white.withValues(alpha: .4),
+      },
+      edge: switch ((kind, dark)) {
+        (GlassVariant.clear, true) => Colors.white.withValues(alpha: .26),
+        (_, true) => Colors.white.withValues(alpha: .16),
+        (GlassVariant.clear, false) => Colors.white.withValues(alpha: .9),
+        (_, false) => Colors.white.withValues(alpha: .75),
+      },
+    );
+  }
+}
 
-  /// The panels' edge: a bright line, softer on Frost.
-  Color get edge => switch (variant) {
-    GlassVariant.liquid => Colors.white.withValues(alpha: .75),
-    GlassVariant.frost => Colors.white.withValues(alpha: .16),
-    GlassVariant.clear => Colors.white.withValues(alpha: .9),
-  };
+/// A Glass scheme as it is drawn by day or by night.
+@immutable
+class GlassLook {
+  const GlassLook({
+    required this.dark,
+    required this.kind,
+    required this.accent,
+    required this.base,
+    required this.spots,
+    required this.strength,
+    required this.panel,
+    required this.edge,
+  });
+
+  final bool dark;
+
+  /// the glass drawn: milky, smoky or clear
+  final GlassVariant kind;
+
+  final Color accent;
+
+  /// the backdrop's colour
+  final Color base;
+
+  /// the backdrop's soft colour spots and how strong each one is
+  final List<Color> spots;
+  final List<double> strength;
+
+  /// the panels' see-through fill and their bright edge
+  final Color panel;
+  final Color edge;
 
   /// What a panel looks like laid on the backdrop, for working out readable colours on it.
   Color get panelOnBase => Color.alphaBlend(panel, Color.lerp(base, spots.first, dark ? .15 : .25)!);
+
+  @override
+  bool operator ==(Object other) =>
+      other is GlassLook &&
+      other.dark == dark &&
+      other.kind == kind &&
+      other.accent == accent &&
+      other.base == base &&
+      other.panel == panel &&
+      other.edge == edge &&
+      listEquals(other.spots, spots) &&
+      listEquals(other.strength, strength);
+
+  @override
+  int get hashCode => Object.hash(dark, kind, accent, base, panel, edge, Object.hashAll(spots));
 }
 
-/// The backdrop behind every Glass screen: the scheme's base colour with its three soft colour spots.
+/// The backdrop behind every Glass screen: the base colour with three soft colour spots.
 class GlassBackdrop extends StatelessWidget {
-  const GlassBackdrop({super.key, required this.scheme});
+  const GlassBackdrop({super.key, required this.look});
 
-  final GlassScheme scheme;
+  final GlassLook look;
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
-    child: CustomPaint(painter: _BackdropPainter(scheme), child: const SizedBox.expand()),
+    child: CustomPaint(painter: _BackdropPainter(look), child: const SizedBox.expand()),
   );
 }
 
 class _BackdropPainter extends CustomPainter {
-  _BackdropPainter(this.scheme);
+  _BackdropPainter(this.look);
 
-  final GlassScheme scheme;
+  final GlassLook look;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = scheme.base);
-    final strength = switch (scheme.variant) {
-      GlassVariant.liquid => [.85, .75, .6],
-      GlassVariant.frost => [.4, .45, .22],
-      GlassVariant.clear => [.55, .7, .6],
-    };
+    canvas.drawRect(Offset.zero & size, Paint()..color = look.base);
+    final strength = look.strength;
     final w = size.width;
     final h = size.height;
     // a spot: the colour fading out to nothing, as a blurred circle would
@@ -190,22 +259,22 @@ class _BackdropPainter extends CustomPainter {
       );
     }
 
-    spot(Offset(w * .05, h * .2), w * .85, scheme.spots[0], strength[0]);
-    spot(Offset(w * 1.0, h * .5), w * .8, scheme.spots[1], strength[1]);
-    spot(Offset(w * .1, h * .85), w * .75, scheme.spots[2], strength[2]);
+    spot(Offset(w * .05, h * .2), w * .85, look.spots[0], strength[0]);
+    spot(Offset(w * 1.0, h * .5), w * .8, look.spots[1], strength[1]);
+    spot(Offset(w * .1, h * .85), w * .75, look.spots[2], strength[2]);
   }
 
   @override
-  bool shouldRepaint(_BackdropPainter old) => old.scheme != scheme;
+  bool shouldRepaint(_BackdropPainter old) => old.look != look;
 }
 
 /// A floating pane of glass: what's behind it blurred, the scheme's fill, a bright edge and a soft shadow. The menu
 /// and the connect panel are drawn on it; the cards in the pages are plain see-through fills (blurring each one
 /// would cost too much on a long list).
 class GlassPane extends StatelessWidget {
-  const GlassPane({super.key, required this.scheme, required this.child, this.radius = 30, this.padding});
+  const GlassPane({super.key, required this.look, required this.child, this.radius = 30, this.padding});
 
-  final GlassScheme scheme;
+  final GlassLook look;
   final Widget child;
   final double radius;
   final EdgeInsetsGeometry? padding;
@@ -219,7 +288,7 @@ class GlassPane extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             // faint: it shows through the see-through pane
-            color: Colors.black.withValues(alpha: scheme.dark ? .25 : .05),
+            color: Colors.black.withValues(alpha: look.dark ? .25 : .05),
             blurRadius: 24,
             offset: const Offset(0, 6),
           ),
@@ -233,14 +302,14 @@ class GlassPane extends StatelessWidget {
             padding: padding,
             decoration: BoxDecoration(
               borderRadius: shape,
-              border: Border.all(color: scheme.edge),
+              border: Border.all(color: look.edge),
               // the light catching the top edge
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color.alphaBlend(Colors.white.withValues(alpha: scheme.dark ? .05 : .12), scheme.panel),
-                  scheme.panel,
+                  Color.alphaBlend(Colors.white.withValues(alpha: look.dark ? .05 : .12), look.panel),
+                  look.panel,
                 ],
               ),
             ),

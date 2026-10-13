@@ -106,8 +106,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                   supportedLocales: AppLocaleUtils.supportedLocales,
                   localizationsDelegates: GlobalMaterialLocalizations.delegates,
                   debugShowCheckedModeBanner: false,
-                  // Glass's scheme brings its own brightness
-                  themeMode: glass ? (glassScheme.dark ? ThemeMode.dark : ThemeMode.light) : themeMode.flutterThemeMode,
+                  themeMode: themeMode.flutterThemeMode,
                   theme: theme.lightTheme(lightColorScheme),
                   darkTheme: theme.darkTheme(darkColorScheme),
                   title: Constants.appName,
@@ -122,7 +121,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                     if (glass) {
                       child = Stack(
                         children: [
-                          Positioned.fill(child: GlassBackdrop(scheme: glassScheme)),
+                          Positioned.fill(child: GlassBackdrop(look: glassScheme.look(theme.brightness))),
                           child,
                         ],
                       );
@@ -138,7 +137,9 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                             ? Brightness.light
                             : Brightness.dark,
                         statusBarBrightness: theme.brightness,
-                        systemNavigationBarColor: glass ? glassScheme.base : theme.scaffoldBackgroundColor,
+                        systemNavigationBarColor: glass
+                            ? glassScheme.look(theme.brightness).base
+                            : theme.scaffoldBackgroundColor,
                         systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
                             ? Brightness.light
                             : Brightness.dark,
