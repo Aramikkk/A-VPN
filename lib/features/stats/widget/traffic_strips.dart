@@ -125,7 +125,8 @@ class _StripMap extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    // Glass: both strips in the scheme's colour, the VPN one a little deeper, the direct one a little lighter
+    // Glass: the VPN strip in the scheme's colour, a little deeper; the direct one grey, as everywhere (in a lighter
+    // shade of the colour it was taken for the VPN one)
     final glass = theme.araLook.glass;
     final calm = glass?.calm ?? false;
     Color deeper(Color c) {
@@ -135,7 +136,6 @@ class _StripMap extends ConsumerWidget {
 
     final base = switch (strip.route) {
       ConnectionRoute.vpn when glass != null => deeper(glass.accent),
-      ConnectionRoute.direct when glass != null => Color.lerp(glass.accent, Colors.white, .45)!,
       // the theme's own colour, as on the chosen server and the power button
       ConnectionRoute.vpn => theme.araLook.neonFill ?? scheme.primary,
       ConnectionRoute.direct => const Color(0xFF9AA0A6),

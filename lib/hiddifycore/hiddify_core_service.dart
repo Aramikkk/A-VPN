@@ -208,7 +208,8 @@ class HiddifyCoreService with InfraLogger {
   /// The config the core starts with: the profile's, or a copy without the servers that don't fit:
   /// outside Europe, or not made for the network the phone is on.
   Future<String> _filteredConfig(String path) async {
-    final europeOnly = ref.read(ConfigOptions.europeOnlyServers);
+    final cisOnly = ref.read(ConfigOptions.cisOnlyServers);
+    final europeOnly = !cisOnly && ref.read(ConfigOptions.europeOnlyServers);
     final serversByNetwork = ref.read(ConfigOptions.serversByNetwork);
     // the phone's network decides the servers and, for "only blocked through the VPN", the rules (Wi-Fi only):
     // either way the config is made for one network and has to be remade when it changes
@@ -217,8 +218,8 @@ class HiddifyCoreService with InfraLogger {
         : NetworkKind.unknown;
     final network = serversByNetwork ? current : NetworkKind.unknown;
     var filtered = path;
-    if (europeOnly || network != NetworkKind.unknown) {
-      filtered = await ServerRegionFilter.apply(path, europeOnly: europeOnly, network: network);
+    if (europeOnly || cisOnly || network != NetworkKind.unknown) {
+      filtered = await ServerRegionFilter.apply(path, europeOnly: europeOnly, cisOnly: cisOnly, network: network);
     }
     ServerRegionFilter.lastApplied = current;
     if (ref.read(ConfigOptions.homeNetwork)) {

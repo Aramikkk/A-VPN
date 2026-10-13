@@ -5,7 +5,7 @@
     android:viewportHeight="680">
     <!-- the peak: a mountain with a pass cut under it and a coloured summit, rounded; within the adaptive icon's
          safe zone -->
-    <group android:pivotX="340" android:pivotY="345" android:scaleX="0.72" android:scaleY="0.72">
+    <group android:pivotX="340" android:pivotY="345" android:scaleX="0.58" android:scaleY="0.58">
         <path android:fillColor="#111111" android:strokeColor="#111111" android:strokeWidth="40"
             android:strokeLineJoin="round" android:pathData="M120,520 L340,150 L560,520 Z"/>
         <path android:fillColor="#FAFAFA" android:strokeColor="#FAFAFA" android:strokeWidth="16"

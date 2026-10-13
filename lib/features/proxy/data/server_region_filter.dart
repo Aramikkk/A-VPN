@@ -21,6 +21,17 @@ abstract class ServerRegionFilter {
     'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'SM', 'UA', 'VA', 'XK',
   };
 
+  /// The CIS and its neighbours without Russia and Belarus: Armenia, Azerbaijan, Georgia, Kazakhstan,
+  /// Kyrgyzstan, Moldova, Tajikistan, Turkmenistan, Uzbekistan.
+  static const cis = {'AM', 'AZ', 'GE', 'KZ', 'KG', 'MD', 'TJ', 'TM', 'UZ'};
+
+  /// Whether a server stays in CIS only: one of [cis]; a mobile-only (whitelist) one from anywhere but Russia
+  /// and Belarus, so a mobile network still switches to the whitelist servers.
+  static bool keepCis(String tag) {
+    final code = countryCode(tag);
+    return isMobileOnly(tag) ? code != 'RU' && code != 'BY' : cis.contains(code);
+  }
+
   /// For names without a flag: country name (lower case, Russian or English) to ISO code.
   static const _names = {
     'россия': 'RU',
@@ -108,6 +119,15 @@ abstract class ServerRegionFilter {
     'македония': 'MK',
     'macedonia': 'MK',
     'молдова': 'MD',
+    'азербайджан': 'AZ',
+    'azerbaijan': 'AZ',
+    'киргизия': 'KG',
+    'кыргызстан': 'KG',
+    'kyrgyzstan': 'KG',
+    'таджикистан': 'TJ',
+    'tajikistan': 'TJ',
+    'туркменистан': 'TM',
+    'turkmenistan': 'TM',
     'moldova': 'MD',
     'украина': 'UA',
     'ukraine': 'UA',
@@ -182,10 +202,16 @@ abstract class ServerRegionFilter {
 
   /// Writes the filtered config next to [path] and returns its path, or [path] itself when nothing is hidden.
   ///
-  /// Placeholders always go. With [europeOnly], servers outside Europe go. Then on a mobile [network] only
-  /// the mobile-only servers stay, and on Wi-Fi they go. A step that would leave no server is skipped, so a
-  /// connection always starts with something.
-  static Future<String> apply(String path, {bool europeOnly = true, NetworkKind network = NetworkKind.unknown}) async {
+  /// Placeholders always go. With [europeOnly], servers outside Europe go; with [cisOnly], the ones [keepCis]
+  /// doesn't keep. Then
+  /// on a mobile [network] only the mobile-only servers stay, and on Wi-Fi they go. A step that would leave no
+  /// server is skipped, so a connection always starts with something.
+  static Future<String> apply(
+    String path, {
+    bool europeOnly = true,
+    bool cisOnly = false,
+    NetworkKind network = NetworkKind.unknown,
+  }) async {
     lastApplied = network;
     try {
       final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
@@ -208,7 +234,11 @@ abstract class ServerRegionFilter {
         return left;
       }
 
-      if (europeOnly) shown = narrow(shown, keep, 'European');
+      if (cisOnly) {
+        shown = narrow(shown, keepCis, 'CIS');
+      } else if (europeOnly) {
+        shown = narrow(shown, keep, 'European');
+      }
       if (network == NetworkKind.mobile) shown = narrow(shown, isMobileOnly, 'mobile-only');
       if (network == NetworkKind.wifi) shown = narrow(shown, (tag) => !isMobileOnly(tag), 'Wi-Fi');
 

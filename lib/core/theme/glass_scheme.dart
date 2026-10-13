@@ -237,6 +237,16 @@ enum GlassScheme {
     Color(0xFF1B1F1F),
     Color(0xFF323737),
   ], calm: true),
+  anthracite(GlassVariant.frost, Color(0xFFBFC3CC), Color(0xFF141518), [
+    Color(0xFF3A3C42),
+    Color(0xFF2A2C31),
+    Color(0xFF46484F),
+  ], calm: true),
+  asphalt(GlassVariant.frost, Color(0xFF8FB4D9), Color(0xFF1A2027), [
+    Color(0xFF34495E),
+    Color(0xFF2C3E50),
+    Color(0xFF3D566E),
+  ], calm: true),
   // Clear: nearly clear panels with bright edges over a calm backdrop
   frostbite(GlassVariant.clear, Color(0xFF2F7BFF), Color(0xFFDCE3EE), [
     Color(0xFF8FB8FF),

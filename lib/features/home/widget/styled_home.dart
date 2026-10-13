@@ -567,12 +567,8 @@ class _GraphiteRow extends StatelessWidget {
           // by day soft grey frames (black ones looked heavy), the chosen one a darker grey and thicker
           side: glass != null
               ? (selected
-                    ? BorderSide(
-                        color: glass.calm
-                            ? glass.edge.withValues(alpha: 1)
-                            : (glass.dark ? glass.accent : Colors.white),
-                        width: 1.8,
-                      )
+                    // the chosen one: an outline in the scheme's colour (no tick at the end)
+                    ? BorderSide(color: scheme.primary, width: 2)
                     : BorderSide(color: glass.edge, width: 1.2))
               : selected
               ? BorderSide(
@@ -588,20 +584,15 @@ class _GraphiteRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
               children: [
-                // the flag on a soft tile
-                Container(
+                // the flag on its own, larger (a grey tile under it looked dull)
+                SizedBox(
                   width: 40,
                   height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: selected && !(glass?.calm ?? false)
-                        ? scheme.primary.withValues(alpha: dark ? .22 : .14)
-                        : scheme.surfaceContainerHighest.withValues(alpha: dark ? .7 : 1),
-                    borderRadius: BorderRadius.circular(13),
+                  child: Center(
+                    child: group
+                        ? AraIconPaint(child: Icon(Icons.auto_awesome_rounded, size: 24, color: scheme.primary))
+                        : Text(flag ?? '🌐', style: const TextStyle(fontSize: 28, fontFamilyFallback: ['Emoji'])),
                   ),
-                  child: group
-                      ? AraIconPaint(child: Icon(Icons.auto_awesome_rounded, size: 19, color: scheme.primary))
-                      : Text(flag ?? '🌐', style: const TextStyle(fontSize: 21, fontFamilyFallback: ['Emoji'])),
                 ),
                 const Gap(12),
                 Expanded(
@@ -630,10 +621,6 @@ class _GraphiteRow extends StatelessWidget {
                 ),
                 const Gap(8),
                 _Delay(delay: delay, testing: testing),
-                if (selected) ...[
-                  const Gap(10),
-                  AraIconPaint(child: Icon(Icons.check_circle_rounded, size: 20, color: scheme.primary)),
-                ],
               ],
             ),
           ),

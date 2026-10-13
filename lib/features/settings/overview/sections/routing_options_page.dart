@@ -684,11 +684,25 @@ class ServersOptionsPage extends ConsumerWidget {
                 onSelected: ref.read(ConfigOptions.balancerStrategy.notifier).update,
               ),
               divider,
+              // Europe only and CIS only: one or the other, or neither
               SwitchListTile.adaptive(
                 title: Text(routing.europeOnlyServers),
                 subtitle: Text(routing.europeOnlyServersHint),
-                value: ref.watch(ConfigOptions.europeOnlyServers),
-                onChanged: ref.read(ConfigOptions.europeOnlyServers.notifier).update,
+                value: ref.watch(ConfigOptions.europeOnlyServers) && !ref.watch(ConfigOptions.cisOnlyServers),
+                onChanged: (on) async {
+                  if (on) await ref.read(ConfigOptions.cisOnlyServers.notifier).update(false);
+                  await ref.read(ConfigOptions.europeOnlyServers.notifier).update(on);
+                },
+              ),
+              divider,
+              SwitchListTile.adaptive(
+                title: Text(routing.cisOnlyServers),
+                subtitle: Text(routing.cisOnlyServersHint),
+                value: ref.watch(ConfigOptions.cisOnlyServers),
+                onChanged: (on) async {
+                  if (on) await ref.read(ConfigOptions.europeOnlyServers.notifier).update(false);
+                  await ref.read(ConfigOptions.cisOnlyServers.notifier).update(on);
+                },
               ),
               divider,
               SwitchListTile.adaptive(

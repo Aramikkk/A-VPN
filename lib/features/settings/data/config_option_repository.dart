@@ -148,6 +148,9 @@ abstract class ConfigOptions {
   /// Keep only European servers in the server list and the auto groups.
   static final europeOnlyServers = PreferencesNotifier.create<bool, bool>("europe-only-servers", true);
 
+  /// Only the CIS servers (not Russia, Belarus, Kazakhstan); turning it on turns Europe only off, and back
+  static final cisOnlyServers = PreferencesNotifier.create<bool, bool>("cis-only-servers", false);
+
   /// Only sites and services blocked in Russia go through the VPN, everything else direct (downloads, games,
   /// updates at full speed). A phone applies it on Wi-Fi only: on mobile data operators may let only
   /// whitelisted sites through, so there everything keeps going through the VPN.
