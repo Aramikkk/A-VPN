@@ -166,7 +166,7 @@
     "topoToVpn": "через VPN",
     "topoToDirect": "напрямую",
     "topoToBlock": "заблокировано",
-    "topoUncounted": "Ещё $amount не попало в список: соединения короче 2 секунд и то, что было, пока приложение было закрыто. Всего за сессию: VPN $vpn, напрямую $direct",
+    "topoUncounted": "Ещё $amount не попало в список: соединения короче 2 секунд и то, что было, пока приложение было закрыто. Всего с 03:00: VPN $vpn, напрямую $direct",
     "connOpenOf": "открыто $open из $n",
     "accentNeonYellow": "Жёлтый",
     "accentNeonRed": "Красный",
@@ -187,7 +187,8 @@
     "global": "Глобально",
     "ruleAi": "ИИ",
     "ruleGoogle": "Google и YouTube",
-    "ruleSocial": "соцсети и мессенджеры"
+    "ruleSocial": "соцсети и мессенджеры",
+    "ruleChina": "китайские сервисы"
   },
   "common": {
     "appTitle": "A-VPN",
@@ -547,11 +548,13 @@
           "socialProxy": "Соцсети и мессенджеры",
           "socialProxyHint": "Instagram, Facebook, WhatsApp, Telegram, Discord, X, TikTok, Snapchat, LinkedIn, Signal, Viber",
           "blockedProxy": "Прочее заблокированное",
-          "blockedProxyHint": "Остальное из реестра РКН: Netflix, Spotify, Twitch, Roblox, SoundCloud, Notion, Canva, СМИ, торренты…",
+          "blockedProxyHint": "Остальное из реестра РКН и AnyDesk: Netflix, Spotify, Twitch, Roblox, SoundCloud, Notion, Canva, СМИ, торренты…",
           "ruDomainsDirect": "Российские сайты",
           "ruDomainsDirectHint": ".ru, .su, .рф, Яндекс, VK, Mail.ru, банки, Госуслуги, маркетплейсы",
           "ruAppsDirect": "Российские приложения",
-          "ruAppsDirectHint": "Яндекс, банки, Госуслуги, Авито, Ozon, Wildberries, VK, MAX"
+          "ruAppsDirectHint": "Яндекс, банки, Госуслуги, Авито, Ozon, Wildberries, VK, MAX",
+          "chinaProxy": "Китайские сервисы",
+          "chinaProxyHint": "Сайты .cn, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…"
         },
         "appBasedRouting": {
           "title": "Маршрутизация по приложениям",

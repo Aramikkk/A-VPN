@@ -6,8 +6,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/features/stats/model/vpn_traffic.dart';
-import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
+import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Where a connection went.
@@ -197,20 +196,20 @@ class SeenConnection {
 class ConnectionsState {
   const ConnectionsState({this.items = const [], this.available = true, this.since});
 
-  /// open ones and the ones closed this session (the latest [Connections.keepClosed]), newest first
+  /// open ones and the ones closed today (the latest [Connections.keepClosed]), newest first
   final List<SeenConnection> items;
 
   /// false: the core's connection list can't be reached (not connected, or the Clash API is off)
   final bool available;
 
-  /// when the list started (the session's start, as far as this tab knows)
+  /// when the list started: 03:00 today (the statistics day), or when it was last cleared
   final DateTime? since;
 }
 
 /// The connections the core reports through its local Clash API, every 2 seconds from the app's start (main.dart
-/// reads it), with the ones that have closed since kept for the whole VPN session, so short ones (a site's images,
-/// a DNS lookup) show too. The list is saved to disk now and then, so it's still there when the app comes back
-/// after Android closed it; a new session (the core's start time changes) starts it over.
+/// reads it), with the ones that have closed since kept for the whole statistics day, so short ones (a site's
+/// images, a DNS lookup) show too. The list is saved to disk now and then, so it's still there when the app
+/// comes back after Android closed it or the VPN reconnects; at 03:00 (or when the user clears it) it starts over.
 final connectionsProvider = NotifierProvider<Connections, ConnectionsState>(Connections.new);
 
 class Connections extends Notifier<ConnectionsState> {
@@ -221,36 +220,25 @@ class Connections extends Notifier<ConnectionsState> {
   HttpClient? _client;
   final _seen = <String, SeenConnection>{};
 
-  /// the VPN session the list belongs to (the core's start time)
-  DateTime? _session;
+  /// the statistics day the list belongs to (its 03:00), and when it starts (that, or the last clearing)
+  DateTime? _day;
+  DateTime? _since;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
 
   File? get _file {
     final dirs = ref.read(appDirectoriesProvider).valueOrNull;
-    return dirs == null ? null : File('${dirs.baseDir.path}/connections_session.json');
+    return dirs == null ? null : File('${dirs.baseDir.path}/connections_day.json');
   }
 
   @override
   ConnectionsState build() {
-    ref.listen(statsNotifierProvider, (_, next) {
-      final session = next.valueOrNull?.sessionStartedAt;
-      if (session == null || session == _session) return;
-      final first = _session == null;
-      _session = session;
-      if (first && _seen.isEmpty) {
-        _restore(session);
-      } else {
-        // a new VPN session: a new list
-        _seen.clear();
-      }
-      state = ConnectionsState(items: _sorted(), available: state.available, since: session);
-    });
+    _rollDay();
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
     final enabled = ref.watch(ConfigOptions.enableClashApi);
     final port = ref.watch(ConfigOptions.clashApiPort);
     final secret = ref.watch(ConfigOptions.clashApiSecret);
     // not connected (or only for a moment while the app comes back): nothing to ask, the list stays as it is
-    if (!connected || !enabled) return ConnectionsState(items: _sorted(), available: false, since: _session);
+    if (!connected || !enabled) return ConnectionsState(items: _sorted(), available: false, since: _since);
     // the core's API is on this machine: never through a proxy
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 2)
@@ -264,15 +252,34 @@ class Connections extends Notifier<ConnectionsState> {
       _client = null;
     });
     unawaited(_poll(client, url, secret));
-    return ConnectionsState(items: _sorted(), since: _session);
+    return ConnectionsState(items: _sorted(), since: _since);
   }
 
-  void _restore(DateTime session) {
+  /// Picks up the saved list once, and starts a new one when a new statistics day has begun (03:00).
+  void _rollDay([DateTime? now]) {
+    final day = statsDayStart(now ?? DateTime.now());
+    if (_day == null && _file != null) {
+      _day = day;
+      _since = day;
+      _restore(day);
+    }
+    if (_day != null && _day != day) {
+      // past 03:00: yesterday's closed connections go, the open ones carry on
+      _seen.removeWhere((_, c) => !c.active);
+      _day = day;
+      _since = day;
+      _save();
+    }
+  }
+
+  void _restore(DateTime day) {
     try {
       final file = _file;
       if (file == null || !file.existsSync()) return;
       final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-      if (json['session'] != session.millisecondsSinceEpoch) return;
+      if (json['day'] != day.millisecondsSinceEpoch) return;
+      final since = json['since'] as int?;
+      if (since != null) _since = DateTime.fromMillisecondsSinceEpoch(since);
       for (final item in (json['items'] as List).whereType<Map<String, dynamic>>()) {
         final c = SeenConnection.fromJson(item);
         if (c != null) _seen[c.id] = c;
@@ -284,20 +291,22 @@ class Connections extends Notifier<ConnectionsState> {
 
   void _save() {
     final file = _file;
-    final session = _session;
-    if (file == null || session == null) return;
+    final day = _day;
+    if (file == null || day == null) return;
     _saved = DateTime.now();
     final json = jsonEncode({
-      'session': session.millisecondsSinceEpoch,
+      'day': day.millisecondsSinceEpoch,
+      'since': _since?.millisecondsSinceEpoch,
       'items': [for (final c in _seen.values) c.toJson()],
     });
     unawaited(file.writeAsString(json).then((_) {}, onError: (_) {}));
   }
 
-  /// Forget the closed ones.
+  /// Forget the closed ones: the list (and the Topology tab) starts over from now.
   void clearClosed() {
     _seen.removeWhere((_, c) => !c.active);
-    state = ConnectionsState(items: _sorted(), since: _session);
+    _since = DateTime.now();
+    state = ConnectionsState(items: _sorted(), since: _since);
     _save();
   }
 
@@ -313,8 +322,9 @@ class Connections extends Notifier<ConnectionsState> {
       list = null;
     }
     if (!identical(client, _client)) return; // disposed meanwhile
+    _rollDay();
     if (list == null && _seen.isEmpty) {
-      state = ConnectionsState(available: false, since: _session);
+      state = ConnectionsState(available: false, since: _since);
       return;
     }
     final open = <String>{};
@@ -331,7 +341,7 @@ class Connections extends Notifier<ConnectionsState> {
       }
     }
     _fold();
-    state = ConnectionsState(items: _sorted(), since: _session);
+    state = ConnectionsState(items: _sorted(), since: _since);
     if (DateTime.now().difference(_saved) > saveEvery) _save();
   }
 

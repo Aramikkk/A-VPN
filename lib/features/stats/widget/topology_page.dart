@@ -5,7 +5,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
-import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
+import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/stats/widget/connections_flow.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -52,13 +52,14 @@ class TopologyPage extends HookConsumerWidget {
     // a rule and the way it sent its traffic: the same list can send some of it through the VPN and some direct
     final rules = groupConnections(items, (c) => '${c.route.index}${ruleLabel(c.rule, t) ?? t.avpn.connRuleDefault}');
 
-    // what the core counted for the whole session against what the list holds: connections shorter than one poll
-    // and the ones while the app was closed aren't in the list
-    final info = (visible ? ref.watch(statsNotifierProvider) : ref.read(statsNotifierProvider)).valueOrNull;
-    final sessionVpn = (info?.vpnUplinkTotal ?? 0) + (info?.vpnDownlinkTotal ?? 0);
-    final sessionAll = (info?.uplinkTotal.toInt() ?? 0) + (info?.downlinkTotal.toInt() ?? 0);
+    // what moved since the list started (03:00, or the last clearing) against what the list holds: connections
+    // shorter than one poll and the ones while the app was closed aren't in the list
+    if (visible) ref.watch(trafficHistoryProvider);
+    final moved = ref.read(trafficHistoryProvider.notifier).amountFrom(state.since ?? statsDayStart(DateTime.now()));
+    final sessionVpn = moved.vpn;
+    final sessionAll = moved.total;
     final listed = state.items.where((c) => c.route != ConnectionRoute.block).fold<int>(0, (s, c) => s + c.total);
-    final uncounted = info?.vpnDownlinkTotal == null ? 0 : sessionAll - listed;
+    final uncounted = sessionAll - listed;
     final showUncounted = uncounted > smallTraffic && uncounted > sessionAll * .05;
 
     if (!state.available && state.items.isEmpty) {
@@ -106,7 +107,18 @@ class TopologyPage extends HookConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.avpn.topologyTab)),
+      appBar: AppBar(
+        title: Text(t.avpn.topologyTab),
+        actions: [
+          // starts the picture over from now; it starts over by itself at 03:00
+          if (state.items.any((c) => !c.active))
+            IconButton(
+              tooltip: t.avpn.connClear,
+              icon: const Icon(Icons.cleaning_services_rounded),
+              onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
+            ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),

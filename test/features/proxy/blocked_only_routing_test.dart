@@ -68,6 +68,11 @@ void main() {
       'netflix.com',
       'rutracker.org',
       'tvrain.ru', // blocked, though .ru
+      'www.baidu.com',
+      'weixin.qq.com',
+      'www.aliexpress.com',
+      'gov.cn',
+      'relay-1.net.anydesk.com',
     ]) {
       expect(route(host), 'select', reason: host);
     }
@@ -84,7 +89,7 @@ void main() {
   });
 
   test('each blocked domain is in exactly one group', () {
-    final groups = [aiDomains, googleDomains, socialDomains, otherBlockedDomains];
+    final groups = [aiDomains, googleDomains, socialDomains, chinaDomains, otherBlockedDomains];
     final all = groups.expand((g) => g).toList();
     expect(all.toSet().length, all.length);
     expect(aiDomains, contains('chatgpt.com'));
@@ -96,13 +101,17 @@ void main() {
 
   test('a group of sites and apps is two rules; every Google app goes by pattern', () {
     final apps = rules.where((r) => r.containsKey('package_name')).toList();
-    expect(apps.length, 3); // AI, Google, Russian
+    expect(apps.length, 5); // AI, Google, Chinese, AnyDesk, Russian
     expect(apps[0]['package_name'], containsAll(['com.openai.chatgpt', 'com.anthropic.claude']));
     expect(apps[1]['package_name'], contains('com.android.vending'));
     final pattern = RegExp((apps[1]['package_name_regex'] as List).single as String);
     expect(pattern.hasMatch('com.google.android.apps.nbu.files'), isTrue);
     expect(pattern.hasMatch('com.android.chrome'), isFalse);
-    expect(apps[2]['outbound'], 'direct §hide§');
+    expect(apps[2]['package_name'], containsAll(['com.tencent.mm', 'com.alibaba.aliexpresshd']));
+    expect(apps[3]['package_name'], ['com.anydesk.anydeskandroid']);
+    expect(apps[4]['outbound'], 'direct §hide§');
+    // AnyDesk on the computer, by its program
+    expect(rules.where((r) => r['process_name'] != null).single['process_name'], contains('AnyDesk.exe'));
     expect(rules.where((r) => r.containsKey('package_name') && r.containsKey('domain_suffix')), isEmpty);
   });
 

@@ -11,6 +11,7 @@ import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/topology_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -253,4 +254,11 @@ void main() {
       }
     });
   }
+
+  test('the Connections and Topology day runs from 03:00 to 03:00', () {
+    expect(statsDayStart(DateTime(2026, 10, 13, 2, 59)), DateTime(2026, 10, 12, 3));
+    expect(statsDayStart(DateTime(2026, 10, 13, 3)), DateTime(2026, 10, 13, 3));
+    expect(statsDayStart(DateTime(2026, 10, 13, 23, 59)), DateTime(2026, 10, 13, 3));
+    expect(statsDayStart(DateTime(2026, 11, 1, 1)), DateTime(2026, 10, 31, 3));
+  });
 }

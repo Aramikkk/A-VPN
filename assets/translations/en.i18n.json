@@ -187,7 +187,8 @@
     "global": "Global",
     "ruleAi": "AI",
     "ruleGoogle": "Google and YouTube",
-    "ruleSocial": "social networks and messengers"
+    "ruleSocial": "social networks and messengers",
+    "ruleChina": "Chinese services"
   },
   "common": {
     "appTitle": "A-VPN",
@@ -541,11 +542,13 @@
           "socialProxy": "Social networks and messengers",
           "socialProxyHint": "Instagram, Facebook, WhatsApp, Telegram, Discord, X, TikTok, Snapchat, LinkedIn, Signal, Viber",
           "blockedProxy": "Other blocked",
-          "blockedProxyHint": "The rest of the Russian block list: Netflix, Spotify, Twitch, Roblox, SoundCloud, Notion, Canva, media, torrents…",
+          "blockedProxyHint": "The rest of the Russian block list and AnyDesk: Netflix, Spotify, Twitch, Roblox, SoundCloud, Notion, Canva, media, torrents…",
           "ruDomainsDirect": "Russian sites",
           "ruDomainsDirectHint": ".ru, .su, .рф, Yandex, VK, Mail.ru, banks, Gosuslugi, marketplaces",
           "ruAppsDirect": "Russian apps",
-          "ruAppsDirectHint": "Yandex, banks, Gosuslugi, Avito, Ozon, Wildberries, VK, MAX"
+          "ruAppsDirectHint": "Yandex, banks, Gosuslugi, Avito, Ozon, Wildberries, VK, MAX",
+          "chinaProxy": "Chinese services",
+          "chinaProxyHint": ".cn sites, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…"
         },
         "appBasedRouting": {
           "title": "App-based routing",

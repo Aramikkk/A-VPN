@@ -42,7 +42,6 @@ class ConnectionsPage extends HookConsumerWidget {
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     final view = useState(_View.apps);
     final filter = useState(_Filter.all);
-    final query = useState('');
     final showSmall = useState(false);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -52,11 +51,7 @@ class ConnectionsPage extends HookConsumerWidget {
     final items = state.items.where((c) {
       if (filter.value == _Filter.vpn && c.route != ConnectionRoute.vpn) return false;
       if (filter.value == _Filter.direct && c.route == ConnectionRoute.vpn) return false;
-      final q = query.value.trim().toLowerCase();
-      return q.isEmpty ||
-          c.host.toLowerCase().contains(q) ||
-          appName(c.app).toLowerCase().contains(q) ||
-          c.app.toLowerCase().contains(q);
+      return true;
     }).toList();
     final allGroups = groupConnections(items, view.value == _View.apps ? (c) => c.app : (c) => c.host);
     // apps and sites that moved less than a megabyte are left out unless asked for
@@ -66,7 +61,7 @@ class ConnectionsPage extends HookConsumerWidget {
     final order = useRef(<String>[]);
     final sortedAt = useRef(DateTime.fromMillisecondsSinceEpoch(0));
     final sortedFor = useRef('');
-    final sortKey = '${view.value}|${filter.value}|${query.value}|${showSmall.value}';
+    final sortKey = '${view.value}|${filter.value}|${showSmall.value}';
     final now = DateTime.now();
     if (sortKey != sortedFor.value || now.difference(sortedAt.value) > const Duration(seconds: 30)) {
       order.value = [for (final g in fresh) g.key];
@@ -156,16 +151,6 @@ class ConnectionsPage extends HookConsumerWidget {
                               ],
                             ],
                           ),
-                          const Gap(10),
-                          TextField(
-                            onChanged: (v) => query.value = v,
-                            decoration: InputDecoration(
-                              isDense: true,
-                              prefixIcon: const Icon(Icons.search_rounded),
-                              hintText: t.avpn.connSearch,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -182,7 +167,7 @@ class ConnectionsPage extends HookConsumerWidget {
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             sliver: SliverList.separated(
                               itemCount: rows + (hidden > 0 || showSmall.value ? 1 : 0),
-                              separatorBuilder: (_, _) => const Gap(8),
+                              separatorBuilder: (_, _) => const Gap(6),
                               itemBuilder: (context, i) => i == rows
                                   ? Center(
                                       child: TextButton.icon(
@@ -325,7 +310,7 @@ class _GroupCard extends HookConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
@@ -334,14 +319,14 @@ class _GroupCard extends HookConsumerWidget {
           InkWell(
             onTap: () => expanded.value = !expanded.value,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              padding: const EdgeInsets.fromLTRB(10, 7, 12, 7),
               child: Row(
                 children: [
                   if (byApp)
                     _AppIcon(icon: iconOf(group.key), name: title)
                   else
-                    _RouteDot(route: group.mainRoute, size: 36),
-                  const Gap(12),
+                    _RouteDot(route: group.mainRoute, size: 32),
+                  const Gap(10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,15 +337,23 @@ class _GroupCard extends HookConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        const Gap(2),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                        const Gap(3),
+                        // where it went, then the package or the apps, on one line
+                        Row(
+                          children: [
+                            Flexible(flex: 3, child: _RouteBadge(group: group)),
+                            const Gap(6),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                              ),
+                            ),
+                          ],
                         ),
-                        const Gap(6),
-                        _RouteBadge(group: group),
                       ],
                     ),
                   ),
@@ -391,11 +384,6 @@ class _GroupCard extends HookConsumerWidget {
                             ),
                           ),
                         ),
-                      ),
-                      Icon(
-                        expanded.value ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                        size: 18,
-                        color: scheme.onSurfaceVariant,
                       ),
                     ],
                   ),
@@ -491,6 +479,10 @@ String? ruleLabel(String rule, Translations t) {
     googleDomains.first: t.avpn.ruleGoogle,
     googleApps.first: t.avpn.ruleGoogle,
     socialDomains.first: t.avpn.ruleSocial,
+    chinaDomains.first: t.avpn.ruleChina,
+    chinaApps.first: t.avpn.ruleChina,
+    otherBlockedApps.first: t.avpn.ruleBlocked,
+    otherBlockedProcesses.first: t.avpn.ruleBlocked,
     otherBlockedDomains.first: t.avpn.ruleBlocked,
     'xn--p1ai': t.avpn.ruleRuSites,
     ruAppPackages.first: t.avpn.ruleRuApps,
@@ -619,12 +611,12 @@ class _AppIcon extends StatelessWidget {
     if (icon != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Image.memory(icon!, width: 36, height: 36, gaplessPlayback: true),
+        child: Image.memory(icon!, width: 32, height: 32, gaplessPlayback: true),
       );
     }
     return Container(
-      width: 36,
-      height: 36,
+      width: 32,
+      height: 32,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .14), borderRadius: BorderRadius.circular(10)),
       child: Text(

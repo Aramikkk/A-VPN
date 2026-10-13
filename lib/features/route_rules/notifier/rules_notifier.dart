@@ -35,6 +35,7 @@ enum BuiltinRule {
   aiProxy(enabledByDefault: true),
   googleProxy(enabledByDefault: true),
   socialProxy(enabledByDefault: true),
+  chinaProxy(enabledByDefault: true),
   blockedProxy(enabledByDefault: true),
   ruDomainsDirect(enabledByDefault: true),
   // Russian apps on the phone (Yandex Music, banks, Gosuslugi…) direct, whatever servers they use
@@ -56,6 +57,7 @@ enum BuiltinRule {
     aiProxy => t.pages.settings.routing.builtinRules.aiProxy,
     googleProxy => t.pages.settings.routing.builtinRules.googleProxy,
     socialProxy => t.pages.settings.routing.builtinRules.socialProxy,
+    chinaProxy => t.pages.settings.routing.builtinRules.chinaProxy,
     blockedProxy => t.pages.settings.routing.builtinRules.blockedProxy,
     ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirect,
     ruAppsDirect => t.pages.settings.routing.builtinRules.ruAppsDirect,
@@ -69,6 +71,7 @@ enum BuiltinRule {
     aiProxy => t.pages.settings.routing.builtinRules.aiProxyHint,
     googleProxy => t.pages.settings.routing.builtinRules.googleProxyHint,
     socialProxy => t.pages.settings.routing.builtinRules.socialProxyHint,
+    chinaProxy => t.pages.settings.routing.builtinRules.chinaProxyHint,
     blockedProxy => t.pages.settings.routing.builtinRules.blockedProxyHint,
     ruDomainsDirect => t.pages.settings.routing.builtinRules.ruDomainsDirectHint,
     ruAppsDirect => t.pages.settings.routing.builtinRules.ruAppsDirectHint,
@@ -110,23 +113,42 @@ enum BuiltinRule {
     aiProxy => Rule(outbound: Outbound.proxy, domainSuffixes: aiDomains, packageNames: aiApps),
     googleProxy => Rule(outbound: Outbound.proxy, domainSuffixes: googleDomains, packageNames: googleApps),
     socialProxy => Rule(outbound: Outbound.proxy, domainSuffixes: socialDomains, ipCidrs: socialCidrs),
-    blockedProxy => Rule(outbound: Outbound.proxy, domainSuffixes: otherBlockedDomains),
+    chinaProxy => Rule(outbound: Outbound.proxy, domainSuffixes: chinaDomains, packageNames: chinaApps),
+    blockedProxy => Rule(
+      outbound: Outbound.proxy,
+      domainSuffixes: otherBlockedDomains,
+      packageNames: otherBlockedApps,
+      processNames: otherBlockedProcesses,
+    ),
     ruDomainsDirect => Rule(outbound: Outbound.direct, domainSuffixes: ['ru', 'su', 'xn--p1ai', ...ruServiceDomains]),
     ruAppsDirect => Rule(outbound: Outbound.direct, packageNames: ruAppPackages),
   }..name = key;
 }
 
-/// The rules as the core gets them. A group with both sites and apps is two rules: sing-box ANDs a rule's
-/// apps with its sites, and the group means either. Both halves keep the group's place.
+/// The rules as the core gets them. A group of sites, phone apps and computer programs is up to three rules:
+/// sing-box ANDs a rule's apps with its sites, and the group means any of them. All keep the group's place.
 List<Rule> splitGroups(Iterable<Rule> rules) => [
   for (final rule in rules)
-    if (BuiltinRule.of(rule) != null && rule.packageNames.isNotEmpty && rule.domainSuffixes.isNotEmpty) ...[
-      rule.deepCopy()..packageNames.clear(),
-      rule.deepCopy()
-        ..domainSuffixes.clear()
-        ..ipCidrs.clear(),
-    ] else
-      rule,
+    if (BuiltinRule.of(rule) == null)
+      rule
+    else ...[
+      if (rule.domainSuffixes.isNotEmpty || rule.ipCidrs.isNotEmpty || rule.ruleSets.isNotEmpty)
+        rule.deepCopy()
+          ..packageNames.clear()
+          ..processNames.clear()
+      else if (rule.packageNames.isEmpty && rule.processNames.isEmpty)
+        rule,
+      if (rule.packageNames.isNotEmpty)
+        rule.deepCopy()
+          ..domainSuffixes.clear()
+          ..ipCidrs.clear()
+          ..processNames.clear(),
+      if (rule.processNames.isNotEmpty)
+        rule.deepCopy()
+          ..domainSuffixes.clear()
+          ..ipCidrs.clear()
+          ..packageNames.clear(),
+    ],
 ];
 
 @riverpod
@@ -175,10 +197,13 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
     }
     // a built-in this version added goes last, after the ones the user already has: "blocked sites through the
     // VPN" stays ahead of the new direct rules
-    return _updateListOrder([
-      ...rules,
-      for (final builtin in missing) builtin.rule..enabled = builtin.enabledByDefault,
-    ]);
+    // each one goes right before the first built-in it comes before in the default order (a new group lands
+    // with the other groups, ahead of the direct rules), or last
+    for (final builtin in missing) {
+      final next = rules.indexWhere((rule) => (BuiltinRule.of(rule)?.index ?? -1) > builtin.index);
+      rules.insert(next == -1 ? rules.length : next, builtin.rule..enabled = builtin.enabledByDefault);
+    }
+    return _updateListOrder(rules);
   }
 
   /// A new rule goes first, so it's checked before every other rule.

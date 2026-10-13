@@ -176,12 +176,79 @@ const _socialSites = [
 ];
 const _socialWords = ['telegram', 'discord', 'twitter', 'tiktok'];
 
+/// Chinese sites: the .cn zone and the big Chinese services; from Russia many of them are slow or refuse to
+/// work without the VPN.
+const _chinaSites = [
+  'cn',
+  'baidu.com',
+  'bdstatic.com',
+  'bdimg.com',
+  'qq.com',
+  'gtimg.com',
+  'tencent.com',
+  'tencent-cloud.com',
+  'myqcloud.com',
+  'wechat.com',
+  'weixin.com',
+  'alibaba.com',
+  'alibabacloud.com',
+  'alicdn.com',
+  'aliyun.com',
+  'aliyuncs.com',
+  'alipay.com',
+  'alipayobjects.com',
+  'taobao.com',
+  'tmall.com',
+  '1688.com',
+  'aliexpress.com',
+  'aliexpress-media.com',
+  'jd.com',
+  '360buyimg.com',
+  'pinduoduo.com',
+  'temu.com',
+  'kwcdn.com',
+  'shein.com',
+  'ltwebstatic.com',
+  'bilibili.com',
+  'bilibili.tv',
+  'biliapi.net',
+  'hdslb.com',
+  'weibo.com',
+  'sina.com',
+  'douyin.com',
+  'douyinpic.com',
+  'douyinvod.com',
+  'bytedance.com',
+  'xiaohongshu.com',
+  'xhscdn.com',
+  'rednote.com',
+  'kuaishou.com',
+  'zhihu.com',
+  'zhimg.com',
+  '163.com',
+  '126.net',
+  'netease.com',
+  'iqiyi.com',
+  'iq.com',
+  'youku.com',
+  'sohu.com',
+  'csdn.net',
+  'meituan.com',
+  'didiglobal.com',
+  'ctrip.com',
+  'trip.com',
+];
+
+/// AnyDesk: its remote sessions get cut from Russia without the VPN.
+const _anydeskSites = ['anydesk.com', 'anydesk.net', 'net.anydesk.com'];
+
 /// Whether [domain] is [site] or under it.
 bool _under(String domain, String site) => domain == site || domain.endsWith('.$site');
 
 bool _isAi(String domain) =>
     _aiSites.any((site) => _under(domain, site)) || domain.contains('openai') || domain.contains('anthropic');
 bool _isGoogle(String domain) => _googleSites.any((site) => _under(domain, site)) || domain.contains('youtube');
+bool _isChina(String domain) => _chinaSites.any((site) => _under(domain, site));
 bool _isSocial(String domain) =>
     _socialSites.any((site) => _under(domain, site)) || _socialWords.any((word) => domain.contains(word));
 
@@ -198,11 +265,48 @@ final socialDomains = _sorted([
 /// The social networks' addresses: their apps often connect by IP.
 const socialCidrs = blockedCidrs;
 
-/// Everything else blocked in Russia, the .ru sites in the registry among it.
-final otherBlockedDomains = _sorted([
-  ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d)),
-  ...rknRuDomains,
+final chinaDomains = _sorted([
+  ..._chinaSites,
+  ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d) && _isChina(d)),
 ]);
+
+/// Everything else blocked in Russia, the .ru sites in the registry and AnyDesk among it.
+final otherBlockedDomains = _sorted([
+  ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d) && !_isChina(d)),
+  ...rknRuDomains,
+  ..._anydeskSites,
+]);
+
+/// AnyDesk on the phone and on the computer.
+const otherBlockedApps = ['com.anydesk.anydeskandroid'];
+const otherBlockedProcesses = ['AnyDesk.exe', 'anydesk.exe'];
+
+/// The Chinese apps on the phone.
+const chinaApps = [
+  'com.tencent.mm', // WeChat
+  'com.tencent.mobileqq',
+  'com.tencent.wework',
+  'com.alibaba.aliexpresshd',
+  'com.alibaba.intl.android.apps.poseidon', // Alibaba.com
+  'com.taobao.taobao',
+  'com.tmall.wireless',
+  'com.eg.android.AlipayGphone',
+  'com.jingdong.app.mall',
+  'com.xunmeng.pinduoduo',
+  'com.einnovation.temu',
+  'com.zzkko', // SHEIN
+  'tv.danmaku.bili', // bilibili
+  'com.sina.weibo',
+  'com.ss.android.ugc.aweme', // Douyin
+  'com.xingin.xhs', // Xiaohongshu (RedNote)
+  'com.smile.gifmaker', // Kuaishou
+  'com.zhihu.android',
+  'com.baidu.searchbox',
+  'com.netease.cloudmusic',
+  'com.qiyi.video',
+  'com.youku.phone',
+  'ctrip.english', // Trip.com
+];
 
 /// The AI apps on the phone: all their traffic through the VPN, whatever servers they use.
 const aiApps = [

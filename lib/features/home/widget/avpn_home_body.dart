@@ -463,14 +463,13 @@ class _CheckRow extends HookConsumerWidget {
       if (on && context.mounted) await showDialog<void>(context: context, builder: (_) => const _SharingDialog());
     }
 
-    // the toggles on the left, the ping check (classic) on the right
+    // the toggles in the middle, the ping check (classic) on the right
     return Row(
       children: [
-        // one line; a very narrow screen shrinks it a little rather than cut it
+        // one line in the middle; a very narrow screen shrinks it a little rather than cut it
         Expanded(
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            alignment: AlignmentDirectional.centerStart,
             child: Row(
               spacing: 6,
               children: [

@@ -67,6 +67,7 @@ class SideBarStatsOverview extends ConsumerWidget {
     ref.watch(trafficHistoryProvider);
     final series = range == StatsRange.minute ? null : ref.read(trafficHistoryProvider.notifier).series(range);
     final history = series?.points ?? minute;
+    final period = pickRange ? (series ?? ref.read(trafficHistoryProvider.notifier).series(range)).total : null;
     final slots = series?.slots ?? SpeedHistory.length;
     String two(int n) => n.toString().padLeft(2, '0');
     final since = ref.read(trafficHistoryProvider.notifier).since;
@@ -149,7 +150,26 @@ class SideBarStatsOverview extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Caption(t.avpn.statsSpeed, color: soft(.8)),
+          // the period's traffic in the top corner: how much moved in the time the graph shows
+          Row(
+            children: [
+              Expanded(child: _Caption(t.avpn.statsSpeed, color: soft(.8))),
+              if (period != null)
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: size(period.total),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      if (period.total > 0) TextSpan(text: '  ·  VPN ${(period.vpn * 100 / period.total).round()}%'),
+                    ],
+                  ),
+                  maxLines: 1,
+                  style: theme.textTheme.labelMedium?.copyWith(color: soft(.9)),
+                ),
+            ],
+          ),
           const Gap(8),
           _SpeedRow(
             icon: Icons.south_rounded,
@@ -186,25 +206,6 @@ class SideBarStatsOverview extends ConsumerWidget {
               speed: speed,
               oneLine: dense,
             ),
-            if (series != null) ...[
-              const Gap(4),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(text: '${t.avpn.graphPeriodTotal} '),
-                    TextSpan(
-                      text: size(series.total.total),
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    if (series.total.total > 0)
-                      TextSpan(text: '  ·  VPN ${(series.total.vpn * 100 / series.total.total).round()}%'),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(color: soft(.85)),
-              ),
-            ],
           ],
         ],
       ),

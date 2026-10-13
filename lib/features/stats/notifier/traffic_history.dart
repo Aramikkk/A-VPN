@@ -11,6 +11,16 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// The periods the Statistics tab can show.
 enum StatsRange { minute, tenMinutes, hour, day, all }
 
+/// The Connections and Topology tabs keep a day that starts at 03:00 local time: everything since then counts
+/// as today, and at 03:00 they start over (a night out past midnight still counts with the evening).
+const statsDayStartHour = 3;
+
+/// The start of the statistics day [now] is in.
+DateTime statsDayStart(DateTime now) {
+  final today = DateTime(now.year, now.month, now.day, statsDayStartHour);
+  return now.isBefore(today) ? DateTime(now.year, now.month, now.day - 1, statsDayStartHour) : today;
+}
+
 /// Bytes moved in some stretch of time: down, up, and how much of it went through the VPN.
 class TrafficAmount {
   TrafficAmount([this.down = 0, this.up = 0, this.vpn = 0]);
@@ -246,6 +256,17 @@ class TrafficHistory extends Notifier<int> {
         ];
         return (points: points, slots: points.length, slot: const Duration(days: 1), total: total);
     }
+  }
+
+  /// What moved from [start] on (to the minute).
+  TrafficAmount amountFrom(DateTime start) {
+    if (!_loaded) _load();
+    final from = start.millisecondsSinceEpoch ~/ 60000;
+    final total = TrafficAmount();
+    for (final e in _minutes.entries) {
+      if (e.key >= from) total.add(e.value.down, e.value.up, e.value.vpn);
+    }
+    return total;
   }
 
   /// When the history starts (for the "all time" axis).
