@@ -64,46 +64,39 @@ class _StyledHome extends HookConsumerWidget {
             large: roomy || !traffic,
           );
 
+    // one gap between every block, folded and unfolded: the session line, the servers, the traffic, the toggles, the
+    // connect panel, and under it the same gap again (the panel stands clear of the menu)
+    const gap = Gap(16);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 2, 18, 12),
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        // the blocks evenly apart, folded and unfolded: the session line, the servers, the traffic, the toggles and
-        // the connect panel, the room left over shared equally between them
-        mainAxisAlignment: hasList ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
         children: [
           _StatusBlock(editorial: editorial, status: status, lastServer: currentName),
           if (hasList) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  header,
-                  Gap(roomy ? 10 : 6),
-                  SizedBox(
-                    height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
-                    child: _StyledServerList(
-                      editorial: editorial,
-                      servers: servers,
-                      selectedTag: group?.selected,
-                      autoNow: autoNow,
-                      testing: testing,
-                    ),
+            gap,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                header,
+                Gap(roomy ? 10 : 6),
+                SizedBox(
+                  height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
+                  child: _StyledServerList(
+                    editorial: editorial,
+                    servers: servers,
+                    selectedTag: group?.selected,
+                    autoNow: autoNow,
+                    testing: testing,
                   ),
-                ],
-              ),
-            ),
-            // where the traffic went, under the servers (as on the Topology tab): as tall as its strips, cut when
-            // the screen has less room
-            if (traffic)
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: _HomeTraffic(editorial: editorial),
                 ),
-              ),
+              ],
+            ),
+            gap,
+            // where the traffic went, under the servers (as on the Topology tab): always the same place and size,
+            // all the room between the servers and the toggles; the unfolded phone has it in a column of its own
+            if (traffic) Expanded(child: _HomeTraffic(editorial: editorial)) else const Spacer(),
           ] else ...[
             Gap(roomy ? 20 : 14),
             header,
@@ -123,11 +116,9 @@ class _StyledHome extends HookConsumerWidget {
                     ),
             ),
           ],
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [_CheckRow(onCheck: onCheck, testing: testing, showCheck: false)],
-          ),
+          gap,
+          _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
+          gap,
           dock,
         ],
       ),
@@ -821,13 +812,9 @@ class _GraphiteDock extends ConsumerWidget {
     );
     // Glass: floating over the backdrop, what's behind it blurred
     if (glass != null) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: GlassPane(look: glass, radius: large ? 40 : 32, padding: padding, child: content),
-      );
+      return GlassPane(look: glass, radius: large ? 40 : 32, padding: padding, child: content);
     }
     return Container(
-      margin: const EdgeInsets.only(top: 6),
       padding: padding,
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow.withValues(alpha: dark ? .85 : 1),
@@ -1103,15 +1090,24 @@ class _HomeTraffic extends ConsumerWidget {
     // Glass: the strips on a pane of glass, as the rows above them
     final glass = theme.araLook.glass;
     if (glass == null) return strips;
-    if (items.isEmpty) return const SizedBox.shrink();
-    // as tall as the strips (the home column places it, evenly apart from the blocks round it)
+    // the card always fills its place (the strips at its top), empty or not
     return DecoratedBox(
       decoration: BoxDecoration(
         color: glass.panel,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: glass.edge, width: 1.2),
       ),
-      child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 10), child: strips),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        child: items.isEmpty
+            ? Center(
+                child: Text(
+                  t.avpn.connEmpty,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              )
+            : strips,
+      ),
     );
   }
 }
