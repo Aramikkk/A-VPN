@@ -111,13 +111,16 @@ class TrafficPanel extends ConsumerWidget {
           ],
         ),
         const Gap(14),
-        TrafficStrips(
-          items: items,
-          weight: (c) => c.total.toDouble(),
-          value: (w) => size(w),
-          compact: true,
-          barHeight: 54,
-          headers: false,
+        _glassCard(
+          context,
+          TrafficStrips(
+            items: items,
+            weight: (c) => c.total.toDouble(),
+            value: (w) => size(w),
+            compact: true,
+            barHeight: 54,
+            headers: false,
+          ),
         ),
         const Gap(14),
         // every app with where it went, filling the rest of the half
@@ -207,4 +210,18 @@ class TrafficPanel extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Glass: [child] on a see-through pane with a bright edge, as the cards round it; otherwise as it is.
+Widget _glassCard(BuildContext context, Widget child) {
+  final glass = Theme.of(context).araLook.glass;
+  if (glass == null) return child;
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      color: glass.panel,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: glass.edge, width: 1.2),
+    ),
+    child: Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 10), child: child),
+  );
 }

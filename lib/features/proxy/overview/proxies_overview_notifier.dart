@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dartx/dartx.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -145,17 +146,7 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
         if (!a.isGroup && b.isGroup) return 1;
         return a.tag.compareTo(b.tag);
       }),
-      ProxiesSort.delay => proxies.items.sortedWith((a, b) {
-        if (a.isGroup && !b.isGroup) return -1;
-        if (!a.isGroup && b.isGroup) return 1;
-
-        final ai = a.urlTestDelay;
-        final bi = b.urlTestDelay;
-        if (ai == 0 && bi == 0) return -1;
-        if (ai == 0 && bi > 0) return 1;
-        if (ai > 0 && bi == 0) return -1;
-        return ai.compareTo(bi);
-      }),
+      ProxiesSort.delay => steadyByDelay(proxies.items, _lastOrder),
       ProxiesSort.unsorted => proxies.items,
       ProxiesSort.usage => proxies.items.sortedWith((a, b) {
         if (a.isGroup && !b.isGroup) return -1;
@@ -227,4 +218,46 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
       }).run();
     }
   }
+}
+
+/// The servers' order the last time (kept across the notifier's rebuilds), so a few milliseconds' difference
+/// doesn't swap two of them.
+final _lastOrder = <String>[];
+
+/// [items] fastest first, the groups ahead, the untested last, and steady: it starts from [last] (the order the
+/// time before) and two neighbours swap only when the later one is clearly faster (by more than 15 ms and 8%), so
+/// servers a few milliseconds apart don't trade places at every ping (Germany 203 ms and Estonia 200 ms jumped).
+/// [last] is updated to the new order.
+@visibleForTesting
+List<OutboundInfo> steadyByDelay(List<OutboundInfo> items, List<String> last) {
+  int rank(OutboundInfo i) => i.isGroup ? 0 : (i.urlTestDelay > 0 ? 1 : 2);
+  final known = {for (final (i, tag) in last.indexed) tag: i};
+  final list = [...items]
+    ..sort((a, b) {
+      final r = rank(a).compareTo(rank(b));
+      if (r != 0) return r;
+      return (known[a.tag] ?? 1 << 30).compareTo(known[b.tag] ?? 1 << 30);
+    });
+  bool clearlyFaster(OutboundInfo later, OutboundInfo earlier) {
+    if (rank(later) != rank(earlier) || rank(later) != 1) return false;
+    final a = later.urlTestDelay;
+    final b = earlier.urlTestDelay;
+    return b - a > 15 && b - a > b * .08;
+  }
+
+  for (var swapped = true, pass = 0; swapped && pass < list.length; pass++) {
+    swapped = false;
+    for (var i = 0; i + 1 < list.length; i++) {
+      if (clearlyFaster(list[i + 1], list[i])) {
+        final t = list[i];
+        list[i] = list[i + 1];
+        list[i + 1] = t;
+        swapped = true;
+      }
+    }
+  }
+  last
+    ..clear()
+    ..addAll(list.map((i) => i.tag));
+  return list;
 }

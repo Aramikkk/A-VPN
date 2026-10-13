@@ -161,9 +161,9 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   // the Connections tab's list fills from the start, not from when the tab is first opened
   await _safeInit("connections", () async => container.read(connectionsProvider));
-  // the apps' names and icons, read in the background a moment after the start, so opening Connections or
-  // Topology doesn't wait for them
-  unawaited(Future.delayed(const Duration(seconds: 3), () => container.read(installedAppsProvider.future)));
+  // the apps' names and icons, read from their saved copy in a background isolate right at the start: the home
+  // screen's traffic shows them at once (read 3 s later, the strips showed packages, org.telegram.messenger…)
+  unawaited(container.read(installedAppsProvider.future));
   // the traffic history for the Statistics tab's periods counts from the start too
   await _safeInit("traffic history", () async => container.read(trafficHistoryProvider));
   // fresh pings when the app opens (Settings → Launch and connection)

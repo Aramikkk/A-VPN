@@ -4,6 +4,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Where the traffic went, as a strip map: a strip per route (through the VPN, direct, blocked), the biggest first,
@@ -36,6 +37,7 @@ class TrafficStrips extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+    final namesLoading = PlatformUtils.isAndroid && !ref.watch(installedAppsProvider).hasValue;
     final scheme = Theme.of(context).colorScheme;
     double sum(Iterable<SeenConnection> cs) => cs.fold<double>(0, (s, c) => s + weight(c));
     final total = sum(items);
@@ -70,7 +72,8 @@ class TrafficStrips extends ConsumerWidget {
             compact: compact,
             barHeight: barHeight,
             headers: headers,
-            appName: (app) => app == null ? t.avpn.connOther : connectionAppName(t, apps, app),
+            // until the apps' names are read (a moment after the start) a piece has no name rather than a package
+            appName: (app) => app == null ? t.avpn.connOther : (namesLoading ? '' : connectionAppName(t, apps, app)),
           ),
         ],
       ],

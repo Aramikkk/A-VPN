@@ -479,6 +479,33 @@ class _CheckRow extends HookConsumerWidget {
       if (on && context.mounted) await showDialog<void>(context: context, builder: (_) => const _SharingDialog());
     }
 
+    // Glass: the toggles in one pane the width of the connect panel, each an equal part of it
+    final glass = Theme.of(context).araLook.glass;
+    if (glass != null) {
+      return _GlassToggles(
+        look: glass,
+        items: [
+          (
+            icon: Icons.wifi_tethering_rounded,
+            label: t.avpn.sharing,
+            on: sharingOn,
+            toggle: toggleSharing,
+            // how to use sharing, on a long press
+            hold: () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+          ),
+          (
+            icon: Icons.public_rounded,
+            label: t.avpn.global,
+            on: ref.watch(ConfigOptions.globalMode),
+            toggle: toggleGlobal,
+            hold: null,
+          ),
+          if (serverAvailable)
+            (icon: Icons.home_rounded, label: t.avpn.server, on: serverOn, toggle: toggleServer, hold: null),
+        ],
+      );
+    }
+
     // the toggles in the middle, the ping check (classic) on the right
     return Row(
       children: [
@@ -524,6 +551,72 @@ class _CheckRow extends HookConsumerWidget {
             label: Text(t.avpn.check),
           ),
       ],
+    );
+  }
+}
+
+typedef _GlassToggle = ({IconData icon, String label, bool on, Future<void> Function(bool) toggle, VoidCallback? hold});
+
+/// Glass's toggles: one see-through pane split into equal parts, the ones on filled with the scheme's colour.
+class _GlassToggles extends StatelessWidget {
+  const _GlassToggles({required this.look, required this.items});
+
+  final GlassLook look;
+  final List<_GlassToggle> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: look.panel,
+        borderRadius: BorderRadius.circular(23),
+        border: Border.all(color: look.edge, width: 1.2),
+      ),
+      child: Row(
+        spacing: 4,
+        children: [
+          for (final item in items)
+            Expanded(
+              child: GestureDetector(
+                onLongPress: item.hold,
+                child: Material(
+                  color: item.on ? look.accent.withValues(alpha: look.dark ? .3 : .75) : Colors.transparent,
+                  shape: const StadiumBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => item.toggle(!item.on),
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(item.icon, size: 17, color: item.on ? scheme.onSurface : scheme.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                item.label,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontSize: 13.5,
+                                  fontWeight: item.on ? FontWeight.w800 : FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -1100,15 +1100,20 @@ class _HomeTraffic extends ConsumerWidget {
     // Glass: the strips on a pane of glass, as the rows above them
     final glass = theme.araLook.glass;
     if (glass == null) return strips;
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 2),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: glass.panel,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: glass.edge, width: 1.2),
+    if (items.isEmpty) return const SizedBox.shrink();
+    // as tall as the strips, not the whole room down to the connect panel
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 2),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: glass.panel,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: glass.edge, width: 1.2),
+          ),
+          child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 10), child: strips),
         ),
-        child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 10), child: strips),
       ),
     );
   }

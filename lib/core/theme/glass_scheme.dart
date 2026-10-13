@@ -282,39 +282,27 @@ class GlassPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shape = BorderRadius.circular(radius);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: shape,
-        boxShadow: [
-          BoxShadow(
-            // faint: it shows through the see-through pane
-            color: Colors.black.withValues(alpha: look.dark ? .25 : .05),
-            blurRadius: 24,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: shape,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: shape,
-              border: Border.all(color: look.edge),
-              // the light catching the top edge
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color.alphaBlend(Colors.white.withValues(alpha: look.dark ? .05 : .12), look.panel),
-                  look.panel,
-                ],
-              ),
+    // no shadow: it shows through the see-through pane as a dirty band along its bottom
+    return ClipRRect(
+      borderRadius: shape,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            borderRadius: shape,
+            border: Border.all(color: look.edge),
+            // the light catching the top edge
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.alphaBlend(Colors.white.withValues(alpha: look.dark ? .05 : .12), look.panel),
+                look.panel,
+              ],
             ),
-            child: child,
           ),
+          child: child,
         ),
       ),
     );
