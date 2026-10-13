@@ -56,11 +56,11 @@ final loadingConfig = RoutingConfig(
 );
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
-    ? ['home', 'speed', 'connections', 'topology', 'settings'][index]
+    ? ['connections', 'speed', 'home', 'topology', 'settings'][index]
     : ['home', 'connections', 'topology', if (showProfilesAction) 'profiles', 'settings'][index];
 
 int getIndexOfBranch(bool isMobileBreakpoint, bool showProfilesAction, String name) => isMobileBreakpoint
-    ? ['home', 'speed', 'connections', 'topology', 'settings'].indexOf(name)
+    ? ['connections', 'speed', 'home', 'topology', 'settings'].indexOf(name)
     : ['home', 'connections', 'topology', if (showProfilesAction) 'profiles', 'settings'].indexOf(name);
 
 @Riverpod(keepAlive: true)
@@ -75,6 +75,24 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
       showProfilesAction = ref.watch(hasAnyProfileProvider).value ?? false;
     }
     if (isMobileBreakpoint == null) return loadingConfig;
+    final speedBranch = StatefulShellBranch(
+      routes: <GoRoute>[
+        GoRoute(
+          name: 'speed',
+          path: '/speed',
+          builder: (_, _) => FocusScope(node: branchesScope['speed'], child: const SpeedPage()),
+        ),
+      ],
+    );
+    final connectionsBranch = StatefulShellBranch(
+      routes: <GoRoute>[
+        GoRoute(
+          name: 'connections',
+          path: '/connections',
+          builder: (_, _) => FocusScope(node: branchesScope['connections'], child: const ConnectionsPage()),
+        ),
+      ],
+    );
     return RoutingConfig(
       redirect: (context, state) {
         // fix path-parameters for deep link
@@ -133,6 +151,8 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
               ? BranchSwiper(navigationShell: navigationShell, children: children)
               : BranchFader(navigationShell: navigationShell, children: children),
           branches: <StatefulShellBranch>[
+            // the phone: Connections and Statistics left of Home, which sits in the middle and opens first
+            if (isMobileBreakpoint) ...[connectionsBranch, speedBranch],
             StatefulShellBranch(
               routes: <GoRoute>[
                 GoRoute(
@@ -160,27 +180,8 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 ),
               ],
             ),
-            // the phone's Statistics tab, right after Home (the desktop shows it all in the sidebar)
-            if (isMobileBreakpoint)
-              StatefulShellBranch(
-                routes: <GoRoute>[
-                  GoRoute(
-                    name: 'speed',
-                    path: '/speed',
-                    builder: (_, _) => FocusScope(node: branchesScope['speed'], child: const SpeedPage()),
-                  ),
-                ],
-              ),
-            // which apps connected where: after Statistics on the phone, after Home on the desktop
-            StatefulShellBranch(
-              routes: <GoRoute>[
-                GoRoute(
-                  name: 'connections',
-                  path: '/connections',
-                  builder: (_, _) => FocusScope(node: branchesScope['connections'], child: const ConnectionsPage()),
-                ),
-              ],
-            ),
+            // the desktop: Connections right after Home (Statistics is its sidebar)
+            if (!isMobileBreakpoint) connectionsBranch,
             StatefulShellBranch(
               routes: <GoRoute>[
                 GoRoute(

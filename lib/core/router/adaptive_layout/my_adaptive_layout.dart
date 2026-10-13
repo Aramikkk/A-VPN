@@ -177,7 +177,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                                 glass.dark ? .28 : .75,
                               ),
                               indicatorShape: const StadiumBorder(),
-                              selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
+                              selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 2,
                               destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
                               onDestinationSelected: (index) => _onTap(context, index),
                             ),
@@ -203,7 +203,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                         },
                       ),
                       child: NavigationBar(
-                        selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 0,
+                        selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 2,
                         destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
                         onDestinationSelected: (index) => _onTap(context, index),
                       ),
@@ -221,10 +221,16 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
   }
 
+  // in the branches' order: the phone's Connections, Statistics, Home, Topology, Settings; the desktop's Home,
+  // Connections, Topology, Profiles, Settings
   List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
+    if (isMobileBreakpoint) ...[
+      ShellRouteAction(Icons.list_alt_rounded, t.avpn.connectionsTab, svg: NavIcons.connections),
+      ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab, svg: NavIcons.stats),
+    ],
     ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title, svg: NavIcons.home),
-    if (isMobileBreakpoint) ShellRouteAction(Icons.speed_rounded, t.avpn.speedTab, svg: NavIcons.stats),
-    ShellRouteAction(Icons.list_alt_rounded, t.avpn.connectionsTab, svg: NavIcons.connections),
+    if (!isMobileBreakpoint)
+      ShellRouteAction(Icons.list_alt_rounded, t.avpn.connectionsTab, svg: NavIcons.connections),
     ShellRouteAction(Icons.hub_rounded, t.avpn.topologyTab, svg: NavIcons.topology),
     if (showProfilesAction && !isMobileBreakpoint)
       ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title, svg: NavIcons.profiles),
