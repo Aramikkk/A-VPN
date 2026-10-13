@@ -11,8 +11,8 @@ import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The Topology tab: where the session's traffic went. On top the totals (through the VPN, direct, how many
-/// servers), then app → route → server, one line per app with arrows, and the servers and the rules ranked
-/// by how much went through them.
+/// servers), then app → route → server, one line per app with arrows, and the rules ranked
+/// by how much went through them (the VPN servers are on the computer's home screen).
 class TopologyPage extends HookConsumerWidget {
   const TopologyPage({super.key});
 
@@ -164,18 +164,6 @@ class TopologyPage extends HookConsumerWidget {
                 title: t.avpn.topoFlow,
                 child: TrafficStrips(items: items, weight: weight, value: value),
               ),
-              if (servers.isNotEmpty) ...[
-                const Gap(12),
-                _Section(
-                  title: t.avpn.topoServersTitle,
-                  child: _Ranking(
-                    rows: [for (final g in servers.take(8)) (g.key, sum(g.items))],
-                    total: viaVpn,
-                    value: value,
-                    colour: scheme.primary,
-                  ),
-                ),
-              ],
               if (rules.isNotEmpty) ...[
                 const Gap(12),
                 _Section(
@@ -302,67 +290,6 @@ class _Section extends StatelessWidget {
           child,
         ],
       ),
-    );
-  }
-}
-
-/// Rows of a name, a share bar and the amount with its share.
-class _Ranking extends StatelessWidget {
-  const _Ranking({required this.rows, required this.total, required this.value, required this.colour});
-
-  final List<(String, double)> rows;
-  final double total;
-  final String Function(double) value;
-  final Color colour;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final top = rows.fold<double>(0, (m, r) => r.$2 > m ? r.$2 : m);
-    return Column(
-      children: [
-        for (final (name, w) in rows)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const Gap(8),
-                    Text(
-                      '${value(w)} · ${total <= 0 ? 0 : (w * 100 / total).round()}%',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-                const Gap(5),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: top <= 0 ? 0 : w / top,
-                    minHeight: 6,
-                    color: colour,
-                    backgroundColor: scheme.surfaceContainerHighest,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
     );
   }
 }

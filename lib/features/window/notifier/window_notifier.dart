@@ -14,7 +14,8 @@ import 'package:window_manager/window_manager.dart';
 part 'window_notifier.g.dart';
 
 const minimumWindowSize = Size(368, 568);
-const defaultWindowSize = Size(868, 668);
+// the size the home screen fits with no empty band: the stats on the left, the servers, traffic and VPN servers
+const defaultWindowSize = Size(1048, 904);
 
 @Riverpod(keepAlive: true)
 class WindowNotifier extends _$WindowNotifier with AppLogger {

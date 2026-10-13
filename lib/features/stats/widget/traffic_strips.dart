@@ -234,3 +234,64 @@ class _StripMap extends ConsumerWidget {
 
 /// How many strips [items] make: one per route that has traffic.
 int trafficStripCount(Iterable<SeenConnection> items) => {for (final c in items) c.route}.length;
+
+/// Rows of a name, a share bar and the amount with its share.
+class TrafficRanking extends StatelessWidget {
+  const TrafficRanking({super.key, required this.rows, required this.total, required this.value, required this.colour});
+
+  final List<(String, double)> rows;
+  final double total;
+  final String Function(double) value;
+  final Color colour;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final top = rows.fold<double>(0, (m, r) => r.$2 > m ? r.$2 : m);
+    return Column(
+      children: [
+        for (final (name, w) in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const Gap(8),
+                    Text(
+                      '${value(w)} · ${total <= 0 ? 0 : (w * 100 / total).round()}%',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: top <= 0 ? 0 : w / top,
+                    minHeight: 6,
+                    color: colour,
+                    backgroundColor: scheme.surfaceContainerHighest,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}

@@ -1024,7 +1024,7 @@ class _HomeTraffic extends ConsumerWidget {
     // followed only while the home screen is in sight
     final visible = TickerMode.of(context);
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
-    // this session's connections only, as the totals at the top
+    // this session's connections only, as the right panel of the unfolded phone
     final sessionStart = ref.watch(statsNotifierProvider).valueOrNull?.sessionStartedAt;
     final current = [
       for (final c in state.items)
@@ -1035,16 +1035,45 @@ class _HomeTraffic extends ConsumerWidget {
         if (g.total >= smallTraffic) g.key,
     };
     final items = current.where((c) => big.contains(c.app)).toList();
+    final servers = groupConnections(
+      items.where((c) => c.route == ConnectionRoute.vpn && c.outbound.isNotEmpty),
+      (c) => c.outbound,
+    )..sort((a, b) => b.total.compareTo(a.total));
+    final theme = Theme.of(context);
     // fixed in place (no scroll) and without a heading, so the strips have the room; what doesn't fit is cut
     return ClipRect(
       child: SingleChildScrollView(
         physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 4),
-        child: TrafficStrips(
-          items: items,
-          weight: (c) => c.total.toDouble(),
-          value: (w) => formatBytes(w.round(), units),
-          compact: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TrafficStrips(
+              items: items,
+              weight: (c) => c.total.toDouble(),
+              value: (w) => formatBytes(w.round(), units),
+              compact: true,
+            ),
+            // the computer has the room: the VPN servers this traffic went through, under the strips
+            if (PlatformUtils.isDesktop && servers.isNotEmpty) ...[
+              const Gap(16),
+              Text(
+                t.avpn.topoServersTitle.toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+              const Gap(4),
+              TrafficRanking(
+                rows: [for (final g in servers.take(6)) (g.key, g.total.toDouble())],
+                total: servers.fold<double>(0, (s, g) => s + g.total),
+                value: (w) => formatBytes(w.round(), units),
+                colour: theme.araLook.neonFill ?? theme.colorScheme.primary,
+              ),
+            ],
+          ],
         ),
       ),
     );
