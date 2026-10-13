@@ -18,7 +18,11 @@ class TrafficStrips extends ConsumerWidget {
     this.compact = false,
     this.barHeight,
     this.headers = true,
+    this.directLabel,
   });
+
+  /// the direct strip's name; the home screen calls it «Обход»
+  final String? directLabel;
 
   /// "Через VPN · 72%   283 МБ" over each strip; the traffic panel has the totals in tiles of its own
   final bool headers;
@@ -72,6 +76,7 @@ class TrafficStrips extends ConsumerWidget {
             compact: compact,
             barHeight: barHeight,
             headers: headers,
+            directLabel: directLabel,
             // until the apps' names are read (a moment after the start) a piece has no name rather than a package
             appName: (app) => app == null ? t.avpn.connOther : (namesLoading ? '' : connectionAppName(t, apps, app)),
           ),
@@ -102,8 +107,10 @@ class _StripMap extends ConsumerWidget {
     this.compact = false,
     this.barHeight,
     this.headers = true,
+    this.directLabel,
   });
 
+  final String? directLabel;
   final bool compact;
   final double? barHeight;
   final bool headers;
@@ -126,7 +133,7 @@ class _StripMap extends ConsumerWidget {
     };
     final title = switch (strip.route) {
       ConnectionRoute.vpn => t.avpn.statsViaVpn,
-      ConnectionRoute.direct => t.avpn.statsDirect,
+      ConnectionRoute.direct => directLabel ?? t.avpn.statsDirect,
       ConnectionRoute.block => t.avpn.connBlocked,
     };
     // the biggest apps, the rest added up in one piece

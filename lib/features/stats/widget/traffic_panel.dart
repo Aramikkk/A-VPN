@@ -107,7 +107,7 @@ class TrafficPanel extends ConsumerWidget {
           children: [
             tile(t.avpn.statsViaVpn, vpn, accent, strong: true),
             const Gap(10),
-            tile(t.avpn.statsDirect, direct, const Color(0xFF9AA0A6), strong: false),
+            tile(t.avpn.homeBypass, direct, const Color(0xFF9AA0A6), strong: false),
           ],
         ),
         const Gap(14),
@@ -120,6 +120,7 @@ class TrafficPanel extends ConsumerWidget {
             compact: true,
             barHeight: 54,
             headers: false,
+            directLabel: t.avpn.homeBypass,
           ),
         ),
         const Gap(14),
@@ -144,7 +145,7 @@ class TrafficPanel extends ConsumerWidget {
                     : (g.mainRoute == ConnectionRoute.block ? scheme.error : const Color(0xFF9AA0A6));
                 final route = switch (g.mainRoute) {
                   ConnectionRoute.vpn => g.servers.isEmpty ? 'VPN' : 'VPN · ${serverFlags(g.servers)}',
-                  ConnectionRoute.direct => t.avpn.statsDirect,
+                  ConnectionRoute.direct => t.avpn.homeBypass,
                   ConnectionRoute.block => t.avpn.connBlocked,
                 };
                 return Padding(

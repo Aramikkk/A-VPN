@@ -38,6 +38,7 @@
     "statsSession": "This session",
     "statsViaVpn": "Through VPN",
     "statsDirect": "Direct",
+    "homeBypass": "Bypass",
     "statsDownload": "Download",
     "statsUpload": "Upload",
     "bytesUnits": "B,KB,MB,GB,TB",

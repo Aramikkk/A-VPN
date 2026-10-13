@@ -34,10 +34,9 @@ class _StyledHome extends HookConsumerWidget {
     // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one
     // (about 830) keeps everything tight
     final roomy = MediaQuery.sizeOf(context).height >= 900;
-    // Auto and two countries folded (three on a lower screen would crowd the strips), Auto and three in the
-    // unfolded phone's servers column; the rest a scroll away
-    final rowsInSight = traffic ? 3 : 4;
-    final glassLook = theme.araLook.glass;
+    // Auto and two countries folded (three would crowd the strips), Auto and four in the unfolded phone's servers
+    // column; the rest a scroll away
+    final rowsInSight = traffic ? 3 : 5;
     final currentName = switch (current?.tag) {
       _ when serverMode => '🏠 ${t.avpn.server}',
       'lowest' || 'balance' => picked == null ? t.avpn.auto : '${t.avpn.auto} · ${_withFlag(serverName(picked))}',
@@ -45,52 +44,73 @@ class _StyledHome extends HookConsumerWidget {
       _ => _withFlag(serverName(current!)),
     };
 
+    final hasList = profile != null && servers.isNotEmpty;
+    final header = _ServersHeader(
+      editorial: editorial,
+      profile: profile,
+      testing: testing,
+      onCheck: connected && editorial ? onCheck : null,
+      showCheck: editorial,
+    );
+    final dock = editorial
+        ? _EditorialDock(status: status)
+        : _GraphiteDock(
+            status: status,
+            server: connected ? currentName : null,
+            testing: testing,
+            onCheck: onCheck,
+            // the bigger connect panel where there's room: a tall screen, or the unfolded phone (no strips under the
+            // servers there), so it's the same size folded and unfolded
+            large: roomy || !traffic,
+          );
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 2, 18, 0),
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        // the blocks evenly apart, folded and unfolded: the session line, the servers, the traffic, the toggles and
+        // the connect panel, the room left over shared equally between them
+        mainAxisAlignment: hasList ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
         children: [
           _StatusBlock(editorial: editorial, status: status, lastServer: currentName),
-          Gap(roomy ? 20 : 14),
-          _ServersHeader(
-            editorial: editorial,
-            profile: profile,
-            testing: testing,
-            onCheck: connected && editorial ? onCheck : null,
-            showCheck: editorial,
-          ),
-          Gap(roomy ? 10 : 6),
-          if (profile != null && servers.isNotEmpty) ...[
-            SizedBox(
-              height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
-              child: _StyledServerList(
-                editorial: editorial,
-                servers: servers,
-                selectedTag: group?.selected,
-                autoNow: autoNow,
-                testing: testing,
-              ),
-            ),
-            // where the traffic went, under the servers (as on the Topology tab); Glass's card sits in the middle of
-            // the room between the servers and the toggles, the same space above and below it
-            if (traffic) ...[
-              Gap(glassLook != null ? 0 : (roomy ? 20 : 10)),
-              Expanded(child: _HomeTraffic(editorial: editorial)),
-            ] else
-              const Spacer(),
-          ] else
-            Expanded(
-              child: profile == null
-                  ? _EmptyCard(text: t.avpn.noProfile)
-                  // the whole list where the traffic has a column of its own
-                  : servers.isNotEmpty
-                  ? _StyledServerList(
+          if (hasList) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  header,
+                  Gap(roomy ? 10 : 6),
+                  SizedBox(
+                    height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
+                    child: _StyledServerList(
                       editorial: editorial,
                       servers: servers,
                       selectedTag: group?.selected,
                       autoNow: autoNow,
                       testing: testing,
-                    )
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // where the traffic went, under the servers (as on the Topology tab): as tall as its strips, cut when
+            // the screen has less room
+            if (traffic)
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: _HomeTraffic(editorial: editorial),
+                ),
+              ),
+          ] else ...[
+            Gap(roomy ? 20 : 14),
+            header,
+            Gap(roomy ? 10 : 6),
+            Expanded(
+              child: profile == null
+                  ? _EmptyCard(text: t.avpn.noProfile)
                   : Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -102,19 +122,13 @@ class _StyledHome extends HookConsumerWidget {
                       ),
                     ),
             ),
-          Gap(glassLook != null ? 12 : 6),
-          _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
-          if (editorial)
-            _EditorialDock(status: status)
-          else
-            _GraphiteDock(
-              status: status,
-              server: connected ? currentName : null,
-              testing: testing,
-              onCheck: onCheck,
-              // only a very tall screen has room to spare for a bigger connect panel; the strip map needs it first
-              large: roomy,
-            ),
+          ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [_CheckRow(onCheck: onCheck, testing: testing, showCheck: false)],
+          ),
+          dock,
         ],
       ),
     );
@@ -232,7 +246,7 @@ class _StatusBlock extends HookConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [item(Icons.south_rounded, down), const Gap(10), item(Icons.north_rounded, up)],
             ),
-            item(Icons.alt_route_rounded, '${t.avpn.statsDirect} ${formatBytes(direct, units)}'),
+            item(Icons.alt_route_rounded, '${t.avpn.homeBypass} ${formatBytes(direct, units)}'),
           ),
         ],
       ),
@@ -808,12 +822,12 @@ class _GraphiteDock extends ConsumerWidget {
     // Glass: floating over the backdrop, what's behind it blurred
     if (glass != null) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
+        padding: const EdgeInsets.only(top: 10),
         child: GlassPane(look: glass, radius: large ? 40 : 32, padding: padding, child: content),
       );
     }
     return Container(
-      margin: const EdgeInsets.fromLTRB(0, 6, 0, 12),
+      margin: const EdgeInsets.only(top: 6),
       padding: padding,
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow.withValues(alpha: dark ? .85 : 1),
@@ -1061,6 +1075,7 @@ class _HomeTraffic extends ConsumerWidget {
               weight: (c) => c.total.toDouble(),
               value: (w) => formatBytes(w.round(), units),
               compact: true,
+              directLabel: t.avpn.homeBypass,
             ),
             // the computer has the room: the VPN servers this traffic went through, under the strips
             if (PlatformUtils.isDesktop && servers.isNotEmpty) ...[
@@ -1089,19 +1104,14 @@ class _HomeTraffic extends ConsumerWidget {
     final glass = theme.araLook.glass;
     if (glass == null) return strips;
     if (items.isEmpty) return const SizedBox.shrink();
-    // as tall as the strips, not the whole room down to the connect panel, and in the middle of that room
-    return Align(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: glass.panel,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: glass.edge, width: 1.2),
-          ),
-          child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 10), child: strips),
-        ),
+    // as tall as the strips (the home column places it, evenly apart from the blocks round it)
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: glass.panel,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: glass.edge, width: 1.2),
       ),
+      child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 10), child: strips),
     );
   }
 }

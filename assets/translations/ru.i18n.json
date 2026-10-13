@@ -38,6 +38,7 @@
     "statsSession": "За сессию",
     "statsViaVpn": "Через VPN",
     "statsDirect": "Напрямую",
+    "homeBypass": "Обход",
     "statsDownload": "Загрузка",
     "statsUpload": "Отдача",
     "bytesUnits": "Б,КБ,МБ,ГБ,ТБ",
