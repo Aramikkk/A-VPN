@@ -759,60 +759,78 @@ class _GraphiteDock extends ConsumerWidget {
         if (!item.isGroup && item.isVisible && item.urlTestDelay > 0 && item.urlTestDelay < 65000) item,
     ]..sort((a, b) => a.urlTestDelay.compareTo(b.urlTestDelay));
     final answering = answeringServers.length;
-    final side = theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: large ? 15 : 14);
-    Widget pill({required Widget icon, required String label, VoidCallback? onTap}) => FilledButton.icon(
-      style: FilledButton.styleFrom(
+    // the ping of the server in use (Auto: of the one it picked), shown in the ring
+    final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
+    final inUse = current != null && current.isGroup ? (autoPick(current, group!.items) ?? current) : current;
+    final delay = inUse?.urlTestDelay ?? 0;
+    final pinged = on && delay > 0 && delay < 65000;
+    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final buttonSize = large ? 56.0 : 50.0;
+    Widget round({required Widget icon, VoidCallback? onTap}) => IconButton.filledTonal(
+      style: IconButton.styleFrom(
         backgroundColor: scheme.surfaceContainerHighest,
         foregroundColor: scheme.onSurface,
         disabledBackgroundColor: scheme.surfaceContainerHighest.withValues(alpha: .5),
         disabledForegroundColor: scheme.onSurfaceVariant,
-        minimumSize: Size(large ? 118 : 104, large ? 54 : 48),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        textStyle: side,
+        fixedSize: Size.square(buttonSize),
       ),
       onPressed: onTap,
       icon: icon,
-      label: Text(label),
     );
-    // the ring button in the middle; the ping check on its left and the servers answering on its right, the same
-    // size, so the panel is even
+    // the gauge ring in the middle; the ping check on its left and the servers answering on its right
     final content = Row(
       children: [
         Expanded(
           child: Center(
-            child: pill(
-              icon: on && testing
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
-                    )
-                  : AraIconPaint(enabled: on, child: const Icon(Icons.network_ping_rounded, size: 18)),
-              label: t.avpn.stPingButton,
-              onTap: on && !busy && !testing ? onCheck : null,
+            child: Tooltip(
+              message: t.avpn.stPingButton,
+              child: round(
+                icon: on && testing
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurface),
+                      )
+                    : AraIconPaint(enabled: on, child: const Icon(Icons.network_ping_rounded, size: 22)),
+                onTap: on && !busy && !testing ? onCheck : null,
+              ),
             ),
           ),
         ),
-        _Orb(on: on, busy: busy, size: large ? 92 : 74, onTap: busy ? null : () => _toggleConnection(ref)),
+        _Orb(
+          on: on,
+          busy: busy,
+          size: large ? 124 : 104,
+          fill: pinged ? _Orb.fillFor(delay) : 0,
+          label: pinged ? '$delay ms' : null,
+          onTap: busy ? null : () => _toggleConnection(ref),
+        ),
         Expanded(
           child: Center(
             child: Semantics(
               label: t.avpn.dockServersAnswering(count: answering),
               child: ExcludeSemantics(
-                child: pill(
-                  icon: AraIconPaint(enabled: on, child: const Icon(Icons.dns_rounded, size: 18)),
-                  label: on ? '$answering' : '—',
-                  // shown, not pressed: it only counts
-                  // the answering servers in a compact list, the fastest first; one tapped is chosen
-                  onTap: on && answering > 0
-                      ? () => showModalBottomSheet<void>(
-                          context: context,
-                          showDragHandle: true,
-                          isScrollControlled: true,
-                          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
-                          builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
-                        )
-                      : null,
+                child: Badge(
+                  isLabelVisible: on && answering > 0,
+                  label: Text('$answering', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  backgroundColor: accent,
+                  textColor: AraLook.contrast(accent, Colors.black) >= AraLook.contrast(accent, Colors.white)
+                      ? Colors.black
+                      : Colors.white,
+                  offset: const Offset(2, -2),
+                  child: round(
+                    icon: AraIconPaint(enabled: on, child: const Icon(Icons.dns_rounded, size: 22)),
+                    // the answering servers in a compact list, the fastest first; one tapped is chosen
+                    onTap: on && answering > 0
+                        ? () => showModalBottomSheet<void>(
+                            context: context,
+                            showDragHandle: true,
+                            isScrollControlled: true,
+                            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
+                            builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
+                          )
+                        : null,
+                  ),
                 ),
               ),
             ),
@@ -839,12 +857,27 @@ class _GraphiteDock extends ConsumerWidget {
   }
 }
 
-/// The round button: a dark (or white) sphere with a ring in the accent that glows while connected and turns
-/// while connecting.
+/// The round button: a dark (or white) sphere in a gauge ring open at the bottom. Connected, the ring fills in
+/// the accent by the ping (the lower, the fuller) and the ping is written under the icon; connecting, a short arc
+/// turns.
 class _Orb extends HookWidget {
-  const _Orb({required this.on, required this.busy, this.onTap, this.size = 74});
+  const _Orb({required this.on, required this.busy, this.onTap, this.size = 74, this.fill = 0, this.label});
 
   final double size;
+
+  /// how much of the gauge is filled, 0 to 1
+  final double fill;
+
+  /// the ping, under the icon
+  final String? label;
+
+  /// 50 ms or less fills it all, 800 ms or more a sliver; between, smoothly on a log scale
+  static double fillFor(int delay) {
+    const best = 50.0;
+    const worst = 800.0;
+    final f = 1 - (math.log(delay.clamp(best, worst)) - math.log(best)) / (math.log(worst) - math.log(best));
+    return .06 + .94 * f;
+  }
 
   final bool on;
   final bool busy;
@@ -871,30 +904,41 @@ class _Orb extends HookWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: AnimatedBuilder(
-          animation: spin,
-          builder: (context, _) => CustomPaint(
-            painter: _RingPainter(
-              colors: on || busy
-                  // one colour, the accent
-                  ? [accent, accent]
-                  : [scheme.outlineVariant, scheme.outlineVariant],
-              sweep: on ? 1 : (busy ? .3 : 1),
-              rotation: spin.value,
+        child: TweenAnimationBuilder<double>(
+          // the fill glides to a new ping
+          tween: Tween(end: on ? fill : 0),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          builder: (context, filled, child) => AnimatedBuilder(
+            animation: spin,
+            builder: (context, child) => CustomPaint(
+              painter: _RingPainter(
+                track: dark ? scheme.outlineVariant.withValues(alpha: .55) : scheme.onSurface.withValues(alpha: .1),
+                color: accent,
+                fill: filled,
+                busy: busy,
+                rotation: spin.value,
+                width: size * .07,
+              ),
+              child: child,
             ),
-            child: Padding(
-              padding: EdgeInsets.all(size * .095),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  // one colour, no gradient
-                  color: dark ? const Color(0xFF16161A) : Colors.white,
-                  boxShadow: on ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)] : null,
-                ),
-                child: Center(
-                  child: Icon(
+            child: child,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(size * .14),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // one colour, no gradient
+                color: dark ? const Color(0xFF16161A) : Colors.white,
+                boxShadow: on ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)] : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
                     Icons.power_settings_new_rounded,
-                    size: size * .4,
+                    size: size * (label == null ? .34 : .28),
                     // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
                     // it goes black there, as the chosen server's text does
                     color: on
@@ -903,7 +947,16 @@ class _Orb extends HookWidget {
                               : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
                         : scheme.onSurfaceVariant,
                   ),
-                ),
+                  if (label != null)
+                    Text(
+                      label!,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        fontSize: size * .115,
+                        color: dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -914,38 +967,49 @@ class _Orb extends HookWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  _RingPainter({required this.colors, required this.sweep, required this.rotation});
+  _RingPainter({
+    required this.track,
+    required this.color,
+    required this.fill,
+    required this.busy,
+    required this.rotation,
+    required this.width,
+  });
 
-  final List<Color> colors;
+  final Color track;
+  final Color color;
 
-  /// how much of the circle the ring covers (1: all of it)
-  final double sweep;
+  /// the part of the gauge in [color], 0 to 1
+  final double fill;
+  final bool busy;
   final double rotation;
+  final double width;
+
+  // the gauge: 270 degrees, open at the bottom, filled clockwise from the lower left
+  static const _start = math.pi * .75;
+  static const _sweep = math.pi * 1.5;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final ring = rect.deflate(2.5);
-    canvas.save();
-    canvas.translate(size.width / 2, size.height / 2);
-    canvas.rotate(rotation * 2 * 3.1415926);
-    canvas.translate(-size.width / 2, -size.height / 2);
-    canvas.drawArc(
-      ring,
-      -1.57,
-      sweep * 2 * 3.1415926,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
-        ..strokeCap = StrokeCap.round
-        ..shader = SweepGradient(colors: colors).createShader(rect),
-    );
-    canvas.restore();
+    final ring = (Offset.zero & size).deflate(width / 2 + 1);
+    Paint stroke(Color c) => Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..color = c;
+    if (busy) {
+      // connecting: the whole circle as the track, a short arc going round
+      canvas.drawArc(ring, 0, math.pi * 2, false, stroke(track));
+      canvas.drawArc(ring, rotation * 2 * math.pi - math.pi / 2, math.pi * .6, false, stroke(color));
+      return;
+    }
+    canvas.drawArc(ring, _start, _sweep, false, stroke(track));
+    if (fill > 0.001) canvas.drawArc(ring, _start, _sweep * fill, false, stroke(color));
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.rotation != rotation || old.sweep != sweep || old.colors != colors;
+  bool shouldRepaint(_RingPainter old) =>
+      old.rotation != rotation || old.fill != fill || old.busy != busy || old.color != color || old.track != track;
 }
 
 /// Editorial's connect control: a huge "ВКЛ." / "ВЫКЛ." over a rule, and a big switch.

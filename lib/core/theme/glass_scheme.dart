@@ -237,15 +237,20 @@ enum GlassScheme {
     Color(0xFF1B1F1F),
     Color(0xFF323737),
   ], calm: true),
-  anthracite(GlassVariant.frost, Color(0xFFBFC3CC), Color(0xFF141518), [
-    Color(0xFF3A3C42),
-    Color(0xFF2A2C31),
-    Color(0xFF46484F),
+  anthracite(GlassVariant.frost, Color(0xFFA3A8B0), Color(0xFF0A0A0B), [
+    Color(0xFF2A2A2E),
+    Color(0xFF1C1C20),
+    Color(0xFF333338),
   ], calm: true),
-  asphalt(GlassVariant.frost, Color(0xFF8FB4D9), Color(0xFF1A2027), [
-    Color(0xFF34495E),
-    Color(0xFF2C3E50),
-    Color(0xFF3D566E),
+  asphalt(GlassVariant.frost, Color(0xFF7C9BBA), Color(0xFF0A0B0C), [
+    Color(0xFF272A2E),
+    Color(0xFF1B1D20),
+    Color(0xFF31353A),
+  ], calm: true),
+  cyberpunk(GlassVariant.frost, Color(0xFFFCEE0A), Color(0xFF0A0A08), [
+    Color(0xFF2C2B1E),
+    Color(0xFF1D1C14),
+    Color(0xFF36352A),
   ], calm: true),
   // Clear: nearly clear panels with bright edges over a calm backdrop
   frostbite(GlassVariant.clear, Color(0xFF2F7BFF), Color(0xFFDCE3EE), [
