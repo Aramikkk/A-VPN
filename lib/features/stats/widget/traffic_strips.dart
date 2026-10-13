@@ -54,7 +54,7 @@ class TrafficStrips extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final (i, strip) in strips.indexed) ...[
-          if (i > 0) Gap(compact ? 10 : 16),
+          if (i > 0) Gap(compact ? 14 : 16),
           _StripMap(
             strip: strip,
             total: total,

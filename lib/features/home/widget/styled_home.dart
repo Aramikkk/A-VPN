@@ -29,7 +29,10 @@ class _StyledHome extends HookConsumerWidget {
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
     final picked = current != null && current.isGroup ? autoPick(current, group!.items) : null;
     final serverMode = ref.watch(ConfigOptions.homeNetwork);
-    final rowsInSight = MediaQuery.sizeOf(context).height >= 900 ? 4 : 3;
+    // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one
+    // (about 830) keeps everything tight
+    final roomy = MediaQuery.sizeOf(context).height >= 900;
+    final rowsInSight = roomy ? 4 : 3;
     final currentName = switch (current?.tag) {
       _ when serverMode => '🏠 ${t.avpn.server}',
       'lowest' || 'balance' => picked == null ? t.avpn.auto : '${t.avpn.auto} · ${_withFlag(serverName(picked))}',
@@ -43,7 +46,7 @@ class _StyledHome extends HookConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _StatusBlock(editorial: editorial, status: status, lastServer: currentName),
-          const Gap(14),
+          Gap(roomy ? 20 : 14),
           _ServersHeader(
             editorial: editorial,
             profile: profile,
@@ -51,7 +54,7 @@ class _StyledHome extends HookConsumerWidget {
             onCheck: connected && editorial ? onCheck : null,
             showCheck: editorial,
           ),
-          const Gap(6),
+          Gap(roomy ? 10 : 6),
           if (profile != null && servers.isNotEmpty) ...[
             // four rows in sight (Auto and three countries), three on a lower screen (the unfolded phone), so the
             // strip map under them fits; the rest a scroll away
@@ -65,7 +68,7 @@ class _StyledHome extends HookConsumerWidget {
                 testing: testing,
               ),
             ),
-            const Gap(10),
+            Gap(roomy ? 20 : 10),
             // where the traffic went, under the servers (as on the Topology tab)
             Expanded(child: _HomeTraffic(editorial: editorial)),
           ] else
@@ -94,7 +97,7 @@ class _StyledHome extends HookConsumerWidget {
               testing: testing,
               onCheck: onCheck,
               // only a very tall screen has room to spare for a bigger connect panel; the strip map needs it first
-              large: MediaQuery.sizeOf(context).height >= 1000,
+              large: roomy,
             ),
         ],
       ),
