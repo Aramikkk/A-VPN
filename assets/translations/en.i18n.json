@@ -670,13 +670,13 @@
         "listHint": "Rules are checked top to bottom: the first that fits decides where a connection goes. Drag to reorder.",
         "everythingElse": "Everything else",
         "everythingElseVpnHint": "Whatever the rules above leave goes through the VPN.",
-        "everythingElseDirectHint": "Only the groups above take the VPN, the rest goes direct at full speed. A phone does this on Wi-Fi only: on mobile data everything goes through the VPN because of the operators' whitelists.",
+        "everythingElseDirectHint": "Only the groups above take the VPN, the rest goes direct at full speed.",
         "globalOn": "\"Global\" is on: all traffic goes through the VPN, the rules below don't apply (except the local network and QUIC).",
         "serverOn": "\"Server\" is on: the home network through your WireGuard, the rest direct. The rules below don't apply.",
         "advanced": "Advanced",
         "everythingElseWhere": "Switched in Settings, the \"Everything else\" row.",
         "everythingElseVpnSettingsHint": "Whatever the routing rules don't cover goes through the VPN.",
-        "everythingElseDirectSettingsHint": "Only what the routing rules send (blocked sites, Google, AI, social networks…) takes the VPN, the rest goes direct at full speed. A phone does this on Wi-Fi only: on mobile data everything goes through the VPN because of the operators' whitelists."
+        "everythingElseDirectSettingsHint": "Only what the routing rules send (blocked sites, Google, AI, social networks…) takes the VPN, the rest goes direct at full speed."
       },
       "dns": {
         "title": "DNS",

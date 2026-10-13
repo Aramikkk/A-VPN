@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
-import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Where the traffic went, as a strip map: a strip per route (through the VPN, direct, blocked), the biggest first,
@@ -73,7 +71,6 @@ class TrafficStrips extends ConsumerWidget {
             barHeight: barHeight,
             headers: headers,
             appName: (app) => app == null ? t.avpn.connOther : connectionAppName(t, apps, app),
-            iconOf: (app) => app == null ? null : apps[app]?.icon,
           ),
         ],
       ],
@@ -99,7 +96,6 @@ class _StripMap extends ConsumerWidget {
     required this.total,
     required this.value,
     required this.appName,
-    required this.iconOf,
     this.compact = false,
     this.barHeight,
     this.headers = true,
@@ -108,7 +104,6 @@ class _StripMap extends ConsumerWidget {
   final bool compact;
   final double? barHeight;
   final bool headers;
-  final Uint8List? Function(String? app) iconOf;
 
   final _Strip strip;
   final double total;
@@ -158,126 +153,10 @@ class _StripMap extends ConsumerWidget {
       ],
     );
 
-    // the phone's home screen only: the computer has no app icons, so it keeps names in the strip and the list
-    if (compact && (PlatformUtils.isAndroid || debugIconStrips)) {
-      // the phone's home screen: a thin strip with each app as its icon in black and white (no names, no amounts in
-      // it, so many apps fit), and the biggest ones named with their amounts under it
-      const least = 28.0;
-      const gap = 2.0;
-      return LayoutBuilder(
-        builder: (context, box) {
-          // as many apps as fit at their least width, those under 1.5% of the route left to the last piece
-          final fit = ((box.maxWidth + gap) / (least + gap)).floor().clamp(1, 12);
-          final big = strip.apps.where((a) => strip.weight == 0 || a.weight / strip.weight >= .015).toList();
-          final own = big.length <= fit ? big : big.take(fit - 1).toList();
-          final rest = strip.apps.skip(own.length).toList();
-          final cells = <({String? app, double weight, int count})>[
-            for (final a in own) (app: a.app, weight: a.weight, count: 1),
-            if (rest.isNotEmpty) (app: null, weight: rest.fold<double>(0, (s, a) => s + a.weight), count: rest.length),
-          ];
-          final room = box.maxWidth - gap * (cells.length - 1);
-          final spare = room - least * cells.length;
-          // the names under the strip: the four biggest, the rest in one
-          const named = 4;
-          final legend = <({String? app, double weight, int count})>[
-            ...own.take(named).map((a) => (app: a.app, weight: a.weight, count: 1)),
-            if (strip.apps.length > named)
-              (
-                app: null,
-                weight: strip.apps.skip(named).fold<double>(0, (s, a) => s + a.weight),
-                count: strip.apps.length - named,
-              ),
-          ];
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (headers) ...[header, const Gap(6)],
-              ClipRRect(
-                borderRadius: BorderRadius.circular(9),
-                child: SizedBox(
-                  height: barHeight ?? 34,
-                  child: Row(
-                    children: [
-                      for (final (i, cell) in cells.indexed) ...[
-                        if (i > 0) const SizedBox(width: gap),
-                        Container(
-                          width: least + (strip.weight == 0 ? 0 : spare * cell.weight / strip.weight),
-                          color: shade(i),
-                          alignment: Alignment.center,
-                          child: cell.app == null
-                              ? Text(
-                                  '+${cell.count}',
-                                  maxLines: 1,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: ink(shade(i)),
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                )
-                              : _GreyIcon(icon: iconOf(cell.app), name: appName(cell.app)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              if (headers) ...[
-                const Gap(6),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 3,
-                  children: [
-                    for (final (i, piece) in legend.indexed)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: piece.app == null ? shade(cells.length - 1) : shade(i),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                          const Gap(5),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 140),
-                            child: Text(
-                              piece.app == null ? '${t.avpn.connOther} · ${piece.count}' : appName(piece.app),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          Text(' ${value(piece.weight)}', style: small),
-                        ],
-                      ),
-                  ],
-                ),
-              ],
-            ],
-          );
-        },
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '$title · $share%',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: AraLook.readableOn(base, scheme.surfaceContainerLow),
-                ),
-              ),
-            ),
-            Text(value(strip.weight), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-          ],
-        ),
-        const Gap(6),
+        if (headers) ...[header, const Gap(6)],
         // the strip itself: each app as wide as its traffic, its name inside when there is room
         ClipRRect(
           borderRadius: BorderRadius.circular(9),
@@ -353,49 +232,5 @@ class _StripMap extends ConsumerWidget {
   }
 }
 
-/// Tests draw the phone's strips (icons in the strip) on the computer.
-@visibleForTesting
-bool debugIconStrips = false;
-
 /// How many strips [items] make: one per route that has traffic.
 int trafficStripCount(Iterable<SeenConnection> items) => {for (final c in items) c.route}.length;
-
-/// An app's icon in black and white on a light tile, so a strip of many reads calmly on any colour; the first
-/// letter when there is no icon.
-class _GreyIcon extends StatelessWidget {
-  const _GreyIcon({required this.icon, required this.name});
-
-  final Uint8List? icon;
-  final String name;
-
-  static const _grey = ColorFilter.matrix([
-    0.2126, 0.7152, 0.0722, 0, 0, //
-    0.2126, 0.7152, 0.0722, 0, 0, //
-    0.2126, 0.7152, 0.0722, 0, 0, //
-    0, 0, 0, 1, 0, //
-  ]);
-
-  @override
-  Widget build(BuildContext context) {
-    final image = icon;
-    if (image != null) {
-      return ColorFiltered(
-        colorFilter: _grey,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Image.memory(image, width: 22, height: 22, gaplessPlayback: true),
-        ),
-      );
-    }
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .92), borderRadius: BorderRadius.circular(7)),
-      child: Text(
-        name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-        style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w800),
-      ),
-    );
-  }
-}

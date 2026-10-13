@@ -171,7 +171,7 @@ class _StatusBlock extends HookConsumerWidget {
     }
     if (!connected) {
       return Padding(
-        padding: const EdgeInsets.only(top: 8),
+        padding: EdgeInsets.zero,
         child: Text(
           waiting ?? t.avpn.stTapBelow,
           style: theme.textTheme.titleMedium?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w700),
@@ -191,17 +191,19 @@ class _StatusBlock extends HookConsumerWidget {
         Text(text, style: big?.copyWith(color: colour)),
       ],
     );
-    // what moved this session, through the VPN and direct
-    final session = ref.watch(sessionTotalsProvider);
-    final vpn = (session.vpnUp ?? 0) + (session.vpnDown ?? 0);
-    final direct = (session.up + session.down - vpn).clamp(0, 1 << 62);
+    // what moved today, from 03:00 to 03:00: kept across sessions, reconnects and a cleared connection list
+    ref.watch(trafficHistoryProvider);
+    final today = ref.read(trafficHistoryProvider.notifier).amountFrom(statsDayStart(DateTime.now()));
+    final vpn = today.vpn;
+    final direct = (today.total - vpn).clamp(0, 1 << 62);
     final small = theme.textTheme.labelMedium?.copyWith(
       fontWeight: FontWeight.w700,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     final accent = theme.araLook.neonFill ?? scheme.primary;
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      // no space of its own on top: the gap under the title bar matches the one above the servers
+      padding: EdgeInsets.zero,
       child: Row(
         children: [
           Expanded(
@@ -773,9 +775,10 @@ class _GraphiteDock extends ConsumerWidget {
                   // ON / OFF are short: the larger size fits either way
                   style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
+                // "Авто" on one line and the country under it, so a long name isn't cut
                 Text(
-                  server ?? t.avpn.stNotProtected,
-                  maxLines: 1,
+                  server?.replaceFirst(' · ', '\n') ?? t.avpn.stNotProtected,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: (large ? theme.textTheme.bodyMedium : theme.textTheme.bodySmall)?.copyWith(
                     color: scheme.onSurfaceVariant,
@@ -1017,8 +1020,6 @@ class _HomeTraffic extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final units = t.avpn.bytesUnits.split(',');
     // followed only while the home screen is in sight
     final visible = TickerMode.of(context);
@@ -1028,34 +1029,18 @@ class _HomeTraffic extends ConsumerWidget {
         if (g.total >= smallTraffic) g.key,
     };
     final items = state.items.where((c) => big.contains(c.app)).toList();
-    // a scroll when the strips and their names don't fit under the servers
-    return LayoutBuilder(
-      builder: (context, box) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.only(top: 4, bottom: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                t.avpn.topoFlow.toUpperCase(),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  letterSpacing: 1.1,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                  color: scheme.onSurface,
-                ),
-              ),
-              const Gap(8),
-              TrafficStrips(
-                items: items,
-                weight: (c) => c.total.toDouble(),
-                value: (w) => formatBytes(w.round(), units),
-                compact: true,
-              ),
-            ],
-          ),
-        );
-      },
+    // fixed in place (no scroll) and without a heading, so the strips have the room; what doesn't fit is cut
+    return ClipRect(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: 4),
+        child: TrafficStrips(
+          items: items,
+          weight: (c) => c.total.toDouble(),
+          value: (w) => formatBytes(w.round(), units),
+          compact: true,
+        ),
+      ),
     );
   }
 }

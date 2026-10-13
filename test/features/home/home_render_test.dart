@@ -27,7 +27,6 @@ import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/traffic_panel.dart';
-import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -145,7 +144,6 @@ void main() {
         // the folded Fold 7: 1080 x 2520 at 2.625, about 411 x 960
         tester.view.physicalSize = unfolded ? const Size(1968, 2184) : const Size(1080, 2520);
         tester.view.devicePixelRatio = 2.625;
-        debugIconStrips = true;
         addTearDown(tester.view.reset);
         final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
         final prefs = await tester.runAsync(SharedPreferences.getInstance);
