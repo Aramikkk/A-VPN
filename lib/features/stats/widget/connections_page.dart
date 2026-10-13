@@ -371,7 +371,7 @@ class _GroupCard extends HookConsumerWidget {
               child: Row(
                 children: [
                   if (byApp)
-                    _AppIcon(icon: iconOf(group.key), name: title)
+                    ConnectionAppIcon(icon: iconOf(group.key), name: title)
                   else
                     _RouteDot(route: group.mainRoute, size: 32),
                   const Gap(10),
@@ -567,7 +567,7 @@ String _routeText(Translations t, ConnectionGroup g) {
   };
 }
 
-Color _routeColor(ColorScheme scheme, ConnectionRoute route) => switch (route) {
+Color routeColor(ColorScheme scheme, ConnectionRoute route) => switch (route) {
   ConnectionRoute.vpn => scheme.primary,
   ConnectionRoute.direct => scheme.onSurfaceVariant,
   ConnectionRoute.block => scheme.error,
@@ -585,7 +585,7 @@ class _RouteBadge extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     Widget pill(ConnectionRoute route, String text, int count) {
-      final color = _routeColor(scheme, route);
+      final color = routeColor(scheme, route);
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
@@ -624,7 +624,7 @@ class _RouteDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _routeColor(Theme.of(context).colorScheme, route);
+    final color = routeColor(Theme.of(context).colorScheme, route);
     if (size < 16) {
       return Container(
         width: size,
@@ -647,24 +647,26 @@ class _RouteDot extends StatelessWidget {
   }
 }
 
-class _AppIcon extends StatelessWidget {
-  const _AppIcon({required this.icon, required this.name});
+/// An app's icon, or its first letter on a tinted tile when it has none.
+class ConnectionAppIcon extends StatelessWidget {
+  const ConnectionAppIcon({super.key, required this.icon, required this.name, this.size = 32});
 
   final Uint8List? icon;
   final String name;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     if (icon != null) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.memory(icon!, width: 32, height: 32, gaplessPlayback: true),
+        borderRadius: BorderRadius.circular(size * .3),
+        child: Image.memory(icon!, width: size, height: size, gaplessPlayback: true),
       );
     }
     return Container(
-      width: 32,
-      height: 32,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .14), borderRadius: BorderRadius.circular(10)),
       child: Text(

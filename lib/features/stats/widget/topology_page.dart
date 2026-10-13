@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -6,12 +7,11 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
-import 'package:hiddify/features/stats/widget/connections_flow.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The Topology tab: where the session's traffic went. On top the totals (through the VPN, direct, how many
-/// servers), then the flows app → route → server, each app in its own colour, and the servers and the rules ranked
+/// servers), then app → route → server, one line per app with arrows, and the servers and the rules ranked
 /// by how much went through them.
 class TopologyPage extends HookConsumerWidget {
   const TopologyPage({super.key});
@@ -29,7 +29,6 @@ class TopologyPage extends HookConsumerWidget {
     final hideSmall = useState(true);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final surface = scheme.surfaceContainerLow;
     final units = t.avpn.bytesUnits.split(',');
 
     final open = openOnly.value ? state.items.where((c) => c.active).toList() : state.items;
@@ -78,33 +77,19 @@ class TopologyPage extends HookConsumerWidget {
       );
     }
 
-    final palette = flowPalette(scheme.primary, surface);
-    final flow = ConnectionFlow.build(
-      items,
-      byTraffic: byTraffic.value,
-      appName: (app) => connectionAppName(t, apps, app),
-      routeName: (route) => switch (route) {
-        ConnectionRoute.vpn => 'VPN',
-        ConnectionRoute.direct => t.avpn.statsDirect,
-        ConnectionRoute.block => t.avpn.connBlocked,
-      },
-      other: t.avpn.connOther,
-      palette: palette,
-      appColours: flowAppColours(surface),
-      routeColor: (route) => switch (route) {
-        ConnectionRoute.vpn => AraLook.readableOn(scheme.primary, surface),
-        ConnectionRoute.direct => AraLook.readableOn(const Color(0xFF9AA0A6), surface),
-        ConnectionRoute.block => AraLook.readableOn(scheme.error, surface),
-      },
-      maxPerColumn: 7,
-    );
-    final most = flow.columns.fold<int>(0, (m, c) => c.length > m ? c.length : m);
-    final chartHeight = (most * 58.0 + 20).clamp(90.0, 430.0);
-    final label = theme.textTheme.labelSmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-      fontWeight: FontWeight.w700,
-      letterSpacing: .8,
-    );
+    // app -> route -> server, one line per app, the biggest first; the rest added up in one line
+    final byApp = groupConnections(items, (c) => c.app)..sort((a, b) => sum(b.items).compareTo(sum(a.items)));
+    const shown = 7;
+    final flowRows = <_Flow>[
+      for (final g in byApp.take(shown)) _Flow(g.key, sum(g.items), g),
+      if (byApp.length > shown)
+        _Flow(
+          null,
+          sum(byApp.skip(shown).expand((g) => g.items)),
+          groupConnections(byApp.skip(shown).expand((g) => g.items), (_) => '').first,
+          others: byApp.length - shown,
+        ),
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -184,7 +169,7 @@ class TopologyPage extends HookConsumerWidget {
               const Gap(12),
               _Section(
                 title: t.avpn.topoFlow,
-                child: flow.isEmpty
+                child: flowRows.isEmpty
                     ? SizedBox(
                         height: 120,
                         child: Center(
@@ -194,51 +179,14 @@ class TopologyPage extends HookConsumerWidget {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // the column headings, over their columns
-                          LayoutBuilder(
-                            builder: (context, box) {
-                              final step = (box.maxWidth * .66 - ConnectionFlowPainter.bar) / 2;
-                              return SizedBox(
-                                height: 16,
-                                child: Stack(
-                                  children: [
-                                    for (final (i, text) in [
-                                      t.avpn.topoApps,
-                                      t.avpn.topoRoute,
-                                      t.avpn.topoServers,
-                                    ].indexed)
-                                      Positioned(
-                                        left: i * step,
-                                        width: i == 2 ? box.maxWidth - i * step : step - 4,
-                                        child: Text(
-                                          text.toUpperCase(),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: label,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                          const Gap(8),
-                          SizedBox(
-                            height: chartHeight,
-                            child: CustomPaint(
-                              size: Size.infinite,
-                              painter: ConnectionFlowPainter(
-                                flow,
-                                background: surface,
-                                valueLabel: value,
-                                textStyle: theme.textTheme.bodySmall!.copyWith(
-                                  color: scheme.onSurface,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                          for (final row in flowRows)
+                            _FlowRow(
+                              row: row,
+                              name: row.app == null ? t.avpn.connOther : connectionAppName(t, apps, row.app!),
+                              icon: row.app == null ? null : apps[row.app!]?.icon,
+                              value: value(row.weight),
+                              share: total == 0 ? 0 : row.weight / total,
                             ),
-                          ),
                         ],
                       ),
               ),
@@ -548,6 +496,133 @@ class _RuleRows extends ConsumerWidget {
             },
           ),
       ],
+    );
+  }
+}
+
+class _Flow {
+  _Flow(this.app, this.weight, this.group, {this.others = 0});
+
+  /// null: the other apps added up
+  final String? app;
+  final double weight;
+  final ConnectionGroup group;
+  final int others;
+}
+
+/// One app's way out: the app with its amount and a bar for its share, an arrow to the route (VPN, direct,
+/// blocked, or both), and for the VPN an arrow on to its server or servers.
+class _FlowRow extends ConsumerWidget {
+  const _FlowRow({required this.row, required this.name, required this.icon, required this.value, required this.share});
+
+  final _Flow row;
+  final String name;
+  final Uint8List? icon;
+  final String value;
+  final double share;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final g = row.group;
+    final route = g.mainRoute;
+    final colour = routeColor(scheme, route);
+    final routeText = g.mixed
+        ? [
+            if (g.vpn > 0) 'VPN',
+            if (g.direct > 0) t.avpn.statsDirect.toLowerCase(),
+            if (g.blocked > 0) t.avpn.connBlocked.toLowerCase(),
+          ].join(' + ')
+        : switch (route) {
+            ConnectionRoute.vpn => 'VPN',
+            ConnectionRoute.direct => t.avpn.statsDirect,
+            ConnectionRoute.block => t.avpn.connBlocked,
+          };
+    final servers = g.vpn > 0 ? serverFlags(g.servers) : '';
+    final small = theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant);
+    Widget pill(String text, {required bool accent}) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: accent ? colour.withValues(alpha: .14) : null,
+        border: Border.all(color: accent ? colour.withValues(alpha: .5) : scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: accent ? AraLook.readableOn(colour, scheme.surfaceContainerLow) : scheme.onSurface,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+    Widget arrow() => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Icon(Icons.arrow_forward_rounded, size: 15, color: scheme.onSurfaceVariant),
+    );
+    // the app and its amount on top, its share as a bar, and under it where it went: → VPN → 🇸🇪 Швеция 2
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (row.app == null)
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(9)),
+              child: Icon(Icons.more_horiz_rounded, size: 18, color: scheme.onSurfaceVariant),
+            )
+          else
+            ConnectionAppIcon(icon: icon, name: name, size: 30),
+          const Gap(10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        row.app == null ? '$name · ${row.others}' : name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const Gap(8),
+                    Text('$value · ${(share * 100).round()}%', maxLines: 1, style: small),
+                  ],
+                ),
+                const Gap(4),
+                // the share of all the traffic, in the route's colour
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: share.clamp(.02, 1.0),
+                    minHeight: 4,
+                    color: colour,
+                    backgroundColor: scheme.outlineVariant.withValues(alpha: .4),
+                  ),
+                ),
+                const Gap(6),
+                Row(
+                  children: [
+                    Icon(Icons.subdirectory_arrow_right_rounded, size: 15, color: scheme.onSurfaceVariant),
+                    const Gap(4),
+                    pill(routeText, accent: true),
+                    if (servers.isNotEmpty) ...[arrow(), Flexible(child: pill(servers, accent: false))],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
