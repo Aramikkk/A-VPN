@@ -10,7 +10,7 @@ import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Ping through the VPN and packet loss: every 2 seconds, while the app is on screen and the VPN is up, a tiny
+/// Ping through the VPN and packet loss: every second, while the app is on screen and the VPN is up, a tiny
 /// request (the connection test URL, which answers 204) goes through A-VPN's own proxy port, so it takes the same
 /// path as the rest of the traffic; a probe that gets no answer in time counts as lost. The state is the last
 /// minute's probes; every probe is also counted by the minute (two days) and by the day (for good) and saved, so
@@ -67,8 +67,8 @@ typedef PingPeriod = ({List<int?> bars, int slots, PingBucket total});
 
 class ConnectionQuality extends Notifier<List<int?>> {
   /// one minute of samples
-  static const length = 30;
-  static const interval = Duration(seconds: 2);
+  static const length = 60;
+  static const interval = Duration(seconds: 1);
   static const timeout = Duration(seconds: 2);
   static const _minutesKept = 2 * 24 * 60;
 
@@ -77,6 +77,9 @@ class ConnectionQuality extends Notifier<List<int?>> {
   final _minutes = <int, PingBucket>{};
   final _days = <int, PingBucket>{};
   bool _loaded = false;
+
+  /// probes since the VPN last came up: the home button shows this connection only
+  int sinceConnect = 0;
   bool _foreground = true;
   AppLifecycleListener? _lifecycle;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
@@ -98,6 +101,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     final port = ref.watch(ConfigOptions.mixedPort);
     final url = Uri.parse(ref.watch(ConfigOptions.connectionTestUrl));
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
+    sinceConnect = 0;
     if (!connected || !ref.watch(ConfigOptions.enableMixedPort)) return List.of(_samples);
 
     final client = HttpClient()
@@ -158,6 +162,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     if (!identical(client, _client)) return; // disposed meanwhile
     final now = DateTime.now();
     _samples.add(ms);
+    sinceConnect++;
     if (_samples.length > length) _samples.removeAt(0);
     final minute = now.millisecondsSinceEpoch ~/ 60000;
     _minutes.putIfAbsent(minute, PingBucket.new).add(ms);

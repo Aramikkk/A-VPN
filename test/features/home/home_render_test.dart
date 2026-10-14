@@ -25,6 +25,7 @@ import 'package:hiddify/features/profile/data/profile_path_resolver.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
+import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/traffic_panel.dart';
@@ -170,6 +171,7 @@ void main() {
               statsNotifierProvider.overrideWith(_Stats.new),
               profilePathResolverProvider.overrideWithValue(ProfilePathResolver(Directory.systemTemp)),
               connectionsProvider.overrideWith(_Connections.new),
+              connectionQualityProvider.overrideWith(_Quality.new),
               installedAppsProvider.overrideWith(
                 (ref) async => {
                   'com.google.android.youtube': (name: 'YouTube', icon: null),
@@ -295,4 +297,13 @@ class _Connections extends Connections {
         ),
     ],
   );
+}
+
+/// A minute of probes through the VPN: 64 ms, one lost.
+class _Quality extends ConnectionQuality {
+  @override
+  List<int?> build() {
+    sinceConnect = ConnectionQuality.length;
+    return [for (var i = 0; i < ConnectionQuality.length; i++) i == 30 ? null : 64];
+  }
 }

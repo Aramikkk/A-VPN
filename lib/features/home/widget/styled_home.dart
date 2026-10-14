@@ -20,16 +20,17 @@ class _StyledHome extends HookConsumerWidget {
     final status = ref.watch(connectionNotifierProvider).valueOrNull ?? const Disconnected();
     final connected = status.isConnected;
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
-    final servers = [
-      for (final item in group?.items ?? <OutboundInfo>[])
-        if (item.isVisible && item.tag != 'balance') item,
-    ];
     final autoGroup = group?.items
         .where((i) => i.tag == (group.selected == 'balance' ? 'balance' : 'lowest'))
         .firstOrNull;
     final autoNow = autoGroup == null ? null : autoPick(autoGroup, group!.items);
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
     final picked = current != null && current.isGroup ? autoPick(current, group!.items) : null;
+    // with Auto chosen, the country it is on now shows in Auto's own row ("сейчас: Польша"), not again below it
+    final servers = [
+      for (final item in group?.items ?? <OutboundInfo>[])
+        if (item.isVisible && item.tag != 'balance' && item.tag != picked?.tag) item,
+    ];
     final serverMode = ref.watch(ConfigOptions.homeNetwork);
     // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one
     // (about 830) keeps everything tight
@@ -775,22 +776,18 @@ class _GraphiteDock extends HookConsumerWidget {
         if (!item.isGroup && item.isVisible && item.urlTestDelay > 0 && item.urlTestDelay < 65000) item,
     ]..sort((a, b) => a.urlTestDelay.compareTo(b.urlTestDelay));
     final answering = answeringServers.length;
-    // the ping of the server in use (Auto: of the one it picked), shown in the ring
-    final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
-    final inUse = current != null && current.isGroup ? (autoPick(current, group!.items) ?? current) : current;
-    // held steady: a re-test zeroes the delays for a moment and the reconnect brings them in one by one, so the
-    // gauge keeps the last real ping until a new one comes, and forgets it only when the VPN is off
-    // a ping counts only once this connection has servers answering: right after connecting the group still
-    // carries the last session's delays for a moment, and they flashed the gauge before going to zero
-    final held = useRef(0);
-    final fresh = inUse?.urlTestDelay ?? 0;
-    if (!on) {
-      held.value = 0;
-    } else if (answering > 0 && fresh > 0 && fresh < 65000) {
-      held.value = fresh;
-    }
-    final delay = held.value;
-    final pinged = on && delay > 0;
+    // ping and loss through the VPN, measured every second (the probes the Statistics tab shows), this
+    // connection's only; the first probes lost while the tunnel warms up don't count
+    final samples = ref.watch(connectionQualityProvider);
+    final since = ref.read(connectionQualityProvider.notifier).sinceConnect;
+    var session = samples.sublist(samples.length - math.min(since, samples.length));
+    final firstAnswer = session.indexWhere((s) => s != null);
+    session = firstAnswer < 0 ? const <int?>[] : session.sublist(firstAnswer);
+    final quality = summarize(session);
+    final ping = on ? quality.ping : null;
+    final loss = quality.loss ?? 0;
+    final measured = ping != null;
+    final lossText = loss == 0 ? '0%' : '${loss.toStringAsFixed(loss < 10 ? 1 : 0)}%';
     final accent = theme.araLook.neonFill ?? scheme.primary;
     // the side icons and the ping in the accent (by day a light accent goes to the text colour); grey while off
     final ink = on
@@ -838,9 +835,11 @@ class _GraphiteDock extends HookConsumerWidget {
         _Orb(
           on: on,
           busy: busy,
-          size: large ? 124 : 104,
-          fill: pinged ? _Orb.fillFor(delay) : 0,
-          label: pinged ? '$delay ms' : null,
+          size: large ? 88 : 76,
+          ping: measured ? _Orb.pingFill(ping) : 0,
+          loss: measured ? _Orb.lossFill(loss) : 0,
+          pingLabel: measured ? '$ping ms' : null,
+          lossLabel: measured ? lossText : null,
           onTap: busy ? null : () => _toggleConnection(ref),
         ),
         Expanded(
@@ -897,31 +896,51 @@ class _GraphiteDock extends HookConsumerWidget {
   }
 }
 
-/// The round button: a dark (or white) sphere in a gauge ring open at the bottom. Connected, the ring fills in
-/// the accent by the ping (the lower, the fuller) and the ping is written under the icon; connecting, a short arc
-/// turns.
+/// The round button under two arcs, like a speedometer: the outer one the ping (the lower, the fuller), in the
+/// accent, the inner one the loss (none: full), in a deep shade of it; the numbers under the arcs' ends.
+/// Off, or connected before the first ping, just the button; connecting, a short arc runs along the outer one.
 class _Orb extends HookWidget {
-  const _Orb({required this.on, required this.busy, this.onTap, this.size = 74, this.fill = 0, this.label});
+  const _Orb({
+    required this.on,
+    required this.busy,
+    this.onTap,
+    this.size = 74,
+    this.ping = 0,
+    this.loss = 0,
+    this.pingLabel,
+    this.lossLabel,
+  });
 
+  /// the button's diameter; the arcs and numbers take about twice that across
   final double size;
 
-  /// how much of the gauge is filled, 0 to 1
-  final double fill;
+  /// how much of each arc is filled, 0 to 1
+  final double ping;
+  final double loss;
 
-  /// the ping, under the icon
-  final String? label;
+  final String? pingLabel;
+  final String? lossLabel;
+
+  final bool on;
+  final bool busy;
+  final VoidCallback? onTap;
 
   /// 50 ms or less fills it all, 800 ms or more a sliver; between, smoothly on a log scale
-  static double fillFor(int delay) {
+  static double pingFill(int delay) {
     const best = 50.0;
     const worst = 800.0;
     final f = 1 - (math.log(delay.clamp(best, worst)) - math.log(best)) / (math.log(worst) - math.log(best));
     return .06 + .94 * f;
   }
 
-  final bool on;
-  final bool busy;
-  final VoidCallback? onTap;
+  /// no loss fills it all, 20% or more a sliver
+  static double lossFill(double percent) => .06 + .94 * (1 - percent.clamp(0, 20) / 20);
+
+  /// the accent made much deeper, the same hue: the loss's colour
+  static Color deep(Color accent) {
+    final hsl = HSLColor.fromColor(accent);
+    return hsl.withLightness((hsl.lightness * .55).clamp(.22, .4)).toColor();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -939,46 +958,78 @@ class _Orb extends HookWidget {
     }, [busy]);
     // the theme's own colour, the same as the chosen server (not the darker one text uses on white)
     final accent = theme.araLook.neonFill ?? scheme.primary;
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: TweenAnimationBuilder<double>(
-          // the fill glides to a new ping
-          tween: Tween(end: on && !busy ? fill : 0),
-          duration: const Duration(milliseconds: 700),
-          curve: Curves.easeOutCubic,
-          builder: (context, filled, child) => AnimatedBuilder(
-            animation: spin,
-            builder: (context, child) => CustomPaint(
-              painter: _RingPainter(
-                track: dark ? scheme.outlineVariant.withValues(alpha: .55) : scheme.onSurface.withValues(alpha: .1),
-                color: accent,
-                fill: filled,
-                busy: busy,
-                rotation: spin.value,
-                width: size * .085,
+    final lossColor = deep(accent);
+    // the numbers readable: by day a light accent goes to the text colour; the deep shade lifted a little by night
+    final pingInk = dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface;
+    final lossInk = dark ? Color.lerp(lossColor, Colors.white, .35)! : lossColor;
+    final width = size * 2.1;
+    final centre = size * .98;
+    final height = centre + size * .5 + size * .26;
+    final outer = size * .86;
+    final inner = size * .7;
+    final label = theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900, fontSize: size * .15);
+    Widget number(String? text, Color ink, bool left) => Positioned(
+      top: centre + size * .12,
+      left: left ? 0 : null,
+      right: left ? null : 0,
+      width: (width - size) / 2,
+      child: AnimatedOpacity(
+        opacity: text == null ? 0 : 1,
+        duration: const Duration(milliseconds: 300),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(text ?? '', style: label?.copyWith(color: ink)),
+        ),
+      ),
+    );
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: TweenAnimationBuilder<Offset>(
+              // both arcs glide to new values
+              tween: Tween(end: on && !busy ? Offset(ping, loss) : Offset.zero),
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeOutCubic,
+              builder: (context, filled, _) => AnimatedBuilder(
+                animation: spin,
+                builder: (context, _) => CustomPaint(
+                  painter: _RainbowPainter(
+                    centre: Offset(width / 2, centre),
+                    radii: (outer, inner),
+                    track: dark ? scheme.outlineVariant.withValues(alpha: .45) : scheme.onSurface.withValues(alpha: .1),
+                    colors: (accent, lossColor),
+                    fills: (filled.dx, filled.dy),
+                    busy: busy,
+                    rotation: spin.value,
+                    stroke: size * .1,
+                  ),
+                ),
               ),
-              child: child,
             ),
-            child: child,
           ),
-          child: Padding(
-            padding: EdgeInsets.all(size * .14),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                // one colour, no gradient
-                color: dark ? const Color(0xFF16161A) : Colors.white,
-                boxShadow: on ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)] : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
+          number(pingLabel, pingInk, true),
+          number(lossLabel, lossInk, false),
+          Positioned(
+            left: (width - size) / 2,
+            top: centre - size / 2,
+            width: size,
+            height: size,
+            child: GestureDetector(
+              onTap: onTap,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  // one colour, no gradient
+                  color: dark ? const Color(0xFF16161A) : Colors.white,
+                  boxShadow: on ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)] : null,
+                ),
+                child: Center(
+                  child: Icon(
                     Icons.power_settings_new_rounded,
-                    size: size * (label == null ? .34 : .28),
+                    size: size * .42,
                     // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
                     // it goes black there, as the chosen server's text does
                     color: on
@@ -987,84 +1038,82 @@ class _Orb extends HookWidget {
                               : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
                         : scheme.onSurfaceVariant,
                   ),
-                  if (label != null)
-                    Text(
-                      label!,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        fontSize: size * .115,
-                        color: dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface,
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-class _RingPainter extends CustomPainter {
-  _RingPainter({
+class _RainbowPainter extends CustomPainter {
+  _RainbowPainter({
+    required this.centre,
+    required this.radii,
     required this.track,
-    required this.color,
-    required this.fill,
+    required this.colors,
+    required this.fills,
     required this.busy,
     required this.rotation,
-    required this.width,
+    required this.stroke,
   });
 
-  final Color track;
-  final Color color;
+  final Offset centre;
 
-  /// the part of the gauge in [color], 0 to 1
-  final double fill;
+  /// the ping's arc, outside, and the loss's, inside
+  final (double, double) radii;
+  final (Color, Color) colors;
+  final (double, double) fills;
+  final Color track;
   final bool busy;
   final double rotation;
-  final double width;
-
-  // the gauge: 270 degrees, open at the bottom, filled clockwise from the lower left
-  static const _start = math.pi * .75;
-  static const _sweep = math.pi * 1.5;
+  final double stroke;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final ring = (Offset.zero & size).deflate(width / 2 + 1);
-    Paint stroke(Color c) => Paint()
+    Paint pen(Color c) => Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = width
+      ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round
       ..color = c;
-    // no gauge until a ping is in: off, or connected and not pinged yet, just the button; it fades in as the
-    // fill grows from nothing (a ping always fills at least .06)
-    final shown = (fill / .06).clamp(0.0, 1.0);
-    if (shown > 0) canvas.drawArc(ring, _start, _sweep, false, stroke(track.withValues(alpha: track.a * shown)));
+    // the upper half, left to right
+    Rect circle(double r) => Rect.fromCircle(center: centre, radius: r);
     if (busy) {
-      // connecting: a short arc running along the gauge's path there and back, no track under it
-      const piece = _sweep * .25;
+      // connecting: a short arc running along the outer one there and back, nothing under it
+      const piece = math.pi * .3;
       final there = rotation < .5 ? rotation * 2 : 2 - rotation * 2;
       final at = Curves.easeInOut.transform(there);
-      canvas.drawArc(ring, _start + (_sweep - piece) * at, piece, false, stroke(color));
+      canvas.drawArc(circle(radii.$1), math.pi + (math.pi - piece) * at, piece, false, pen(colors.$1));
       return;
     }
-    if (fill > 0.001) {
+    // the arcs fade in as the ping's fill grows from nothing (a ping always fills at least .06)
+    final shown = (fills.$1 / .06).clamp(0.0, 1.0);
+    if (shown == 0) return;
+    for (final (r, c, f) in [(radii.$1, colors.$1, fills.$1), (radii.$2, colors.$2, fills.$2)]) {
+      canvas.drawArc(circle(r), math.pi, math.pi, false, pen(track.withValues(alpha: track.a * shown)));
+      if (f < .001) continue;
       // a soft neon glow under the fill, then the fill itself
       canvas.drawArc(
-        ring,
-        _start,
-        _sweep * fill,
+        circle(r),
+        math.pi,
+        math.pi * f,
         false,
-        stroke(color.withValues(alpha: .55))..maskFilter = MaskFilter.blur(BlurStyle.normal, width * .7),
+        pen(c.withValues(alpha: .5 * shown))..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke * .7),
       );
-      canvas.drawArc(ring, _start, _sweep * fill, false, stroke(color));
+      canvas.drawArc(circle(r), math.pi, math.pi * f, false, pen(c.withValues(alpha: shown)));
     }
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.rotation != rotation || old.fill != fill || old.busy != busy || old.color != color || old.track != track;
+  bool shouldRepaint(_RainbowPainter old) =>
+      old.rotation != rotation ||
+      old.fills != fills ||
+      old.busy != busy ||
+      old.colors != colors ||
+      old.track != track ||
+      old.centre != centre;
 }
 
 /// Editorial's connect control: a huge "ВКЛ." / "ВЫКЛ." over a rule, and a big switch.
@@ -1237,8 +1286,8 @@ class _HomeTraffic extends ConsumerWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               )
-            // in the middle of the card when they take less room than it has; cut at its foot when more
-            : Center(child: strips),
+            // from the top, each part always in its place (the strips keep a fixed height)
+            : Align(alignment: Alignment.topCenter, child: strips),
       ),
     );
   }

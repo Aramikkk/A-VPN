@@ -47,7 +47,8 @@ class TrafficStrips extends ConsumerWidget {
     final total = sum(items);
     final strips = <_Strip>[
       for (final route in ConnectionRoute.values)
-        if (items.where((c) => c.route == route).toList() case final inRoute when inRoute.isNotEmpty)
+        if (items.where((c) => c.route == route).toList() case final inRoute
+            when inRoute.isNotEmpty || (compact && route != ConnectionRoute.block))
           _Strip(route, sum(inRoute), [
             for (final g in groupConnections(
               inRoute,
@@ -55,8 +56,10 @@ class TrafficStrips extends ConsumerWidget {
             )..sort((a, b) => sum(b.items).compareTo(sum(a.items))))
               (app: g.key, weight: sum(g.items)),
           ]),
-    ]..sort((a, b) => b.weight.compareTo(a.weight));
-    if (strips.isEmpty) {
+    ];
+    // the home screen keeps VPN over the bypass whatever their sizes, so nothing swaps places as traffic comes in
+    if (!compact) strips.sort((a, b) => b.weight.compareTo(a.weight));
+    if (strips.isEmpty || (compact && total == 0)) {
       return SizedBox(
         height: compact ? 48 : 120,
         child: Center(
@@ -182,7 +185,9 @@ class _StripMap extends ConsumerWidget {
         // the strip itself: each app as wide as its traffic, its name inside when there is room
         ClipRRect(
           borderRadius: BorderRadius.circular(9),
-          child: SizedBox(
+          child: Container(
+            // the strip's track: an empty strip keeps its place on the home screen
+            color: base.withValues(alpha: .12),
             height: compact ? 26 : 34,
             child: LayoutBuilder(
               builder: (context, box) {
@@ -220,35 +225,74 @@ class _StripMap extends ConsumerWidget {
           ),
         ),
         const Gap(8),
-        // every piece named, with its colour, amount and share of the route
-        Wrap(
-          spacing: 12,
-          runSpacing: 4,
-          children: [
-            for (final (i, piece) in pieces.indexed)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(color: shade(i), borderRadius: BorderRadius.circular(3)),
-                  ),
-                  const Gap(5),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 150),
-                    child: Text(
-                      appName(piece.app),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+        // every piece named, with its colour, amount and share of the route; on the home screen two rows of two,
+        // always (empty cells keep their room), so the panel never grows or shrinks as apps come and go
+        if (compact)
+          for (final row in [0, 2]) ...[
+            if (row > 0) const Gap(4),
+            Row(
+              children: [
+                for (final i in [row, row + 1]) ...[
+                  if (i > row) const Gap(12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 17,
+                      child: i >= pieces.length
+                          ? null
+                          : Row(
+                              children: [
+                                Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(color: shade(i), borderRadius: BorderRadius.circular(3)),
+                                ),
+                                const Gap(5),
+                                Flexible(
+                                  child: Text(
+                                    appName(pieces[i].app),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                Text(' ${value(pieces[i].weight)}', style: small),
+                              ],
+                            ),
                     ),
                   ),
-                  Text(' ${value(piece.weight)}', style: small),
                 ],
-              ),
-          ],
-        ),
+              ],
+            ),
+          ]
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              for (final (i, piece) in pieces.indexed)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(color: shade(i), borderRadius: BorderRadius.circular(3)),
+                    ),
+                    const Gap(5),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 150),
+                      child: Text(
+                        appName(piece.app),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Text(' ${value(piece.weight)}', style: small),
+                  ],
+                ),
+            ],
+          ),
       ],
     );
   }
