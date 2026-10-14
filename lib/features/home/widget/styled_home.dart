@@ -1317,13 +1317,15 @@ class _HomeTraffic extends ConsumerWidget {
     final visible = TickerMode.of(context);
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     // this session's connections only, as the right panel of the unfolded phone
-    final sessionStart = ref.watch(statsNotifierProvider).valueOrNull?.sessionStartedAt;
+    // held across the statistics stream's blinks, so the card doesn't flip when the app comes back
+    final sessionStart = ref.watch(sessionStartProvider);
     // the VPN off: no session, the picture (the last session's list isn't shown)
     final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
     final current = [
-      if (connected)
+      // the session's start not known yet: nothing rather than the whole day's list
+      if (connected && sessionStart != null)
         for (final c in state.items)
-          if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
+          if (!c.start.isBefore(sessionStart)) c,
     ];
     final big = {
       for (final g in groupConnections(current, (c) => c.app))

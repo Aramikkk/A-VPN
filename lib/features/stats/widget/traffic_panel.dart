@@ -2,13 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
-import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -31,13 +31,15 @@ class TrafficPanel extends ConsumerWidget {
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     // this session's connections only, as the heading says
-    final sessionStart = ref.watch(statsNotifierProvider).valueOrNull?.sessionStartedAt;
+    // held across the statistics stream's blinks, so the card doesn't flip when the app comes back
+    final sessionStart = ref.watch(sessionStartProvider);
     // the VPN off: no session, the picture (the last session's list isn't shown)
     final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
     final current = [
-      if (connected)
+      // the session's start not known yet: nothing rather than the whole day's list
+      if (connected && sessionStart != null)
         for (final c in state.items)
-          if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
+          if (!c.start.isBefore(sessionStart)) c,
     ];
     final groups = groupConnections(current, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
