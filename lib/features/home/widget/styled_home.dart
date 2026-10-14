@@ -794,7 +794,8 @@ class _GraphiteDock extends HookConsumerWidget {
     final since = ref.read(connectionQualityProvider.notifier).sinceConnect;
     var session = samples.sublist(samples.length - math.min(since, samples.length));
     final firstAnswer = session.indexWhere((s) => s != null);
-    session = firstAnswer < 0 ? const <int?>[] : session.sublist(firstAnswer);
+    // and the first answer itself is the tunnel warming up (well over a second), so it doesn't count either
+    session = firstAnswer < 0 ? const <int?>[] : session.sublist(firstAnswer + 1);
     final quality = summarize(session);
     final ping = on ? quality.ping : null;
     final loss = quality.loss ?? 0;
@@ -846,7 +847,9 @@ class _GraphiteDock extends HookConsumerWidget {
         ),
         _Orb(
           on: on,
-          busy: busy,
+          // connected but no ping yet: the arcs keep filling and emptying until the first one comes, so switching
+          // flows straight into the gauge
+          busy: busy || (on && !measured),
           size: large ? 88 : 76,
           ping: measured ? _Orb.pingFill(ping) : 0,
           loss: measured ? _Orb.lossFill(loss) : 0,
@@ -1292,12 +1295,12 @@ class _HomeTraffic extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
         child: items.isEmpty
-            ? Center(
-                child: Text(
-                  // traffic this session, all of it from apps under a megabyte (they're left out)
-                  current.isEmpty ? t.avpn.connEmpty : t.avpn.homeTrafficSmall,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            // nothing (or only apps under a megabyte) yet: the strips drawn empty, in their places
+            ? Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: TrafficPlaceholder(compact: true, directLabel: t.avpn.homeBypass),
                 ),
               )
             // from the top, each part always in its place (the strips keep a fixed height)
