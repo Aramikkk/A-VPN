@@ -123,8 +123,11 @@ class ConnectionQuality extends Notifier<List<int?>> {
     final port = ref.watch(ConfigOptions.mixedPort);
     final url = Uri.parse(ref.watch(ConfigOptions.connectionTestUrl));
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
-    sinceConnect = 0;
-    _answered = false;
+    // a connection found up when the app opened (not started meanwhile): the tunnel is long warm, and the last
+    // probes kept from before show at once (the fresh ones take over within the minute)
+    final foundUp = connected && !warmUp;
+    sinceConnect = foundUp ? _samples.length : 0;
+    _answered = foundUp;
     if (!connected || !ref.watch(ConfigOptions.enableMixedPort)) return List.of(_samples);
 
     final client = HttpClient()

@@ -872,7 +872,8 @@ class _GraphiteDock extends HookConsumerWidget {
           on: on,
           // connected but no ping yet: the arcs keep filling and emptying until the first one comes, so switching
           // flows straight into the gauge
-          busy: busy || (on && !measured),
+          // (only for a connection just started: one found up when the app opened shows its gauge straight away)
+          busy: busy || (on && !measured && ref.read(connectionQualityProvider.notifier).warmUp),
           size: large ? 88 : 76,
           below: padding.bottom,
           ping: measured ? _Orb.pingFill(ping) : 0,
