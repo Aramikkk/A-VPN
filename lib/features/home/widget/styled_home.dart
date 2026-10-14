@@ -772,7 +772,10 @@ class _GraphiteDock extends HookConsumerWidget {
     }, [status, pendingFrom]);
     final busy = status.isSwitching || pendingFrom != null;
     final glass = theme.araLook.glass;
-    final padding = large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10);
+    // Contrast: tight, on its black panel
+    final padding = theme.araLook.style == AraStyle.contrast
+        ? const EdgeInsets.fromLTRB(12, 4, 12, 2)
+        : (large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10));
     // the servers answering their ping right now (a test that timed out or never ran doesn't count)
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
     final answeringServers = [
@@ -998,7 +1001,8 @@ class _Orb extends HookWidget {
     final lossInk = dark ? Color.lerp(lossColor, Colors.white, .35)! : lossColor;
     final width = size * 2.1;
     final centre = size * .98;
-    final height = centre + size * .5 + size * .26;
+    // Contrast keeps the mode inside the button: no room under it for a pill
+    final height = centre + size * .5 + size * (theme.araLook.style == AraStyle.contrast ? .04 : .26);
     final outer = size * .86;
     final inner = size * .7;
     final label = theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900, fontSize: size * .15);
@@ -1501,7 +1505,7 @@ class _ContrastHome extends StatelessWidget {
                 children: [
                   Container(
                     // the connect control lower, with room above it
-                    padding: const EdgeInsets.fromLTRB(16, 34, 16, 14),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     decoration: BoxDecoration(
                       color: contrastPanel,
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
@@ -1525,8 +1529,9 @@ class _ContrastHome extends StatelessWidget {
   }
 }
 
-/// Contrast's light on the upper zone, behind the app bar too: a warm spot from the accent (lifted towards amber by
-/// day) at the right and a cool one at the top left, by night too, so the zone stands apart from the black panel.
+/// Contrast's light on the upper zone, behind the app bar too: a sun at the top left (a bright disc of the accent
+/// with its halo) and two calmer colour fields at the right, warm in the middle and cool at the bottom; by night
+/// too, so the zone stands apart from the black panel.
 class ContrastGlow extends StatelessWidget {
   const ContrastGlow({super.key, required this.child});
 
@@ -1538,32 +1543,46 @@ class ContrastGlow extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
     final warm = HSLColor.fromColor(accent);
-    final glow = dark
-        ? warm.withLightness(.42).withSaturation(.6).toColor()
-        : Color.lerp(warm.withLightness(.62).toColor(), const Color(0xFFFFC46B), .55)!;
-    final cool = dark ? const Color(0xFF3A4E78) : const Color(0xFFB9CCE3);
+    // the sun: the accent itself by night; by day lifted towards a soft peach
+    final sun = dark ? accent : Color.lerp(warm.withLightness(.68).toColor(), const Color(0xFFFFB07A), .5)!;
+    final amber = dark ? const Color(0xFF5A3A1A) : const Color(0xFFFFD08A);
+    final steel = dark ? const Color(0xFF2F3B55) : const Color(0xFFC9D8EA);
+    // a soft round field of colour; [radius] against the screen's width
+    Widget field(Alignment at, double radius, Color c) => Positioned.fill(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: at,
+            radius: radius,
+            colors: [c, c.withValues(alpha: 0)],
+            stops: const [0, .75],
+          ),
+        ),
+      ),
+    );
     return DecoratedBox(
-      decoration: BoxDecoration(color: theme.colorScheme.surface),
+      decoration: BoxDecoration(color: dark ? const Color(0xFF1D1D20) : const Color(0xFFEFEDE8)),
       child: Stack(
         children: [
-          Positioned.fill(
+          field(const Alignment(.95, -.25), 1.15, amber),
+          field(const Alignment(.8, .75), 1.2, steel),
+          // the sun
+          Positioned(
+            left: -110,
+            top: -90,
+            width: 330,
+            height: 330,
             child: DecoratedBox(
               decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  center: const Alignment(.95, .1),
-                  radius: 1.0,
-                  colors: [glow.withValues(alpha: .75), glow.withValues(alpha: 0)],
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(-1.1, -.85),
-                  radius: .9,
-                  colors: [cool.withValues(alpha: .65), cool.withValues(alpha: 0)],
+                  colors: [
+                    sun,
+                    sun.withValues(alpha: dark ? .67 : .75),
+                    sun.withValues(alpha: dark ? .2 : .3),
+                    sun.withValues(alpha: 0),
+                  ],
+                  stops: const [0, .28, .52, .7],
                 ),
               ),
             ),
@@ -2017,17 +2036,27 @@ class _WaterTile extends ConsumerWidget {
     final units = t.avpn.bytesUnits.split(',');
     final bytes = apps.fold<int>(0, (s, a) => s + a.bytes);
     final share = total == 0 ? 0.0 : bytes / total;
-    // the bands: the four biggest, the rest in one
+    // the bands: the apps with at least 12% of the route, the rest in one ("Ещё N"), so no stack of thin lines
+    final big = [
+      for (final a in apps)
+        if (bytes > 0 && a.bytes / bytes >= .12) a,
+    ].take(4).toList();
+    final rest = apps.where((a) => !big.contains(a)).toList();
     final bands = <(String, int)>[
-      for (final a in apps.take(4)) (a.name, a.bytes),
-      if (apps.length > 4) (t.avpn.connOther, apps.skip(4).fold<int>(0, (s, a) => s + a.bytes)),
+      for (final a in big) (a.name, a.bytes),
+      if (rest.isNotEmpty)
+        (
+          rest.length == 1 ? rest.first.name : t.avpn.contrastMore(n: rest.length),
+          rest.fold<int>(0, (s, a) => s + a.bytes),
+        ),
     ];
     final ink = scheme.onSurface;
     final amount = formatBytes(bytes, units).split(' ');
     const header = 40.0;
     // by day the water lighter, so the light behind shows through
     final alphas = dark ? _alphas : const [.4, .3, .22, .16, .14];
-    final level = bytes == 0 ? 0.0 : (.06 + .94 * share);
+    // always full of its own apps; the route's share is the thin bar under the header
+    final level = bytes == 0 ? 0.0 : 1.0;
     return GestureDetector(
       onTap: () => _open(context, t),
       child: Container(
@@ -2086,6 +2115,23 @@ class _WaterTile extends ConsumerWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: share),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) => LinearProgressIndicator(
+                    value: v,
+                    minHeight: 4,
+                    color: colour,
+                    backgroundColor: ink.withValues(alpha: .07),
+                  ),
+                ),
               ),
             ),
             Expanded(

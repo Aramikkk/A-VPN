@@ -203,8 +203,11 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       // the home screen's tab, Settings from the cog by the "+"
                       child: Theme.of(context).araLook.style == AraStyle.contrast
                           ? NavigationBar(
-                              // a lower menu: the room goes to the connect panel
+                              // a lower menu: the room goes to the connect panel; flat, no shadow line over it
                               height: 62,
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                              backgroundColor: const Color(0xFF0B0B0C),
                               selectedIndex: (navigationShell.currentIndex - 1).clamp(0, 2),
                               destinations: _navDests(
                                 _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),

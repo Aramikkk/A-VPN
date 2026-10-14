@@ -209,7 +209,12 @@ void main() {
                     !ref.watch(translationsProvider).hasValue || !ref.watch(sharedPreferencesProvider).hasValue
                     ? const SizedBox()
                     : Scaffold(
-                        appBar: AppBar(title: const Text('A-VPN')),
+                        // Contrast: the page on its light, as the home page draws it
+                        backgroundColor: style == AraStyle.contrast ? Colors.transparent : null,
+                        appBar: AppBar(
+                          title: const Text('A-VPN'),
+                          backgroundColor: style == AraStyle.contrast ? Colors.transparent : null,
+                        ),
                         body: unfolded
                             ? const Row(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
