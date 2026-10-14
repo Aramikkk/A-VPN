@@ -16,8 +16,10 @@ class ThemesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    // Glass has its own colour schemes (each by day and by night), not the colour themes the others share
-    final glass = ref.watch(Preferences.araStyle) == AraStyle.glass;
+    // Glass has its own colour schemes (each by day and by night), not the colour themes the others share; Contrast
+    // takes its colour from them too
+    final style = ref.watch(Preferences.araStyle);
+    final glass = style == AraStyle.glass || style == AraStyle.contrast;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.themes)),
       body: ListView(

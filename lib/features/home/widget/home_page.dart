@@ -2,6 +2,7 @@ import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/widget/app_logo.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
@@ -23,10 +24,14 @@ class HomePage extends HookConsumerWidget {
     // Graphite: a soft glow in the accent colour from the top, behind the app bar and both columns of an unfolded
     // phone
     final graphite = theme.araLook.style == AraStyle.graphite;
+    // Contrast: the app bar on the upper zone's light, no band of its own; the settings by the "+"
+    final contrast = theme.araLook.style == AraStyle.contrast;
     final scaffold = Scaffold(
-      backgroundColor: graphite ? Colors.transparent : null,
+      backgroundColor: graphite || contrast ? Colors.transparent : null,
       appBar: AppBar(
-        backgroundColor: graphite ? Colors.transparent : null,
+        backgroundColor: graphite || contrast ? Colors.transparent : null,
+        surfaceTintColor: contrast ? Colors.transparent : null,
+        scrolledUnderElevation: contrast ? 0 : null,
         // a low bar: the home screen needs the height for the traffic card
         toolbarHeight: 46,
         // leading: (RootScaffold.stateKey.currentState?.hasDrawer ?? false) && showDrawerButton(context)
@@ -72,6 +77,12 @@ class HomePage extends HookConsumerWidget {
               onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
             ),
           ),
+          if (contrast && !PlatformUtils.isDesktop)
+            IconButton(
+              tooltip: t.pages.settings.title,
+              icon: Icon(Icons.settings_outlined, color: theme.colorScheme.primary),
+              onPressed: () => context.goNamed('settings'),
+            ),
           const Gap(8),
         ],
       ),
@@ -123,6 +134,7 @@ class HomePage extends HookConsumerWidget {
         },
       ),
     );
+    if (contrast) return ContrastGlow(child: scaffold);
     // no glow on a true black (or white) OLED screen
     final pure = theme.scaffoldBackgroundColor == Colors.black || theme.scaffoldBackgroundColor == Colors.white;
     if (!graphite || pure) {

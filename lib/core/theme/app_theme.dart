@@ -284,29 +284,32 @@ class AppTheme {
             nav: dark ? Colors.black : Colors.white,
           )
         : styled;
-    final accentColour = glass ? look.accent : (dark ? accent.darkPrimary : accent.lightPrimary);
+    // Glass and Contrast take their colour from the Glass scheme chosen (Contrast: its accent only)
+    final fromScheme = glass || contrast;
+    final accentColour = fromScheme ? look.accent : (dark ? accent.darkPrimary : accent.lightPrimary);
     final primary = AraLook.readableOn(accentColour, glass ? look.panelOnBase : p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
-    final scheme = ColorScheme.fromSeed(seedColor: glass ? look.accent : accent.seed, brightness: brightness).copyWith(
-      primary: primary,
-      onPrimary: onPrimary,
-      primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
-      onPrimaryContainer: p.fg,
-      secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
-      onSecondaryContainer: p.fg,
-      surface: p.bg,
-      onSurface: p.fg,
-      onSurfaceVariant: p.muted,
-      surfaceDim: p.bg,
-      surfaceBright: p.card,
-      surfaceContainerLowest: p.bg,
-      surfaceContainerLow: p.card,
-      surfaceContainer: p.container,
-      surfaceContainerHigh: p.high,
-      surfaceContainerHighest: p.highest,
-      outline: p.strongLine,
-      outlineVariant: p.line,
-    );
+    final scheme = ColorScheme.fromSeed(seedColor: fromScheme ? look.accent : accent.seed, brightness: brightness)
+        .copyWith(
+          primary: primary,
+          onPrimary: onPrimary,
+          primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
+          onPrimaryContainer: p.fg,
+          secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
+          onSecondaryContainer: p.fg,
+          surface: p.bg,
+          onSurface: p.fg,
+          onSurfaceVariant: p.muted,
+          surfaceDim: p.bg,
+          surfaceBright: p.card,
+          surfaceContainerLowest: p.bg,
+          surfaceContainerLow: p.card,
+          surfaceContainer: p.container,
+          surfaceContainerHigh: p.high,
+          surfaceContainerHighest: p.highest,
+          outline: p.strongLine,
+          outlineVariant: p.line,
+        );
 
     // body text: Manrope (Graphite, Glass) or Golos Text (Contrast); headings in Unbounded (Contrast: Golos)
     final body = contrast ? 'Golos Text' : 'Manrope';
@@ -444,6 +447,8 @@ class AppTheme {
   AraLook _styledLook(Brightness brightness, AraPalette p, Color primary) {
     final dark = brightness == Brightness.dark;
     final glass = _glass;
+    // Contrast takes its colour from the Glass scheme, as Glass does (no neon fill of the colour themes)
+    final fromScheme = glass || style == AraStyle.contrast;
     final look = glassScheme.look(brightness);
     final blockColours = glass
         ? [p.high, p.card]
@@ -455,10 +460,10 @@ class AppTheme {
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
     final block = glass ? look.panelOnBase : blockColours[blockColours.length ~/ 2];
-    final colourless = HSLColor.fromColor(glass ? look.accent : accent.seed).saturation < .12;
+    final colourless = HSLColor.fromColor(fromScheme ? look.accent : accent.seed).saturation < .12;
     final Color down;
     final Color up;
-    final filled = accent.filled && !glass;
+    final filled = accent.filled && !fromScheme;
     if (filled) {
       // on the neon block: black lines, upload a lighter shade of it
       down = Colors.black;

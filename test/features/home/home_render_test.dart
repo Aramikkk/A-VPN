@@ -105,7 +105,10 @@ class _Stats extends StatsNotifier {
   Stream<SystemInfo> build() => Stream.value(
     SystemInfo(uplink: Int64(640 * 1024), downlink: Int64(12 * 1024 * 1024 + 420 * 1024), connectionsIn: 31)
       // the session's start (the core's field 102), long before the connections listed
-      ..unknownFields.mergeVarintField(102, Int64(DateTime(2000).millisecondsSinceEpoch)),
+      ..unknownFields.mergeVarintField(
+        102,
+        Int64(DateTime.now().subtract(const Duration(hours: 1, minutes: 14)).millisecondsSinceEpoch),
+      ),
   );
 }
 
@@ -189,7 +192,9 @@ void main() {
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
               theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
-              builder: (context, child) => glass
+              builder: (context, child) => style == AraStyle.contrast
+                  ? ContrastGlow(child: child!)
+                  : glass
                   ? Stack(
                       children: [
                         Positioned.fill(
@@ -295,7 +300,7 @@ class _Connections extends Connections {
             route: route,
             outbound: server,
             rule: '',
-            start: DateTime(2026, 10, 13),
+            start: DateTime.now().subtract(const Duration(minutes: 30)),
             up: (down / 20).round(),
             down: down.round(),
             active: false,

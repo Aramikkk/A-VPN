@@ -199,11 +199,21 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                           AraStyle.contrast || AraStyle.glass || AraStyle.classic => null,
                         },
                       ),
-                      child: NavigationBar(
-                        selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 2,
-                        destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                        onDestinationSelected: (index) => _onTap(context, index),
-                      ),
+                      // Contrast: three tabs, Statistics, Home and Topology (the branches 1 to 3); Connections open from
+                      // the home screen's tab, Settings from the cog by the "+"
+                      child: Theme.of(context).araLook.style == AraStyle.contrast
+                          ? NavigationBar(
+                              selectedIndex: (navigationShell.currentIndex - 1).clamp(0, 2),
+                              destinations: _navDests(
+                                _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
+                              ),
+                              onDestinationSelected: (index) => _onTap(context, index + 1),
+                            )
+                          : NavigationBar(
+                              selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 2,
+                              destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+                              onDestinationSelected: (index) => _onTap(context, index),
+                            ),
                     ),
                   )
                 : null,
