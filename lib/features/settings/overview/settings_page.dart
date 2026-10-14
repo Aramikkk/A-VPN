@@ -186,6 +186,11 @@ class SettingsPage extends HookConsumerWidget {
                     namedLocation: context.namedLocation('serversOptions'),
                   ),
                   SettingsSection(
+                    title: t.avpn.pingSettings,
+                    icon: Icons.network_ping_rounded,
+                    namedLocation: context.namedLocation('pingOptions'),
+                  ),
+                  SettingsSection(
                     title: t.pages.settings.dns.title,
                     icon: Icons.dns_rounded,
                     namedLocation: context.namedLocation('dnsOptions'),

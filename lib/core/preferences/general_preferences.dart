@@ -119,6 +119,9 @@ abstract class Preferences {
 
   /// A-VPN: ping the servers when the app opens, if the last such ping was half an hour ago or more
   static final autoPingOnOpen = PreferencesNotifier.create<bool, bool>("auto_ping_on_open", true);
+
+  /// no server has answered its ping for a minute: the ping address switches to the next known one
+  static final pingAutoSwitch = PreferencesNotifier.create<bool, bool>("ping_auto_switch", true);
   static final lastAutoPing = PreferencesNotifier.create<int, int>("last_auto_ping", 0);
 
   /// A-VPN: how often the subscription (the server list) updates, in hours; 0: as the subscription says,

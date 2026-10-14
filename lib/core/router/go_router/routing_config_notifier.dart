@@ -26,6 +26,7 @@ import 'package:hiddify/features/settings/overview/sections/chain_options_page.d
 import 'package:hiddify/features/settings/overview/sections/dns_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/general_page.dart';
 import 'package:hiddify/features/settings/overview/sections/inbound_options_page.dart';
+import 'package:hiddify/features/settings/overview/sections/ping_page.dart';
 import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/themes_page.dart';
 import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart';
@@ -261,6 +262,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         state.pageKey,
                         settingsWidth(const ServersOptionsPage()),
                       ),
+                    ),
+                    GoRoute(
+                      name: 'pingOptions',
+                      path: 'ping-options',
+                      pageBuilder: (_, state) =>
+                          customTransition(TransitionType.slide, state.pageKey, settingsWidth(const PingPage())),
                     ),
                     GoRoute(
                       name: 'themes',

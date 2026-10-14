@@ -1,19 +1,15 @@
-import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/auto_pause/auto_pause_page.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
-import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/widget/preference_tile.dart';
 import 'package:hiddify/features/settings/widget/settings_block.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:humanizer/humanizer.dart';
 
 /// A dialog listing [values], [selected] ticked; returns the one tapped.
 Future<T?> _pick<T>(
@@ -50,12 +46,6 @@ class GeneralPage extends HookConsumerWidget {
       0 => t.avpn.subUpdateAsProvider,
       < 0 => t.avpn.subUpdateNever,
       _ => t.avpn.subUpdateEvery(n: hours),
-    };
-    String pingStyleName(PingStyle style) => switch (style) {
-      PingStyle.numbers => t.avpn.pingNumbers,
-      PingStyle.bars => t.avpn.pingBars,
-      PingStyle.barsAndNumbers => t.avpn.pingBarsAndNumbers,
-      PingStyle.dots => t.avpn.pingDots,
     };
 
     return Scaffold(
@@ -97,22 +87,8 @@ class GeneralPage extends HookConsumerWidget {
                 ),
                 // Debug mode and log level moved to the Logs page. Both decide how
                 // much is recorded, which is only meaningful next to the logs
-                // themselves — and next to the filters that decide what is shown.
-                ListTile(
-                  title: Text(t.avpn.pingStyle),
-                  subtitle: Text(pingStyleName(ref.watch(Preferences.pingStyle))),
-                  leading: const Icon(Icons.signal_cellular_alt_rounded),
-                  onTap: () async {
-                    final picked = await _pick(
-                      context,
-                      title: t.avpn.pingStyle,
-                      values: PingStyle.values,
-                      selected: ref.read(Preferences.pingStyle),
-                      label: pingStyleName,
-                    );
-                    if (picked != null) await ref.read(Preferences.pingStyle.notifier).update(picked);
-                  },
-                ),
+                // themselves — and next to the filters that decide what is shown. The ping's settings are on a page
+                // of their own (Settings → Ping).
               ] else ...[
                 if (PlatformUtils.isAndroid) ...[
                   ListTile(
@@ -161,13 +137,6 @@ class GeneralPage extends HookConsumerWidget {
                   ),
                 ],
                 if (PlatformUtils.isAndroid) const BatteryOptimizationWidget(),
-                SwitchListTile.adaptive(
-                  title: Text(t.avpn.autoPingOnOpen),
-                  subtitle: Text(t.avpn.autoPingOnOpenMsg),
-                  secondary: const Icon(Icons.network_ping_rounded),
-                  value: ref.watch(Preferences.autoPingOnOpen),
-                  onChanged: ref.read(Preferences.autoPingOnOpen.notifier).update,
-                ),
                 ListTile(
                   title: Text(t.avpn.subUpdate),
                   subtitle: Text(subUpdateName(ref.watch(Preferences.subUpdateHours))),
@@ -183,25 +152,6 @@ class GeneralPage extends HookConsumerWidget {
                     if (picked != null) await ref.read(Preferences.subUpdateHours.notifier).update(picked);
                   },
                 ),
-                ListTile(
-                  title: Text(t.avpn.pingTimeout),
-                  subtitle: Text(
-                    '${t.avpn.seconds(n: ref.watch(ConfigOptions.urlTestTimeout).inSeconds)} · ${t.avpn.pingTimeoutMsg}',
-                  ),
-                  leading: const Icon(Icons.hourglass_bottom_rounded),
-                  onTap: () async {
-                    final picked = await _pick(
-                      context,
-                      title: t.avpn.pingTimeout,
-                      values: const [2, 3, 5, 7, 10],
-                      selected: ref.read(ConfigOptions.urlTestTimeout).inSeconds,
-                      label: (n) => t.avpn.seconds(n: n),
-                    );
-                    if (picked != null) {
-                      await ref.read(ConfigOptions.urlTestTimeout.notifier).update(Duration(seconds: picked));
-                    }
-                  },
-                ),
                 ValuePreferenceWidget(
                   value: ref.watch(ConfigOptions.mtu),
                   preferences: ref.watch(ConfigOptions.mtu.notifier),
@@ -213,32 +163,6 @@ class GeneralPage extends HookConsumerWidget {
                     final mtu = int.tryParse(value);
                     return mtu != null && mtu >= 1280 && mtu <= 9000;
                   },
-                ),
-                ValuePreferenceWidget(
-                  value: ref.watch(ConfigOptions.connectionTestUrl),
-                  preferences: ref.watch(ConfigOptions.connectionTestUrl.notifier),
-                  title: t.pages.settings.general.connectionTestUrl,
-                  icon: Icons.link_rounded,
-                ),
-                ListTile(
-                  title: Text(t.pages.settings.general.urlTestInterval),
-                  subtitle: Text(ref.watch(ConfigOptions.urlTestInterval).toApproximateTime(isRelativeToNow: false)),
-                  leading: const Icon(Icons.timer_rounded),
-                  onTap: () async => await ref
-                      .read(dialogNotifierProvider.notifier)
-                      .showSettingSlider(
-                        title: t.pages.settings.general.urlTestInterval,
-                        initialValue: ref.watch(ConfigOptions.urlTestInterval).inMinutes.coerceIn(0, 60).toDouble(),
-                        onReset: ref.read(ConfigOptions.urlTestInterval.notifier).reset,
-                        min: 1,
-                        max: 60,
-                        divisions: 60,
-                        labelGen: (value) => Duration(minutes: value.toInt()).toApproximateTime(isRelativeToNow: false),
-                      )
-                      .then((value) async {
-                        if (value == null) return;
-                        await ref.read(ConfigOptions.urlTestInterval.notifier).update(Duration(minutes: value.toInt()));
-                      }),
                 ),
                 ValuePreferenceWidget(
                   value: ref.watch(ConfigOptions.clashApiPort),

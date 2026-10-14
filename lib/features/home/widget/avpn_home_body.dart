@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
@@ -26,6 +27,7 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
 import 'package:hiddify/features/proxy/data/lan_sharing.dart';
+import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
@@ -84,15 +86,33 @@ class AraHomeBody extends HookConsumerWidget {
       final timer = Timer.periodic(const Duration(minutes: 1), (_) {
         if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) unawaited(refresh());
       });
-      // no server answering yet (just connected, or the network came back): every 3 seconds until one does
+      // no server answering yet (just connected, or the network came back): every 3 seconds until one does; a minute
+      // with none (the address may be what's down), the next known ping address and a reconnect, if that's on
       var retrying = false;
+      var lastAnswer = DateTime.now();
       final retry = Timer.periodic(const Duration(seconds: 3), (_) async {
         if (retrying || WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
         final items = ref.read(proxiesOverviewNotifierProvider).valueOrNull?.items ?? const <OutboundInfo>[];
         final answering = items.any((i) => !i.isGroup && i.urlTestDelay > 0 && i.urlTestDelay < 65000);
-        if (answering) return;
+        if (answering) {
+          lastAnswer = DateTime.now();
+          return;
+        }
         retrying = true;
-        await refresh();
+        if (ref.read(Preferences.pingAutoSwitch) &&
+            DateTime.now().difference(lastAnswer) >= const Duration(minutes: 1)) {
+          lastAnswer = DateTime.now();
+          final next = nextPingTarget(ref.read(ConfigOptions.connectionTestUrl));
+          await ref.read(ConfigOptions.connectionTestUrl.notifier).update(next.url);
+          ref.read(inAppNotificationControllerProvider).showInfoToast(t.avpn.pingSwitched(name: next.name));
+          try {
+            await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
+          } catch (_) {
+            // the next round tries again
+          }
+        } else {
+          await refresh();
+        }
         retrying = false;
       });
       final lifecycle = AppLifecycleListener(

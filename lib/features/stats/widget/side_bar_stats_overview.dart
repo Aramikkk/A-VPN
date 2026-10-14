@@ -850,19 +850,22 @@ class _QualityCard extends ConsumerWidget {
           // half named at its side
           _grow(
             fill,
-            height: compact ? 40 : 80,
+            // the sidebar's: taller, the bars the full width (no names at the side, the values are over it)
+            height: compact ? 64 : 80,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    halfLabel(Icons.south_rounded, t.avpn.statsLoss.toLowerCase(), lostColor),
-                    halfLabel(Icons.north_rounded, t.avpn.statsPing.toLowerCase(), theme.araLook.pingColors.first),
-                  ],
-                ),
-                Gap(compact ? 6 : 8),
+                if (!compact) ...[
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      halfLabel(Icons.south_rounded, t.avpn.statsLoss.toLowerCase(), lostColor),
+                      halfLabel(Icons.north_rounded, t.avpn.statsPing.toLowerCase(), theme.araLook.pingColors.first),
+                    ],
+                  ),
+                  const Gap(8),
+                ],
                 Expanded(
                   child: CustomPaint(
                     painter: _PingBars(

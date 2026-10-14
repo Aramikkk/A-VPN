@@ -313,49 +313,63 @@ class TrafficRanking extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final top = rows.fold<double>(0, (m, r) => r.$2 > m ? r.$2 : m);
-    return Column(
-      children: [
-        for (final (name, w) in rows)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const Gap(8),
-                    Text(
-                      '${value(w)} · ${total <= 0 ? 0 : (w * 100 / total).round()}%',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
+    Widget row(String name, double w) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                const Gap(5),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: top <= 0 ? 0 : w / top,
-                    minHeight: 6,
-                    color: colour,
-                    backgroundColor: scheme.surfaceContainerHighest,
-                  ),
+              ),
+              const Gap(8),
+              Text(
+                '${value(w)} · ${total <= 0 ? 0 : (w * 100 / total).round()}%',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
-              ],
+              ),
+            ],
+          ),
+          const Gap(5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: top <= 0 ? 0 : w / top,
+              minHeight: 6,
+              color: colour,
+              backgroundColor: scheme.surfaceContainerHighest,
             ),
           ),
-      ],
+        ],
+      ),
+    );
+    // two columns where there's the width (the computer, the unfolded phone), the biggest first, read across
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (box.maxWidth < 480) return Column(children: [for (final (name, w) in rows) row(name, w)]);
+        return Column(
+          children: [
+            for (var i = 0; i < rows.length; i += 2)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: row(rows[i].$1, rows[i].$2)),
+                  const Gap(20),
+                  Expanded(child: i + 1 < rows.length ? row(rows[i + 1].$1, rows[i + 1].$2) : const SizedBox()),
+                ],
+              ),
+          ],
+        );
+      },
     );
   }
 }

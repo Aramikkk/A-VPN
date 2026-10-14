@@ -88,7 +88,9 @@ class _StyledHome extends HookConsumerWidget {
                 header,
                 const Gap(6),
                 SizedBox(
-                  height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
+                  // always the same height, however many servers there are: the whitelist has fewer than the regular
+                  // list, and switching between them moved everything under it (most on the unfolded phone)
+                  height: rowsInSight * (editorial ? 66.0 : 62.0),
                   child: _StyledServerList(
                     editorial: editorial,
                     servers: servers,
@@ -1130,7 +1132,7 @@ class _Orb extends HookWidget {
 }
 
 /// The servers the connection runs on, as a small pill: the whitelist filled in the accent with an antenna, the
-/// regular ones quiet (the button's own colour, a thin edge, a globe).
+/// regular ones quiet (the button's own colour, a thin edge, the Wi-Fi sign).
 class _ModeBadge extends ConsumerWidget {
   const _ModeBadge({super.key, required this.whitelist, required this.size});
 
@@ -1167,7 +1169,7 @@ class _ModeBadge extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(whitelist ? Icons.signal_cellular_alt_rounded : Icons.language_rounded, size: height * .58, color: ink),
+          Icon(whitelist ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded, size: height * .58, color: ink),
           SizedBox(width: height * .2),
           Text(
             whitelist ? t.avpn.dockModeWhitelist : t.avpn.dockModeRegular,
