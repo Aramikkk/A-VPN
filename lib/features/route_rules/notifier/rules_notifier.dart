@@ -9,6 +9,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/route_rules/notifier/app_groups.dart';
 import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -33,11 +34,18 @@ enum BuiltinRule {
   blockQuic(enabledByDefault: true),
   blockAds(enabledByDefault: true),
   aiProxy(enabledByDefault: true),
+  videoProxy(enabledByDefault: true),
+  storesProxy(enabledByDefault: true),
   googleProxy(enabledByDefault: true),
   socialProxy(enabledByDefault: true),
   chinaProxy(enabledByDefault: true),
   adultProxy(enabledByDefault: true),
   blockedProxy(enabledByDefault: true),
+  foreignProxy(enabledByDefault: true),
+  // Yandex, marketplaces and banks direct, ahead of the rest of the Russian apps
+  yandexDirect(enabledByDefault: true),
+  marketsDirect(enabledByDefault: true),
+  banksDirect(enabledByDefault: true),
   // Russian apps on the phone (Yandex Music, banks, Gosuslugi…) direct, whatever servers they use
   ruAppsDirect(enabledByDefault: true),
   ruDomainsDirect(enabledByDefault: true);
@@ -56,6 +64,12 @@ enum BuiltinRule {
     blockAds => t.pages.settings.routing.builtinRules.blockAds,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuic,
     aiProxy => t.pages.settings.routing.builtinRules.aiProxy,
+    banksDirect => t.pages.settings.routing.builtinRules.banksDirect,
+    marketsDirect => t.pages.settings.routing.builtinRules.marketsDirect,
+    yandexDirect => t.pages.settings.routing.builtinRules.yandexDirect,
+    foreignProxy => t.pages.settings.routing.builtinRules.foreignProxy,
+    storesProxy => t.pages.settings.routing.builtinRules.storesProxy,
+    videoProxy => t.pages.settings.routing.builtinRules.videoProxy,
     googleProxy => t.pages.settings.routing.builtinRules.googleProxy,
     socialProxy => t.pages.settings.routing.builtinRules.socialProxy,
     chinaProxy => t.pages.settings.routing.builtinRules.chinaProxy,
@@ -71,6 +85,12 @@ enum BuiltinRule {
     blockAds => t.pages.settings.routing.builtinRules.blockAdsHint,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuicHint,
     aiProxy => t.pages.settings.routing.builtinRules.aiProxyHint,
+    banksDirect => t.pages.settings.routing.builtinRules.banksDirectHint,
+    marketsDirect => t.pages.settings.routing.builtinRules.marketsDirectHint,
+    yandexDirect => t.pages.settings.routing.builtinRules.yandexDirectHint,
+    foreignProxy => t.pages.settings.routing.builtinRules.foreignProxyHint,
+    storesProxy => t.pages.settings.routing.builtinRules.storesProxyHint,
+    videoProxy => t.pages.settings.routing.builtinRules.videoProxyHint,
     googleProxy => t.pages.settings.routing.builtinRules.googleProxyHint,
     socialProxy => t.pages.settings.routing.builtinRules.socialProxyHint,
     chinaProxy => t.pages.settings.routing.builtinRules.chinaProxyHint,
@@ -114,6 +134,8 @@ enum BuiltinRule {
     // The lists are inline because the core downloads rule-sets through the proxy before it starts, and a
     // server that doesn't answer yet (an "LTE Only" one on Wi-Fi) stalls that download and the whole start.
     aiProxy => Rule(outbound: Outbound.proxy, domainSuffixes: aiDomains, packageNames: aiApps),
+    videoProxy => Rule(outbound: Outbound.proxy, domainSuffixes: videoDomains, packageNames: videoApps),
+    storesProxy => Rule(outbound: Outbound.proxy, domainSuffixes: storeDomains, packageNames: storeApps),
     googleProxy => Rule(outbound: Outbound.proxy, domainSuffixes: googleDomains, packageNames: googleApps),
     socialProxy => Rule(
       outbound: Outbound.proxy,
@@ -129,6 +151,10 @@ enum BuiltinRule {
       packageNames: otherBlockedApps,
       processNames: otherBlockedProcesses,
     ),
+    foreignProxy => Rule(outbound: Outbound.proxy, packageNames: foreignApps),
+    yandexDirect => Rule(outbound: Outbound.direct, domainSuffixes: yandexDomains, packageNames: yandexApps),
+    marketsDirect => Rule(outbound: Outbound.direct, domainSuffixes: marketDomains, packageNames: marketApps),
+    banksDirect => Rule(outbound: Outbound.direct, domainSuffixes: bankDomains, packageNames: bankApps),
     ruDomainsDirect => Rule(outbound: Outbound.direct, domainSuffixes: ['ru', 'su', 'xn--p1ai', ...ruServiceDomains]),
     ruAppsDirect => Rule(outbound: Outbound.direct, packageNames: ruAppPackages),
   }..name = key;

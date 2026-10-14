@@ -118,11 +118,11 @@ void main() {
     expect(ruleLabel('package_name=[ru.yandex.music ru.yandex.taxi] => route(direct)', t), 'Российские приложения');
     String first(List<String> list) => 'domain_suffix=[${list.take(3).join(' ')} ...] => route(select)';
     expect(ruleLabel(first(aiDomains), t), 'ИИ');
-    expect(ruleLabel(first(googleDomains), t), 'Google и YouTube');
+    expect(ruleLabel(first(googleDomains), t), 'Приложения Google');
     expect(ruleLabel(first(socialDomains), t), 'Соцсети и мессенджеры');
     expect(ruleLabel(first(otherBlockedDomains), t), 'Прочее заблокированное');
     expect(ruleLabel('package_name=[${aiApps.take(3).join(' ')} ...] => route(select)', t), 'ИИ');
-    expect(ruleLabel('package_name=[${googleApps.take(3).join(' ')} ...] => route(select)', t), 'Google и YouTube');
+    expect(ruleLabel('package_name=[${googleApps.take(3).join(' ')} ...] => route(select)', t), 'Приложения Google');
     expect(
       ruleLabel('ip_cidr=[5.28.192.0/18 5.200.14.128/25 31.13.24.0/21 ...] => route(select)', t),
       startsWith('Соцсети и мессенджеры'),

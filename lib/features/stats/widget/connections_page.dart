@@ -8,6 +8,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/features/route_rules/notifier/app_groups.dart';
 import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -583,7 +584,19 @@ String? _ruleLabel(String rule, Translations t) {
   final match = rule.split('=>').first.trim();
   if (match.isEmpty || match == 'final') return null;
   // the built-in groups, by their lists' first entries (the core prints a long list as its first few)
+  final rules = t.pages.settings.routing.builtinRules;
   final groups = {
+    videoDomains.first: rules.videoProxy,
+    videoApps.first: rules.videoProxy,
+    storeDomains.first: rules.storesProxy,
+    storeApps.first: rules.storesProxy,
+    foreignApps.first: rules.foreignProxy,
+    yandexDomains.first: rules.yandexDirect,
+    yandexApps.first: rules.yandexDirect,
+    marketDomains.first: rules.marketsDirect,
+    marketApps.first: rules.marketsDirect,
+    bankDomains.first: rules.banksDirect,
+    bankApps.first: rules.banksDirect,
     aiDomains.first: t.avpn.ruleAi,
     aiApps.first: t.avpn.ruleAi,
     googleDomains.first: t.avpn.ruleGoogle,

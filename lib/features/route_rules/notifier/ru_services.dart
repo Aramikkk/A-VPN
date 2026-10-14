@@ -260,4 +260,12 @@ const ruAppPackages = [
   'com.thermex.ru',
   'com.polaris.iot',
   'su.wrf.android.new',
+  'air.StrelkaSDFREE', // Стрелка
+  'com.danilkinkin.buckwheat',
+  'com.everylounge',
+  'com.evtime.app',
+  'com.mileonair',
+  'ru.easytools.scanner',
+  'mobi.zona',
+  'ru.vokino.web',
 ];

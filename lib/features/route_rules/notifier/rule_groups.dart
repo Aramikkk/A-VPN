@@ -1,3 +1,4 @@
+import 'package:hiddify/features/route_rules/notifier/app_groups.dart';
 import 'package:hiddify/features/route_rules/notifier/blocked_list.dart';
 import 'package:hiddify/features/route_rules/notifier/rkn_ru_domains.dart';
 
@@ -81,7 +82,7 @@ const _aiSites = [
   'gigachat.ru',
 ];
 
-/// Google, the Play Store and YouTube.
+/// Google (YouTube and the stores are groups of their own).
 const _googleSites = [
   'google', // the .google zone: gemini.google, deepmind.google, notebooklm.google…
   'google.com',
@@ -90,18 +91,9 @@ const _googleSites = [
   'gstatic.com',
   'googleusercontent.com',
   'ggpht.com',
-  'googlevideo.com',
   'gvt1.com',
   'gvt2.com',
   'gvt3.com',
-  'youtube.com',
-  'youtu.be',
-  'yt.be',
-  'ytimg.com',
-  'yting.com',
-  'youtube-nocookie.com',
-  'youtubekids.com',
-  'returnyoutubedislikeapi.com',
   'android.com',
   'withgoogle.com',
   'goo.gl',
@@ -344,7 +336,15 @@ bool _isSocial(String domain) =>
 List<String> _sorted(Iterable<String> domains) => domains.toSet().toList()..sort();
 
 final aiDomains = _sorted([..._aiSites, ...blockedDomains.where(_isAi)]);
-final googleDomains = _sorted([..._googleSites, ...blockedDomains.where((d) => !_isAi(d) && _isGoogle(d))]);
+bool _isVideo(String domain) =>
+    videoSites.any((site) => _under(domain, site)) || domain.contains('youtube') || domain.contains('twitch');
+
+/// YouTube and Twitch: their sites and the blocked domains that are theirs.
+final videoDomains = _sorted([...videoSites, ...blockedDomains.where((d) => !_isAi(d) && _isVideo(d))]);
+final googleDomains = _sorted([
+  ..._googleSites,
+  ...blockedDomains.where((d) => !_isAi(d) && !_isVideo(d) && _isGoogle(d)),
+]);
 final socialDomains = _sorted([
   ..._socialSites,
   ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && _isSocial(d)),
@@ -373,6 +373,7 @@ const socialApps = [
   'com.linkedin.android',
   'org.thoughtcrime.securesms', // Signal
   'com.viber.voip',
+  'com.imo.android.imoim',
   // Meta's services preinstalled on the phone: they reach the same blocked servers
   'com.facebook.appmanager',
   'com.facebook.services',
@@ -388,7 +389,9 @@ final chinaDomains = _sorted([
 
 /// Everything else blocked in Russia, the .ru sites in the registry and AnyDesk among it.
 final otherBlockedDomains = _sorted([
-  ...blockedDomains.where((d) => !_isAi(d) && !_isGoogle(d) && !_isSocial(d) && !_isChina(d) && !isAdultHost(d)),
+  ...blockedDomains.where(
+    (d) => !_isAi(d) && !_isVideo(d) && !_isGoogle(d) && !_isSocial(d) && !_isChina(d) && !isAdultHost(d),
+  ),
   ...rknRuDomains.where((d) => !isAdultHost(d)),
   ..._anydeskSites,
 ]);
@@ -403,7 +406,6 @@ const otherBlockedApps = [
   'com.adobe.reader',
   'notion.id',
   'com.soundcloud.android',
-  'tv.twitch.android.app',
   'com.roblox.client',
   'com.spotify.music',
   'com.netflix.mediaclient',
@@ -447,6 +449,8 @@ const chinaApps = [
   'com.xiaomi.smarthome', // Mi Home
   'com.cmlink.esim',
   'com.multibyte.esender.jiedian',
+  'com.xiaomi.router',
+  'ru.aliexpress.buyer', // AliExpress Россия
 ];
 
 /// The AI apps on the phone: all their traffic through the VPN, whatever servers they use.
@@ -470,10 +474,6 @@ const aiApps = [
 const googleApps = [
   'com.google.android.gms',
   'com.google.android.gsf',
-  'com.android.vending',
-  'com.google.android.youtube',
-  'com.google.android.apps.youtube.music',
-  'com.google.android.apps.youtube.kids',
   'com.google.android.googlequicksearchbox',
   'com.google.android.gm',
   'com.google.android.apps.docs',
