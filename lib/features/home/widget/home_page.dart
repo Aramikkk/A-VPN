@@ -27,6 +27,8 @@ class HomePage extends HookConsumerWidget {
       backgroundColor: graphite ? Colors.transparent : null,
       appBar: AppBar(
         backgroundColor: graphite ? Colors.transparent : null,
+        // a low bar: the home screen needs the height for the traffic card
+        toolbarHeight: 46,
         // leading: (RootScaffold.stateKey.currentState?.hasDrawer ?? false) && showDrawerButton(context)
         //     ? DrawerButton(
         //         onPressed: () {

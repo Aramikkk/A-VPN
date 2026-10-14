@@ -69,7 +69,7 @@ class TrafficStrips extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final (i, strip) in strips.indexed) ...[
-          if (i > 0) Gap(compact ? 14 : 16),
+          if (i > 0) Gap(compact ? 10 : 16),
           _StripMap(
             strip: strip,
             total: total,
@@ -179,14 +179,14 @@ class _StripMap extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (headers) ...[header, const Gap(6)],
+        if (headers) ...[header, Gap(compact ? 4 : 6)],
         // the strip itself: each app as wide as its traffic, its name inside when there is room
         ClipRRect(
           borderRadius: BorderRadius.circular(9),
           child: Container(
             // the strip's track: an empty strip keeps its place on the home screen
             color: base.withValues(alpha: .12),
-            height: compact ? 26 : 34,
+            height: compact ? 24 : 34,
             child: LayoutBuilder(
               builder: (context, box) {
                 final gaps = (pieces.length - 1) * 2.0;
@@ -222,19 +222,19 @@ class _StripMap extends ConsumerWidget {
             ),
           ),
         ),
-        const Gap(8),
+        Gap(compact ? 6 : 8),
         // every piece named, with its colour, amount and share of the route; on the home screen two rows of two,
         // always (empty cells keep their room), so the panel never grows or shrinks as apps come and go
         if (compact)
           for (final row in [0, 2]) ...[
-            if (row > 0) const Gap(4),
+            if (row > 0) const Gap(2),
             Row(
               children: [
                 for (final i in [row, row + 1]) ...[
                   if (i > row) const Gap(12),
                   Expanded(
                     child: SizedBox(
-                      height: 17,
+                      height: 16,
                       child: i >= pieces.length
                           ? null
                           : Row(

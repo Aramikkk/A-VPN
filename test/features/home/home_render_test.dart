@@ -103,7 +103,9 @@ class _Profile extends ActiveProfile {
 class _Stats extends StatsNotifier {
   @override
   Stream<SystemInfo> build() => Stream.value(
-    SystemInfo(uplink: Int64(640 * 1024), downlink: Int64(12 * 1024 * 1024 + 420 * 1024), connectionsIn: 31),
+    SystemInfo(uplink: Int64(640 * 1024), downlink: Int64(12 * 1024 * 1024 + 420 * 1024), connectionsIn: 31)
+      // the session's start (the core's field 102), long before the connections listed
+      ..unknownFields.mergeVarintField(102, Int64(DateTime(2000).millisecondsSinceEpoch)),
   );
 }
 

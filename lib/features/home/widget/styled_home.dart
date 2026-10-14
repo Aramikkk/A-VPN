@@ -68,7 +68,7 @@ class _StyledHome extends HookConsumerWidget {
 
     // one gap between every block, folded and unfolded: the session line, the servers, the traffic, the toggles, the
     // connect panel, and under it the same gap again (the panel stands clear of the menu)
-    const gap = Gap(16);
+    const gap = Gap(12);
     // the unfolded phone (the traffic in its own column) has room to spare under the servers: it goes in equal
     // shares to the three gaps under them, servers to toggles, toggles to the connect panel, the panel to the menu
     final spread = !traffic && profile != null && servers.isNotEmpty;
@@ -86,7 +86,7 @@ class _StyledHome extends HookConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 header,
-                Gap(roomy ? 10 : 6),
+                const Gap(6),
                 SizedBox(
                   height: (servers.length < rowsInSight ? servers.length : rowsInSight) * (editorial ? 66.0 : 62.0),
                   child: _StyledServerList(
@@ -240,7 +240,6 @@ class _StatusBlock extends HookConsumerWidget {
               colour: AraLook.readableOn(accent, scheme.surface),
             ),
           ),
-          const Gap(2),
           line(
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -1408,7 +1407,7 @@ class _HomeTraffic extends ConsumerWidget {
         border: Border.all(color: glass.edge, width: 1.2),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
         child: items.isEmpty
             // nothing (or only apps under a megabyte) yet: a picture of strips, half the card high
             ? LayoutBuilder(
