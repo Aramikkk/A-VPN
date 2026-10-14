@@ -223,7 +223,8 @@ class AppTheme {
             highest: dark ? const Color(0xFF424248) : const Color(0xFFE6E4DF),
             line: dark ? const Color(0xFF45454B) : const Color(0xFFD4D1CB),
             strongLine: dark ? const Color(0xFF55555B) : const Color(0xFFB4B0A8),
-            nav: dark ? const Color(0xFF0B0B0C) : const Color(0xFF111111),
+            // the menu as black as the connect panel over it
+            nav: const Color(0xFF0B0B0C),
           )
         : AraPalette(
             bg: dark ? const Color(0xFF0B0B0D) : const Color(0xFFF4F4F6),
@@ -313,6 +314,8 @@ class AppTheme {
 
     // body text: Manrope (Graphite, Glass) or Golos Text (Contrast); headings in Unbounded (Contrast: Golos)
     final body = contrast ? 'Golos Text' : 'Manrope';
+    // Contrast's menu is black by day too: its idle tabs in a grey that reads on it
+    final navMuted = contrast ? const Color(0xFF8F8C86) : p.muted;
     final base = (dark ? Typography.material2021().white : Typography.material2021().black).apply(
       fontFamily: body,
       bodyColor: p.fg,
@@ -375,13 +378,13 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         indicatorColor: primary.withValues(alpha: .16),
         iconTheme: WidgetStateProperty.resolveWith(
-          (s) => IconThemeData(color: s.contains(WidgetState.selected) ? primary : p.muted),
+          (s) => IconThemeData(color: s.contains(WidgetState.selected) ? primary : navMuted),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (s) => TextStyle(
             fontFamily: body,
             fontSize: 11.5,
-            color: s.contains(WidgetState.selected) ? primary : p.muted,
+            color: s.contains(WidgetState.selected) ? primary : navMuted,
             fontWeight: s.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
           ),
         ),

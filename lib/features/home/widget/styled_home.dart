@@ -773,7 +773,10 @@ class _GraphiteDock extends HookConsumerWidget {
     // no plates: an icon (or a number) over a small caption, pressed as one
     // on a barely-there plate, as the toggles above
     Widget side({required Widget top, required String label, VoidCallback? onTap}) => Material(
-      color: scheme.onSurface.withValues(alpha: dark ? .06 : .045),
+      // Contrast: no plate, right on its black panel
+      color: theme.araLook.style == AraStyle.contrast
+          ? Colors.transparent
+          : scheme.onSurface.withValues(alpha: dark ? .06 : .045),
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1719,12 +1722,10 @@ class _ContrastRow extends StatelessWidget {
             ),
           )
         : BoxDecoration(
-            color: scheme.surfaceContainerLow,
+            color: scheme.surfaceContainerLow.withValues(alpha: dark ? .45 : .6),
             borderRadius: BorderRadius.circular(22),
-            border: dark ? Border.all(color: scheme.outlineVariant) : null,
-            boxShadow: dark
-                ? null
-                : [BoxShadow(color: Colors.black.withValues(alpha: .07), blurRadius: 18, offset: const Offset(0, 6))],
+            // see-through: the zone's light shows through
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .7)),
           );
     final ms = delay <= 0 ? '—' : (delay > 65000 ? '×' : '$delay');
     return Padding(
@@ -1846,18 +1847,10 @@ class _ContrastStats extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.fromLTRB(6, 8, 6, 9),
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerLow,
+                // see-through: the zone's light shows through
+                color: scheme.surfaceContainerLow.withValues(alpha: dark ? .45 : .6),
                 borderRadius: BorderRadius.circular(20),
-                border: dark ? Border.all(color: scheme.outlineVariant) : null,
-                boxShadow: dark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: .07),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+                border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .7)),
               ),
               child: Column(
                 children: [
@@ -1988,12 +1981,10 @@ class _WaterTile extends ConsumerWidget {
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
+          color: scheme.surfaceContainerLow.withValues(alpha: dark ? .45 : .6),
           borderRadius: BorderRadius.circular(20),
-          border: dark ? Border.all(color: scheme.outlineVariant) : null,
-          boxShadow: dark
-              ? null
-              : [BoxShadow(color: Colors.black.withValues(alpha: .07), blurRadius: 18, offset: const Offset(0, 6))],
+          // see-through: the zone's light shows through
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .7)),
         ),
         child: Stack(
           children: [
@@ -2002,68 +1993,71 @@ class _WaterTile extends ConsumerWidget {
                 tween: Tween(end: bytes == 0 ? 0 : (.06 + .94 * share)),
                 duration: const Duration(milliseconds: 900),
                 curve: Curves.easeOutCubic,
-                builder: (context, level, _) => Align(
-                  alignment: Alignment.bottomCenter,
-                  child: FractionallySizedBox(
-                    heightFactor: level,
-                    widthFactor: 1,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border(top: BorderSide(color: colour, width: 1.5)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final (i, (name, b)) in bands.indexed.toList().reversed)
-                            Expanded(
-                              flex: (b * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: colour.withValues(alpha: _alphas[i.clamp(0, 4)]),
-                                  border: i < bands.length - 1
-                                      ? Border(
-                                          top: BorderSide(
-                                            color: dark
-                                                ? Colors.white.withValues(alpha: .18)
-                                                : Colors.white.withValues(alpha: .75),
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: LayoutBuilder(
-                                  builder: (context, box) => box.maxHeight < 17
-                                      ? const SizedBox.shrink()
-                                      : Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                name,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: theme.textTheme.labelMedium?.copyWith(
-                                                  color: ink,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                            Text(
-                                              formatBytes(b, units),
-                                              style: theme.textTheme.labelMedium?.copyWith(
-                                                color: ink.withValues(alpha: .75),
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
+                // no water with nothing through the route; no surface line when the tile is all but full
+                builder: (context, level, _) => level < .005
+                    ? const SizedBox.shrink()
+                    : Align(
+                        alignment: Alignment.bottomCenter,
+                        child: FractionallySizedBox(
+                          heightFactor: level,
+                          widthFactor: 1,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: level > .97 ? null : Border(top: BorderSide(color: colour, width: 1.5)),
                             ),
-                        ],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                for (final (i, (name, b)) in bands.indexed.toList().reversed)
+                                  Expanded(
+                                    flex: (b * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: colour.withValues(alpha: _alphas[i.clamp(0, 4)]),
+                                        border: i < bands.length - 1
+                                            ? Border(
+                                                top: BorderSide(
+                                                  color: dark
+                                                      ? Colors.white.withValues(alpha: .18)
+                                                      : Colors.white.withValues(alpha: .75),
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: LayoutBuilder(
+                                        builder: (context, box) => box.maxHeight < 17
+                                            ? const SizedBox.shrink()
+                                            : Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      name,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: theme.textTheme.labelMedium?.copyWith(
+                                                        color: ink,
+                                                        fontWeight: FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    formatBytes(b, units),
+                                                    style: theme.textTheme.labelMedium?.copyWith(
+                                                      color: ink.withValues(alpha: .75),
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
               ),
             ),
             Padding(
