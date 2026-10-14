@@ -771,6 +771,13 @@ class _QualityCard extends ConsumerWidget {
     // the last minute probe by probe; a longer period from the saved history
     final period = range == StatsRange.minute ? null : ref.read(connectionQualityProvider.notifier).period(range);
     final bars = period?.bars ?? samples;
+    final losses = period?.losses ?? [for (final s in samples) s == null ? 1.0 : 0.0];
+    final lostColor = _isRed(theme.araLook.pingColors.first) ? scheme.onSurface : scheme.error;
+    final tiny = theme.textTheme.labelSmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+      fontSize: compact ? 9 : 10.5,
+      fontWeight: FontWeight.w700,
+    );
     final summary = period == null
         ? summarize(samples)
         : (
@@ -830,19 +837,41 @@ class _QualityCard extends ConsumerWidget {
             ],
           ),
           const Gap(10),
+          // two-sided: the loss hangs from the top down to the middle, the ping rises from the bottom up to it; each
+          // half named at its side
           _grow(
             fill,
-            height: compact ? 28 : 56,
-            child: CustomPaint(
-              painter: _PingBars(
-                bars,
-                slots: period?.slots ?? ConnectionQuality.length,
-                ok: theme.araLook.pingColors.first,
-                colorOf: (ms) => theme.araLook.pingColor(ms, scheme.onSurfaceVariant),
-                // a lost probe in red, unless red already means a fast ping (the red theme): then in the text colour
-                lost: _isRed(theme.araLook.pingColors.first) ? scheme.onSurface : scheme.error,
-                track: scheme.outlineVariant.withValues(alpha: .5),
-              ),
+            height: compact ? 40 : 80,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(t.avpn.statsLoss.toLowerCase(), style: tiny?.copyWith(color: lostColor)),
+                    Text(
+                      t.avpn.statsPing.toLowerCase(),
+                      style: tiny?.copyWith(color: theme.araLook.pingColors.first),
+                    ),
+                  ],
+                ),
+                Gap(compact ? 6 : 8),
+                Expanded(
+                  child: CustomPaint(
+                    painter: _PingBars(
+                      bars,
+                      losses: losses,
+                      slots: period?.slots ?? ConnectionQuality.length,
+                      ok: theme.araLook.pingColors.first,
+                      colorOf: (ms) => theme.araLook.pingColor(ms, scheme.onSurfaceVariant),
+                      // the loss in red, unless red already means a fast ping (the red theme): then in the text colour
+                      lost: lostColor,
+                      track: scheme.outlineVariant.withValues(alpha: .5),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           if (!compact) const Gap(6),
@@ -890,10 +919,13 @@ class _QualityCard extends ConsumerWidget {
   }
 }
 
-/// One bar per probe, height by ping (scaled to the slowest answer); a lost probe is a full-height red bar.
+/// Two-sided bars, one per probe (or slot): the lower half the ping, rising from the bottom (scaled to the usual
+/// ping), the upper half the loss, hanging from the top (a lost probe, or a slot that lost all of them, reaches the
+/// middle). Both halves over a faint track.
 class _PingBars extends CustomPainter {
   _PingBars(
     this.samples, {
+    required this.losses,
     required this.ok,
     required this.lost,
     required this.track,
@@ -903,6 +935,9 @@ class _PingBars extends CustomPainter {
 
   /// a probe's (or a slot's average) ping; null: lost; 0: no probes in that slot
   final List<int?> samples;
+
+  /// each probe's (slot's) share lost, 0 to 1, in step with [samples]
+  final List<double> losses;
 
   /// how many bars the width holds
   final int slots;
@@ -917,32 +952,44 @@ class _PingBars extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final slot = size.width / slots;
     final barWidth = slot * (slots > 40 ? .7 : .62);
-    // the scale follows the usual ping, not one stray spike: a spike over three times the median fills the bar
+    const gap = 2.0;
+    final half = (size.height - gap) / 2;
+    final lowerTop = half + gap;
+    // the scale follows the usual ping, not one stray spike: a spike over three times the median fills the half
     final answered = samples.whereType<int>().where((v) => v > 0).toList()..sort();
     final median = answered.isEmpty ? 50 : answered[answered.length ~/ 2];
     final top = answered.isEmpty ? 50 : answered.last;
     final peak = top.clamp(50, median * 3 < 50 ? 50 : median * 3);
     final offset = (slots - samples.length).clamp(0, slots);
-    final shown = samples.length > slots ? samples.sublist(samples.length - slots) : samples;
+    final cut = samples.length > slots ? samples.length - slots : 0;
+    const radius = Radius.circular(2);
     for (var i = 0; i < slots; i++) {
       final x = i * slot + (slot - barWidth) / 2;
-      final rect = RRect.fromRectAndRadius(Rect.fromLTWH(x, 0, barWidth, size.height), const Radius.circular(2));
-      canvas.drawRRect(rect, Paint()..color = track);
-      if (i < offset) continue;
-      final sample = shown[i - offset];
-      if (sample == 0) continue;
-      final height = sample == null
-          ? size.height
-          : (size.height * (sample / peak)).clamp(math.min(3.0, size.height), size.height).toDouble();
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, 0, barWidth, half), radius), Paint()..color = track);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height - height, barWidth, height), const Radius.circular(2)),
-        Paint()..color = sample == null ? lost : (colorOf?.call(sample) ?? ok),
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, lowerTop, barWidth, half), radius),
+        Paint()..color = track,
       );
+      if (i < offset) continue;
+      final k = cut + i - offset;
+      final sample = samples[k];
+      final loss = k < losses.length ? losses[k].clamp(0.0, 1.0) : (sample == null ? 1.0 : 0.0);
+      if (loss > 0) {
+        final h = math.max(half * loss, math.min(3.0, half));
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, 0, barWidth, h), radius), Paint()..color = lost);
+      }
+      if (sample != null && sample > 0) {
+        final h = (half * (sample / peak)).clamp(math.min(3.0, half), half).toDouble();
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height - h, barWidth, h), radius),
+          Paint()..color = colorOf?.call(sample) ?? ok,
+        );
+      }
     }
   }
 
   @override
-  bool shouldRepaint(_PingBars old) => old.samples != samples || old.ok != ok;
+  bool shouldRepaint(_PingBars old) => old.samples != samples || old.losses != losses || old.ok != ok;
 }
 
 bool _isRed(Color color) {

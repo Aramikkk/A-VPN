@@ -61,9 +61,9 @@ class PingBucket {
   }
 }
 
-/// A period's ping: a bar per slot (its average, null when nothing answered), how many slots the width holds,
-/// and the totals.
-typedef PingPeriod = ({List<int?> bars, int slots, PingBucket total});
+/// A period's ping: a bar per slot (its average, null when nothing answered), the share of each slot's probes
+/// lost (0 to 1), how many slots the width holds, and the totals.
+typedef PingPeriod = ({List<int?> bars, List<double> losses, int slots, PingBucket total});
 
 class ConnectionQuality extends Notifier<List<int?>> {
   /// one minute of samples
@@ -212,11 +212,17 @@ class ConnectionQuality extends Notifier<List<int?>> {
       for (final s in _samples) {
         total.add(s);
       }
-      return (bars: List.of(_samples), slots: length, total: total);
+      return (
+        bars: List.of(_samples),
+        losses: [for (final s in _samples) s == null ? 1.0 : 0.0],
+        slots: length,
+        total: total,
+      );
     }
     PingPeriod fromMinutes(int minutes, int perSlot) {
       final total = PingBucket();
       final bars = <int?>[];
+      final losses = <double>[];
       for (var m = minuteNow - minutes + 1; m <= minuteNow; m += perSlot) {
         final slot = PingBucket();
         for (var k = m; k < m + perSlot && k <= minuteNow; k++) {
@@ -227,8 +233,9 @@ class ConnectionQuality extends Notifier<List<int?>> {
         // slots before the first probe aren't drawn
         if (slot.sent == 0 && bars.isEmpty) continue;
         bars.add(slot.sent == 0 ? 0 : slot.average);
+        losses.add(slot.sent == 0 ? 0 : slot.lost / slot.sent);
       }
-      return (bars: bars, slots: minutes ~/ perSlot, total: total);
+      return (bars: bars, losses: losses, slots: minutes ~/ perSlot, total: total);
     }
 
     switch (range) {
@@ -247,10 +254,14 @@ class ConnectionQuality extends Notifier<List<int?>> {
         final days = _days.keys.toList()..sort();
         if (days.length <= 2) {
           final r = fromMinutes(48 * 60, 60);
-          return (bars: r.bars, slots: r.bars.length.clamp(2, 48), total: total);
+          return (bars: r.bars, losses: r.losses, slots: r.bars.length.clamp(2, 48), total: total);
         }
         final bars = [for (var d = days.first; d <= days.last; d++) _days[d]?.average];
-        return (bars: bars, slots: bars.length, total: total);
+        final losses = [
+          for (var d = days.first; d <= days.last; d++)
+            (_days[d]?.sent ?? 0) == 0 ? 0.0 : _days[d]!.lost / _days[d]!.sent,
+        ];
+        return (bars: bars, losses: losses, slots: bars.length, total: total);
     }
   }
 }

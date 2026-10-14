@@ -826,24 +826,30 @@ class _GraphiteDock extends HookConsumerWidget {
     final caption = theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant);
     final iconSize = large ? 28.0 : 26.0;
     // no plates: an icon (or a number) over a small caption, pressed as one
-    Widget side({required Widget top, required String label, VoidCallback? onTap}) => InkWell(
-      onTap: onTap,
+    // on a barely-there plate, as the toggles above
+    Widget side({required Widget top, required String label, VoidCallback? onTap}) => Material(
+      color: scheme.onSurface.withValues(alpha: dark ? .06 : .045),
       borderRadius: BorderRadius.circular(18),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        // shrinks rather than overflows on the narrowest screens
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                height: iconSize + 2,
-                child: Center(child: top),
-              ),
-              const Gap(4),
-              Text(label, style: caption),
-            ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          // shrinks rather than overflows on the narrowest screens
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: iconSize + 2,
+                  child: Center(child: top),
+                ),
+                const Gap(4),
+                Text(label, style: caption),
+              ],
+            ),
           ),
         ),
       ),

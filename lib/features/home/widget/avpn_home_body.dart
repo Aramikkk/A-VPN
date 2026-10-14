@@ -630,7 +630,10 @@ class _GlassToggles extends StatelessWidget {
               child: GestureDetector(
                 onLongPress: item.hold,
                 child: Material(
-                  color: item.on ? look.tint(scheme.onSurface, look.dark ? .3 : .75) : Colors.transparent,
+                  // off: a barely-there plate, so each toggle reads as a button
+                  color: item.on
+                      ? look.tint(scheme.onSurface, look.dark ? .3 : .75)
+                      : scheme.onSurface.withValues(alpha: look.dark ? .06 : .045),
                   shape: const StadiumBorder(),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
