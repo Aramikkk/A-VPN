@@ -120,14 +120,9 @@ class TopologyPage extends HookConsumerWidget {
                   onSelectionChanged: (s) => byTraffic.value = s.first,
                 ),
               ),
-              // the VPN servers this traffic went through, first; drawn empty until there is some
-              const Gap(12),
-              if (servers.isEmpty)
-                _Section(
-                  title: t.avpn.topoServersTitle,
-                  child: RankingPlaceholder(colour: theme.araLook.neonFill ?? scheme.primary),
-                )
-              else ...[
+              // the VPN servers this traffic went through, first
+              if (servers.isNotEmpty) ...[
+                const Gap(12),
                 _Section(
                   title: t.avpn.topoServersTitle,
                   child: TrafficRanking(

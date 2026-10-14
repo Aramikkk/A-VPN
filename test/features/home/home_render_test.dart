@@ -265,36 +265,38 @@ void main() {
 class _Connections extends Connections {
   @override
   ConnectionsState build() => ConnectionsState(
+    // EMPTY=1: no traffic yet, the placeholder picture
     items: [
-      for (final (i, (app, route, server, down)) in [
-        ('com.google.android.youtube', ConnectionRoute.vpn, '🇵🇱 Польша', 182e6),
-        ('com.instagram.android', ConnectionRoute.vpn, '🇵🇱 Польша', 41e6),
-        ('com.anthropic.claude', ConnectionRoute.vpn, '🇫🇮 Финляндия', 22e6),
-        ('org.telegram.messenger', ConnectionRoute.vpn, '🇵🇱 Польша', 14e6),
-        ('com.openai.chatgpt', ConnectionRoute.vpn, '🇵🇱 Польша', 9e6),
-        ('com.whatsapp', ConnectionRoute.vpn, '🇵🇱 Польша', 6e6),
-        ('com.spotify.music', ConnectionRoute.vpn, '🇵🇱 Польша', 4e6),
-        ('com.discord', ConnectionRoute.vpn, '🇵🇱 Польша', 3e6),
-        ('com.pinterest', ConnectionRoute.vpn, '🇵🇱 Польша', 2e6),
-        ('ru.ozon.app.android', ConnectionRoute.direct, '', 5e6),
-        ('ru.yandex.disk', ConnectionRoute.direct, '', 96e6),
-        ('ru.sberbankmobile', ConnectionRoute.direct, '', 8e6),
-      ].indexed)
-        SeenConnection(
-          id: '$i',
-          app: app,
-          host: 'example.com',
-          port: 443,
-          network: 'tcp',
-          route: route,
-          outbound: server,
-          rule: '',
-          start: DateTime(2026, 10, 13),
-          up: (down / 20).round(),
-          down: down.round(),
-          active: false,
-          count: 1,
-        ),
+      if (Platform.environment['EMPTY'] != '1')
+        for (final (i, (app, route, server, down)) in [
+          ('com.google.android.youtube', ConnectionRoute.vpn, '🇵🇱 Польша', 182e6),
+          ('com.instagram.android', ConnectionRoute.vpn, '🇵🇱 Польша', 41e6),
+          ('com.anthropic.claude', ConnectionRoute.vpn, '🇫🇮 Финляндия', 22e6),
+          ('org.telegram.messenger', ConnectionRoute.vpn, '🇵🇱 Польша', 14e6),
+          ('com.openai.chatgpt', ConnectionRoute.vpn, '🇵🇱 Польша', 9e6),
+          ('com.whatsapp', ConnectionRoute.vpn, '🇵🇱 Польша', 6e6),
+          ('com.spotify.music', ConnectionRoute.vpn, '🇵🇱 Польша', 4e6),
+          ('com.discord', ConnectionRoute.vpn, '🇵🇱 Польша', 3e6),
+          ('com.pinterest', ConnectionRoute.vpn, '🇵🇱 Польша', 2e6),
+          ('ru.ozon.app.android', ConnectionRoute.direct, '', 5e6),
+          ('ru.yandex.disk', ConnectionRoute.direct, '', 96e6),
+          ('ru.sberbankmobile', ConnectionRoute.direct, '', 8e6),
+        ].indexed)
+          SeenConnection(
+            id: '$i',
+            app: app,
+            host: 'example.com',
+            port: 443,
+            network: 'tcp',
+            route: route,
+            outbound: server,
+            rule: '',
+            start: DateTime(2026, 10, 13),
+            up: (down / 20).round(),
+            down: down.round(),
+            active: false,
+            count: 1,
+          ),
     ],
   );
 }

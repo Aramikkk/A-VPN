@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -106,7 +108,7 @@ class TrafficPanel extends ConsumerWidget {
           ],
         ),
         const Gap(14),
-        // nothing over a megabyte yet: the totals stay on top and the message sits in the list's card, the panel
+        // nothing over a megabyte yet: the totals stay on top and a picture sits in the list's card, the panel
         // keeping its shape
         if (groups.isEmpty)
           Expanded(
@@ -118,10 +120,10 @@ class TrafficPanel extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: scheme.outlineVariant),
               ),
-              child: Text(
-                current.isEmpty ? t.avpn.connEmpty : t.avpn.homeTrafficSmall,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.onSurfaceVariant),
+              // a picture of strips, half the card high, until the traffic comes
+              child: LayoutBuilder(
+                builder: (context, box) =>
+                    TrafficPlaceholder(height: math.min(box.maxHeight / 2, box.maxWidth * .6 * 122 / 200)),
               ),
             ),
           )

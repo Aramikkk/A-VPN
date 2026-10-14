@@ -1295,12 +1295,10 @@ class _HomeTraffic extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
         child: items.isEmpty
-            // nothing (or only apps under a megabyte) yet: the strips drawn empty, in their places
-            ? Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: TrafficPlaceholder(compact: true, directLabel: t.avpn.homeBypass),
+            // nothing (or only apps under a megabyte) yet: a picture of strips, half the card high
+            ? LayoutBuilder(
+                builder: (context, box) => Center(
+                  child: TrafficPlaceholder(height: math.min(box.maxHeight / 2, box.maxWidth * .6 * 122 / 200)),
                 ),
               )
             // from the top, each part always in its place (the strips keep a fixed height)

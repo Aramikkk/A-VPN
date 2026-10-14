@@ -58,9 +58,13 @@ class TrafficStrips extends ConsumerWidget {
     ];
     // the home screen keeps VPN over the bypass whatever their sizes, so nothing swaps places as traffic comes in
     if (!compact) strips.sort((a, b) => b.weight.compareTo(a.weight));
-    // nothing yet: the strips drawn empty, in their places, until the traffic fills them
-    if (strips.isEmpty || (compact && total == 0))
-      return TrafficPlaceholder(compact: compact, directLabel: directLabel);
+    // nothing yet: a picture of strips until the traffic comes
+    if (strips.isEmpty || (compact && total == 0)) {
+      return SizedBox(
+        height: compact ? 120 : 170,
+        child: Center(child: TrafficPlaceholder(height: compact ? 60 : 85)),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -356,149 +360,45 @@ class TrafficRanking extends StatelessWidget {
   }
 }
 
-/// The strips before there is any traffic: the same layout, drawn empty and faint (the route's colour, the pieces
-/// stepping down, blank pills for the names), so the place doesn't change when the numbers come in.
-class TrafficPlaceholder extends ConsumerWidget {
-  const TrafficPlaceholder({super.key, this.compact = false, this.directLabel});
+/// Shown before there is any traffic: three rounded strips of different lengths, two in the theme's colour (the
+/// VPN) and one grey (the bypass), each over its faint track. [height] is the whole picture's.
+class TrafficPlaceholder extends StatelessWidget {
+  const TrafficPlaceholder({super.key, this.height = 120});
 
-  final bool compact;
-  final String? directLabel;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final muted = theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800, color: scheme.onSurfaceVariant);
-    Widget route(String title, Color base, List<double> pieces, List<double> names) {
-      final faint = base.withValues(alpha: .2);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text(title, style: muted)),
-              Text('—', style: muted),
-            ],
-          ),
-          const Gap(6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: SizedBox(
-              height: compact ? 26 : 34,
-              child: Row(
-                children: [
-                  for (final (i, w) in pieces.indexed) ...[
-                    if (i > 0) const SizedBox(width: 2),
-                    Expanded(
-                      flex: (w * 100).round(),
-                      child: ColoredBox(color: Color.lerp(faint, scheme.surfaceContainerLow, i * .22)!),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const Gap(8),
-          // the names: blank pills, two rows of two, as the home screen's legend
-          for (final row in [0, 2]) ...[
-            if (row > 0) const Gap(6),
-            Row(
-              children: [
-                for (final i in [row, row + 1]) ...[
-                  if (i > row) const Gap(12),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: Color.lerp(faint, scheme.surfaceContainerLow, i * .22),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                        const Gap(5),
-                        FractionallySizedBox(
-                          widthFactor: names[i],
-                          child: Container(
-                            height: 9,
-                            decoration: BoxDecoration(
-                              color: scheme.onSurface.withValues(alpha: .07),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        route(
-          t.avpn.statsViaVpn,
-          theme.araLook.neonFill ?? scheme.primary,
-          const [.55, .2, .15, .1],
-          const [.7, .55, .45, .6],
-        ),
-        Gap(compact ? 14 : 16),
-        route(directLabel ?? t.avpn.statsDirect, const Color(0xFF9AA0A6), const [.7, .2, .1], const [.6, .5, .4, 0]),
-      ],
-    );
-  }
-}
-
-/// The servers list before there is any traffic: a few blank rows with empty bars, as [TrafficRanking] draws them.
-class RankingPlaceholder extends StatelessWidget {
-  const RankingPlaceholder({super.key, required this.colour});
-
-  final Color colour;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    Widget pill(double w, double h, Color c) => Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(h / 2)),
-    );
-    final ink = scheme.onSurface.withValues(alpha: .08);
-    return Column(
-      children: [
-        for (final w in const [.7, .35, .15])
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(children: [pill(110, 11, ink), const Spacer(), pill(60, 9, ink)]),
-                const Gap(8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: SizedBox(
-                    height: 5,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(child: ColoredBox(color: scheme.onSurface.withValues(alpha: .06))),
-                        FractionallySizedBox(
-                          widthFactor: w,
-                          child: ColoredBox(color: colour.withValues(alpha: .22)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+    final theme = Theme.of(context);
+    final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
+    const grey = Color(0xFF9AA0A6);
+    // drawn on a 200 x 122 grid: strips 26 high, 10 apart
+    final unit = height / 122;
+    Widget strip(Color track, Color fill, double share) => ClipRRect(
+      borderRadius: BorderRadius.circular(13 * unit),
+      child: SizedBox(
+        width: 200 * unit,
+        height: 26 * unit,
+        child: ColoredBox(
+          color: track,
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: share,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(13 * unit)),
             ),
           ),
+        ),
+      ),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        strip(accent.withValues(alpha: .15), accent, 2 / 3),
+        SizedBox(height: 10 * unit),
+        strip(accent.withValues(alpha: .15), accent.withValues(alpha: .6), 5 / 12),
+        SizedBox(height: 10 * unit),
+        strip(grey.withValues(alpha: .15), grey.withValues(alpha: .6), 5 / 6),
       ],
     );
   }
