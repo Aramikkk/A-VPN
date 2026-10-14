@@ -206,6 +206,8 @@
     "stNotProtected": "not protected",
     "stPingButton": "Ping",
     "dockActive": "active",
+    "dockModeRegular": "Regular",
+    "dockModeWhitelist": "Whitelist",
     "dockServersAnswering": "Answering their ping: $count",
     "topoServerCount": "Servers",
     "topoFlow": "Traffic",

@@ -53,6 +53,7 @@ final _servers = [
   ('fit', '🇫🇮 Доступ - Финляндия (Тестовый)', 66, false),
   ('ee', '🇪🇪 Доступ - Эстония', 88, false),
   ('sk', '🇸🇰 Доступ - Словакия', 90, false),
+  ('lte', '🇵🇱 Доступ - Польша LTE Only', 95, false),
 ];
 
 class _Proxies extends ProxiesOverviewNotifier {
@@ -71,7 +72,8 @@ class _Proxies extends ProxiesOverviewNotifier {
                   urlTestDelay: group ? 108 : delay,
                   isGroup: group,
                   isVisible: true,
-                  groupSelectedTag: group ? 'pl5' : null,
+                  // WL=1: Auto on a whitelist server
+                  groupSelectedTag: group ? (Platform.environment['WL'] == '1' ? 'lte' : 'pl5') : null,
                 ),
             ],
           )

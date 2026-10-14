@@ -206,6 +206,8 @@
     "stNotProtected": "не защищено",
     "stPingButton": "Пинг",
     "dockActive": "активных",
+    "dockModeRegular": "Обычные",
+    "dockModeWhitelist": "Белые списки",
     "dockServersAnswering": "Отвечают на пинг: $count",
     "topoServerCount": "Серверов",
     "topoFlow": "Трафик",

@@ -801,6 +801,14 @@ class _GraphiteDock extends HookConsumerWidget {
     final loss = quality.loss ?? 0;
     final measured = ping != null;
     final lossText = loss == 0 ? '0%' : '${loss.toStringAsFixed(loss < 10 ? 1 : 0)}%';
+    // the whitelist ("LTE Only") servers or the regular ones: the server in use (Auto: the one it picked) tells; the
+    // computer only ever marks the whitelist
+    final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
+    final inUse = current != null && current.isGroup ? autoPick(current, group!.items) : current;
+    final whitelist =
+        inUse != null &&
+        (ServerRegionFilter.isMobileOnly(inUse.tag) || ServerRegionFilter.isMobileOnly(inUse.tagDisplay));
+    final mode = !on || busy || inUse == null ? null : (whitelist ? true : (PlatformUtils.isDesktop ? null : false));
     final accent = theme.araLook.neonFill ?? scheme.primary;
     // the side icons and the ping in the accent (by day a light accent goes to the text colour); grey while off
     final ink = on
@@ -855,6 +863,7 @@ class _GraphiteDock extends HookConsumerWidget {
           loss: measured ? _Orb.lossFill(loss) : 0,
           pingLabel: measured && !busy ? '$ping ms' : null,
           lossLabel: measured && !busy ? lossText : null,
+          mode: mode,
           onTap: busy ? null : () => _toggleConnection(ref),
         ),
         Expanded(
@@ -925,6 +934,7 @@ class _Orb extends HookWidget {
     this.loss = 0,
     this.pingLabel,
     this.lossLabel,
+    this.mode,
   });
 
   /// the button's diameter; the arcs and numbers take about twice that across
@@ -936,6 +946,10 @@ class _Orb extends HookWidget {
 
   final String? pingLabel;
   final String? lossLabel;
+
+  /// which servers the connection runs on, on the button's lower edge: null hides it, true the whitelist
+  /// ("Белые списки", filled in the accent), false the regular ones ("Обычные", quiet)
+  final bool? mode;
 
   final bool on;
   final bool busy;
@@ -1059,6 +1073,75 @@ class _Orb extends HookWidget {
                   ),
                 ),
               ),
+            ),
+          ),
+          // the mode, over the button's lower edge in the arcs' gap, clear of the numbers at the sides
+          Positioned(
+            left: 0,
+            right: 0,
+            top: centre + size * .5 - size * .13,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: mode == null
+                    ? const SizedBox.shrink()
+                    : _ModeBadge(key: ValueKey(mode), whitelist: mode!, size: size),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The servers the connection runs on, as a small pill: the whitelist filled in the accent with an antenna, the
+/// regular ones quiet (the button's own colour, a thin edge, a globe).
+class _ModeBadge extends ConsumerWidget {
+  const _ModeBadge({super.key, required this.whitelist, required this.size});
+
+  final bool whitelist;
+  final double size;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final onAccent = AraLook.contrast(accent, Colors.black) >= AraLook.contrast(accent, Colors.white)
+        ? Colors.black
+        : Colors.white;
+    final ink = whitelist ? onAccent : scheme.onSurfaceVariant;
+    final height = size * .26;
+    return Container(
+      height: height,
+      padding: EdgeInsets.symmetric(horizontal: height * .45),
+      decoration: BoxDecoration(
+        color: whitelist ? accent : (dark ? const Color(0xFF16161A) : Colors.white),
+        borderRadius: BorderRadius.circular(height / 2),
+        border: whitelist ? null : Border.all(color: scheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? .3 : .08),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(whitelist ? Icons.signal_cellular_alt_rounded : Icons.language_rounded, size: height * .58, color: ink),
+          SizedBox(width: height * .2),
+          Text(
+            whitelist ? t.avpn.dockModeWhitelist : t.avpn.dockModeRegular,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: height * .44,
+              height: 1,
+              fontWeight: FontWeight.w800,
+              color: ink,
             ),
           ),
         ],
