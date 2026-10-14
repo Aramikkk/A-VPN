@@ -82,9 +82,13 @@ class ConnectionQuality extends Notifier<List<int?>> {
   int sinceConnect = 0;
 
   /// this connection was started while the app ran (not found up when it opened): its first answer is the tunnel
-  /// warming up and doesn't count
+  /// warming up and isn't recorded
   bool warmUp = false;
   bool _sawConnecting = false;
+
+  /// an answer has come on this connection: the probes lost before it (the tunnel coming up) aren't recorded, nor
+  /// the first answer itself after a fresh start
+  bool _answered = false;
   Uri? _url;
   bool _foreground = true;
   AppLifecycleListener? _lifecycle;
@@ -120,6 +124,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     final url = Uri.parse(ref.watch(ConfigOptions.connectionTestUrl));
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
     sinceConnect = 0;
+    _answered = false;
     if (!connected || !ref.watch(ConfigOptions.enableMixedPort)) return List.of(_samples);
 
     final client = HttpClient()
@@ -180,6 +185,13 @@ class ConnectionQuality extends Notifier<List<int?>> {
     }
     if (!identical(client, _client)) return; // disposed meanwhile
     final now = DateTime.now();
+    // the tunnel coming up: nothing recorded before the first answer, and that answer only when the connection was
+    // found up (a fresh one's first answer is the warm-up, well over a second)
+    if (!_answered) {
+      if (ms == null) return;
+      _answered = true;
+      if (warmUp) return;
+    }
     _samples.add(ms);
     sinceConnect++;
     if (_samples.length > length) _samples.removeAt(0);

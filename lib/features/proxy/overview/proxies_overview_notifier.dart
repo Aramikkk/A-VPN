@@ -208,10 +208,11 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
     }
   }
 
-  Future<void> urlTest(String groupTag) async {
+  /// [quiet]: the minute's refresh, without the tap's buzz.
+  Future<void> urlTest(String groupTag, {bool quiet = false}) async {
     loggy.debug("testing group: [$groupTag]");
     if (state case AsyncData()) {
-      await ref.read(hapticServiceProvider.notifier).lightImpact();
+      if (!quiet) await ref.read(hapticServiceProvider.notifier).lightImpact();
       await ref.read(proxyRepositoryProvider).urlTest(groupTag).getOrElse((err) {
         loggy.error("error testing group", err);
         throw err;

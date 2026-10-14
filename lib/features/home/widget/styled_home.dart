@@ -743,15 +743,12 @@ Future<void> _toggleConnection(WidgetRef ref) async {
   }
 }
 
-/// Ping and loss through the VPN, measured every second (the probes the Statistics tab shows), this connection's
-/// only: the probes lost before the first answer don't count, nor the first answer itself when the connection was
-/// just started (the tunnel warming up, well over a second). Null ping until there's an answer.
+/// Ping and loss through the VPN, measured every second (the probes the Statistics tab shows; the tunnel's warm-up
+/// is left out there already), this connection's only. Null ping until there's an answer.
 ({int? ping, double loss}) _sessionQuality(WidgetRef ref, bool on) {
   final samples = ref.watch(connectionQualityProvider);
   final quality = ref.read(connectionQualityProvider.notifier);
-  var session = samples.sublist(samples.length - math.min(quality.sinceConnect, samples.length));
-  final firstAnswer = session.indexWhere((s) => s != null);
-  session = firstAnswer < 0 ? const <int?>[] : session.sublist(firstAnswer + (quality.warmUp ? 1 : 0));
+  final session = samples.sublist(samples.length - math.min(quality.sinceConnect, samples.length));
   final summary = summarize(session);
   return (ping: on ? summary.ping : null, loss: summary.loss ?? 0);
 }

@@ -64,6 +64,36 @@ class AraHomeBody extends HookConsumerWidget {
       }
     }
 
+    // the servers' pings kept fresh: once a minute while connected and on screen, quietly (the list just updates,
+    // no spinners); back from the background after longer, at once
+    final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
+    useEffect(() {
+      if (!connected) return null;
+      var last = DateTime.now();
+      Future<void> refresh() async {
+        if (testing.value) return;
+        last = DateTime.now();
+        try {
+          await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select", quiet: true);
+        } catch (_) {
+          // the core went away meanwhile: next time
+        }
+      }
+
+      final timer = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) unawaited(refresh());
+      });
+      final lifecycle = AppLifecycleListener(
+        onResume: () {
+          if (DateTime.now().difference(last) >= const Duration(minutes: 1)) unawaited(refresh());
+        },
+      );
+      return () {
+        timer.cancel();
+        lifecycle.dispose();
+      };
+    }, [connected]);
+
     final style = Theme.of(context).araLook.style;
     if (style != AraStyle.classic) {
       return _StyledHome(
