@@ -209,13 +209,13 @@ class _StatusBlock extends HookConsumerWidget {
         Text(text, style: big?.copyWith(color: colour)),
       ],
     );
-    // the country in use, short (Auto's pick without "Авто ·"), and the ping and loss through the VPN
-    final country = lastServer == null
-        ? null
-        : (lastServer!.contains(' · ') ? lastServer!.substring(lastServer!.lastIndexOf(' · ') + 3) : lastServer!);
-    final (:ping, :loss) = _sessionQuality(ref, connected);
+    // what moved today, from 03:00 to 03:00: kept across sessions, reconnects and a cleared connection list
+    ref.watch(trafficHistoryProvider);
+    final today = ref.read(trafficHistoryProvider.notifier).amountFrom(statsDayStart(DateTime.now()));
+    final vpn = today.vpn;
+    final direct = (today.total - vpn).clamp(0, 1 << 62);
     final accent = theme.araLook.neonFill ?? scheme.primary;
-    // one line each side, the same size and height: the time against the country, the speed against the ping
+    // one line each side, the same size and height: the time against VPN, the speed against direct
     Widget line(Widget left, Widget right) => Row(
       children: [
         Expanded(
@@ -233,7 +233,11 @@ class _StatusBlock extends HookConsumerWidget {
         children: [
           line(
             item(Icons.schedule_rounded, time, colour: scheme.primary),
-            Text(country ?? '', style: big?.copyWith(color: AraLook.readableOn(accent, scheme.surface))),
+            item(
+              Icons.shield_rounded,
+              'VPN ${formatBytes(vpn, units)}',
+              colour: AraLook.readableOn(accent, scheme.surface),
+            ),
           ),
           const Gap(2),
           line(
@@ -241,12 +245,7 @@ class _StatusBlock extends HookConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [item(Icons.south_rounded, down), const Gap(10), item(Icons.north_rounded, up)],
             ),
-            item(
-              Icons.network_ping_rounded,
-              ping == null
-                  ? '— · ${t.avpn.statsLoss.toLowerCase()} —'
-                  : '$ping ms · ${t.avpn.statsLoss.toLowerCase()} ${_lossText(loss)}',
-            ),
+            item(Icons.alt_route_rounded, '${t.avpn.homeBypass} ${formatBytes(direct, units)}'),
           ),
         ],
       ),
@@ -1319,9 +1318,12 @@ class _HomeTraffic extends ConsumerWidget {
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     // this session's connections only, as the right panel of the unfolded phone
     final sessionStart = ref.watch(statsNotifierProvider).valueOrNull?.sessionStartedAt;
+    // the VPN off: no session, the picture (the last session's list isn't shown)
+    final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
     final current = [
-      for (final c in state.items)
-        if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
+      if (connected)
+        for (final c in state.items)
+          if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
     ];
     final big = {
       for (final g in groupConnections(current, (c) => c.app))

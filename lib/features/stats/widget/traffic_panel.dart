@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -31,9 +32,12 @@ class TrafficPanel extends ConsumerWidget {
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     // this session's connections only, as the heading says
     final sessionStart = ref.watch(statsNotifierProvider).valueOrNull?.sessionStartedAt;
+    // the VPN off: no session, the picture (the last session's list isn't shown)
+    final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
     final current = [
-      for (final c in state.items)
-        if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
+      if (connected)
+        for (final c in state.items)
+          if (sessionStart == null || !c.start.isBefore(sessionStart)) c,
     ];
     final groups = groupConnections(current, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
       ..sort((a, b) => b.total.compareTo(a.total));

@@ -39,6 +39,10 @@ object SessionTraffic {
         return Pair(sessionVpn, (sessionTotal - sessionVpn).coerceAtLeast(0))
     }
 
+    /** The current session's start, as the core reports it (0 before the first report). */
+    @Synchronized
+    fun sessionId(): Long = session
+
     /** The varint fields of a protobuf message's raw bytes, by field number. */
     fun unknownVarints(bytes: ByteArray): Map<Int, Long> {
         val out = HashMap<Int, Long>()
