@@ -1000,8 +1000,12 @@ class _Orb extends HookWidget {
     final dark = theme.brightness == Brightness.dark;
     // switching: both arcs fill to the full and back, once every this long
     final spin = useAnimationController(duration: const Duration(milliseconds: 1600));
+    // the arcs as last drawn, so switching flows on from the gauge and the gauge from the wave, with no jump to empty
+    final drawn = useRef(Offset.zero);
     useEffect(() {
       if (busy) {
+        // the wave starts where the gauge stood (rising from its fill)
+        spin.value = (drawn.value.dx.clamp(0.0, 1.0)) / 2;
         spin.repeat();
       } else {
         spin.stop();
@@ -1043,27 +1047,31 @@ class _Orb extends HookWidget {
         children: [
           Positioned.fill(
             child: TweenAnimationBuilder<Offset>(
-              // both arcs glide to new values
-              tween: Tween(end: on && !busy ? Offset(ping, loss) : Offset.zero),
+              // both arcs glide to new values; started over when switching ends, from where the wave was
+              key: ValueKey(busy),
+              tween: Tween(begin: drawn.value, end: on && !busy ? Offset(ping, loss) : Offset.zero),
               duration: const Duration(milliseconds: 700),
               curve: Curves.easeOutCubic,
               builder: (context, filled, _) => AnimatedBuilder(
                 animation: spin,
-                builder: (context, _) => CustomPaint(
-                  painter: _RainbowPainter(
-                    centre: Offset(width / 2, centre),
-                    radii: (outer, inner),
-                    // by night the empty part leans to the accent: plain grey stood out on the warm themes
-                    track: dark
-                        ? Color.lerp(scheme.outlineVariant, accent, .3)!.withValues(alpha: .45)
-                        : scheme.onSurface.withValues(alpha: .1),
-                    colors: (accent, lossColor),
-                    fills: (filled.dx, filled.dy),
-                    busy: busy,
-                    rotation: spin.value,
-                    stroke: size * .1,
-                  ),
-                ),
+                builder: (context, _) {
+                  drawn.value = busy ? _RainbowPainter.waveAt(spin.value) : filled;
+                  return CustomPaint(
+                    painter: _RainbowPainter(
+                      centre: Offset(width / 2, centre),
+                      radii: (outer, inner),
+                      // by night the empty part leans to the accent: plain grey stood out on the warm themes
+                      track: dark
+                          ? Color.lerp(scheme.outlineVariant, accent, .3)!.withValues(alpha: .45)
+                          : scheme.onSurface.withValues(alpha: .1),
+                      colors: (accent, lossColor),
+                      fills: (filled.dx, filled.dy),
+                      busy: busy,
+                      rotation: spin.value,
+                      stroke: size * .1,
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -1177,6 +1185,12 @@ class _ModeBadge extends ConsumerWidget {
 }
 
 class _RainbowPainter extends CustomPainter {
+  /// the switching wave's two fills at [t] (0 to 1 round the loop): to the full and back, the inner a little behind
+  static Offset waveAt(double t) {
+    double wave(double t) => Curves.easeInOut.transform(t < .5 ? t * 2 : 2 - t * 2);
+    return Offset(wave(t), wave((t + .92) % 1));
+  }
+
   _RainbowPainter({
     required this.centre,
     required this.radii,
@@ -1210,8 +1224,7 @@ class _RainbowPainter extends CustomPainter {
     Rect circle(double r) => Rect.fromCircle(center: centre, radius: r);
     // connecting or disconnecting: both arcs fill from nothing to the full and back, over and over, the inner one a
     // little behind
-    double wave(double t) => Curves.easeInOut.transform(t < .5 ? t * 2 : 2 - t * 2);
-    final (ping, loss) = busy ? (wave(rotation), wave((rotation + .92) % 1)) : fills;
+    final (ping, loss) = busy ? (waveAt(rotation).dx, waveAt(rotation).dy) : fills;
     // the arcs fade in as the ping's fill grows from nothing (a ping always fills at least .06)
     final shown = busy ? 1.0 : (ping / .06).clamp(0.0, 1.0);
     if (shown == 0) return;
