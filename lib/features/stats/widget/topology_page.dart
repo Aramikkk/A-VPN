@@ -6,6 +6,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
@@ -180,6 +181,60 @@ class TopologyPage extends HookConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Why this session's traffic went the way it did: the rules ranked by how much went through each, and where
+/// they sent it. The home screen's pull-up sheet (Contrast).
+class SessionRules extends ConsumerWidget {
+  const SessionRules({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final units = t.avpn.bytesUnits.split(',');
+    final start = ref.watch(sessionStartProvider);
+    final session = [
+      for (final c in ref.watch(connectionsProvider).items)
+        if (start == null || !c.start.isBefore(start)) c,
+    ];
+    double sum(Iterable<SeenConnection> cs) => cs.fold<double>(0, (s, c) => s + c.total);
+    final total = sum(session);
+    final rules = groupConnections(
+      session,
+      (c) => '${c.route.index}${ruleLabel(c.rule, t) ?? t.avpn.connRuleDefault}',
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(t.avpn.topoRulesTitle, style: theme.textTheme.titleLarge),
+        const Gap(4),
+        Text(t.avpn.topoRulesHint, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+        const Gap(14),
+        if (rules.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 30),
+            child: Center(child: TrafficPlaceholder(height: 70)),
+          )
+        else
+          _RuleRows(
+            rows: [
+              for (final g in rules)
+                (
+                  name: g.key.substring(1),
+                  route: g.items.first.route,
+                  servers: serverFlags(g.servers),
+                  weight: sum(g.items),
+                ),
+            ]..sort((a, b) => b.weight.compareTo(a.weight)),
+            total: total,
+            value: (w) => formatBytes(w.round(), units),
+          ),
+      ],
     );
   }
 }

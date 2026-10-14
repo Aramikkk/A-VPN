@@ -141,7 +141,6 @@
     "bigOff": "ВЫКЛ",
     "bigWait": "ЖДИТЕ",
     "styleTitle": "Стиль",
-    "countdownNote": "Проверяю серверы: $answered из $total · лучший $best",
     "contrastSession": "Сессия",
     "styleContrast": "Контраст",
     "styleContrastHint": "Светлый верх, чёрный низ, белые плитки и крупные цифры",

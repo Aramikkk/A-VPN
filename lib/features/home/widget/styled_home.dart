@@ -642,61 +642,12 @@ class _GraphiteRow extends StatelessWidget {
 final _pendingFrom = ValueNotifier<ConnectionStatus?>(null);
 Timer? _pendingTimeout;
 
-/// The countdown before a connection: [_countdownLength] in which every server is reached straight (the VPN still
-/// off), so what answers from this network shows under the button; a tap during it calls it off.
-class _Countdown {
-  _Countdown(this.started);
-
-  final DateTime started;
-  int tried = 0;
-  int answered = 0;
-  int total = 0;
-  int? bestMs;
-  bool cancelled = false;
-}
-
-const _countdownLength = Duration(seconds: 5);
-final _countdown = ValueNotifier<_Countdown?>(null);
-
-/// ticks while a countdown runs, so the button redraws its figure and its arcs
-final _countdownTick = ValueNotifier(0);
-
 Future<void> _toggleConnection(WidgetRef ref) async {
-  // a tap during the countdown calls the connection off
-  if (_countdown.value case final running?) {
-    running.cancelled = true;
-    _countdown.value = null;
-    return;
-  }
   if (_pendingFrom.value != null) return;
-  final profile = ref.read(activeProfileProvider).valueOrNull;
-  if (profile == null) {
+  if (ref.read(activeProfileProvider).valueOrNull == null) {
     await ref.read(dialogNotifierProvider.notifier).showNoActiveProfile();
     ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
     return;
-  }
-  // turning on: the countdown first, the servers reached straight meanwhile
-  if (ref.read(connectionNotifierProvider).valueOrNull is Disconnected) {
-    final run = _Countdown(DateTime.now());
-    _countdown.value = run;
-    final path = ref.read(profilePathResolverProvider).file(profile.id).path;
-    unawaited(
-      PrePing.servers(path).then((servers) {
-        run.total = servers.length;
-        return PrePing.run(servers, (tag, ms) {
-          run.tried++;
-          if (ms != null) {
-            run.answered++;
-            if (run.bestMs == null || ms < run.bestMs!) run.bestMs = ms;
-          }
-        });
-      }),
-    );
-    final ticker = Timer.periodic(const Duration(milliseconds: 100), (_) => _countdownTick.value++);
-    await Future<void>.delayed(_countdownLength);
-    ticker.cancel();
-    if (run.cancelled || !identical(_countdown.value, run)) return;
-    _countdown.value = null;
   }
   _pendingFrom.value = ref.read(connectionNotifierProvider).valueOrNull ?? const Disconnected();
   // never stuck: a core that doesn't answer lets the button go after a while
@@ -758,12 +709,6 @@ class _GraphiteDock extends HookConsumerWidget {
       return null;
     }, [status, pendingFrom]);
     final busy = status.isSwitching || pendingFrom != null;
-    final countdown = useValueListenable(_countdown);
-    useValueListenable(_countdownTick);
-    final t0 = countdown?.started;
-    final progress = t0 == null
-        ? null
-        : (DateTime.now().difference(t0).inMilliseconds / _countdownLength.inMilliseconds).clamp(0.0, 1.0);
     final glass = theme.araLook.glass;
     final padding = large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10);
     // the servers answering their ping right now (a test that timed out or never ran doesn't count)
@@ -846,15 +791,7 @@ class _GraphiteDock extends HookConsumerWidget {
           loss: measured ? _Orb.lossFill(loss) : 0,
           pingLabel: measured && !busy ? '$ping ms' : null,
           lossLabel: measured && !busy ? lossText : null,
-          mode: countdown == null ? mode : null,
-          countdown: progress,
-          countdownNote: countdown == null
-              ? null
-              : t.avpn.countdownNote(
-                  answered: countdown.answered,
-                  total: countdown.total,
-                  best: countdown.bestMs == null ? '—' : '${countdown.bestMs} ms',
-                ),
+          mode: mode,
           onTap: busy ? null : () => _toggleConnection(ref),
         ),
         Expanded(
@@ -928,8 +865,6 @@ class _Orb extends HookWidget {
     this.pingLabel,
     this.lossLabel,
     this.mode,
-    this.countdown,
-    this.countdownNote,
     this.below = 0,
   });
 
@@ -946,12 +881,6 @@ class _Orb extends HookWidget {
   /// which servers the connection runs on, on the button's lower edge: null hides it, true the whitelist
   /// ("Белые списки", filled in the accent), false the regular ones ("Обычные", quiet)
   final bool? mode;
-
-  /// the countdown before connecting, 0 to 1 (null: none): the arcs fill with it, the button shows the seconds left
-  final double? countdown;
-
-  /// under the button during the countdown: how many servers answered, and the fastest
-  final String? countdownNote;
 
   /// the panel's room under this widget: the mode pill sits halfway between the button and the panel's edge
   final double below;
@@ -1032,14 +961,9 @@ class _Orb extends HookWidget {
           Positioned.fill(
             child: TweenAnimationBuilder<Offset>(
               // both arcs glide to new values; started over when switching ends, from where the wave was
-              key: ValueKey((busy, countdown != null)),
-              tween: Tween(
-                begin: drawn.value,
-                end: countdown != null
-                    ? Offset(countdown!, countdown!)
-                    : (on && !busy ? Offset(ping, loss) : Offset.zero),
-              ),
-              duration: Duration(milliseconds: countdown != null ? 120 : 700),
+              key: ValueKey(busy),
+              tween: Tween(begin: drawn.value, end: on && !busy ? Offset(ping, loss) : Offset.zero),
+              duration: const Duration(milliseconds: 700),
               curve: Curves.easeOutCubic,
               builder: (context, filled, _) => AnimatedBuilder(
                 animation: spin,
@@ -1085,28 +1009,17 @@ class _Orb extends HookWidget {
                       : null,
                 ),
                 child: Center(
-                  child: countdown != null
-                      // the seconds left
-                      ? Text(
-                          '${(_countdownLength.inSeconds * (1 - countdown!)).ceil().clamp(1, _countdownLength.inSeconds)}',
-                          style: theme.textTheme.displaySmall?.copyWith(
-                            fontSize: size * .42,
-                            fontWeight: FontWeight.w700,
-                            color: accent,
-                            height: 1,
-                          ),
-                        )
-                      : Icon(
-                          Icons.power_settings_new_rounded,
-                          size: size * .42,
-                          // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
-                          // it goes black there, as the chosen server's text does
-                          color: on
-                              ? (theme.araLook.neonFill == null
-                                    ? (dark && theme.araLook.style != AraStyle.contrast ? Colors.white : scheme.primary)
-                                    : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
-                              : scheme.onSurfaceVariant,
-                        ),
+                  child: Icon(
+                    Icons.power_settings_new_rounded,
+                    size: size * .42,
+                    // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
+                    // it goes black there, as the chosen server's text does
+                    color: on
+                        ? (theme.araLook.neonFill == null
+                              ? (dark && theme.araLook.style != AraStyle.contrast ? Colors.white : scheme.primary)
+                              : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
+                        : scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
@@ -1119,16 +1032,7 @@ class _Orb extends HookWidget {
             child: Center(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
-                child: countdownNote != null
-                    ? Text(
-                        countdownNote!,
-                        key: const ValueKey('countdown'),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    : mode == null
+                child: mode == null
                     ? const SizedBox.shrink()
                     : _ModeBadge(key: ValueKey(mode), whitelist: mode!, size: size),
               ),
@@ -1308,10 +1212,10 @@ class _HomeTraffic extends ConsumerWidget {
 
       int sum(ConnectionRoute route) => items.where((c) => c.route == route).fold<int>(0, (s, c) => s + c.total);
       return _ContrastTraffic(
-        viaVpn: t.avpn.statsViaVpn,
-        bypass: t.avpn.homeBypass,
         vpn: formatBytes(sum(ConnectionRoute.vpn), units),
         direct: formatBytes(sum(ConnectionRoute.direct), units),
+        vpnBytes: sum(ConnectionRoute.vpn),
+        directBytes: sum(ConnectionRoute.direct),
         vpnApps: biggest(ConnectionRoute.vpn),
         directApps: biggest(ConnectionRoute.direct),
       );
@@ -1443,9 +1347,10 @@ class _AnsweringSheet extends ConsumerWidget {
   }
 }
 
-/// Contrast's home: the session tiles and the servers on the light (by night dark grey) page, then a black panel the
-/// full width with a notch at its top, holding the traffic, the toggles and the connect panel, drawn in the dark
-/// look whatever the time of day.
+/// Contrast's home: the session tiles, the servers and the traffic on the upper zone (soft warm and cool light
+/// spreading over it, by night too, so it stands apart from the black under it), then a black panel holding the
+/// toggles and the connect panel. On the seam a tab to pull: up shows why this session's traffic went as it did,
+/// down brings the connections in from the top.
 class _ContrastHome extends StatelessWidget {
   const _ContrastHome({
     required this.status,
@@ -1464,57 +1369,206 @@ class _ContrastHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final page = theme.colorScheme.surface;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
+    final warm = HSLColor.fromColor(accent);
+    // the upper zone's light: a warm spot from the accent (lifted towards amber by day) and a cool one opposite
+    final glow = dark
+        ? warm.withLightness(.42).withSaturation(.6).toColor()
+        : Color.lerp(warm.withLightness(.62).toColor(), const Color(0xFFFFC46B), .55)!;
+    final cool = dark ? const Color(0xFF3A4E78) : const Color(0xFFB9CCE3);
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [status, const Gap(12), servers]),
+        // the light on the upper zone
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(.85, .05),
+                radius: 1.0,
+                colors: [
+                  glow.withValues(alpha: dark ? .75 : .75),
+                  glow.withValues(alpha: 0),
+                ],
+              ),
+            ),
+          ),
         ),
-        Expanded(
-          child: Theme(
-            data: contrastPanelTheme(theme),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: DecoratedBox(
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(-1.1, -.75),
+                radius: .9,
+                colors: [
+                  cool.withValues(alpha: dark ? .65 : .65),
+                  cool.withValues(alpha: 0),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    status,
+                    const Gap(12),
+                    servers,
+                    if (traffic != null) ...[const Gap(10), Expanded(child: traffic!)] else const Spacer(),
+                  ],
+                ),
+              ),
+            ),
+            Theme(
+              data: contrastPanelTheme(theme),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
                     decoration: BoxDecoration(
                       color: contrastPanel,
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                      // a fine light edge along the top, as glass catching the light
+                      border: Border(top: BorderSide(color: Colors.white.withValues(alpha: .08))),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [toggles, const Gap(2), dock],
                     ),
                   ),
-                ),
-                // the notch: a bite of the page in the panel's top edge
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: Container(
-                    width: 60,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: page,
-                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+                  const Positioned(left: 0, right: 0, top: -13, child: Center(child: _SeamTab())),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// The tab on the seam between Contrast's zones: a black tongue with a light grip. Pulled (or flicked) up, it
+/// opens why the session's traffic went as it did; down, the connections slide in from the top; a tap opens the
+/// first.
+class _SeamTab extends StatelessWidget {
+  const _SeamTab();
+
+  static void _rules(BuildContext context) {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: contrastPanel,
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .82),
+      builder: (_) => Theme(
+        data: contrastPanelTheme(theme),
+        child: const SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 0, 20, 28), child: SessionRules()),
+      ),
+    );
+  }
+
+  static void _connections(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height * .86;
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 320),
+      pageBuilder: (context, _, _) => Align(
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          height: height,
+          child: Material(
+            clipBehavior: Clip.antiAlias,
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+            child: Column(
+              children: [
+                const Expanded(child: ConnectionsPage()),
+                // the grip at the foot: pulled up (or tapped), the connections go back
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(context).pop(),
+                  onVerticalDragEnd: (d) {
+                    if ((d.primaryVelocity ?? 0) < -150) Navigator.of(context).pop();
+                  },
+                  child: SizedBox(
+                    height: 26,
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .5),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (traffic != null) Expanded(child: traffic!) else const Spacer(),
-                      const Gap(10),
-                      toggles,
-                      const Gap(4),
-                      dock,
-                    ],
                   ),
                 ),
               ],
             ),
           ),
         ),
-      ],
+      ),
+      transitionBuilder: (context, animation, _, child) => SlideTransition(
+        position: Tween(
+          begin: const Offset(0, -1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic)),
+        child: child,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Почему трафик пошёл так · Соединения',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _rules(context),
+        onVerticalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v < -100) {
+            _rules(context);
+          } else if (v > 100) {
+            _connections(context);
+          }
+        },
+        child: Container(
+          width: 92,
+          height: 26,
+          decoration: const BoxDecoration(
+            color: contrastPanel,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.keyboard_arrow_up_rounded, size: 14, color: Colors.white.withValues(alpha: .45)),
+              Container(
+                width: 30,
+                height: 3.5,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .55),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1785,23 +1839,23 @@ class _ContrastStats extends StatelessWidget {
   }
 }
 
-/// Contrast's traffic: two glass tiles on the black panel, through the VPN (a deep tint of the accent) and the
-/// bypass (graphite), each its amount in big figures and its biggest apps.
+/// Contrast's traffic: two tiles, through the VPN (the accent) and the bypass (grey), each marked by its sign, its
+/// amount in big figures and its biggest apps; each filled from the bottom like water by its share of the
+/// session's traffic, with a flat surface.
 class _ContrastTraffic extends StatelessWidget {
   const _ContrastTraffic({
-    required this.viaVpn,
-    required this.bypass,
     required this.vpn,
     required this.direct,
+    required this.vpnBytes,
+    required this.directBytes,
     required this.vpnApps,
     required this.directApps,
   });
 
-  final String viaVpn;
-  final String bypass;
-
   final String vpn;
   final String direct;
+  final int vpnBytes;
+  final int directBytes;
   final String vpnApps;
   final String directApps;
 
@@ -1809,51 +1863,96 @@ class _ContrastTraffic extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
     final accent = theme.araLook.neonFill ?? scheme.primary;
-    final deep = HSLColor.fromColor(accent);
-    Widget tile(String label, String amount, String apps, List<Color> colours, Color edge) {
+    final total = vpnBytes + directBytes;
+    final ink = scheme.onSurface;
+    Widget tile(IconData icon, String amount, String apps, int bytes, Color water) {
       final parts = amount.split(' ');
+      final share = total == 0 ? 0.0 : bytes / total;
       return Expanded(
         child: Container(
-          padding: const EdgeInsets.all(12),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colours),
-            border: Border.all(color: edge),
+            border: dark ? Border.all(color: scheme.outlineVariant) : null,
+            boxShadow: dark
+                ? null
+                : [BoxShadow(color: Colors.black.withValues(alpha: .07), blurRadius: 18, offset: const Offset(0, 6))],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Text(label, style: theme.textTheme.labelMedium?.copyWith(color: Colors.white.withValues(alpha: .7))),
-              const Gap(4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(text: parts.first),
-                      if (parts.length > 1)
-                        TextSpan(
-                          text: ' ${parts.sublist(1).join(' ')}',
-                          style: TextStyle(fontSize: 12, letterSpacing: 0, color: Colors.white.withValues(alpha: .7)),
-                        ),
-                    ],
-                  ),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: -1.2,
-                    color: Colors.white,
+              // the water, rising to its share (a sliver when there's any traffic at all)
+              Positioned.fill(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: bytes == 0 ? 0 : (.06 + .94 * share)),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, level, _) => CustomPaint(
+                    painter: _WaterPainter(level: level, colour: water),
                   ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                apps.isEmpty ? '—' : apps,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(color: Colors.white.withValues(alpha: .7)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: scheme.surfaceContainerLow.withValues(alpha: .7),
+                            border: Border.all(color: water, width: 1.4),
+                          ),
+                          child: Icon(icon, size: 16, color: water),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${(share * 100).round()}%',
+                          style: theme.textTheme.labelLarge?.copyWith(color: ink, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                    const Gap(6),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: parts.first),
+                            if (parts.length > 1)
+                              TextSpan(
+                                text: ' ${parts.sublist(1).join(' ')}',
+                                style: TextStyle(fontSize: 12, letterSpacing: 0, color: ink.withValues(alpha: .65)),
+                              ),
+                          ],
+                        ),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -1.2,
+                          color: ink,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      apps.isEmpty ? '—' : apps,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: ink.withValues(alpha: .8),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1864,13 +1963,39 @@ class _ContrastTraffic extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        tile(theme.brightness == Brightness.dark ? 'Через VPN' : 'Через VPN', vpn, vpnApps, [
-          deep.withLightness(.24).toColor(),
-          deep.withLightness(.11).withSaturation(.35).toColor(),
-        ], deep.withLightness(.32).toColor()),
+        tile(Icons.shield_rounded, vpn, vpnApps, vpnBytes, accent),
         const Gap(8),
-        tile(bypass, direct, directApps, const [Color(0xFF4A4C50), Color(0xFF232427)], const Color(0xFF55575B)),
+        tile(Icons.alt_route_rounded, direct, directApps, directBytes, const Color(0xFF9AA0A6)),
       ],
     );
   }
+}
+
+/// Water in a tile: [level] of its height (0 to 1) from the bottom, a flat surface with a fine bright line,
+/// deeper towards the bottom.
+class _WaterPainter extends CustomPainter {
+  _WaterPainter({required this.level, required this.colour});
+
+  final double level;
+  final Color colour;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (level <= 0) return;
+    final top = size.height * (1 - level);
+    final water = Rect.fromLTRB(0, top, size.width, size.height);
+    canvas.drawRect(
+      water,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [colour.withValues(alpha: .26), colour.withValues(alpha: .5)],
+        ).createShader(water),
+    );
+    canvas.drawRect(Rect.fromLTWH(0, top, size.width, 1.5), Paint()..color = colour.withValues(alpha: .7));
+  }
+
+  @override
+  bool shouldRepaint(_WaterPainter old) => old.level != level || old.colour != colour;
 }

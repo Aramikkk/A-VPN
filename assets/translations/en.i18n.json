@@ -141,7 +141,6 @@
     "bigOff": "OFF",
     "bigWait": "WAIT",
     "styleTitle": "Style",
-    "countdownNote": "Checking servers: $answered of $total · best $best",
     "contrastSession": "Session",
     "styleContrast": "Contrast",
     "styleContrastHint": "A light top, a black bottom, white tiles and big figures",

@@ -214,14 +214,14 @@ class AppTheme {
     // panel is drawn by the home screen itself)
     return style == AraStyle.contrast
         ? AraPalette(
-            bg: dark ? const Color(0xFF1A1A1C) : const Color(0xFFECEBE7),
+            bg: dark ? const Color(0xFF242428) : const Color(0xFFECEBE7),
             fg: dark ? const Color(0xFFF3F1EC) : const Color(0xFF111111),
             muted: dark ? const Color(0xFF8F8C86) : const Color(0xFF6E6A64),
-            card: dark ? const Color(0xFF26262A) : Colors.white,
-            container: dark ? const Color(0xFF2A2A2E) : const Color(0xFFF7F6F3),
-            high: dark ? const Color(0xFF303034) : const Color(0xFFF1F0EC),
-            highest: dark ? const Color(0xFF38383D) : const Color(0xFFE6E4DF),
-            line: dark ? const Color(0xFF3A3A3F) : const Color(0xFFD4D1CB),
+            card: dark ? const Color(0xFF303035) : Colors.white,
+            container: dark ? const Color(0xFF34343A) : const Color(0xFFF7F6F3),
+            high: dark ? const Color(0xFF3A3A40) : const Color(0xFFF1F0EC),
+            highest: dark ? const Color(0xFF424248) : const Color(0xFFE6E4DF),
+            line: dark ? const Color(0xFF45454B) : const Color(0xFFD4D1CB),
             strongLine: dark ? const Color(0xFF55555B) : const Color(0xFFB4B0A8),
             nav: dark ? const Color(0xFF0B0B0C) : const Color(0xFF111111),
           )
