@@ -100,6 +100,7 @@ class GlassSchemePicker extends ConsumerWidget {
       GlassScheme.honey => t.avpn.glassHoney,
       GlassScheme.eucalyptus => t.avpn.glassEucalyptus,
       GlassScheme.claude => t.avpn.glassClaude,
+      GlassScheme.claudeLight => t.avpn.glassClaudeLight,
       GlassScheme.tangerine => t.avpn.glassTangerine,
       GlassScheme.sunflower => t.avpn.glassSunflower,
       GlassScheme.ruby => t.avpn.glassRuby,

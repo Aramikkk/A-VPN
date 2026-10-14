@@ -369,7 +369,8 @@ class _Delay extends ConsumerWidget {
     // the desktop gets a slightly larger, bolder ping: tiny thin text renders soft on Windows
     final style = PlatformUtils.isDesktop
         ? Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)
-        : Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500, letterSpacing: .2);
+        // the phone: bold, the numbers read at a glance on the glass
+        : Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: .2);
     if (delay <= 0) return Text('—', style: style?.copyWith(color: scheme.onSurfaceVariant));
     if (delay > 65000) return Icon(Icons.close_rounded, size: 14, color: scheme.error);
     // yellow and orange need darker shades to read on the light theme's white

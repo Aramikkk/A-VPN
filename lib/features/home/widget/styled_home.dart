@@ -717,29 +717,30 @@ class _EditorialRow extends StatelessWidget {
   }
 }
 
-/// A tap while the last one is still connecting or disconnecting is dropped: off and straight on again used to
-/// stack the two, and the button flipped between them.
-/// It also shows as switching from the tap on: right after turning off, the core takes a few seconds to start
-/// again before it says "connecting", and the button looked dead meanwhile.
-final _toggling = ValueNotifier(false);
+/// The status a tap started from, until the core settles somewhere else: the button shows as switching all that
+/// time. The call returns at once while the core takes its time (right after turning off, a few seconds before it
+/// even says "connecting"), and the button looked off meanwhile. A tap while one is pending is dropped, so off and
+/// straight on again don't stack.
+final _pendingFrom = ValueNotifier<ConnectionStatus?>(null);
+Timer? _pendingTimeout;
 
 Future<void> _toggleConnection(WidgetRef ref) async {
-  if (_toggling.value) return;
-  _toggling.value = true;
-  try {
-    await _toggleConnectionNow(ref);
-  } finally {
-    _toggling.value = false;
-  }
-}
-
-Future<void> _toggleConnectionNow(WidgetRef ref) async {
+  if (_pendingFrom.value != null) return;
   if (ref.read(activeProfileProvider).valueOrNull == null) {
     await ref.read(dialogNotifierProvider.notifier).showNoActiveProfile();
     ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
     return;
   }
-  await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+  _pendingFrom.value = ref.read(connectionNotifierProvider).valueOrNull ?? const Disconnected();
+  // never stuck: a core that doesn't answer lets the button go after a while
+  _pendingTimeout?.cancel();
+  _pendingTimeout = Timer(const Duration(seconds: 30), () => _pendingFrom.value = null);
+  try {
+    await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+  } catch (_) {
+    _pendingFrom.value = null;
+    rethrow;
+  }
 }
 
 /// Graphite's connect panel: the glowing ring button, the state and server, and a pill button.
@@ -766,7 +767,18 @@ class _GraphiteDock extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final on = status.isConnected;
-    final busy = status.isSwitching || useValueListenable(_toggling);
+    final pendingFrom = useValueListenable(_pendingFrom);
+    // the tap's done once the core has settled on another status (on, off, or a failure)
+    useEffect(() {
+      if (pendingFrom != null && !status.isSwitching && status != pendingFrom) {
+        Future.microtask(() {
+          _pendingTimeout?.cancel();
+          _pendingFrom.value = null;
+        });
+      }
+      return null;
+    }, [status, pendingFrom]);
+    final busy = status.isSwitching || pendingFrom != null;
     final glass = theme.araLook.glass;
     final padding = large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10);
     // the servers answering their ping right now (a test that timed out or never ran doesn't count)
@@ -838,8 +850,8 @@ class _GraphiteDock extends HookConsumerWidget {
           size: large ? 88 : 76,
           ping: measured ? _Orb.pingFill(ping) : 0,
           loss: measured ? _Orb.lossFill(loss) : 0,
-          pingLabel: measured ? '$ping ms' : null,
-          lossLabel: measured ? lossText : null,
+          pingLabel: measured && !busy ? '$ping ms' : null,
+          lossLabel: measured && !busy ? lossText : null,
           onTap: busy ? null : () => _toggleConnection(ref),
         ),
         Expanded(
@@ -896,7 +908,8 @@ class _GraphiteDock extends HookConsumerWidget {
   }
 }
 
-/// The round button under two arcs, like a speedometer: the outer one the ping (the lower, the fuller), in the
+/// The round button under two arcs, like a speedometer, filled from the top outwards both ways: the outer one the
+/// ping (the lower, the fuller), in the
 /// accent, the inner one the loss (none: full), in a deep shade of it; the numbers under the arcs' ends.
 /// Off, or connected before the first ping, just the button; connecting, a short arc runs along the outer one.
 class _Orb extends HookWidget {
@@ -947,7 +960,8 @@ class _Orb extends HookWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    final spin = useAnimationController(duration: const Duration(milliseconds: 1400));
+    // switching: both arcs fill to the full and back, once every this long
+    final spin = useAnimationController(duration: const Duration(milliseconds: 1600));
     useEffect(() {
       if (busy) {
         spin.repeat();
@@ -1024,7 +1038,9 @@ class _Orb extends HookWidget {
                   shape: BoxShape.circle,
                   // one colour, no gradient
                   color: dark ? const Color(0xFF16161A) : Colors.white,
-                  boxShadow: on ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)] : null,
+                  boxShadow: on && !busy
+                      ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)]
+                      : null,
                 ),
                 child: Center(
                   child: Icon(
@@ -1080,29 +1096,27 @@ class _RainbowPainter extends CustomPainter {
       ..color = c;
     // the upper half, left to right
     Rect circle(double r) => Rect.fromCircle(center: centre, radius: r);
-    if (busy) {
-      // connecting: a short arc running along the outer one there and back, nothing under it
-      const piece = math.pi * .3;
-      final there = rotation < .5 ? rotation * 2 : 2 - rotation * 2;
-      final at = Curves.easeInOut.transform(there);
-      canvas.drawArc(circle(radii.$1), math.pi + (math.pi - piece) * at, piece, false, pen(colors.$1));
-      return;
-    }
+    // connecting or disconnecting: both arcs fill from nothing to the full and back, over and over, the inner one a
+    // little behind
+    double wave(double t) => Curves.easeInOut.transform(t < .5 ? t * 2 : 2 - t * 2);
+    final (ping, loss) = busy ? (wave(rotation), wave((rotation + .92) % 1)) : fills;
     // the arcs fade in as the ping's fill grows from nothing (a ping always fills at least .06)
-    final shown = (fills.$1 / .06).clamp(0.0, 1.0);
+    final shown = busy ? 1.0 : (ping / .06).clamp(0.0, 1.0);
     if (shown == 0) return;
-    for (final (r, c, f) in [(radii.$1, colors.$1, fills.$1), (radii.$2, colors.$2, fills.$2)]) {
+    for (final (r, c, f) in [(radii.$1, colors.$1, ping), (radii.$2, colors.$2, loss)]) {
       canvas.drawArc(circle(r), math.pi, math.pi, false, pen(track.withValues(alpha: track.a * shown)));
       if (f < .001) continue;
+      // filled from the top outwards, the same both ways: a worse value shrinks it from both ends at once
+      final from = math.pi * 1.5 - math.pi * f / 2;
       // a soft neon glow under the fill, then the fill itself
       canvas.drawArc(
         circle(r),
-        math.pi,
+        from,
         math.pi * f,
         false,
         pen(c.withValues(alpha: .5 * shown))..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke * .7),
       );
-      canvas.drawArc(circle(r), math.pi, math.pi * f, false, pen(c.withValues(alpha: shown)));
+      canvas.drawArc(circle(r), from, math.pi * f, false, pen(c.withValues(alpha: shown)));
     }
   }
 

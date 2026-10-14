@@ -111,6 +111,11 @@ enum GlassScheme {
     Color(0xFFE6E6E9),
     Color(0xFFC9CACF),
   ], calm: true),
+  claudeLight(GlassVariant.liquid, Color(0xFFC96442), Color(0xFFF0EEE6), [
+    Color(0xFFDDD9CE),
+    Color(0xFFE9E6DC),
+    Color(0xFFD3CEC2),
+  ], calm: true),
   // Frost: smoky panels over black, the colour glowing through
   midnight(GlassVariant.frost, Color(0xFFFFE600), Color(0xFF07070B), [
     Color(0xFFFFE600),
