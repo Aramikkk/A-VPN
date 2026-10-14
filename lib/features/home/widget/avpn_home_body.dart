@@ -83,6 +83,17 @@ class AraHomeBody extends HookConsumerWidget {
       final timer = Timer.periodic(const Duration(minutes: 1), (_) {
         if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) unawaited(refresh());
       });
+      // no server answering yet (just connected, or the network came back): every 3 seconds until one does
+      var retrying = false;
+      final retry = Timer.periodic(const Duration(seconds: 3), (_) async {
+        if (retrying || WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
+        final items = ref.read(proxiesOverviewNotifierProvider).valueOrNull?.items ?? const <OutboundInfo>[];
+        final answering = items.any((i) => !i.isGroup && i.urlTestDelay > 0 && i.urlTestDelay < 65000);
+        if (answering) return;
+        retrying = true;
+        await refresh();
+        retrying = false;
+      });
       final lifecycle = AppLifecycleListener(
         onResume: () {
           if (DateTime.now().difference(last) >= const Duration(minutes: 1)) unawaited(refresh());
@@ -90,6 +101,7 @@ class AraHomeBody extends HookConsumerWidget {
       );
       return () {
         timer.cancel();
+        retry.cancel();
         lifecycle.dispose();
       };
     }, [connected]);

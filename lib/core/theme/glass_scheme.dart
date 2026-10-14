@@ -343,13 +343,15 @@ enum GlassScheme {
   final List<Color> spots;
 
   // a new install's scheme: the calm dark one with the light blue accent
-  static const fallback = azure;
+  static const fallback = claudeLight;
 
   /// The scheme by day or by night: every scheme has both. By night the backdrop goes near-black with the same
   /// colour spots glowing through smoky glass (Clear keeps its brighter edges); by day it goes light with milky
   /// glass (Clear: nearly clear).
   GlassLook look(Brightness brightness) {
     final dark = brightness == Brightness.dark;
+    // Claude Light by night is Claude: its cream and warm greys turned into grey smudges on black
+    if (dark && this == claudeLight) return claude.look(brightness);
     final native = variant.dark == dark;
     final kind = dark
         ? (variant == GlassVariant.clear ? GlassVariant.clear : GlassVariant.frost)

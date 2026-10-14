@@ -615,7 +615,14 @@ class _GraphiteRow extends StatelessWidget {
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 12),
+                        // Auto's "сейчас: 🇵🇱 Польша · БС" a little larger, bolder and darker: it says where it is now
+                        style: group
+                            ? theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurface.withValues(alpha: .82),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              )
+                            : theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 12),
                       ),
                     ],
                   ),
@@ -861,6 +868,7 @@ class _GraphiteDock extends HookConsumerWidget {
           // flows straight into the gauge
           busy: busy || (on && !measured),
           size: large ? 88 : 76,
+          below: padding.bottom,
           ping: measured ? _Orb.pingFill(ping) : 0,
           loss: measured ? _Orb.lossFill(loss) : 0,
           pingLabel: measured && !busy ? '$ping ms' : null,
@@ -937,6 +945,7 @@ class _Orb extends HookWidget {
     this.pingLabel,
     this.lossLabel,
     this.mode,
+    this.below = 0,
   });
 
   /// the button's diameter; the arcs and numbers take about twice that across
@@ -952,6 +961,9 @@ class _Orb extends HookWidget {
   /// which servers the connection runs on, on the button's lower edge: null hides it, true the whitelist
   /// ("Белые списки", filled in the accent), false the regular ones ("Обычные", quiet)
   final bool? mode;
+
+  /// the panel's room under this widget: the mode pill sits halfway between the button and the panel's edge
+  final double below;
 
   final bool on;
   final bool busy;
@@ -1019,6 +1031,8 @@ class _Orb extends HookWidget {
       width: width,
       height: height,
       child: Stack(
+        // the mode pill reaches into the panel's padding under it
+        clipBehavior: Clip.none,
         children: [
           Positioned.fill(
             child: TweenAnimationBuilder<Offset>(
@@ -1032,7 +1046,10 @@ class _Orb extends HookWidget {
                   painter: _RainbowPainter(
                     centre: Offset(width / 2, centre),
                     radii: (outer, inner),
-                    track: dark ? scheme.outlineVariant.withValues(alpha: .45) : scheme.onSurface.withValues(alpha: .1),
+                    // by night the empty part leans to the accent: plain grey stood out on the warm themes
+                    track: dark
+                        ? Color.lerp(scheme.outlineVariant, accent, .3)!.withValues(alpha: .45)
+                        : scheme.onSurface.withValues(alpha: .1),
                     colors: (accent, lossColor),
                     fills: (filled.dx, filled.dy),
                     busy: busy,
@@ -1077,11 +1094,11 @@ class _Orb extends HookWidget {
               ),
             ),
           ),
-          // the mode, over the button's lower edge in the arcs' gap, clear of the numbers at the sides
+          // the mode, under the button, as far from it as from the panel's lower edge
           Positioned(
             left: 0,
             right: 0,
-            top: centre + size * .5 - size * .13,
+            top: centre + size * .5 + (height - centre - size * .5 + below) / 2 - size * .13,
             child: Center(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
