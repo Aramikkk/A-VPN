@@ -209,13 +209,13 @@ class _StatusBlock extends HookConsumerWidget {
         Text(text, style: big?.copyWith(color: colour)),
       ],
     );
-    // what moved today, from 03:00 to 03:00: kept across sessions, reconnects and a cleared connection list
-    ref.watch(trafficHistoryProvider);
-    final today = ref.read(trafficHistoryProvider.notifier).amountFrom(statsDayStart(DateTime.now()));
-    final vpn = today.vpn;
-    final direct = (today.total - vpn).clamp(0, 1 << 62);
+    // the country in use, short (Auto's pick without "Авто ·"), and the ping and loss through the VPN
+    final country = lastServer == null
+        ? null
+        : (lastServer!.contains(' · ') ? lastServer!.substring(lastServer!.lastIndexOf(' · ') + 3) : lastServer!);
+    final (:ping, :loss) = _sessionQuality(ref, connected);
     final accent = theme.araLook.neonFill ?? scheme.primary;
-    // one line each side, the same size and height: the time against VPN, the speed against direct
+    // one line each side, the same size and height: the time against the country, the speed against the ping
     Widget line(Widget left, Widget right) => Row(
       children: [
         Expanded(
@@ -233,11 +233,7 @@ class _StatusBlock extends HookConsumerWidget {
         children: [
           line(
             item(Icons.schedule_rounded, time, colour: scheme.primary),
-            item(
-              Icons.shield_rounded,
-              'VPN ${formatBytes(vpn, units)}',
-              colour: AraLook.readableOn(accent, scheme.surface),
-            ),
+            Text(country ?? '', style: big?.copyWith(color: AraLook.readableOn(accent, scheme.surface))),
           ),
           const Gap(2),
           line(
@@ -245,7 +241,12 @@ class _StatusBlock extends HookConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [item(Icons.south_rounded, down), const Gap(10), item(Icons.north_rounded, up)],
             ),
-            item(Icons.alt_route_rounded, '${t.avpn.homeBypass} ${formatBytes(direct, units)}'),
+            item(
+              Icons.network_ping_rounded,
+              ping == null
+                  ? '— · ${t.avpn.statsLoss.toLowerCase()} —'
+                  : '$ping ms · ${t.avpn.statsLoss.toLowerCase()} ${_lossText(loss)}',
+            ),
           ),
         ],
       ),
@@ -743,6 +744,21 @@ Future<void> _toggleConnection(WidgetRef ref) async {
   }
 }
 
+/// Ping and loss through the VPN, measured every second (the probes the Statistics tab shows), this connection's
+/// only: the probes lost before the first answer don't count, nor the first answer itself when the connection was
+/// just started (the tunnel warming up, well over a second). Null ping until there's an answer.
+({int? ping, double loss}) _sessionQuality(WidgetRef ref, bool on) {
+  final samples = ref.watch(connectionQualityProvider);
+  final quality = ref.read(connectionQualityProvider.notifier);
+  var session = samples.sublist(samples.length - math.min(quality.sinceConnect, samples.length));
+  final firstAnswer = session.indexWhere((s) => s != null);
+  session = firstAnswer < 0 ? const <int?>[] : session.sublist(firstAnswer + (quality.warmUp ? 1 : 0));
+  final summary = summarize(session);
+  return (ping: on ? summary.ping : null, loss: summary.loss ?? 0);
+}
+
+String _lossText(double loss) => loss == 0 ? '0%' : '${loss.toStringAsFixed(loss < 10 ? 1 : 0)}%';
+
 /// Graphite's connect panel: the glowing ring button, the state and server, and a pill button.
 class _GraphiteDock extends HookConsumerWidget {
   const _GraphiteDock({
@@ -788,19 +804,9 @@ class _GraphiteDock extends HookConsumerWidget {
         if (!item.isGroup && item.isVisible && item.urlTestDelay > 0 && item.urlTestDelay < 65000) item,
     ]..sort((a, b) => a.urlTestDelay.compareTo(b.urlTestDelay));
     final answering = answeringServers.length;
-    // ping and loss through the VPN, measured every second (the probes the Statistics tab shows), this
-    // connection's only; the first probes lost while the tunnel warms up don't count
-    final samples = ref.watch(connectionQualityProvider);
-    final since = ref.read(connectionQualityProvider.notifier).sinceConnect;
-    var session = samples.sublist(samples.length - math.min(since, samples.length));
-    final firstAnswer = session.indexWhere((s) => s != null);
-    // and the first answer itself is the tunnel warming up (well over a second), so it doesn't count either
-    session = firstAnswer < 0 ? const <int?>[] : session.sublist(firstAnswer + 1);
-    final quality = summarize(session);
-    final ping = on ? quality.ping : null;
-    final loss = quality.loss ?? 0;
+    final (:ping, :loss) = _sessionQuality(ref, on);
     final measured = ping != null;
-    final lossText = loss == 0 ? '0%' : '${loss.toStringAsFixed(loss < 10 ? 1 : 0)}%';
+    final lossText = _lossText(loss);
     // the whitelist ("LTE Only") servers or the regular ones: the server in use (Auto: the one it picked) tells; the
     // computer only ever marks the whitelist
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;

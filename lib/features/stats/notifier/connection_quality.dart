@@ -80,6 +80,12 @@ class ConnectionQuality extends Notifier<List<int?>> {
 
   /// probes since the VPN last came up: the home button shows this connection only
   int sinceConnect = 0;
+
+  /// this connection was started while the app ran (not found up when it opened): its first answer is the tunnel
+  /// warming up and doesn't count
+  bool warmUp = false;
+  bool _sawConnecting = false;
+  Uri? _url;
   bool _foreground = true;
   AppLifecycleListener? _lifecycle;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
@@ -93,11 +99,23 @@ class ConnectionQuality extends Notifier<List<int?>> {
   List<int?> build() {
     if (!_loaded) _load();
     _lifecycle ??= AppLifecycleListener(
-      onResume: () => _foreground = true,
+      // back from the background or the screen off: a probe at once, so the ping shows straight away
+      onResume: () {
+        _foreground = true;
+        final client = _client;
+        final url = _url;
+        if (client != null && url != null) unawaited(_probe(client, url));
+      },
       onHide: () => _foreground = false,
       onPause: () => _foreground = false,
     );
-    final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
+    final status = ref.watch(connectionNotifierProvider).valueOrNull;
+    final connected = status is Connected;
+    if (status is Connecting) _sawConnecting = true;
+    if (connected) {
+      warmUp = _sawConnecting;
+      _sawConnecting = false;
+    }
     final port = ref.watch(ConfigOptions.mixedPort);
     final url = Uri.parse(ref.watch(ConfigOptions.connectionTestUrl));
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
@@ -108,6 +126,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
       ..connectionTimeout = timeout
       ..findProxy = ((_) => 'PROXY 127.0.0.1:$port');
     _client = client;
+    _url = url;
     final timer = Timer.periodic(interval, (_) {
       if (_foreground) _probe(client, url);
     });
