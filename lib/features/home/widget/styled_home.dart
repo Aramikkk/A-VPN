@@ -237,11 +237,39 @@ class _StatusBlock extends HookConsumerWidget {
 
       final vpn = amount(today.vpn);
       final direct = amount((today.total - today.vpn).clamp(0, 1 << 62));
+      final sessionLength = now.value.difference(stats?.sessionStartedAt ?? since.value ?? now.value);
+      final routed = today.total == 0 ? 1 : today.total;
+      final vpnShare = today.vpn / routed;
       return _ContrastStats(
         items: [
-          (Icons.schedule_rounded, t.avpn.contrastTime, connected ? time : (waiting ?? '—'), '', false),
-          (Icons.shield_outlined, t.avpn.statsViaVpn, vpn.$1, vpn.$2, true),
-          (Icons.alt_route_rounded, t.avpn.homeBypass, direct.$1, direct.$2, false),
+          // the time by the day, the two routes by each other
+          (
+            Icons.schedule_rounded,
+            t.avpn.contrastTime,
+            connected ? time : (waiting ?? '—'),
+            '',
+            false,
+            connected ? sessionLength.inMinutes / (24 * 60) : 0,
+            const Color(0xFF8FA8BD),
+          ),
+          (
+            Icons.shield_outlined,
+            t.avpn.statsViaVpn,
+            vpn.$1,
+            vpn.$2,
+            true,
+            today.total == 0 ? 0 : vpnShare,
+            scheme.primary,
+          ),
+          (
+            Icons.alt_route_rounded,
+            t.avpn.homeBypass,
+            direct.$1,
+            direct.$2,
+            false,
+            today.total == 0 ? 0 : 1 - vpnShare,
+            const Color(0xFF9AA0A6),
+          ),
         ],
       );
     }
@@ -1046,17 +1074,45 @@ class _Orb extends HookWidget {
                       : null,
                 ),
                 child: Center(
-                  child: Icon(
-                    Icons.power_settings_new_rounded,
-                    size: size * .42,
-                    // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
-                    // it goes black there, as the chosen server's text does
-                    color: on
-                        ? (theme.araLook.neonFill == null
-                              ? (dark && theme.araLook.style != AraStyle.contrast ? Colors.white : scheme.primary)
-                              : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
-                        : scheme.onSurfaceVariant,
-                  ),
+                  child: theme.araLook.style == AraStyle.contrast && mode != null
+                      // Contrast: the mode under the sign, inside the button
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.power_settings_new_rounded, size: size * .34, color: accent),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  mode! ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded,
+                                  size: size * .11,
+                                  color: mode! ? accent : const Color(0xFF8A857E),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  mode! ? 'LTE' : 'Wi‑Fi',
+                                  style: TextStyle(
+                                    fontSize: size * .1,
+                                    fontWeight: FontWeight.w800,
+                                    color: mode! ? accent : const Color(0xFF8A857E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        )
+                      : Icon(
+                          Icons.power_settings_new_rounded,
+                          size: size * .42,
+                          // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
+                          // it goes black there, as the chosen server's text does
+                          color: on
+                              ? (theme.araLook.neonFill == null
+                                    ? (dark && theme.araLook.style != AraStyle.contrast ? Colors.white : scheme.primary)
+                                    : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
+                              : scheme.onSurfaceVariant,
+                        ),
                 ),
               ),
             ),
@@ -1069,7 +1125,7 @@ class _Orb extends HookWidget {
             child: Center(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
-                child: mode == null
+                child: mode == null || theme.araLook.style == AraStyle.contrast
                     ? const SizedBox.shrink()
                     : _ModeBadge(key: ValueKey(mode), whitelist: mode!, size: size),
               ),
@@ -1428,13 +1484,11 @@ class _ContrastHome extends StatelessWidget {
                       _ContrastBlock(child: servers),
                       const Gap(8),
                       if (traffic != null && box.maxHeight >= 500)
-                        Expanded(
-                          child: _ContrastBlock(title: t.avpn.trafficThisSession, expand: true, child: traffic!),
-                        )
+                        Expanded(child: _ContrastBlock(expand: true, child: traffic!))
                       else
                         const Spacer(),
                       const Gap(8),
-                      _ContrastBlock(title: t.avpn.contrastToggles, child: toggles),
+                      _ContrastBlock(child: toggles),
                     ],
                   ),
                 ),
@@ -1446,7 +1500,8 @@ class _ContrastHome extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    // the connect control lower, with room above it
+                    padding: const EdgeInsets.fromLTRB(16, 34, 16, 14),
                     decoration: BoxDecoration(
                       color: contrastPanel,
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
@@ -1522,9 +1577,8 @@ class ContrastGlow extends StatelessWidget {
 
 /// A block on Contrast's upper zone: a pane of frosted glass with a small heading in capitals.
 class _ContrastBlock extends StatelessWidget {
-  const _ContrastBlock({this.title, required this.child, this.expand = false});
+  const _ContrastBlock({required this.child, this.expand = false});
 
-  final String? title;
   final Widget child;
 
   /// the child takes the block's height (the traffic)
@@ -1532,30 +1586,15 @@ class _ContrastBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.fromLTRB(9, 9, 9, 9),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: dark ? Colors.white.withValues(alpha: .05) : Colors.white.withValues(alpha: .42),
+        color: dark ? Colors.white.withValues(alpha: .05) : Colors.white.withValues(alpha: .18),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: dark ? Colors.white.withValues(alpha: .08) : Colors.white.withValues(alpha: .75)),
+        border: Border.all(color: dark ? Colors.white.withValues(alpha: .08) : Colors.white.withValues(alpha: .6)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-        children: [
-          if (title != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 7),
-              child: Text(
-                title!.toUpperCase(),
-                style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 1.3),
-              ),
-            ),
-          if (expand) Expanded(child: child) else child,
-        ],
-      ),
+      child: child,
     );
   }
 }
@@ -1567,56 +1606,28 @@ class _SeamTab extends StatelessWidget {
   final String label;
 
   static void _connections(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height * .86;
+    final theme = Theme.of(context);
     showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 320),
-      pageBuilder: (context, _, _) => Align(
-        alignment: Alignment.topCenter,
-        child: SizedBox(
-          height: height,
-          child: Material(
-            clipBehavior: Clip.antiAlias,
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-            child: Column(
-              children: [
-                const Expanded(child: ConnectionsPage()),
-                // the grip at the foot: a tap (or a flick up) sends the connections back
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.of(context).pop(),
-                  onVerticalDragEnd: (d) {
-                    if ((d.primaryVelocity ?? 0) < -150) Navigator.of(context).pop();
-                  },
-                  child: SizedBox(
-                    height: 26,
-                    child: Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .5),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+      barrierColor: Colors.black38,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (_, _, _) => Theme(data: theme, child: const _SessionConnections()),
+      transitionBuilder: (context, animation, _, child) {
+        final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 6 * animation.value, sigmaY: 6 * animation.value),
+          child: FadeTransition(
+            opacity: curve,
+            child: ScaleTransition(
+              scale: Tween(begin: .9, end: 1.0).animate(curve),
+              alignment: const Alignment(0, .9),
+              child: child,
             ),
           ),
-        ),
-      ),
-      transitionBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween(
-          begin: const Offset(0, -1),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic)),
-        child: child,
-      ),
+        );
+      },
     );
   }
 
@@ -1707,25 +1718,27 @@ class _ContrastRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final accent = theme.araLook.neonFill ?? scheme.primary;
-    final ink = selected ? Colors.white : scheme.onSurface;
-    final hsl = HSLColor.fromColor(accent);
+    final ink = scheme.onSurface;
     final decoration = selected
+        // the chosen one: see-through glass, cool at the left warming to the accent, a light edge and a glow
         ? BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: LinearGradient(
               colors: [
-                hsl.withHue((hsl.hue + 200) % 360).withSaturation(.25).withLightness(.62).toColor(),
-                hsl.withLightness(.62).toColor(),
-                accent,
+                const Color(0xFF8FA8BD).withValues(alpha: dark ? .28 : .32),
+                accent.withValues(alpha: dark ? .25 : .22),
+                accent.withValues(alpha: dark ? .4 : .36),
               ],
-              stops: const [0, .55, 1],
+              stops: const [0, .6, 1],
             ),
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .14 : .85)),
+            boxShadow: [BoxShadow(color: accent.withValues(alpha: .15), blurRadius: 20, offset: const Offset(0, 6))],
           )
         : BoxDecoration(
-            color: scheme.surfaceContainerLow.withValues(alpha: dark ? .45 : .6),
+            color: scheme.surfaceContainerLow.withValues(alpha: dark ? .3 : .3),
             borderRadius: BorderRadius.circular(22),
             // see-through: the zone's light shows through
-            border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .7)),
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
           );
     final ms = delay <= 0 ? '—' : (delay > 65000 ? '×' : '$delay');
     return Padding(
@@ -1747,13 +1760,10 @@ class _ContrastRow extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: selected ? Colors.white.withValues(alpha: .7) : scheme.outlineVariant,
-                        width: 1.3,
-                      ),
+                      border: Border.all(color: selected ? accent : scheme.outlineVariant, width: 1.3),
                     ),
                     child: group
-                        ? Icon(Icons.auto_awesome_rounded, size: 18, color: ink)
+                        ? Icon(Icons.auto_awesome_rounded, size: 18, color: selected ? accent : ink)
                         : Text(flag ?? '🌐', style: const TextStyle(fontSize: 18, fontFamilyFallback: ['Emoji'])),
                   ),
                   const Gap(11),
@@ -1773,7 +1783,7 @@ class _ContrastRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: selected ? Colors.white.withValues(alpha: .85) : scheme.onSurfaceVariant,
+                            color: selected ? ink.withValues(alpha: .75) : scheme.onSurfaceVariant,
                             fontWeight: group ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
@@ -1798,7 +1808,7 @@ class _ContrastRow extends StatelessWidget {
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w500,
                         letterSpacing: -1,
-                        color: ink,
+                        color: selected ? accent : ink,
                         fontSize: 19,
                       ),
                     ),
@@ -1808,12 +1818,12 @@ class _ContrastRow extends StatelessWidget {
                     height: 30,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: selected ? Colors.white : (dark ? const Color(0xFFF3F1EC) : const Color(0xFF111111)),
+                      color: dark ? const Color(0xFFF3F1EC) : const Color(0xFF111111),
                     ),
                     child: Icon(
                       Icons.north_east_rounded,
                       size: 15,
-                      color: selected || dark ? const Color(0xFF111111) : Colors.white,
+                      color: dark ? const Color(0xFF111111) : Colors.white,
                     ),
                   ),
                 ],
@@ -1826,77 +1836,115 @@ class _ContrastRow extends StatelessWidget {
   }
 }
 
-/// Contrast's session tiles: the time, through the VPN and the bypass today, each a white tile with its sign in a
-/// thin circle, its label and a big tight figure, all centred.
+/// Contrast's session tiles: the time, through the VPN and the bypass today, each a see-through tile with its sign
+/// in a thin circle, its label and a big tight figure, all centred, over water: the time's level by the day, the
+/// two routes' by each other.
 class _ContrastStats extends StatelessWidget {
   const _ContrastStats({required this.items});
 
-  /// (sign, label, figure, unit, in the accent)
-  final List<(IconData, String, String, String, bool)> items;
+  /// (sign, label, figure, unit, in the accent, water level 0 to 1, water colour)
+  final List<(IconData, String, String, String, bool, double, Color)> items;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    return Row(
-      children: [
-        for (final (i, (icon, label, figure, unit, lit)) in items.indexed) ...[
-          if (i > 0) const Gap(6),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(6, 8, 6, 9),
-              decoration: BoxDecoration(
-                // see-through: the zone's light shows through
-                color: scheme.surfaceContainerLow.withValues(alpha: dark ? .45 : .6),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .7)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: scheme.outlineVariant, width: 1.3),
+    Widget water(double level, Color colour) => TweenAnimationBuilder<double>(
+      tween: Tween(end: level.clamp(0.0, 1.0)),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (context, l, _) => l < .005
+          ? const SizedBox.shrink()
+          : Align(
+              alignment: Alignment.bottomCenter,
+              child: FractionallySizedBox(
+                heightFactor: l,
+                widthFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        colour.withValues(alpha: dark ? .25 : .19),
+                        colour.withValues(alpha: dark ? .4 : .3),
+                      ],
                     ),
-                    child: Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+                    border: l > .97 ? null : Border(top: BorderSide(color: colour.withValues(alpha: .6), width: 1.5)),
                   ),
-                  const Gap(5),
-                  Text(label, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-                  const Gap(2),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: figure),
-                          if (unit.isNotEmpty)
-                            TextSpan(
-                              text: ' $unit',
-                              style: TextStyle(
-                                fontSize: 11,
-                                letterSpacing: 0,
-                                color: scheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                        ],
-                      ),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -1,
-                        color: lit ? scheme.primary : scheme.onSurface,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
+    );
+    Widget tile(IconData icon, String label, String figure, String unit, bool lit, double level, Color colour) =>
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow.withValues(alpha: .3),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
           ),
+          child: Stack(
+            children: [
+              Positioned.fill(child: water(level, colour)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 8, 6, 9),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: scheme.outlineVariant, width: 1.3),
+                        ),
+                        child: Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+                      ),
+                      const Gap(5),
+                      Text(label, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                      const Gap(2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: figure),
+                              if (unit.isNotEmpty)
+                                TextSpan(
+                                  text: ' $unit',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    letterSpacing: 0,
+                                    color: scheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -1,
+                            color: lit ? scheme.primary : scheme.onSurface,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+    return Row(
+      children: [
+        for (final (i, (icon, label, figure, unit, lit, level, colour)) in items.indexed) ...[
+          if (i > 0) const Gap(6),
+          Expanded(child: tile(icon, label, figure, unit, lit, level, colour)),
         ],
       ],
     );
@@ -1976,139 +2024,151 @@ class _WaterTile extends ConsumerWidget {
     ];
     final ink = scheme.onSurface;
     final amount = formatBytes(bytes, units).split(' ');
+    const header = 40.0;
+    // by day the water lighter, so the light behind shows through
+    final alphas = dark ? _alphas : const [.4, .3, .22, .16, .14];
+    final level = bytes == 0 ? 0.0 : (.06 + .94 * share);
     return GestureDetector(
       onTap: () => _open(context, t),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow.withValues(alpha: dark ? .45 : .6),
+          color: scheme.surfaceContainerLow.withValues(alpha: .3),
           borderRadius: BorderRadius.circular(20),
-          // see-through: the zone's light shows through
-          border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .7)),
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
         ),
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Positioned.fill(
+            // the sign, the amount and the share in one small row over the water
+            Container(
+              height: header,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: colour.withValues(alpha: .25))),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: colour, width: 1.3),
+                    ),
+                    child: Icon(icon, size: 13, color: colour),
+                  ),
+                  const Gap(8),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: amount.first),
+                        if (amount.length > 1)
+                          TextSpan(
+                            text: ' ${amount.sublist(1).join(' ')}',
+                            style: TextStyle(fontSize: 10, letterSpacing: 0, color: ink.withValues(alpha: .6)),
+                          ),
+                      ],
+                    ),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -.6,
+                      color: ink,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${(share * 100).round()}%',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
               child: TweenAnimationBuilder<double>(
-                tween: Tween(end: bytes == 0 ? 0 : (.06 + .94 * share)),
+                tween: Tween(end: level),
                 duration: const Duration(milliseconds: 900),
                 curve: Curves.easeOutCubic,
-                // no water with nothing through the route; no surface line when the tile is all but full
-                builder: (context, level, _) => level < .005
-                    ? const SizedBox.shrink()
-                    : Align(
-                        alignment: Alignment.bottomCenter,
-                        child: FractionallySizedBox(
-                          heightFactor: level,
-                          widthFactor: 1,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: level > .97 ? null : Border(top: BorderSide(color: colour, width: 1.5)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (final (i, (name, b)) in bands.indexed.toList().reversed)
-                                  Expanded(
-                                    flex: (b * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: colour.withValues(alpha: _alphas[i.clamp(0, 4)]),
-                                        border: i < bands.length - 1
-                                            ? Border(
-                                                top: BorderSide(
-                                                  color: dark
-                                                      ? Colors.white.withValues(alpha: .18)
-                                                      : Colors.white.withValues(alpha: .75),
-                                                ),
-                                              )
-                                            : null,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      child: LayoutBuilder(
-                                        builder: (context, box) => box.maxHeight < 17
-                                            ? const SizedBox.shrink()
-                                            : Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      name,
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      style: theme.textTheme.labelMedium?.copyWith(
-                                                        color: ink,
-                                                        fontWeight: FontWeight.w700,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    formatBytes(b, units),
-                                                    style: theme.textTheme.labelMedium?.copyWith(
-                                                      color: ink.withValues(alpha: .75),
-                                                      fontWeight: FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                      ),
-                                    ),
-                                  ),
+                builder: (context, level, _) => Stack(
+                  children: [
+                    // the stream: a soft glow of the route's colour rising from the water up to the amount
+                    if (level > .005)
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: [0, 1 - level, 1 - level],
+                              colors: [
+                                colour.withValues(alpha: 0),
+                                colour.withValues(alpha: dark ? .16 : .14),
+                                Colors.transparent,
                               ],
                             ),
                           ),
                         ),
                       ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: scheme.surfaceContainerLow.withValues(alpha: .7),
-                          border: Border.all(color: colour, width: 1.4),
+                    if (level > .005)
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: FractionallySizedBox(
+                          heightFactor: level,
+                          widthFactor: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final (i, (name, b)) in bands.indexed.toList().reversed)
+                                Expanded(
+                                  flex: (b * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: colour.withValues(alpha: alphas[i.clamp(0, 4)]),
+                                      border: i < bands.length - 1
+                                          ? Border(
+                                              top: BorderSide(color: Colors.white.withValues(alpha: dark ? .16 : .7)),
+                                            )
+                                          : null,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                                    child: LayoutBuilder(
+                                      builder: (context, box) => box.maxHeight < 16
+                                          ? const SizedBox.shrink()
+                                          : Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    name,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: theme.textTheme.labelSmall?.copyWith(
+                                                      color: ink,
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Text(
+                                                  formatBytes(b, units),
+                                                  style: theme.textTheme.labelSmall?.copyWith(
+                                                    color: ink.withValues(alpha: .7),
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                        child: Icon(icon, size: 15, color: colour),
                       ),
-                      const Spacer(),
-                      Text(
-                        '${(share * 100).round()}%',
-                        style: theme.textTheme.labelLarge?.copyWith(color: ink, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                  const Gap(6),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: amount.first),
-                          if (amount.length > 1)
-                            TextSpan(
-                              text: ' ${amount.sublist(1).join(' ')}',
-                              style: TextStyle(fontSize: 12, letterSpacing: 0, color: ink.withValues(alpha: .65)),
-                            ),
-                        ],
-                      ),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -1.2,
-                        color: ink,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -2362,6 +2422,213 @@ class _RouteCard extends ConsumerWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// This session's connections by app, in a see-through card in the middle of the screen: each app with its icon,
+/// amount, the way it went (through the VPN with the servers' flags, direct) and how many sites.
+class _SessionConnections extends ConsumerWidget {
+  const _SessionConnections();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final units = t.avpn.bytesUnits.split(',');
+    final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+    final start = ref.watch(sessionStartProvider);
+    final session = [
+      for (final c in ref.watch(connectionsProvider).items)
+        if (start != null && !c.start.isBefore(start)) c,
+    ];
+    final groups = groupConnections(session, (c) => c.app)..sort((a, b) => b.total.compareTo(a.total));
+    final ink = scheme.onSurface;
+    Widget pill(String text, bool vpn) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: vpn ? accent.withValues(alpha: .16) : null,
+        borderRadius: BorderRadius.circular(9),
+        border: vpn ? null : Border.all(color: ink.withValues(alpha: .16)),
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: vpn ? accent : scheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 60),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+              child: Material(
+                color: dark ? const Color(0xB81C1C1F) : const Color(0x9EFFFFFF),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  side: BorderSide(color: Colors.white.withValues(alpha: dark ? .12 : .9)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 16, 14, 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: accent, width: 1.4),
+                              ),
+                              child: Icon(Icons.swap_horiz_rounded, size: 18, color: accent),
+                            ),
+                            const Gap(10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(t.avpn.connectionsTab, style: theme.textTheme.titleLarge),
+                                  Text(
+                                    t.avpn.contrastThisSession,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(text: '${groups.length}'),
+                                  TextSpan(
+                                    text: ' ${t.avpn.contrastAppsShort}',
+                                    style: TextStyle(fontSize: 11, letterSpacing: 0, color: scheme.onSurfaceVariant),
+                                  ),
+                                ],
+                              ),
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: -1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (groups.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 30),
+                          child: Center(child: TrafficPlaceholder(height: 60)),
+                        )
+                      else
+                        Flexible(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            itemCount: groups.length,
+                            itemBuilder: (context, i) {
+                              final g = groups[i];
+                              final icon = installed[g.key]?.icon;
+                              final name = connectionAppName(t, installed, g.key);
+                              final vpn = g.items.where((c) => c.route == ConnectionRoute.vpn).length;
+                              final direct = g.items.where((c) => c.route == ConnectionRoute.direct).length;
+                              final sites = {for (final c in g.items) c.host}.length;
+                              final flags = serverFlags(g.servers.where((s) => !isHiddenServer(s)));
+                              return Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                decoration: BoxDecoration(
+                                  border: Border(top: BorderSide(color: ink.withValues(alpha: .07))),
+                                ),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: icon == null
+                                          ? Container(
+                                              width: 34,
+                                              height: 34,
+                                              color: accent.withValues(alpha: .2),
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+                                                style: TextStyle(color: accent, fontWeight: FontWeight.w800),
+                                              ),
+                                            )
+                                          : Image.memory(icon, width: 34, height: 34, gaplessPlayback: true),
+                                    ),
+                                    const Gap(11),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  name,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                              Text(
+                                                formatBytes(g.total, units),
+                                                style: theme.textTheme.bodyMedium?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const Gap(4),
+                                          Row(
+                                            children: [
+                                              if (vpn > 0)
+                                                pill(['VPN', if (flags.isNotEmpty) flags, '$vpn'].join(' · '), true),
+                                              if (vpn > 0 && direct > 0) const Gap(5),
+                                              if (direct > 0) pill('${t.avpn.statsDirect} $direct', false),
+                                              const Spacer(),
+                                              Text(
+                                                t.avpn.contrastSites(n: sites),
+                                                style: theme.textTheme.labelSmall?.copyWith(
+                                                  color: scheme.onSurfaceVariant,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
