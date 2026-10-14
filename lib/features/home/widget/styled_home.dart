@@ -17,30 +17,8 @@ class _StyledHome extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final profile = ref.watch(activeProfileProvider).valueOrNull;
-    // a "disconnected" straight after "connected" that no tap asked for (the core's link restarting when the app
-    // comes back says so for a moment) is held for 2 seconds: the button and the gauge don't blink off and on
-    final raw = ref.watch(connectionNotifierProvider).valueOrNull ?? const Disconnected();
-    final shown = useState<ConnectionStatus>(raw);
-    final hold = useRef<Timer?>(null);
-    useEffect(
-      () =>
-          () => hold.value?.cancel(),
-      const [],
-    );
-    useEffect(() {
-      final blink =
-          shown.value.isConnected && raw is Disconnected && raw.connectionFailure == null && _pendingFrom.value == null;
-      hold.value?.cancel();
-      if (blink) {
-        hold.value = Timer(const Duration(seconds: 2), () {
-          if (context.mounted) shown.value = ref.read(connectionNotifierProvider).valueOrNull ?? const Disconnected();
-        });
-      } else if (shown.value != raw) {
-        shown.value = raw;
-      }
-      return null;
-    }, [raw]);
-    final status = shown.value;
+    // the status as the screen shows it: a blink of "disconnected" while the core's link restarts doesn't show
+    final status = ref.watch(shownConnectionProvider);
     final connected = status.isConnected;
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
     final autoGroup = group?.items
@@ -1364,7 +1342,7 @@ class _HomeTraffic extends ConsumerWidget {
     // held across the statistics stream's blinks, so the card doesn't flip when the app comes back
     final sessionStart = ref.watch(sessionStartProvider);
     // the VPN off: no session, the picture (the last session's list isn't shown)
-    final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
+    final connected = ref.watch(shownConnectionProvider).isConnected;
     final current = [
       // the session's start not known yet: nothing rather than the whole day's list
       if (connected && sessionStart != null)

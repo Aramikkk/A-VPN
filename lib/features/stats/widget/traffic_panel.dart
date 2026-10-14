@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
-import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/connection/notifier/shown_connection.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -34,7 +34,7 @@ class TrafficPanel extends ConsumerWidget {
     // held across the statistics stream's blinks, so the card doesn't flip when the app comes back
     final sessionStart = ref.watch(sessionStartProvider);
     // the VPN off: no session, the picture (the last session's list isn't shown)
-    final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
+    final connected = ref.watch(shownConnectionProvider).isConnected;
     final current = [
       // the session's start not known yet: nothing rather than the whole day's list
       if (connected && sessionStart != null)
