@@ -89,6 +89,10 @@ class ConnectionQuality extends Notifier<List<int?>> {
   /// an answer has come on this connection: the probes lost before it (the tunnel coming up) aren't recorded, nor
   /// the first answer itself after a fresh start
   bool _answered = false;
+
+  /// the last moment the VPN was seen up: a status that blinks off for a moment (the core's link restarting when
+  /// the app comes back) isn't a new connection
+  DateTime? _lastUp;
   Uri? _url;
   bool _foreground = true;
   AppLifecycleListener? _lifecycle;
@@ -117,17 +121,24 @@ class ConnectionQuality extends Notifier<List<int?>> {
     final connected = status is Connected;
     if (status is Connecting) _sawConnecting = true;
     if (connected) {
-      warmUp = _sawConnecting;
+      // a new connection: one that went through "connecting", or the VPN down for more than a few seconds; the
+      // core's link restarting on resume rebuilds this without either, and the gauge kept starting over
+      final now = DateTime.now();
+      final fresh = _sawConnecting || _lastUp == null || now.difference(_lastUp!) > const Duration(seconds: 10);
+      if (fresh) {
+        warmUp = _sawConnecting;
+        // a connection found up when the app opened (not started meanwhile): the tunnel is long warm, and the
+        // last probes kept from before show at once (the fresh ones take over within the minute)
+        final foundUp = !warmUp;
+        sinceConnect = foundUp ? _samples.length : 0;
+        _answered = foundUp;
+      }
       _sawConnecting = false;
+      _lastUp = now;
     }
     final port = ref.watch(ConfigOptions.mixedPort);
     final url = Uri.parse(ref.watch(ConfigOptions.connectionTestUrl));
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
-    // a connection found up when the app opened (not started meanwhile): the tunnel is long warm, and the last
-    // probes kept from before show at once (the fresh ones take over within the minute)
-    final foundUp = connected && !warmUp;
-    sinceConnect = foundUp ? _samples.length : 0;
-    _answered = foundUp;
     if (!connected || !ref.watch(ConfigOptions.enableMixedPort)) return List.of(_samples);
 
     final client = HttpClient()
@@ -197,6 +208,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     }
     _samples.add(ms);
     sinceConnect++;
+    _lastUp = now;
     if (_samples.length > length) _samples.removeAt(0);
     final minute = now.millisecondsSinceEpoch ~/ 60000;
     _minutes.putIfAbsent(minute, PingBucket.new).add(ms);

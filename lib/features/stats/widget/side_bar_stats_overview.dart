@@ -775,8 +775,17 @@ class _QualityCard extends ConsumerWidget {
     final lostColor = _isRed(theme.araLook.pingColors.first) ? scheme.onSurface : scheme.error;
     final tiny = theme.textTheme.labelSmall?.copyWith(
       color: scheme.onSurfaceVariant,
-      fontSize: compact ? 9 : 10.5,
-      fontWeight: FontWeight.w700,
+      fontSize: compact ? 10 : 12.5,
+      fontWeight: FontWeight.w800,
+    );
+    // a half's name: which way its bars go, the word, in the half's colour
+    Widget halfLabel(IconData arrow, String text, Color colour) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(arrow, size: compact ? 11 : 14, color: colour),
+        const SizedBox(width: 2),
+        Text(text, style: tiny?.copyWith(color: colour)),
+      ],
     );
     final summary = period == null
         ? summarize(samples)
@@ -849,11 +858,8 @@ class _QualityCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(t.avpn.statsLoss.toLowerCase(), style: tiny?.copyWith(color: lostColor)),
-                    Text(
-                      t.avpn.statsPing.toLowerCase(),
-                      style: tiny?.copyWith(color: theme.araLook.pingColors.first),
-                    ),
+                    halfLabel(Icons.south_rounded, t.avpn.statsLoss.toLowerCase(), lostColor),
+                    halfLabel(Icons.north_rounded, t.avpn.statsPing.toLowerCase(), theme.araLook.pingColors.first),
                   ],
                 ),
                 Gap(compact ? 6 : 8),

@@ -17,7 +17,30 @@ class _StyledHome extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final profile = ref.watch(activeProfileProvider).valueOrNull;
-    final status = ref.watch(connectionNotifierProvider).valueOrNull ?? const Disconnected();
+    // a "disconnected" straight after "connected" that no tap asked for (the core's link restarting when the app
+    // comes back says so for a moment) is held for 2 seconds: the button and the gauge don't blink off and on
+    final raw = ref.watch(connectionNotifierProvider).valueOrNull ?? const Disconnected();
+    final shown = useState<ConnectionStatus>(raw);
+    final hold = useRef<Timer?>(null);
+    useEffect(
+      () =>
+          () => hold.value?.cancel(),
+      const [],
+    );
+    useEffect(() {
+      final blink =
+          shown.value.isConnected && raw is Disconnected && raw.connectionFailure == null && _pendingFrom.value == null;
+      hold.value?.cancel();
+      if (blink) {
+        hold.value = Timer(const Duration(seconds: 2), () {
+          if (context.mounted) shown.value = ref.read(connectionNotifierProvider).valueOrNull ?? const Disconnected();
+        });
+      } else if (shown.value != raw) {
+        shown.value = raw;
+      }
+      return null;
+    }, [raw]);
+    final status = shown.value;
     final connected = status.isConnected;
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
     final autoGroup = group?.items
