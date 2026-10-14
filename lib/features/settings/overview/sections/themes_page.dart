@@ -319,7 +319,7 @@ class AccentPicker extends ConsumerWidget {
   }
 }
 
-/// The looks as small previews in today's brightness: Graphite, Editorial and the classic one.
+/// The looks as small previews in today's brightness: Contrast, Glass, Graphite and the classic one.
 class StylePicker extends ConsumerWidget {
   const StylePicker({super.key});
 
@@ -333,7 +333,7 @@ class StylePicker extends ConsumerWidget {
     final accentColour = brightness == Brightness.dark ? accent.darkPrimary : accent.lightPrimary;
     (String, String) names(AraStyle style) => switch (style) {
       AraStyle.graphite => (t.avpn.styleGraphite, t.avpn.styleGraphiteHint),
-      AraStyle.editorial => (t.avpn.styleEditorial, t.avpn.styleEditorialHint),
+      AraStyle.contrast => (t.avpn.styleContrast, t.avpn.styleContrastHint),
       AraStyle.glass => (t.avpn.styleGlass, t.avpn.styleGlassHint),
       AraStyle.classic => (t.avpn.styleClassic, t.avpn.styleClassicHint),
     };
@@ -401,17 +401,15 @@ class _StylePreview extends StatelessWidget {
     final p = style == AraStyle.classic ? null : AppTheme.palette(style, brightness);
     final neon = accent;
     final bg = p?.bg ?? (dark ? Colors.black : Colors.white);
-    final fg = p?.fg ?? (dark ? Colors.white : Colors.black);
     final line = p?.line ?? (dark ? const Color(0xFF26262B) : const Color(0xFFDDDFDA));
     final card = p?.card ?? (dark ? const Color(0xFF111113) : const Color(0xFFF6F7F4));
-    final editorial = style == AraStyle.editorial;
+    final contrast = style == AraStyle.contrast;
     Widget row(bool selected) => Container(
       height: 9,
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: selected ? (editorial ? fg : neon.withValues(alpha: .3)) : card,
-        borderRadius: BorderRadius.circular(editorial ? 0 : 4),
-        border: editorial ? Border(bottom: BorderSide(color: line)) : null,
+        color: selected ? neon.withValues(alpha: .3) : card,
+        borderRadius: BorderRadius.circular(4),
       ),
     );
     return Container(
@@ -459,38 +457,21 @@ class _StylePreview extends StatelessWidget {
                 ),
               ],
             )
-          else if (editorial)
+          // Contrast: the black panel with the glowing ring under the light rows
+          else if (contrast)
             Container(
-              padding: const EdgeInsets.only(top: 3),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: fg, width: 1.5)),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    'ВКЛ.',
-                    style: TextStyle(
-                      fontFamily: 'Unbounded',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: fg,
-                      height: 1,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 24,
-                    height: 13,
-                    padding: const EdgeInsets.all(2),
-                    alignment: Alignment.centerRight,
-                    decoration: BoxDecoration(color: fg, borderRadius: BorderRadius.circular(9)),
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                    ),
-                  ),
-                ],
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: const Color(0xFF0B0B0C), borderRadius: BorderRadius.circular(8)),
+              child: Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF3F1EC),
+                  border: Border.all(color: neon, width: 2),
+                  boxShadow: [BoxShadow(color: neon.withValues(alpha: .6), blurRadius: 8)],
+                ),
               ),
             )
           else

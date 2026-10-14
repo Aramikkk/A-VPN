@@ -16,6 +16,7 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
@@ -27,7 +28,9 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
 import 'package:hiddify/features/proxy/data/lan_sharing.dart';
+import 'package:hiddify/features/proxy/data/hidden_servers.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
+import 'package:hiddify/features/proxy/data/pre_ping.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
@@ -129,12 +132,7 @@ class AraHomeBody extends HookConsumerWidget {
 
     final style = Theme.of(context).araLook.style;
     if (style != AraStyle.classic) {
-      return _StyledHome(
-        editorial: style == AraStyle.editorial,
-        testing: testing.value,
-        onCheck: pingAll,
-        traffic: traffic,
-      );
+      return _StyledHome(testing: testing.value, onCheck: pingAll, traffic: traffic);
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -546,8 +544,67 @@ class _CheckRow extends HookConsumerWidget {
       if (on && context.mounted) await showDialog<void>(context: context, builder: (_) => const _SharingDialog());
     }
 
-    // Glass: the toggles in one pane the width of the connect panel, each an equal part of it
+    // Glass: the toggles in one pane the width of the connect panel, each an equal part of it; Contrast: outlined
+    // pills on its black panel, the ones on filled
     final glass = Theme.of(context).araLook.glass;
+    if (Theme.of(context).araLook.style == AraStyle.contrast) {
+      final scheme = Theme.of(context).colorScheme;
+      Widget pill(IconData icon, String label, bool on, Future<void> Function(bool) toggle, VoidCallback? hold) =>
+          Expanded(
+            child: GestureDetector(
+              onLongPress: hold,
+              child: Material(
+                color: on ? scheme.onSurface : Colors.transparent,
+                shape: StadiumBorder(
+                  side: BorderSide(color: on ? scheme.onSurface : scheme.outlineVariant, width: 1.3),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => toggle(!on),
+                  child: SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(icon, size: 16, color: on ? scheme.surface : scheme.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                label,
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: on ? scheme.surface : scheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+      return Row(
+        spacing: 6,
+        children: [
+          pill(
+            Icons.wifi_tethering_rounded,
+            t.avpn.sharing,
+            sharingOn,
+            toggleSharing,
+            () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+          ),
+          pill(Icons.public_rounded, t.avpn.global, ref.watch(ConfigOptions.globalMode), toggleGlobal, null),
+          if (serverAvailable) pill(Icons.home_rounded, t.avpn.server, serverOn, toggleServer, null),
+        ],
+      );
+    }
     if (glass != null) {
       return _GlassToggles(
         look: glass,

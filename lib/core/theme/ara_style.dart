@@ -1,15 +1,16 @@
 /// The app's look, picked in Settings → Themes; each one has a day and a night version, and the accent colour
 /// (the colour theme) colours it.
 enum AraStyle {
-  /// Graphite: near-black (or light grey) with glass cards, a glowing ring button and big Unbounded figures.
-  graphite,
-
-  /// Editorial: paper (or dark paper), black and one accent colour, huge type, monospaced labels and thin rules.
-  editorial,
+  /// Contrast: a light upper half (dark grey by night) with white tiles, and the connect controls on a black panel
+  /// under it; big tight Golos figures. In place of Editorial (5.8.89).
+  contrast,
 
   /// Glass: see-through panels over a soft coloured backdrop, the menu and the connect panel
   /// floating over it, in one of its own colour schemes (GlassScheme).
   glass,
+
+  /// Graphite: near-black (or light grey) with glass cards, a glowing ring button and big Unbounded figures.
+  graphite,
 
   /// The look before 5.8: cards on white or black, the accent gradient on the speed block.
   classic;

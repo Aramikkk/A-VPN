@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dartx/dartx.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:hiddify/features/proxy/data/hidden_servers.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
@@ -156,6 +157,8 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
     };
     final items = <OutboundInfo>[];
     for (final item in sortedItems) {
+      // the provider's gaming auto-pick: in no list
+      if (isHiddenServer(item.tag) || isHiddenServer(item.tagDisplay)) continue;
       // if (groupWithSelected.keys.contains(item.tag)) {
       //   items.add(item.copyWith(selectedTag: groupWithSelected[item.tag]));
       // } else {

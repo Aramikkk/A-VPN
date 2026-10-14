@@ -33,21 +33,23 @@ enum BuiltinRule {
   // fall back to TCP at once instead of after a timeout
   blockQuic(enabledByDefault: true),
   blockAds(enabledByDefault: true),
+  // what is blocked in Russia first: no app reaches it direct
+  socialProxy(enabledByDefault: true),
+  adultProxy(enabledByDefault: true),
+  blockedProxy(enabledByDefault: true),
+  // then the Russian apps whole, Google's push and analytics servers they call included (they went through the
+  // VPN when Google's group came first): Yandex, marketplaces, banks, the rest
+  yandexDirect(enabledByDefault: true),
+  marketsDirect(enabledByDefault: true),
+  banksDirect(enabledByDefault: true),
+  ruAppsDirect(enabledByDefault: true),
+  // then the groups that take the VPN for everyone else
   aiProxy(enabledByDefault: true),
   videoProxy(enabledByDefault: true),
   storesProxy(enabledByDefault: true),
   googleProxy(enabledByDefault: true),
-  socialProxy(enabledByDefault: true),
   chinaProxy(enabledByDefault: true),
-  adultProxy(enabledByDefault: true),
-  blockedProxy(enabledByDefault: true),
   foreignProxy(enabledByDefault: true),
-  // Yandex, marketplaces and banks direct, ahead of the rest of the Russian apps
-  yandexDirect(enabledByDefault: true),
-  marketsDirect(enabledByDefault: true),
-  banksDirect(enabledByDefault: true),
-  // Russian apps on the phone (Yandex Music, banks, Gosuslugi…) direct, whatever servers they use
-  ruAppsDirect(enabledByDefault: true),
   ruDomainsDirect(enabledByDefault: true);
 
   const BuiltinRule({required this.enabledByDefault});
@@ -210,7 +212,12 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
     final missing = {...BuiltinRule.values};
     // a list from before the groups (5.8.20 and older) had one "blocked through the VPN" rule: the built-ins
     // go back to their order, under the user's own rules, keeping their switches
-    if (saved.any((rule) => rule.name == 'builtin:rknBlockedProxy')) {
+    // a list from before 5.8.89 had Google's group (and AI, YouTube, the stores) ahead of the Russian apps, so
+    // a Russian app's calls to Google went through the VPN: the built-ins go to the new order once, under the
+    // user's own rules, keeping their switches
+    int at(String name) => saved.indexWhere((rule) => rule.name == name);
+    final oldOrder = at('builtin:ruAppsDirect') > at('builtin:googleProxy') && at('builtin:googleProxy') >= 0;
+    if (oldOrder || saved.any((rule) => rule.name == 'builtin:rknBlockedProxy')) {
       final enabled = {for (final rule in saved) rule.name: rule.enabled};
       enabled['builtin:blockedProxy'] = enabled['builtin:rknBlockedProxy'] ?? true;
       return _updateListOrder([

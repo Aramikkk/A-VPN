@@ -27,7 +27,7 @@ class AppTheme {
   /// the accent colour and gradient (Settings → General → Colour theme)
   final AraAccent accent;
 
-  /// Graphite, Editorial or the classic look (Settings → Themes)
+  /// Contrast, Glass, Graphite or the classic look (Settings → Themes)
   final AraStyle style;
 
   AraLook _look(Brightness brightness) {
@@ -210,18 +210,20 @@ class AppTheme {
   static AraPalette palette(AraStyle style, Brightness brightness, {GlassScheme glass = GlassScheme.fallback}) {
     if (style == AraStyle.glass) return glassPalette(glass.look(brightness));
     final dark = brightness == Brightness.dark;
-    return style == AraStyle.editorial
+    // Contrast: warm light grey with white tiles by day, dark graphite with lighter tiles by night (its black
+    // panel is drawn by the home screen itself)
+    return style == AraStyle.contrast
         ? AraPalette(
-            bg: dark ? const Color(0xFF131211) : const Color(0xFFF3F1EC),
-            fg: dark ? const Color(0xFFECE8DF) : const Color(0xFF111111),
-            muted: dark ? const Color(0xFF8F8A80) : const Color(0xFF6D6A63),
-            card: dark ? const Color(0xFF1B1A18) : const Color(0xFFECE9E2),
-            container: dark ? const Color(0xFF211F1C) : const Color(0xFFE6E2D9),
-            high: dark ? const Color(0xFF282521) : const Color(0xFFDFDAD0),
-            highest: dark ? const Color(0xFF2F2C27) : const Color(0xFFD7D2C7),
-            line: dark ? const Color(0xFF46423B) : const Color(0xFFC2BDB1),
-            strongLine: dark ? const Color(0xFFECE8DF) : const Color(0xFF111111),
-            nav: dark ? const Color(0xFF131211) : const Color(0xFFF3F1EC),
+            bg: dark ? const Color(0xFF1A1A1C) : const Color(0xFFECEBE7),
+            fg: dark ? const Color(0xFFF3F1EC) : const Color(0xFF111111),
+            muted: dark ? const Color(0xFF8F8C86) : const Color(0xFF6E6A64),
+            card: dark ? const Color(0xFF26262A) : Colors.white,
+            container: dark ? const Color(0xFF2A2A2E) : const Color(0xFFF7F6F3),
+            high: dark ? const Color(0xFF303034) : const Color(0xFFF1F0EC),
+            highest: dark ? const Color(0xFF38383D) : const Color(0xFFE6E4DF),
+            line: dark ? const Color(0xFF3A3A3F) : const Color(0xFFD4D1CB),
+            strongLine: dark ? const Color(0xFF55555B) : const Color(0xFFB4B0A8),
+            nav: dark ? const Color(0xFF0B0B0C) : const Color(0xFF111111),
           )
         : AraPalette(
             bg: dark ? const Color(0xFF0B0B0D) : const Color(0xFFF4F4F6),
@@ -256,10 +258,10 @@ class AppTheme {
     );
   }
 
-  /// Graphite, Editorial and Glass, by day or night, in the accent colour (Glass: its scheme's).
+  /// Contrast, Glass and Graphite, by day or night, in the accent colour (Glass: its scheme's).
   ThemeData _styledTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final editorial = style == AraStyle.editorial;
+    final contrast = style == AraStyle.contrast;
     final styled = palette(style, brightness, glass: glassScheme);
     final glass = _glass;
     final look = glassScheme.look(brightness);
@@ -282,12 +284,7 @@ class AppTheme {
             nav: dark ? Colors.black : Colors.white,
           )
         : styled;
-    final colourless = HSLColor.fromColor(accent.seed).saturation < .12;
-    final accentColour = glass
-        ? look.accent
-        : editorial && colourless
-        ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A))
-        : (dark ? accent.darkPrimary : accent.lightPrimary);
+    final accentColour = glass ? look.accent : (dark ? accent.darkPrimary : accent.lightPrimary);
     final primary = AraLook.readableOn(accentColour, glass ? look.panelOnBase : p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
     final scheme = ColorScheme.fromSeed(seedColor: glass ? look.accent : accent.seed, brightness: brightness).copyWith(
@@ -311,16 +308,17 @@ class AppTheme {
       outlineVariant: p.line,
     );
 
-    // body text: Manrope (Graphite) or Golos Text (Editorial); headings in Unbounded; Editorial's small labels
-    // monospaced
-    final body = editorial ? 'Golos Text' : 'Manrope';
+    // body text: Manrope (Graphite, Glass) or Golos Text (Contrast); headings in Unbounded (Contrast: Golos)
+    final body = contrast ? 'Golos Text' : 'Manrope';
     final base = (dark ? Typography.material2021().white : Typography.material2021().black).apply(
       fontFamily: body,
       bodyColor: p.fg,
       displayColor: p.fg,
     );
-    TextStyle? heading(TextStyle? s, double spacing) =>
-        s?.copyWith(fontFamily: 'Unbounded', fontWeight: FontWeight.w800, letterSpacing: spacing);
+    // Contrast's headings in Golos too, medium and tight, as its big figures
+    TextStyle? heading(TextStyle? s, double spacing) => contrast
+        ? s?.copyWith(fontFamily: 'Golos Text', fontWeight: FontWeight.w600, letterSpacing: spacing * .8)
+        : s?.copyWith(fontFamily: 'Unbounded', fontWeight: FontWeight.w800, letterSpacing: spacing);
     final text = base.copyWith(
       displayLarge: heading(base.displayLarge, -2),
       displayMedium: heading(base.displayMedium, -1.5),
@@ -335,22 +333,15 @@ class AppTheme {
       bodySmall: base.bodySmall?.copyWith(fontWeight: FontWeight.w500),
       labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       labelMedium: base.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-      labelSmall: editorial
-          ? base.labelSmall?.copyWith(
-              fontFamily: 'JetBrains Mono',
-              fontWeight: FontWeight.w700,
-              fontSize: 10.5,
-              letterSpacing: 0,
-            )
-          : base.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+      labelSmall: base.labelSmall?.copyWith(fontWeight: FontWeight.w600),
     );
 
-    final radius = editorial ? 6.0 : (glass ? 24.0 : 20.0);
+    final radius = (glass ? 24.0 : 20.0);
     final ShapeBorder shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
-      side: editorial ? BorderSide(color: p.strongLine, width: 1.2) : BorderSide(color: p.line),
+      side: BorderSide(color: p.line),
     );
-    final OutlinedBorder small = RoundedRectangleBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 99));
+    final OutlinedBorder small = RoundedRectangleBorder(borderRadius: BorderRadius.circular(99));
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -379,7 +370,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: p.nav,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: editorial ? Colors.transparent : primary.withValues(alpha: .16),
+        indicatorColor: primary.withValues(alpha: .16),
         iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(color: s.contains(WidgetState.selected) ? primary : p.muted),
         ),
@@ -394,8 +385,8 @@ class AppTheme {
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: p.nav,
-        indicatorColor: editorial ? p.fg : primary.withValues(alpha: .16),
-        selectedIconTheme: IconThemeData(color: editorial ? p.bg : primary),
+        indicatorColor: primary.withValues(alpha: .16),
+        selectedIconTheme: IconThemeData(color: primary),
         unselectedIconTheme: IconThemeData(color: p.muted),
         selectedLabelTextStyle: text.labelMedium?.copyWith(color: p.fg, fontWeight: FontWeight.w800),
         unselectedLabelTextStyle: text.labelMedium?.copyWith(color: p.muted),
@@ -412,68 +403,50 @@ class AppTheme {
             )
           : null,
       chipTheme: ChipThemeData(
-        shape: small.copyWith(side: BorderSide(color: editorial ? p.strongLine : p.line)),
-        // a selected chip keeps its text colour, so its fill is a tint (Editorial's ink would hide the text)
-        selectedColor: editorial ? p.fg.withValues(alpha: .14) : primary.withValues(alpha: .18),
+        shape: small.copyWith(side: BorderSide(color: p.line)),
+        // a selected chip keeps its text colour, so its fill is a tint
+        selectedColor: primary.withValues(alpha: .18),
         backgroundColor: Colors.transparent,
         labelStyle: text.labelLarge,
-        secondaryLabelStyle: text.labelLarge?.copyWith(color: editorial ? p.bg : p.fg),
-        checkmarkColor: editorial ? p.fg : primary,
+        secondaryLabelStyle: text.labelLarge?.copyWith(color: p.fg),
+        checkmarkColor: primary,
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
           shape: WidgetStatePropertyAll(small),
-          side: WidgetStatePropertyAll(BorderSide(color: editorial ? p.strongLine : p.line)),
+          side: WidgetStatePropertyAll(BorderSide(color: p.line)),
           backgroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? (editorial ? p.fg : primary.withValues(alpha: .18)) : null,
+            (s) => s.contains(WidgetState.selected) ? (primary.withValues(alpha: .18)) : null,
           ),
-          foregroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) && editorial ? p.bg : p.fg,
-          ),
-          iconColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) && editorial ? p.bg : p.fg,
-          ),
+          foregroundColor: WidgetStatePropertyAll(p.fg),
+          iconColor: WidgetStatePropertyAll(p.fg),
         ),
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected)
-              ? (editorial ? (AraLook.contrast(primary, p.fg) >= 2.6 ? primary : p.bg) : onPrimary)
-              : p.muted,
-        ),
-        trackColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? (editorial ? p.fg : primary) : p.highest,
-        ),
+        thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? (onPrimary) : p.muted),
+        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? (primary) : p.highest),
         trackOutlineColor: WidgetStateProperty.resolveWith(
-          (s) => editorial ? p.strongLine : (s.contains(WidgetState.selected) ? primary : p.line),
+          (s) => (s.contains(WidgetState.selected) ? primary : p.line),
         ),
         thumbIcon: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected)
-              ? Icon(Icons.check_rounded, size: 16, color: editorial ? p.fg : primary)
-              : null,
+          (s) => s.contains(WidgetState.selected) ? Icon(Icons.check_rounded, size: 16, color: primary) : null,
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(editorial ? 4 : 14)),
-      ),
+      inputDecorationTheme: InputDecorationTheme(border: OutlineInputBorder(borderRadius: BorderRadius.circular(14))),
       filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(shape: small)),
-      listTileTheme: ListTileThemeData(iconColor: editorial ? p.fg : primary),
+      listTileTheme: ListTileThemeData(iconColor: primary),
       extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _styledLook(brightness, p, primary)},
     );
   }
 
   /// The speed block and the graph's colours for a style: Graphite's block is a dark (or white) glass card with the
-  /// download in the accent and the upload across the colour wheel; Editorial's is flat with a rule round it, the
-  /// download in ink and the upload in the accent.
+  /// download in the accent and the upload across the colour wheel.
   AraLook _styledLook(Brightness brightness, AraPalette p, Color primary) {
     final dark = brightness == Brightness.dark;
-    final editorial = style == AraStyle.editorial;
     final glass = _glass;
     final look = glassScheme.look(brightness);
     final blockColours = glass
         ? [p.high, p.card]
-        : editorial
-        ? [p.card, p.card]
         : accent.filled
         ? [accent.darkPrimary, accent.darkPrimary]
         : accent.pure
@@ -485,14 +458,11 @@ class AppTheme {
     final colourless = HSLColor.fromColor(glass ? look.accent : accent.seed).saturation < .12;
     final Color down;
     final Color up;
-    final filled = accent.filled && !editorial && !glass;
+    final filled = accent.filled && !glass;
     if (filled) {
       // on the neon block: black lines, upload a lighter shade of it
       down = Colors.black;
       up = Color.alphaBlend(Colors.black.withValues(alpha: .55), block);
-    } else if (editorial) {
-      down = p.fg;
-      up = colourless ? (dark ? const Color(0xFFFF5F61) : const Color(0xFFE0353A)) : primary;
     } else if (colourless) {
       down = dark ? const Color(0xFF3B9BFF) : const Color(0xFF1F66E5);
       up = dark ? const Color(0xFFFF9F2E) : const Color(0xFFD9590B);
@@ -507,7 +477,7 @@ class AppTheme {
       fastPing: primary,
       neonFill: filled ? accent.darkPrimary : null,
       dark: dark,
-      border: editorial ? p.strongLine : p.line,
+      border: p.line,
       graphDown: filled ? down : AraLook.readableOn(down, block),
       graphUp: filled ? up : AraLook.readableOn(up, block),
       style: style,
@@ -574,7 +544,7 @@ class AraPalette {
   /// a hairline between rows
   final Color line;
 
-  /// Editorial's ink rules (Graphite: a stronger hairline)
+  /// a stronger hairline
   final Color strongLine;
   final Color nav;
 }

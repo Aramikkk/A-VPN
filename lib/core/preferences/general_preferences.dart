@@ -147,11 +147,14 @@ abstract class Preferences {
     mapTo: (value) => value.name,
   );
 
-  /// A-VPN: the look (Graphite, Editorial or the classic one).
+  /// A-VPN: the look (Contrast, Glass, Graphite or the classic one).
   static final araStyle = PreferencesNotifier.create<AraStyle, String>(
     "ara_style",
     AraStyle.fallback,
-    mapFrom: (value) => AraStyle.values.firstWhere((e) => e.name == value, orElse: () => AraStyle.fallback),
+    // Editorial's place went to Contrast
+    mapFrom: (value) => value == 'editorial'
+        ? AraStyle.contrast
+        : AraStyle.values.firstWhere((e) => e.name == value, orElse: () => AraStyle.fallback),
     mapTo: (value) => value.name,
   );
 

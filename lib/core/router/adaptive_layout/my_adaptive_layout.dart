@@ -190,16 +190,13 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                 ? FocusScope(
                     node: navScopeNode,
                     child: DecoratedBox(
-                      // Editorial rules the menu off with an ink line, Graphite with a hairline
+                      // Graphite rules the menu off with a hairline
                       decoration: BoxDecoration(
                         border: switch (Theme.of(context).araLook.style) {
-                          AraStyle.editorial => Border(
-                            top: BorderSide(color: Theme.of(context).colorScheme.outline, width: 2),
-                          ),
                           AraStyle.graphite => Border(
                             top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
                           ),
-                          AraStyle.glass || AraStyle.classic => null,
+                          AraStyle.contrast || AraStyle.glass || AraStyle.classic => null,
                         },
                       ),
                       child: NavigationBar(
