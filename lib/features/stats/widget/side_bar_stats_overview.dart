@@ -271,7 +271,6 @@ class SideBarStatsOverview extends ConsumerWidget {
       final accent = theme.araAccent;
       // the figures and labels in the accent: graphite by day when it's too light to read (Contrast's citrus)
       final accentText = theme.araIcon;
-      const grey = Color(0xFF9AA0A6);
       final dark = theme.brightness == Brightness.dark;
       final ink = scheme.onSurface;
       final muted = scheme.onSurfaceVariant;
@@ -285,56 +284,6 @@ class SideBarStatsOverview extends ConsumerWidget {
         child: child,
       );
       Widget block(Widget child) => ContrastFrost(child: child);
-      Widget figure(String text, {Color? color, double size = 18}) {
-        final cut = text.lastIndexOf(' ');
-        return Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(text: cut < 0 ? text : text.substring(0, cut)),
-              if (cut >= 0)
-                TextSpan(
-                  text: text.substring(cut),
-                  style: TextStyle(fontSize: size * .5, letterSpacing: 0, color: muted),
-                ),
-            ],
-          ),
-          maxLines: 1,
-          style: TextStyle(
-            fontSize: size,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -.8,
-            color: color ?? ink,
-            height: 1,
-          ),
-        );
-      }
-
-      Widget row(IconData icon, String label, String value, {bool lit = false}) => Expanded(
-        child: pane(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: lit ? accentText : muted),
-              const Gap(8),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
-                ),
-              ),
-              FittedBox(child: figure(value, color: lit ? accentText : null)),
-            ],
-          ),
-        ),
-      );
-      Widget dot(Color c) => Container(
-        width: 7,
-        height: 7,
-        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-      );
-      final sessionAmount = size(total).split(' ');
       final contrastGraph = _SlidingGraph(
         samples: history,
         live: range == StatsRange.minute,
@@ -349,78 +298,6 @@ class SideBarStatsOverview extends ConsumerWidget {
           textStyle: theme.textTheme.labelSmall!.copyWith(color: muted, fontSize: 10),
           ticks: ticks,
           slots: slots,
-        ),
-      );
-      final summary = block(
-        SizedBox(
-          height: 168,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // the session's traffic in a ring of its routes: through the VPN in the accent, the bypass grey
-              SizedBox(
-                width: 148,
-                child: pane(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: CustomPaint(
-                          painter: _RouteRing(share: share ?? 0, vpn: accent, direct: grey),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                figure(sessionAmount.first, size: 22),
-                                Text(
-                                  '${sessionAmount.length > 1 ? sessionAmount.last : ''} ${t.avpn.statsSessionShort.toLowerCase()}',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: muted,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 9.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const Gap(6),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(accent)),
-                            TextSpan(
-                              text: ' VPN ${share == null ? '—' : '${(share * 100).round()}%'}   ',
-                              style: TextStyle(color: accentText),
-                            ),
-                            WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(grey)),
-                            TextSpan(
-                              text: ' ${share == null ? '—' : '${((1 - share) * 100).round()}%'}',
-                              style: TextStyle(color: muted),
-                            ),
-                          ],
-                        ),
-                        style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Gap(6),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    row(Icons.south_rounded, t.avpn.statsDownload, speed(stats.downlink.toInt()), lit: true),
-                    const Gap(6),
-                    row(Icons.north_rounded, t.avpn.statsUpload, speed(stats.uplink.toInt())),
-                    const Gap(6),
-                    row(Icons.lan_rounded, t.avpn.statsConnectionsShort, '${stats.connectionsIn}'),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
       );
       final speedPage = block(
@@ -469,37 +346,34 @@ class SideBarStatsOverview extends ConsumerWidget {
         scrollDirection: Axis.vertical,
         children: [
           LayoutBuilder(
-            builder: (context, box) => Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-              // a short, wide page (the phone turned): the summary and the losses side by side
-              child: box.maxHeight < 420 && box.maxWidth >= 560
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              summary,
-                              const Spacer(),
-                              Icon(Icons.keyboard_arrow_down_rounded, color: muted),
-                            ],
-                          ),
-                        ),
-                        const Gap(8),
-                        Expanded(child: block(const _LossDay())),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        summary,
-                        const Gap(8),
-                        Expanded(child: block(const _LossDay())),
-                        const Gap(4),
-                        Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
-                      ],
-                    ),
-            ),
+            builder: (context, box) {
+              final wide = box.maxHeight < 420 && box.maxWidth >= 560;
+              final ping = block(_PingBlock(range: range));
+              final losses = block(const _LossDay());
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                // the ping over the period on top, the session's losses under it (side by side on a short, wide page)
+                child: wide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: ping),
+                          const Gap(8),
+                          Expanded(child: losses),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(flex: 3, child: ping),
+                          const Gap(8),
+                          Expanded(flex: 2, child: losses),
+                          const Gap(4),
+                          Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
+                        ],
+                      ),
+              );
+            },
           ),
           Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 22), child: speedPage),
         ],
@@ -1345,30 +1219,6 @@ class _SlidingGraph extends HookWidget {
   }
 }
 
-/// A ring of the session's two routes: through the VPN (from the top, clockwise) and the bypass, the rest.
-class _RouteRing extends CustomPainter {
-  _RouteRing({required this.share, required this.vpn, required this.direct});
-
-  final double share;
-  final Color vpn;
-  final Color direct;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = math.min(size.width, size.height) / 2 - 6;
-    final rect = Rect.fromCircle(center: size.center(Offset.zero), radius: r);
-    final pen = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(rect.center, r, pen..color = direct.withValues(alpha: .35));
-    if (share > 0) canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * share.clamp(0, 1), false, pen..color = vpn);
-  }
-
-  @override
-  bool shouldRepaint(_RouteRing old) => old.share != share || old.vpn != vpn || old.direct != direct;
-}
-
 /// This session's packet loss: its share of the probes, a strip of the session with each loss where it fell, and
 /// each stretch of loss with when it began, how long it went on and how much was lost.
 class _LossDay extends ConsumerWidget {
@@ -1381,14 +1231,11 @@ class _LossDay extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final muted = scheme.onSurfaceVariant;
-    // followed with the probes (one a second); worked out from the minutes kept
     ref.watch(connectionQualityProvider);
-    // this session's, in the theme's colour
     final start = ref.watch(sessionStartProvider);
     final day = ref.read(connectionQualityProvider.notifier).lossDay(since: start ?? DateTime.now());
-    // the loss's strip and dots in the accent, its figures grey
     final loss = theme.araAccent;
-    final lossText = theme.brightness == Brightness.dark ? const Color(0xFFA3A9B0) : const Color(0xFF5F656D);
+    final lossText = dark ? const Color(0xFFA3A9B0) : const Color(0xFF5F656D);
     String two(int n) => n.toString().padLeft(2, '0');
     String clock(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
     String percent(double v) => v == 0
@@ -1396,7 +1243,6 @@ class _LossDay extends ConsumerWidget {
         : v < .001
         ? '<0,1%'
         : '${(v * 100).toStringAsFixed(v < .1 ? 1 : 0).replaceAll('.', ',')}%';
-    final share = day.total.sent == 0 ? 0.0 : day.total.lost / day.total.sent;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
       decoration: BoxDecoration(
@@ -1407,59 +1253,16 @@ class _LossDay extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      t.avpn.contrastLossTitle,
-                      style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
-                    ),
-                    const Gap(2),
-                    Text(
-                      day.episodes.isEmpty
-                          ? t.avpn.contrastLossNone
-                          : t.avpn.contrastLossEpisodes(n: day.episodes.length),
-                      style: theme.textTheme.labelSmall?.copyWith(color: muted),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                percent(share),
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -1,
-                  height: 1,
-                  color: share > 0 ? lossText : scheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const Gap(10),
-          // the day as a strip, now at the right: each minute with loss a mark, as high as the share lost
-          SizedBox(
-            height: 26,
-            child: CustomPaint(
-              painter: _LossStrip(day.minutes, colour: loss, track: scheme.onSurface.withValues(alpha: .08)),
-            ),
+          Text(
+            t.avpn.contrastLossTitle,
+            style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w700),
           ),
           const Gap(4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (final label in [if (start != null) clock(start) else '', t.avpn.graphNow])
-                Text(label, style: theme.textTheme.labelSmall?.copyWith(color: muted, fontSize: 10)),
-            ],
-          ),
-          const Gap(6),
           Expanded(
             child: day.episodes.isEmpty
-                ? Center(child: Icon(Icons.check_circle_outline_rounded, size: 34, color: muted.withValues(alpha: .5)))
+                ? Center(
+                    child: Text(t.avpn.contrastLossNone, style: theme.textTheme.bodyMedium?.copyWith(color: muted)),
+                  )
                 : ListView.builder(
                     padding: EdgeInsets.zero,
                     itemCount: day.episodes.length,
@@ -1471,7 +1274,7 @@ class _LossDay extends ConsumerWidget {
                           : '$minutes ${t.avpn.unitMinuteShort}';
                       final part = e.sent == 0 ? 0.0 : e.lost / e.sent;
                       return Container(
-                        padding: const EdgeInsets.symmetric(vertical: 7),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           border: Border(top: BorderSide(color: scheme.onSurface.withValues(alpha: .07))),
                         ),
@@ -1484,7 +1287,7 @@ class _LossDay extends ConsumerWidget {
                             ),
                             const Gap(10),
                             SizedBox(
-                              width: 104,
+                              width: 112,
                               child: Text(
                                 minutes <= 1
                                     ? clock(e.start)
@@ -1514,30 +1317,167 @@ class _LossDay extends ConsumerWidget {
   }
 }
 
-/// The day's minutes as a strip: the track, and a mark for each minute that lost probes, as high as its share lost.
-class _LossStrip extends CustomPainter {
-  _LossStrip(this.minutes, {required this.colour, required this.track});
+/// The ping over the period chosen under it: now, the average, the fastest and slowest, and a bar per slot (a
+/// probe every 3 seconds, longer periods averaged), the slow ones grey.
+class _PingBlock extends ConsumerWidget {
+  const _PingBlock({required this.range});
 
-  /// the share lost in each minute of the day, the oldest first (null: no probes)
-  final List<double?> minutes;
+  final StatsRange range;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final muted = scheme.onSurfaceVariant;
+    final samples = ref.watch(connectionQualityProvider);
+    final period = ref.read(connectionQualityProvider.notifier).period(range);
+    final now = samples.reversed.firstWhere((v) => v != null, orElse: () => null);
+    final total = period.total;
+    final periodName = switch (range) {
+      StatsRange.minute => t.avpn.rangeMinute,
+      StatsRange.tenMinutes => t.avpn.rangeTenMinutes,
+      StatsRange.hour => t.avpn.rangeHour,
+      StatsRange.day => t.avpn.rangeDay,
+      StatsRange.all => t.avpn.periodAllTime,
+    };
+    final ticks = switch (range) {
+      StatsRange.minute => ['−3 мин', '−1,5', t.avpn.graphNow],
+      StatsRange.tenMinutes => ['−10 мин', '−5', t.avpn.graphNow],
+      StatsRange.hour => ['−60 мин', '−30', t.avpn.graphNow],
+      StatsRange.day => ['−24 ч', '−12', t.avpn.graphNow],
+      StatsRange.all => ['', '', t.avpn.graphToday],
+    };
+    Widget figure(String label, String value) => Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '$label '),
+          TextSpan(
+            text: value,
+            style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+      style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: dark ? .07 : .24),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.avpn.pingNow,
+                    style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
+                  ),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: now == null ? '—' : '$now'),
+                        if (now != null)
+                          TextSpan(
+                            text: ' ms',
+                            style: TextStyle(fontSize: 13, color: muted),
+                          ),
+                      ],
+                    ),
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w600, letterSpacing: -1, height: 1.1),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  figure(t.avpn.pingAverage, total.average == null ? '—' : '${total.average} ms'),
+                  figure(t.avpn.pingRange, total.answered == 0 ? '—' : '${total.min} · ${total.max}'),
+                ],
+              ),
+            ],
+          ),
+          const Gap(8),
+          Text(
+            t.avpn.pingFor(period: periodName),
+            style: theme.textTheme.labelSmall?.copyWith(color: muted, fontWeight: FontWeight.w600),
+          ),
+          const Gap(6),
+          Expanded(
+            child: CustomPaint(
+              painter: _PingGraph(
+                period.bars,
+                slots: period.slots,
+                colour: theme.araAccent,
+                slow: const Color(0xFF8C939C),
+                grid: scheme.onSurface.withValues(alpha: .06),
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          const Gap(4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final label in ticks)
+                Text(label, style: theme.textTheme.labelSmall?.copyWith(color: muted, fontSize: 10)),
+            ],
+          ),
+          const Gap(8),
+          _RangePicker(range: range, color: theme.araIcon),
+        ],
+      ),
+    );
+  }
+}
+
+/// A bar per slot, as tall as its ping on a scale rounded up from the slowest; slots over 150 ms grey, a slot
+/// with nothing answered left out.
+class _PingGraph extends CustomPainter {
+  _PingGraph(this.bars, {required this.slots, required this.colour, required this.slow, required this.grid});
+
+  final List<int?> bars;
+  final int slots;
   final Color colour;
-  final Color track;
+  final Color slow;
+  final Color grid;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final r = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(6));
-    canvas.drawRRect(r, Paint()..color = track);
-    if (minutes.isEmpty) return;
-    final w = size.width / minutes.length;
-    final paint = Paint()..color = colour;
-    for (var i = 0; i < minutes.length; i++) {
-      final v = minutes[i];
-      if (v == null || v == 0) continue;
-      final h = size.height * (.35 + .65 * v.clamp(0.0, 1.0));
-      canvas.drawRect(Rect.fromLTWH(i * w, size.height - h, math.max(w, 1.5), h), paint);
+    final line = Paint()..color = grid;
+    for (final f in const [.25, .5, .75]) {
+      canvas.drawLine(Offset(0, size.height * f), Offset(size.width, size.height * f), line);
+    }
+    final answered = bars.whereType<int>().where((v) => v > 0);
+    if (answered.isEmpty) return;
+    final top = (answered.reduce(math.max) / 50).ceil() * 50.0;
+    final n = math.max(slots, bars.length);
+    final w = size.width / n;
+    final start = n - bars.length;
+    final paint = Paint();
+    for (var i = 0; i < bars.length; i++) {
+      final v = bars[i];
+      if (v == null || v <= 0) continue;
+      final h = math.max(2.0, size.height * v / top);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH((start + i) * w + w * .15, size.height - h, w * .7, h),
+          Radius.circular(math.min(2, w * .3)),
+        ),
+        paint..color = v > 150 ? slow : colour,
+      );
     }
   }
 
   @override
-  bool shouldRepaint(_LossStrip old) => true;
+  bool shouldRepaint(_PingGraph old) => true;
 }

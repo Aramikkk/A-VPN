@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
 
@@ -167,7 +168,28 @@ abstract class ServerRegionFilter {
   static const _networkChannel = MethodChannel('com.aravpn.app/network');
 
   /// The network the running config was filtered for; the app re-filters when the phone's network differs.
-  static NetworkKind lastApplied = NetworkKind.unknown;
+  /// Kept across the app's restarts: the VPN outlives the app, and an app opened again took "unknown" for a
+  /// change and reconnected, dropping every connection (ChatGPT's answers cut off) each time it was opened.
+  static NetworkKind get lastApplied => _lastApplied;
+  static set lastApplied(NetworkKind value) {
+    _lastApplied = value;
+    SharedPreferences.getInstance().then((p) => p.setString(_lastKey, value.name)).ignore();
+  }
+
+  static NetworkKind _lastApplied = NetworkKind.unknown;
+  static const _lastKey = 'aravpn-last-applied-network';
+
+  /// The network the running config was made for, as the app saved it before it was closed.
+  static Future<NetworkKind> restoreLastApplied() async {
+    if (_lastApplied != NetworkKind.unknown) return _lastApplied;
+    try {
+      final saved = (await SharedPreferences.getInstance()).getString(_lastKey);
+      _lastApplied = NetworkKind.values.firstWhere((k) => k.name == saved, orElse: () => NetworkKind.unknown);
+    } catch (_) {
+      // nothing saved: unknown
+    }
+    return _lastApplied;
+  }
 
   /// The kind of network the phone uses right now, under the VPN.
   ///

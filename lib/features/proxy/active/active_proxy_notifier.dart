@@ -108,7 +108,15 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
               !ref.read(ConfigOptions.homeNetwork));
       if (switching || !follows) return;
       final network = await ServerRegionFilter.currentNetwork();
-      if (network == NetworkKind.unknown || network == ServerRegionFilter.lastApplied) return;
+      if (network == NetworkKind.unknown) return;
+      // the app was closed and opened again while the VPN ran on: the network its config was made for, as saved
+      final applied = await ServerRegionFilter.restoreLastApplied();
+      if (applied == NetworkKind.unknown) {
+        // nothing saved (an update from before this was kept): take the network as it is rather than reconnect
+        ServerRegionFilter.lastApplied = network;
+        return;
+      }
+      if (network == applied) return;
       switching = true;
       try {
         loggy.info("network is now ${network.name}, was ${ServerRegionFilter.lastApplied.name}: reloading servers");

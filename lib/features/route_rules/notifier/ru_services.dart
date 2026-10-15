@@ -194,6 +194,7 @@ const ruAppPackages = [
   'ru.sbcs.store',
   'ru.vk.store',
   'com.sec.android.app.samsungapps', // Galaxy Store: works direct
+  'com.google.android.apps.photos', // Google Photos: works direct (Drive doesn't)
   'com.kaspersky.security.cloud',
   // the ones on the owner's phone the list above missed
   'com.yandex.aliceapp',

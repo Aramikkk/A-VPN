@@ -477,7 +477,6 @@ const googleApps = [
   'com.google.android.googlequicksearchbox',
   'com.google.android.gm',
   'com.google.android.apps.docs',
-  'com.google.android.apps.photos',
   'com.google.android.apps.translate',
   'com.google.android.keep',
   'com.google.android.calendar',

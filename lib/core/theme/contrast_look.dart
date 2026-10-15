@@ -107,6 +107,13 @@ enum ContrastBackdrop {
   confetti('Конфетти', 'Confetti'),
   relief('Рельеф', 'Relief'),
   stripes('Полосы', 'Stripes'),
+  // in the stripes' way
+  verticalStripes('Вертикальные', 'Vertical'),
+  horizontalStripes('Горизонтальные', 'Horizontal'),
+  pinstripes('Тонкие полосы', 'Pinstripes'),
+  tartan('Шотландка', 'Tartan'),
+  rays('Лучи', 'Rays'),
+  chevronStripes('Шевронные полосы', 'Chevron stripes'),
   dots('Сетка точек', 'Dot grid'),
   ribbons('Ленты', 'Ribbons'),
   rings('Кольца', 'Rings'),
@@ -114,21 +121,15 @@ enum ContrastBackdrop {
   mosaic('Мозаика', 'Mosaic'),
   grid('Клетка', 'Grid'),
   // quiet ones: thin lines near the page's own colour, the palette in a detail or two
-  contours('Контуры', 'Contours'),
   honeycomb('Соты', 'Honeycomb'),
-  hatching('Штриховка', 'Hatching'),
   horizon('Горизонт', 'Horizon'),
   grain('Зерно', 'Grain'),
-  slabs('Плиты', 'Slabs'),
   chevron('Шеврон', 'Chevron'),
   // in the chevron's way: thin repeated lines, a few in the palette's colour
   zigzag('Зигзаг', 'Zigzag'),
   waveLines('Волнистые линии', 'Wavy lines'),
-  diamonds('Ромбы', 'Diamonds'),
   herringbone('Ёлочка', 'Herringbone'),
   steps('Ступени', 'Steps'),
-  constellations('Созвездия', 'Constellations'),
-  radar('Радар', 'Radar'),
   circuit('Схема', 'Circuit');
 
   const ContrastBackdrop(this.ru, this.en);
@@ -182,6 +183,10 @@ class ContrastBackdropPainter extends CustomPainter {
     // the quiet backdrops' lines: near the page's own colour, thin
     final faint = dark ? const Color(0xFF3A3A42) : const Color(0xFFD9D4CC);
     final thin = math.max(1.0, w / 411 * 1.4);
+    // the line families' lit rows: the ones nearest a quarter, a half and three quarters down (in the gaps between
+    // the blocks there), the same every time
+    bool lit(double y, double pitch) => const [.24, .52, .8].any((f) => (y - f * h).abs() < pitch / 2);
+    Paint line(bool on) => stroke(on ? warm : faint, on ? thin * 1.6 : thin);
     canvas.save();
     canvas.clipRect(Offset.zero & box);
     switch (kind) {
@@ -234,6 +239,60 @@ class ContrastBackdropPainter extends CustomPainter {
           canvas.drawRect(Rect.fromLTWH(x, -h, width, h * 2), fill..color = j.isOdd ? cool : warm);
         }
         canvas.restore();
+      case ContrastBackdrop.verticalStripes:
+        for (var j = 0; j < 8; j++) {
+          final width = j.isOdd ? w * .05 : w * .11;
+          canvas.drawRect(Rect.fromLTWH(j * w / 6 - w * .04, 0, width, h), fill..color = j.isOdd ? cool : warm);
+        }
+      case ContrastBackdrop.horizontalStripes:
+        for (var j = 0; j < 10; j++) {
+          final height = j.isOdd ? h * .018 : h * .045;
+          canvas.drawRect(Rect.fromLTWH(0, j * h / 8 - h * .02, w, height), fill..color = j.isOdd ? cool : warm);
+        }
+      case ContrastBackdrop.pinstripes:
+        canvas.save();
+        canvas.translate(w / 2, h / 2);
+        canvas.rotate(-35 * math.pi / 180);
+        for (var j = 0; j < 48; j++) {
+          final on = j % 5 == 2;
+          canvas.drawRect(
+            Rect.fromLTWH(-w * 2 + j * w / 12, -h, on ? 3 * w / 411 : 1.4 * w / 411, h * 2),
+            fill..color = on ? warm : faint,
+          );
+        }
+        canvas.restore();
+      case ContrastBackdrop.tartan:
+        for (var j = 0; j < 5; j++) {
+          canvas.drawRect(Rect.fromLTWH(j * w / 4, 0, w * .08, h), fill..color = warm.withValues(alpha: .55));
+          canvas.drawRect(Rect.fromLTWH(0, j * h / 5, w, h * .04), fill..color = cool.withValues(alpha: .55));
+        }
+      case ContrastBackdrop.rays:
+        final origin = Offset(w + 10, -10);
+        final reach = h * 2;
+        for (var j = 0; j < 11; j++) {
+          final a = (95 + j * 8) * math.pi / 180;
+          final b = a + (j.isOdd ? .03 : .07);
+          final ray = Path()
+            ..moveTo(origin.dx, origin.dy)
+            ..lineTo(origin.dx + math.cos(a) * reach, origin.dy + math.sin(a) * reach)
+            ..lineTo(origin.dx + math.cos(b) * reach, origin.dy + math.sin(b) * reach)
+            ..close();
+          canvas.drawPath(ray, fill..color = j.isOdd ? cool : warm);
+        }
+      case ContrastBackdrop.chevronStripes:
+        for (var j = 0; j < 7; j++) {
+          final y = j * h / 5;
+          final band = j.isOdd ? h * .025 : h * .05;
+          final path = Path()
+            ..moveTo(0, y)
+            ..lineTo(w / 2, y + w * .35)
+            ..lineTo(w, y)
+            ..lineTo(w, y + band)
+            ..lineTo(w / 2, y + w * .35 + band)
+            ..lineTo(0, y + band)
+            ..close();
+          canvas.drawPath(path, fill..color = j.isOdd ? cool : warm);
+        }
       case ContrastBackdrop.dots:
         final centre = Offset(w * (.2 + r.nextDouble() * .6), h * (.15 + r.nextDouble() * .5));
         final step = 26 * w / 411;
@@ -324,18 +383,6 @@ class ContrastBackdropPainter extends CustomPainter {
             fill..color = i.isEven ? warm : cool,
           );
         }
-      case ContrastBackdrop.contours:
-        final c = Offset(w * (.3 + r.nextDouble() * .4), h * (.3 + r.nextDouble() * .3));
-        for (var j = 1; j < 16; j++) {
-          final path = Path();
-          for (var a = 0; a <= 64; a++) {
-            final t = a / 64 * math.pi * 2;
-            final rr = j * w * .07 * (1 + .18 * math.sin(t * 3 + j * .7) + .08 * math.cos(t * 5 + j));
-            final p = c + Offset(math.cos(t) * rr, math.sin(t) * rr * 1.1);
-            a == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
-          }
-          canvas.drawPath(path..close(), stroke(j % 4 == 0 ? warm : faint, thin));
-        }
       case ContrastBackdrop.honeycomb:
         final a = w / 9;
         final rowH = a * math.sqrt(3) / 2;
@@ -355,12 +402,6 @@ class ContrastBackdropPainter extends CustomPainter {
             canvas.drawPath(path, stroke(faint, thin));
           }
         }
-      case ContrastBackdrop.hatching:
-        for (var x = -h; x < w; x += w / 26) {
-          canvas.drawLine(Offset(x, h), Offset(x + h, 0), stroke(faint, thin));
-        }
-        final band = h * (.3 + r.nextDouble() * .4);
-        canvas.drawRect(Rect.fromLTWH(0, band, w, h * .12), fill..color = warm.withValues(alpha: .35));
       case ContrastBackdrop.horizon:
         final accentEvery = 6 + r.nextInt(4);
         for (var j = 0; j < 42; j++) {
@@ -381,21 +422,8 @@ class ContrastBackdropPainter extends CustomPainter {
             fill..color = r.nextDouble() < .12 ? warm : speck,
           );
         }
-      case ContrastBackdrop.slabs:
-        for (var k = 0; k < 6; k++) {
-          final sw = w * (.35 + r.nextDouble() * .4);
-          final sh = h * (.12 + r.nextDouble() * .18);
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(r.nextDouble() * w - sw * .3, r.nextDouble() * h - sh * .3, sw, sh),
-              Radius.circular(w * .05),
-            ),
-            fill..color = (k.isOdd ? cool : warm).withValues(alpha: dark ? .22 : .28),
-          );
-        }
       case ContrastBackdrop.chevron:
         final c = w / 7;
-        final lit = r.nextInt(5);
         var row = 0;
         for (var y = 0.0; y < h + c; y += c * .6, row++) {
           for (var x = 0.0; x < w + c; x += c) {
@@ -403,12 +431,11 @@ class ContrastBackdropPainter extends CustomPainter {
               ..moveTo(x, y + c * .3)
               ..lineTo(x + c / 2, y)
               ..lineTo(x + c, y + c * .3);
-            canvas.drawPath(path, stroke(row % 5 == lit ? warm : faint, thin));
+            canvas.drawPath(path, line(lit(y, c * .6)));
           }
         }
       case ContrastBackdrop.zigzag:
         final c = w / 12;
-        final lit = r.nextInt(6);
         var row = 0;
         for (var y = 0.0; y < h + c; y += c * .9, row++) {
           final path = Path()..moveTo(0, y);
@@ -417,11 +444,10 @@ class ContrastBackdropPainter extends CustomPainter {
               ..lineTo(x + c / 2, y + c * .45)
               ..lineTo(x + c, y);
           }
-          canvas.drawPath(path, stroke(row % 6 == lit ? warm : faint, thin));
+          canvas.drawPath(path, line(lit(y, c * .9)));
         }
       case ContrastBackdrop.waveLines:
         final c = w / 6;
-        final lit = r.nextInt(7);
         var row = 0;
         for (var y = 0.0; y < h + c; y += c * .42, row++) {
           final path = Path()..moveTo(0, y);
@@ -430,39 +456,21 @@ class ContrastBackdropPainter extends CustomPainter {
               ..quadraticBezierTo(x + c / 4, y - c * .18, x + c / 2, y)
               ..quadraticBezierTo(x + c * .75, y + c * .18, x + c, y);
           }
-          canvas.drawPath(path, stroke(row % 7 == lit ? warm : faint, thin));
+          canvas.drawPath(path, line(lit(y, c * .42)));
         }
-      case ContrastBackdrop.diamonds:
-        final c = w / 6;
-        for (var x = -h; x < w + h; x += c) {
-          canvas.drawLine(Offset(x, 0), Offset(x + h * .6, h), stroke(faint, thin));
-          canvas.drawLine(Offset(x, 0), Offset(x - h * .6, h), stroke(faint, thin));
-        }
-        // one band of the lattice drawn in the palette's colour
-        final y0 = h * (.25 + r.nextDouble() * .5);
-        final rise = c / 2 / .6;
-        final band = Path()..moveTo(0, y0);
-        for (var x = 0.0; x < w + c; x += c) {
-          band
-            ..lineTo(x + c / 2, y0 - rise * .5)
-            ..lineTo(x + c, y0);
-        }
-        canvas.drawPath(band, stroke(warm, thin * 1.3));
       case ContrastBackdrop.herringbone:
         final c = w / 9;
         final rowH = c * .55;
-        final lit = r.nextInt(8);
         var row = 0;
         for (var y = 0.0; y < h + c; y += rowH, row++) {
-          final colour = row % 8 == lit ? warm : faint;
+          final on = lit(y, rowH);
           for (var x = row.isOdd ? c / 2 : 0.0; x < w + c; x += c) {
-            canvas.drawLine(Offset(x, y), Offset(x + c * .4, y + rowH * .8), stroke(colour, thin));
-            canvas.drawLine(Offset(x + c * .9, y), Offset(x + c * .5, y + rowH * .8), stroke(colour, thin));
+            canvas.drawLine(Offset(x, y), Offset(x + c * .4, y + rowH * .8), line(on));
+            canvas.drawLine(Offset(x + c * .9, y), Offset(x + c * .5, y + rowH * .8), line(on));
           }
         }
       case ContrastBackdrop.steps:
         final c = w / 8;
-        final lit = r.nextInt(6);
         var row = 0;
         for (var y = 0.0; y < h + c; y += c * .7, row++) {
           final path = Path()..moveTo(0, y);
@@ -473,31 +481,8 @@ class ContrastBackdropPainter extends CustomPainter {
               ..lineTo(x + c, y - c * .3)
               ..lineTo(x + c, y);
           }
-          canvas.drawPath(path, stroke(row % 6 == lit ? warm : faint, thin));
+          canvas.drawPath(path, line(lit(y, c * .7)));
         }
-      case ContrastBackdrop.constellations:
-        final points = [for (var k = 0; k < 26; k++) Offset(r.nextDouble() * w, r.nextDouble() * h)];
-        for (var k = 0; k < points.length; k++) {
-          final q = points[(k * 7 + 3) % points.length];
-          if ((points[k] - q).distance < w * .5) canvas.drawLine(points[k], q, stroke(faint, thin));
-        }
-        for (var k = 0; k < points.length; k++) {
-          canvas.drawCircle(points[k], w / 411 * (k % 5 == 0 ? 3.4 : 2), fill..color = k % 5 == 0 ? warm : cool);
-        }
-      case ContrastBackdrop.radar:
-        final right = r.nextBool();
-        final c = Offset(right ? w * .85 : w * .15, h * .85);
-        for (var j = 1; j < 14; j++) {
-          canvas.drawCircle(c, j * w * .12, stroke(faint, thin));
-        }
-        final end = Offset(right ? c.dx - w * .7 : c.dx + w * .7, c.dy - h * .9);
-        final sweep = Path()
-          ..moveTo(c.dx, c.dy)
-          ..lineTo(right ? c.dx - w * 1.1 : c.dx + w * 1.1, c.dy - h * .5)
-          ..lineTo(end.dx, end.dy)
-          ..close();
-        canvas.drawPath(sweep, fill..color = warm.withValues(alpha: .18));
-        canvas.drawLine(c, end, stroke(warm, thin * 1.4));
       case ContrastBackdrop.circuit:
         final g = w / 10;
         for (var k = 0; k < 22; k++) {
