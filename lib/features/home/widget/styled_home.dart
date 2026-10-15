@@ -800,8 +800,14 @@ class _GraphiteDock extends HookConsumerWidget {
     final ink = on
         ? (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface)
         : scheme.onSurfaceVariant;
-    final caption = theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant);
-    final iconSize = large ? 28.0 : 26.0;
+    // Contrast: the side figures and captions a little bigger
+    final sideFigure = theme.araLook.style == AraStyle.contrast ? 25.0 : null;
+    final caption =
+        (theme.araLook.style == AraStyle.contrast ? theme.textTheme.labelLarge : theme.textTheme.labelMedium)?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: scheme.onSurfaceVariant,
+        );
+    final iconSize = (large ? 28.0 : 26.0) * (theme.araLook.style == AraStyle.contrast ? 1.05 : 1);
     // no plates: an icon (or a number) over a small caption, pressed as one
     // on a barely-there plate, as the toggles above
     Widget side({required Widget top, required String label, VoidCallback? onTap}) => Material(
@@ -844,8 +850,37 @@ class _GraphiteDock extends HookConsumerWidget {
             child: side(
               top: on && testing
                   ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: ink))
+                  : theme.araLook.style == AraStyle.contrast
+                  // Contrast: the ping here, as the servers answering are on the right: the sign and the figure
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.network_ping_rounded, size: iconSize, color: ink),
+                        const Gap(6),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: on && measured && !busy ? '$ping' : '—'),
+                              if (on && measured && !busy)
+                                TextSpan(
+                                  text: ' ms',
+                                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                                ),
+                            ],
+                          ),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                            fontSize: sideFigure,
+                          ),
+                        ),
+                      ],
+                    )
                   : Icon(Icons.network_ping_rounded, size: iconSize, color: ink),
-              label: t.avpn.stPingButton,
+              // Contrast: the loss under it while measured
+              label: theme.araLook.style == AraStyle.contrast && on && measured && !busy
+                  ? t.avpn.dockLoss(loss: lossText)
+                  : t.avpn.stPingButton,
               onTap: on && !busy && !testing ? onCheck : null,
             ),
           ),
@@ -856,7 +891,8 @@ class _GraphiteDock extends HookConsumerWidget {
           // flows straight into the gauge
           // (only for a connection just started: one found up when the app opened shows its gauge straight away)
           busy: busy || (on && !measured && ref.read(connectionQualityProvider.notifier).warmUp),
-          size: large ? 88 : 76,
+          // Contrast: a fifth smaller
+          size: (large ? 88.0 : 76.0) * (theme.araLook.style == AraStyle.contrast ? .8 : 1),
           below: padding.bottom,
           ping: measured ? _Orb.pingFill(ping) : 0,
           loss: measured ? _Orb.lossFill(loss) : 0,
@@ -878,7 +914,11 @@ class _GraphiteDock extends HookConsumerWidget {
                       const Gap(6),
                       Text(
                         on ? '$answering' : '—',
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                          fontSize: sideFigure,
+                        ),
                       ),
                     ],
                   ),
@@ -988,8 +1028,8 @@ class _Orb extends HookWidget {
     final drawn = useRef(Offset.zero);
     useEffect(() {
       if (busy) {
-        // the wave starts where the gauge stood (rising from its fill)
-        spin.value = (drawn.value.dx.clamp(0.0, 1.0)) / 2;
+        // the pulse starts bright
+        spin.value = .5;
         spin.repeat();
       } else {
         spin.stop();
@@ -1006,17 +1046,18 @@ class _Orb extends HookWidget {
     final width = size * 2.1;
     // Contrast: a rounded-square button in two square frames, the ping outside, the loss inside
     final square = theme.araLook.style == AraStyle.contrast;
-    final centre = square ? size * .82 : size * .98;
-    // Contrast keeps the mode inside the button: no room under it for a pill; the square's frames reach below it
-    final height = square ? centre + size * .84 + size * .22 : centre + size * .5 + size * .26;
+    // the square: its numbers inside the button, the frames reaching below it
+    final centre = square ? size * .94 : size * .98;
+    // Contrast keeps the mode inside the button: no room under it for a pill
+    final height = square ? centre + size * .84 : centre + size * .5 + size * .26;
     final outer = square ? size * .74 : size * .86;
     final inner = square ? size * .58 : size * .7;
     // the square's button a little smaller, inside its frames
-    final button = square ? size * .84 : size;
+    final button = square ? size * .92 : size;
     final label = theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900, fontSize: size * .15);
     Widget number(String? text, Color ink, bool left) => Positioned(
       // the square's numbers under its frames, at their corners
-      top: square ? centre + outer + size * .1 : centre + size * .12,
+      top: square ? centre - outer - size * .3 : centre + size * .12,
       left: left ? 0 : null,
       right: left ? null : 0,
       width: (width - size) / 2,
@@ -1047,7 +1088,8 @@ class _Orb extends HookWidget {
               builder: (context, filled, _) => AnimatedBuilder(
                 animation: spin,
                 builder: (context, _) {
-                  drawn.value = busy ? _RainbowPainter.waveAt(spin.value) : filled;
+                  // switching: drawn whole (the gauge glides down from the full when it ends)
+                  drawn.value = busy ? const Offset(1, 1) : filled;
                   return CustomPaint(
                     painter: _RainbowPainter(
                       centre: Offset(width / 2, centre),
@@ -1068,8 +1110,8 @@ class _Orb extends HookWidget {
               ),
             ),
           ),
-          number(pingLabel, pingInk, true),
-          number(lossLabel, lossInk, false),
+          // the square has them inside its button
+          if (!square) ...[number(pingLabel, pingInk, true), number(lossLabel, lossInk, false)],
           Positioned(
             left: (width - button) / 2,
             top: centre - button / 2,
@@ -1082,7 +1124,15 @@ class _Orb extends HookWidget {
                   shape: square ? BoxShape.rectangle : BoxShape.circle,
                   borderRadius: square ? BorderRadius.circular(button * .26) : null,
                   // one colour, no gradient; Contrast's is light on its black panel
-                  color: dark && theme.araLook.style != AraStyle.contrast
+                  // Contrast: a plain grey while off, light with a touch of the accent while on
+                  color: square
+                      ? (on
+                            ? Color.alphaBlend(
+                                accent.withValues(alpha: dark ? .22 : .14),
+                                dark ? const Color(0xFFF7F5F1) : Colors.white,
+                              )
+                            : (dark ? const Color(0xFF2C2C30) : const Color(0xFFECEAE6)))
+                      : dark
                       ? const Color(0xFF16161A)
                       : (contrastDay ? Colors.white : const Color(0xFFF7F5F1)),
                   boxShadow: [
@@ -1095,29 +1145,24 @@ class _Orb extends HookWidget {
                 child: Center(
                   child: theme.araLook.style == AraStyle.contrast && mode != null
                       // Contrast: the mode under the sign, inside the button
+                      // Contrast: the network it runs on, large, instead of the power sign (that only while off)
                       ? Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.power_settings_new_rounded, size: size * .34, color: accent),
-                            const SizedBox(height: 2),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  mode! ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded,
-                                  size: size * .11,
-                                  color: mode! ? accent : const Color(0xFF8A857E),
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  mode! ? 'LTE' : 'Wi‑Fi',
-                                  style: TextStyle(
-                                    fontSize: size * .1,
-                                    fontWeight: FontWeight.w800,
-                                    color: mode! ? accent : const Color(0xFF8A857E),
-                                  ),
-                                ),
-                              ],
+                            // the network it runs on (the ping and the loss are by the ping button)
+                            Icon(
+                              mode! ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded,
+                              size: size * .36,
+                              color: accent,
+                            ),
+                            Text(
+                              mode! ? 'LTE' : 'Wi‑Fi',
+                              style: TextStyle(
+                                fontSize: size * .14,
+                                height: 1.1,
+                                fontWeight: FontWeight.w800,
+                                color: accent,
+                              ),
                             ),
                           ],
                         )
@@ -1212,11 +1257,8 @@ class _ModeBadge extends ConsumerWidget {
 }
 
 class _RainbowPainter extends CustomPainter {
-  /// the switching wave's two fills at [t] (0 to 1 round the loop): to the full and back, the inner a little behind
-  static Offset waveAt(double t) {
-    double wave(double t) => Curves.easeInOut.transform(t < .5 ? t * 2 : 2 - t * 2);
-    return Offset(wave(t), wave((t + .92) % 1));
-  }
+  /// the switching pulse's brightness at [t] (0 to 1 round the loop): up to the full and back down, smoothly
+  static double pulse(double t) => Curves.easeInOut.transform(t < .5 ? t * 2 : 2 - t * 2);
 
   _RainbowPainter({
     required this.centre,
@@ -1230,7 +1272,7 @@ class _RainbowPainter extends CustomPainter {
     this.square = false,
   });
 
-  /// rounded-square frames all round, filled from the top's middle both ways, instead of the upper half-circles
+  /// rounded-square frames all round, filled from the bottom's middle up both ways, instead of the upper half-circles
   final bool square;
 
   final Offset centre;
@@ -1255,9 +1297,10 @@ class _RainbowPainter extends CustomPainter {
     Rect circle(double r) => Rect.fromCircle(center: centre, radius: r);
     // connecting or disconnecting: both arcs fill from nothing to the full and back, over and over, the inner one a
     // little behind
-    final (ping, loss) = busy ? (waveAt(rotation).dx, waveAt(rotation).dy) : fills;
-    // the arcs fade in as the ping's fill grows from nothing (a ping always fills at least .06)
-    final shown = busy ? 1.0 : (ping / .06).clamp(0.0, 1.0);
+    // connecting or disconnecting: both drawn whole, pulsing (brighter and dimmer), not running back and forth
+    final (ping, loss) = busy ? (1.0, 1.0) : fills;
+    // the arcs fade in as the ping's fill grows from nothing (a ping always fills at least .06); the pulse
+    final shown = busy ? .3 + .7 * pulse(rotation) : (ping / .06).clamp(0.0, 1.0);
     if (shown == 0) return;
     if (square) {
       for (final (r, c, f) in [(radii.$1, colors.$1, ping), (radii.$2, colors.$2, loss)]) {
@@ -1266,7 +1309,7 @@ class _RainbowPainter extends CustomPainter {
         final length = metric.length;
         canvas.drawPath(frame, pen(track.withValues(alpha: track.a * shown)));
         if (f < .001) continue;
-        // from the top's middle both ways at once: the start of the path and its end
+        // from the bottom's middle both ways at once: the start of the path and its end
         final half = length * f.clamp(0.0, 1.0) / 2;
         final fill = Path()
           ..addPath(metric.extractPath(0, half), Offset.zero)
@@ -1296,7 +1339,8 @@ class _RainbowPainter extends CustomPainter {
     }
   }
 
-  /// a rounded square [half] from the centre to each side, as one path from the top's middle round clockwise
+  /// a rounded square [half] from the centre to each side, as one path from the bottom's middle round clockwise:
+  /// filled from both its ends, the frame fills from the bottom up both ways, a worse value opening it at the top
   Path _frame(double half) {
     final l = centre.dx - half;
     final t = centre.dy - half;
@@ -1305,16 +1349,16 @@ class _RainbowPainter extends CustomPainter {
     final round = Radius.circular(half * .42);
     final k = half * .42;
     return Path()
-      ..moveTo(centre.dx, t)
-      ..lineTo(r - k, t)
-      ..arcToPoint(Offset(r, t + k), radius: round)
-      ..lineTo(r, b - k)
-      ..arcToPoint(Offset(r - k, b), radius: round)
+      ..moveTo(centre.dx, b)
       ..lineTo(l + k, b)
       ..arcToPoint(Offset(l, b - k), radius: round)
       ..lineTo(l, t + k)
       ..arcToPoint(Offset(l + k, t), radius: round)
-      ..lineTo(centre.dx, t);
+      ..lineTo(r - k, t)
+      ..arcToPoint(Offset(r, t + k), radius: round)
+      ..lineTo(r, b - k)
+      ..arcToPoint(Offset(r - k, b), radius: round)
+      ..lineTo(centre.dx, b);
   }
 
   @override
@@ -1646,7 +1690,7 @@ class ContrastShellDock extends HookConsumerWidget {
         children: [
           Container(
             margin: const EdgeInsets.only(top: _SeamTab.overhang),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             decoration: BoxDecoration(
               color: contrastPanelColor(dark),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),

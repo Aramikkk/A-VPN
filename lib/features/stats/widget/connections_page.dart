@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -152,6 +153,76 @@ class ConnectionsPage extends HookConsumerWidget {
     final viaVpn = count(ConnectionRoute.vpn);
     final direct = count(ConnectionRoute.direct);
 
+    if (embedded) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 22,
+              child: Row(
+                children: [
+                  const Gap(6),
+                  Text(
+                    t.avpn.connectionsTab.toUpperCase(),
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 1.4),
+                  ),
+                  const Spacer(),
+                  if (all.any((c) => !c.active))
+                    IconButton(
+                      tooltip: t.avpn.connClear,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      iconSize: 18,
+                      icon: Icon(Icons.cleaning_services_rounded, color: scheme.onSurfaceVariant),
+                      onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
+                    ),
+                ],
+              ),
+            ),
+            const Gap(8),
+            Row(
+              children: [
+                _Count(label: t.avpn.connOpen, value: open, color: scheme.onSurface, dense: true),
+                const Gap(8),
+                _Count(label: t.avpn.statsViaVpn, value: viaVpn, color: scheme.primary, dense: true),
+                const Gap(8),
+                _Count(label: t.avpn.statsDirect, value: direct, color: scheme.onSurfaceVariant, dense: true),
+              ],
+            ),
+            const Gap(8),
+            Expanded(
+              child: groups.isEmpty
+                  ? _Empty(icon: Icons.hourglass_empty_rounded, text: t.avpn.connEmpty)
+                  : LayoutBuilder(
+                      // only whole cards: as many as the room holds, stretched a little to fill it (the last one
+                      // isn't cut in half)
+                      builder: (context, box) {
+                        final rows = math.max(1, (box.maxHeight / 66).floor());
+                        return ListView.builder(
+                          padding: EdgeInsets.zero,
+                          itemExtent: box.maxHeight / rows,
+                          itemCount: groups.length,
+                          itemBuilder: (context, i) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: _GroupCard(
+                              key: ValueKey('apps:${groups[i].key}'),
+                              group: groups[i],
+                              byApp: true,
+                              appName: appName,
+                              iconOf: (app) => apps[app]?.icon,
+                              dense: true,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      );
+    }
     return Scaffold(
       appBar: embedded
           ? null
@@ -339,7 +410,10 @@ String? _folderHint(List<String> folders) {
 }
 
 class _Count extends StatelessWidget {
-  const _Count({required this.label, required this.value, required this.color});
+  const _Count({required this.label, required this.value, required this.color, this.dense = false});
+
+  /// lower: the unfolded home's
+  final bool dense;
 
   final String label;
   final int value;
@@ -351,7 +425,7 @@ class _Count extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        padding: dense ? const EdgeInsets.fromLTRB(10, 5, 10, 6) : const EdgeInsets.fromLTRB(12, 8, 12, 10),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(14),
@@ -373,7 +447,10 @@ class _Count extends StatelessWidget {
             const Gap(2),
             Text(
               '$value',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: color),
+              style: (dense ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -414,7 +491,17 @@ class _Empty extends StatelessWidget {
 /// An app (or a site) with its traffic and the way its connections went; tapped, the sites it connected to (or
 /// the apps that connected to it), each with its own way.
 class _GroupCard extends HookConsumerWidget {
-  const _GroupCard({super.key, required this.group, required this.byApp, required this.appName, required this.iconOf});
+  const _GroupCard({
+    super.key,
+    required this.group,
+    required this.byApp,
+    required this.appName,
+    required this.iconOf,
+    this.dense = false,
+  });
+
+  /// the unfolded home's: its routes on one line, the same height as the others, not unfolding
+  final bool dense;
 
   final ConnectionGroup group;
   final bool byApp;
@@ -447,9 +534,11 @@ class _GroupCard extends HookConsumerWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
+        // dense: in the middle of its fixed height
+        mainAxisAlignment: dense ? MainAxisAlignment.center : MainAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => expanded.value = !expanded.value,
+            onTap: dense ? null : () => expanded.value = !expanded.value,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 7, 12, 7),
               child: Row(
@@ -473,7 +562,10 @@ class _GroupCard extends HookConsumerWidget {
                         // where it went, then the package or the apps, on one line
                         Row(
                           children: [
-                            Flexible(flex: 3, child: _RouteBadge(group: group)),
+                            Flexible(
+                              flex: 3,
+                              child: _RouteBadge(group: group, oneLine: dense),
+                            ),
                             const Gap(6),
                             Expanded(
                               flex: 2,
@@ -685,9 +777,12 @@ Color routeColor(ColorScheme scheme, ConnectionRoute route) => switch (route) {
 
 /// "VPN · 🇸🇪 Швеция 2", "Напрямую", or both when an app went both ways.
 class _RouteBadge extends ConsumerWidget {
-  const _RouteBadge({required this.group});
+  const _RouteBadge({required this.group, this.oneLine = false});
 
   final ConnectionGroup group;
+
+  /// the pills on one line, cut short rather than wrapped (the dense cards are all one height)
+  final bool oneLine;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -713,6 +808,18 @@ class _RouteBadge extends ConsumerWidget {
     }
 
     final servers = group.servers;
+    if (oneLine) {
+      return Row(
+        children: [
+          if (group.vpn > 0)
+            Flexible(
+              child: pill(ConnectionRoute.vpn, servers.isEmpty ? 'VPN' : 'VPN · ${serverFlags(servers)}', group.vpn),
+            ),
+          if (group.vpn > 0 && group.direct > 0) const Gap(6),
+          if (group.direct > 0) Flexible(child: pill(ConnectionRoute.direct, t.avpn.statsDirect, group.direct)),
+        ],
+      );
+    }
     return Wrap(
       spacing: 6,
       runSpacing: 4,

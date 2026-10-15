@@ -542,15 +542,16 @@ class _CheckRow extends HookConsumerWidget {
     final glass = Theme.of(context).araLook.glass;
     if (Theme.of(context).araLook.style == AraStyle.contrast) {
       final scheme = Theme.of(context).colorScheme;
+      final accent = Theme.of(context).araLook.neonFill ?? scheme.primary;
       Widget pill(IconData icon, String label, bool on, Future<void> Function(bool) toggle, VoidCallback? hold) =>
           Expanded(
             child: GestureDetector(
               onLongPress: hold,
               child: Material(
-                color: on ? scheme.onSurface : Colors.transparent,
-                shape: StadiumBorder(
-                  side: BorderSide(color: on ? scheme.onSurface : scheme.outlineVariant, width: 1.3),
-                ),
+                // on: a light fill of the accent with its edge (the page colour is see-through here, so the old
+                // inverted look came out a black blot with nothing on it)
+                color: on ? accent.withValues(alpha: .16) : Colors.transparent,
+                shape: StadiumBorder(side: BorderSide(color: on ? accent : scheme.outlineVariant, width: 1.3)),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: () => toggle(!on),
@@ -564,13 +565,13 @@ class _CheckRow extends HookConsumerWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(icon, size: 16, color: on ? scheme.surface : scheme.primary),
+                              Icon(icon, size: 16, color: accent),
                               const SizedBox(width: 6),
                               Text(
                                 label,
                                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                  color: on ? scheme.surface : scheme.onSurface,
-                                  fontWeight: FontWeight.w600,
+                                  color: on ? accent : scheme.onSurface,
+                                  fontWeight: on ? FontWeight.w800 : FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -794,15 +795,20 @@ class _SharingDialog extends HookConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (addresses != null && hotspot.isEmpty) ...[
-              Text(
-                t.avpn.sharingNoHotspot,
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
-              ),
+            if (addresses != null && shown.isEmpty) ...[
+              // no hotspot and no Wi-Fi either: nothing to give the other device yet
+              Text(t.avpn.sharingNoAddress, style: theme.textTheme.bodyMedium),
+            ] else ...[
+              if (addresses != null && hotspot.isEmpty) ...[
+                Text(
+                  t.avpn.sharingNoHotspot,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+                ),
+                const Gap(12),
+              ],
+              Text(t.avpn.sharingHowTo),
               const Gap(12),
             ],
-            Text(t.avpn.sharingHowTo),
-            const Gap(12),
             for (final a in shown)
               Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -816,11 +822,13 @@ class _SharingDialog extends HookConsumerWidget {
                   ),
                 ),
               ),
-            const Gap(4),
-            Text(
-              t.avpn.sharingNote,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
+            if (shown.isNotEmpty) ...[
+              const Gap(4),
+              Text(
+                t.avpn.sharingNote,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
           ],
         ),
       ),
