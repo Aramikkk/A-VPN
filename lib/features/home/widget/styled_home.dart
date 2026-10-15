@@ -301,7 +301,7 @@ class _StatusBlock extends HookConsumerWidget {
     final today = ref.read(trafficHistoryProvider.notifier).amountFrom(statsDayStart(DateTime.now()));
     final vpn = today.vpn;
     final direct = (today.total - vpn).clamp(0, 1 << 62);
-    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final accent = theme.araAccent;
     // one line each side, the same size and height: the time against VPN, the speed against direct
     Widget line(Widget left, Widget right) => Row(
       children: [
@@ -795,10 +795,12 @@ class _GraphiteDock extends HookConsumerWidget {
         inUse != null &&
         (ServerRegionFilter.isMobileOnly(inUse.tag) || ServerRegionFilter.isMobileOnly(inUse.tagDisplay));
     final mode = !on || busy || inUse == null ? null : (whitelist ? true : (PlatformUtils.isDesktop ? null : false));
-    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final accent = theme.araAccent;
     // the side icons and the ping in the accent (by day a light accent goes to the text colour); grey while off
     final ink = on
-        ? (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface)
+        ? (theme.araLook.fill != null
+              ? theme.araIcon
+              : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface))
         : scheme.onSurfaceVariant;
     // Contrast: the side figures and captions a little bigger
     final sideFigure = theme.araLook.style == AraStyle.contrast ? 25.0 : null;
@@ -1038,9 +1040,13 @@ class _Orb extends HookWidget {
       return null;
     }, [busy]);
     // the theme's own colour, the same as the chosen server (not the darker one text uses on white)
-    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final accent = theme.araAccent;
     final lossColor = deep(accent);
     final contrastDay = !dark && theme.araLook.style == AraStyle.contrast;
+    // the network's sign on the light button: graphite when the accent is too light to read on it (citrus, lemon)
+    final onButton = AraLook.contrast(theme.araIcon, const Color(0xFFF7F5F1)) >= 2.2
+        ? theme.araIcon
+        : ContrastPalette.ink;
     // the numbers readable: by day a light accent goes to the text colour; the deep shade lifted a little by night
     final pingInk = dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface;
     final lossInk = dark ? Color.lerp(lossColor, Colors.white, .35)! : lossColor;
@@ -1161,7 +1167,7 @@ class _Orb extends HookWidget {
                             Icon(
                               mode! ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded,
                               size: size * .36,
-                              color: accent,
+                              color: onButton,
                             ),
                             Text(
                               mode! ? 'LTE' : 'Wi‑Fi',
@@ -1169,7 +1175,7 @@ class _Orb extends HookWidget {
                                 fontSize: size * .14,
                                 height: 1.1,
                                 fontWeight: FontWeight.w800,
-                                color: accent,
+                                color: onButton,
                               ),
                             ),
                           ],
@@ -1223,7 +1229,7 @@ class _ModeBadge extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final accent = theme.araAccent;
     final onAccent = AraLook.contrast(accent, Colors.black) >= AraLook.contrast(accent, Colors.white)
         ? Colors.black
         : Colors.white;
@@ -1461,7 +1467,7 @@ class _HomeTraffic extends ConsumerWidget {
                 rows: [for (final g in servers.take(6)) (g.key, g.total.toDouble())],
                 total: servers.fold<double>(0, (s, g) => s + g.total),
                 value: (w) => formatBytes(w.round(), units),
-                colour: theme.araLook.neonFill ?? theme.colorScheme.primary,
+                colour: theme.araAccent,
               ),
             ],
           ],
@@ -1982,7 +1988,6 @@ class _SeamTab extends StatelessWidget {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final ink = dark ? Colors.white.withValues(alpha: .75) : const Color(0xFF4A4743);
-    final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
     return Material(
       color: contrastPanelColor(dark),
       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -1994,7 +1999,7 @@ class _SeamTab extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.dns_rounded, size: 14, color: accent),
+              Icon(Icons.dns_rounded, size: 14, color: theme.araIcon),
               const Gap(5),
               Text(
                 label,
@@ -2067,7 +2072,7 @@ class _ContrastRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final accent = theme.araAccent;
     final ink = scheme.onSurface;
     final decoration = selected
         // the chosen one: see-through glass, cool at the left warming to the accent, a light edge and a glow
@@ -2120,7 +2125,7 @@ class _ContrastRow extends StatelessWidget {
                       border: Border.all(color: selected ? accent : scheme.outlineVariant, width: 1.3),
                     ),
                     child: group
-                        ? Icon(Icons.auto_awesome_rounded, size: 18, color: selected ? accent : ink)
+                        ? Icon(Icons.auto_awesome_rounded, size: 18, color: selected ? theme.araIcon : ink)
                         : Text(flag ?? '🌐', style: const TextStyle(fontSize: 18, fontFamilyFallback: ['Emoji'])),
                   ),
                   const Gap(11),
@@ -2387,7 +2392,7 @@ class _ContrastTraffic extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
+    final accent = theme.araAccent;
     int sum(List<_AppShare> apps) => apps.fold(0, (s, a) => s + a.bytes);
     final total = sum(vpn) + sum(direct);
     return Row(
@@ -2486,7 +2491,7 @@ class _WaterTile extends ConsumerWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: colour, width: 1.3),
                     ),
-                    child: Icon(icon, size: 13, color: colour),
+                    child: Icon(icon, size: 13, color: vpn ? theme.araIcon : colour),
                   ),
                   const Gap(8),
                   Text.rich(
@@ -2947,7 +2952,7 @@ class _SessionServers extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final accent = theme.araAccent;
     final units = t.avpn.bytesUnits.split(',');
     final start = ref.watch(sessionStartProvider);
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
@@ -2981,7 +2986,7 @@ class _SessionServers extends ConsumerWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: accent, width: 1.4),
                   ),
-                  child: Icon(Icons.dns_rounded, size: 16, color: accent),
+                  child: Icon(Icons.dns_rounded, size: 16, color: theme.araIcon),
                 ),
                 const Gap(10),
                 Expanded(

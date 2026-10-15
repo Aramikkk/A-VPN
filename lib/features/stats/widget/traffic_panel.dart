@@ -50,7 +50,7 @@ class TrafficPanel extends ConsumerWidget {
     final vpn = ((session.vpnUp ?? 0) + (session.vpnDown ?? 0)).clamp(0, total);
     final direct = total - vpn;
     final listed = items.fold<int>(0, (s, c) => s + c.total);
-    final accent = theme.araLook.neonFill ?? scheme.primary;
+    final accent = theme.araAccent;
 
     Widget tile(String title, int bytes, Color colour, {required bool strong}) => Expanded(
       child: Container(

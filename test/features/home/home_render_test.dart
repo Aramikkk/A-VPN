@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -179,7 +180,16 @@ void main() {
         // GLASS=<scheme>: Glass in that scheme, by day or by night as the others
         final glassScheme = GlassScheme.values.byName(Platform.environment['GLASS'] ?? 'lemonade');
         final glass = style == AraStyle.glass;
-        final theme = AppTheme(AppThemeMode.system, '', accent: accent, style: style, glassScheme: glassScheme);
+        final theme = AppTheme(
+          AppThemeMode.system,
+          '',
+          accent: accent,
+          style: style,
+          glassScheme: glassScheme,
+          contrastPalette: ContrastPalette.values.byName(
+            (Platform.environment['PAL'] ?? '').isEmpty ? 'claude' : Platform.environment['PAL']!,
+          ),
+        );
         await tester.pumpWidget(
           ProviderScope(
             overrides: [

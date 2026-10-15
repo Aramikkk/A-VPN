@@ -16,7 +16,7 @@ enum AraStyle {
   classic;
 
   // a new install opens in Glass (its scheme: GlassScheme.fallback)
-  static const fallback = glass;
+  static const fallback = contrast;
 }
 
 /// The three kinds of glass (each scheme has a day and a night look; by night Liquid turns smoky like Frost).

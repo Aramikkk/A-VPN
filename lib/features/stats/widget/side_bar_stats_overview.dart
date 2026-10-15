@@ -268,7 +268,7 @@ class SideBarStatsOverview extends ConsumerWidget {
     );
 
     if (contrast) {
-      final accent = theme.araLook.neonFill ?? scheme.primary;
+      final accent = theme.araAccent;
       const grey = Color(0xFF9AA0A6);
       final dark = theme.brightness == Brightness.dark;
       final ink = scheme.onSurface;
@@ -1384,7 +1384,7 @@ class _LossDay extends ConsumerWidget {
     // this session's, in the theme's colour
     final start = ref.watch(sessionStartProvider);
     final day = ref.read(connectionQualityProvider.notifier).lossDay(since: start ?? DateTime.now());
-    final loss = theme.araLook.neonFill ?? scheme.primary;
+    final loss = theme.araAccent;
     String two(int n) => n.toString().padLeft(2, '0');
     String clock(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
     String percent(double v) => v == 0

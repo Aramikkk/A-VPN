@@ -294,7 +294,9 @@ class AppTheme {
     final fromScheme = glass || contrast;
     final schemeAccent = contrast ? contrastPalette.accent(brightness) : look.accent;
     final accentColour = fromScheme ? schemeAccent : (dark ? accent.darkPrimary : accent.lightPrimary);
-    final primary = AraLook.readableOn(accentColour, glass ? look.panelOnBase : p.bg);
+    // Contrast by day, a light or grey palette: graphite icons and figures (its colour stays on the fills)
+    final inkDay = contrast && !dark && contrastPalette.inkByDay;
+    final primary = inkDay ? ContrastPalette.ink : AraLook.readableOn(accentColour, glass ? look.panelOnBase : p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
     final scheme = ColorScheme.fromSeed(seedColor: fromScheme ? schemeAccent : accent.seed, brightness: brightness)
         .copyWith(
@@ -491,6 +493,7 @@ class AppTheme {
       onGradient: filled ? Colors.black : p.fg,
       fastPing: primary,
       neonFill: filled ? accent.darkPrimary : null,
+      fill: style == AraStyle.contrast && !dark && contrastPalette.inkByDay ? contrastPalette.warm : null,
       dark: dark,
       border: p.line,
       graphDown: filled ? down : AraLook.readableOn(down, block),

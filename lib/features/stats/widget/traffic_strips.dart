@@ -138,7 +138,7 @@ class _StripMap extends ConsumerWidget {
     final base = switch (strip.route) {
       ConnectionRoute.vpn when glass != null => deeper(glass.accent),
       // the theme's own colour, as on the chosen server and the power button
-      ConnectionRoute.vpn => theme.araLook.neonFill ?? scheme.primary,
+      ConnectionRoute.vpn => theme.araAccent,
       ConnectionRoute.direct => const Color(0xFF9AA0A6),
       ConnectionRoute.block => scheme.error,
     };
@@ -384,7 +384,7 @@ class TrafficPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
+    final accent = theme.araAccent;
     const grey = Color(0xFF9AA0A6);
     // drawn on a 200 x 122 grid: strips 26 high, 10 apart
     final unit = height / 122;

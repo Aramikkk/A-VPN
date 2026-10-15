@@ -541,7 +541,7 @@ class _CheckRow extends HookConsumerWidget {
     final glass = Theme.of(context).araLook.glass;
     if (Theme.of(context).araLook.style == AraStyle.contrast) {
       final scheme = Theme.of(context).colorScheme;
-      final accent = Theme.of(context).araLook.neonFill ?? scheme.primary;
+      final accent = Theme.of(context).araAccent;
       Widget pill(IconData icon, String label, bool on, Future<void> Function(bool) toggle, VoidCallback? hold) =>
           Expanded(
             child: GestureDetector(
@@ -564,7 +564,7 @@ class _CheckRow extends HookConsumerWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(icon, size: 16, color: accent),
+                              Icon(icon, size: 16, color: Theme.of(context).araIcon),
                               const SizedBox(width: 6),
                               Text(
                                 label,

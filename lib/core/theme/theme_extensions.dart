@@ -47,7 +47,12 @@ class AraLook extends ThemeExtension<AraLook> {
     this.pingOn,
     this.neonFill,
     this.glass,
+    this.fill,
   });
+
+  /// Contrast by day with a light or grey palette: the colour the frames, fills and lit pills are drawn in, while
+  /// the icons and accent figures (the scheme's primary) go graphite to read on white; null: the primary for both
+  final Color? fill;
 
   /// the Glass scheme the theme was built for: panels see-through, the menu and the connect panel floating;
   /// null: not Glass
@@ -161,6 +166,7 @@ class AraLook extends ThemeExtension<AraLook> {
     pingOn: pingOn,
     neonFill: neonFill,
     glass: glass,
+    fill: fill,
   );
 
   @override
@@ -180,6 +186,7 @@ class AraLook extends ThemeExtension<AraLook> {
       pingOn: Color.lerp(pingOn, other.pingOn, t),
       neonFill: Color.lerp(neonFill, other.neonFill, t),
       glass: t < .5 ? glass : other.glass,
+      fill: Color.lerp(fill, other.fill, t),
     );
   }
 }
@@ -187,6 +194,12 @@ class AraLook extends ThemeExtension<AraLook> {
 extension AraLookOf on ThemeData {
   AraLook get araLook =>
       extension<AraLook>() ?? AraLook(fastPing: colorScheme.primary, dark: brightness == Brightness.dark);
+
+  /// the accent things are filled and drawn in: Contrast's fill, a neon theme's fill, or the primary
+  Color get araAccent => araLook.fill ?? araLook.neonFill ?? colorScheme.primary;
+
+  /// the accent icons and figures are drawn in: graphite when Contrast fills in its palette by day, else the accent
+  Color get araIcon => araLook.fill != null ? colorScheme.primary : araAccent;
 }
 
 /// Paints [child] (an icon) in the theme's neon icon gradient when it has one.

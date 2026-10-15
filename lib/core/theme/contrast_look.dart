@@ -59,7 +59,14 @@ enum ContrastPalette {
   final Color warm;
   final Color cool;
 
-  static const fallback = ContrastPalette.claude;
+  static const fallback = ContrastPalette.citrus;
+
+  /// by day its colour stays as it is on the frames, fills and lit pills, while icons and accent figures go
+  /// graphite (light ones washed out on white, darkened ones stopped being themselves): every palette
+  bool get inkByDay => true;
+
+  /// the icons' and figures' colour by day for [inkByDay]
+  static const ink = Color(0xFF3A3E44);
 
   /// the accent: the warm colour, by night lifted a little to read on the dark (a near-black one to light grey)
   Color accent(Brightness brightness) {
@@ -91,7 +98,7 @@ enum ContrastClarity {
   final double night;
   final double blur;
 
-  static const fallback = ContrastClarity.medium;
+  static const fallback = ContrastClarity.strong;
 }
 
 /// Contrast's backdrop: ten kinds, laid out at random once when the app starts (the same on every page).
