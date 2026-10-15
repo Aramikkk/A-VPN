@@ -6,9 +6,14 @@ import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
+import 'package:hiddify/utils/custom_loggers.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+final _logger = infraLogger('ConnectionQuality');
 
 /// Ping through the VPN and packet loss: every second, while the app is on screen and the VPN is up, a tiny
 /// request (the connection test URL, which answers 204) goes through A-VPN's own proxy port, so it takes the same
@@ -101,6 +106,12 @@ class ConnectionQuality extends Notifier<List<int?>> {
   DateTime? _lastUp;
   Uri? _url;
   bool _foreground = true;
+
+  /// the phone probes while the app is on screen; a computer all the time (in the tray too), for its watchdog
+  bool get _probing => _foreground || PlatformUtils.isDesktop;
+
+  /// the last time the watchdog reconnected
+  DateTime? _rescued;
   AppLifecycleListener? _lifecycle;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -153,14 +164,14 @@ class ConnectionQuality extends Notifier<List<int?>> {
     _client = client;
     _url = url;
     final timer = Timer.periodic(interval, (_) {
-      if (_foreground) _probe(client, url);
+      if (_probing) _probe(client, url);
     });
     ref.onDispose(() {
       timer.cancel();
       client.close(force: true);
       _client = null;
     });
-    if (_foreground) unawaited(_probe(client, url));
+    if (_probing) unawaited(_probe(client, url));
     return List.of(_samples);
   }
 
@@ -223,6 +234,41 @@ class ConnectionQuality extends Notifier<List<int?>> {
     _minutes.removeWhere((m, _) => m < minute - _minutesKept);
     if (now.difference(_saved) > const Duration(minutes: 1)) _save();
     state = List.of(_samples);
+    if (PlatformUtils.isDesktop && ms == null) unawaited(_watchdog());
+  }
+
+  /// A computer's VPN that stopped carrying anything (after sleep, a Wi-Fi change, a server gone quiet) is
+  /// reconnected: half a minute of probes lost in a row while the internet itself answers, once in two minutes
+  /// at most.
+  Future<void> _watchdog() async {
+    const inARow = 10;
+    if (_samples.length < inARow || _samples.sublist(_samples.length - inARow).any((s) => s != null)) return;
+    final now = DateTime.now();
+    if (_rescued != null && now.difference(_rescued!) < const Duration(minutes: 2)) return;
+    _rescued = now;
+    // no internet at all (the Wi-Fi gone): nothing a reconnect would mend
+    if (!await _internetAnswers()) {
+      _rescued = null;
+      return;
+    }
+    _logger.warning('the VPN carries nothing for half a minute while the internet answers: reconnecting');
+    final profile = await ref.read(activeProfileProvider.future);
+    await ref.read(connectionNotifierProvider.notifier).reconnect(profile);
+  }
+
+  /// Whether a Russian site answers straight, past the VPN's proxy (it goes direct by the rules anyway).
+  Future<bool> _internetAnswers() async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final request = await client.headUrl(Uri.parse('https://ya.ru')).timeout(const Duration(seconds: 4));
+      final response = await request.close().timeout(const Duration(seconds: 4));
+      await response.drain<void>();
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
   }
 
   /// The loss since [since] (the session's start; the last day when null): the total, the share lost in each

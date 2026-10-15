@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 
@@ -208,20 +209,46 @@ class HiddifyCoreService with InfraLogger {
   /// The config the core starts with: the profile's, or a copy without the servers that don't fit:
   /// outside Europe, or not made for the network the phone is on.
   Future<String> _filteredConfig(String path) async {
-    final cisOnly = ref.read(ConfigOptions.cisOnlyServers);
-    final europeOnly = !cisOnly && ref.read(ConfigOptions.europeOnlyServers);
     final serversByNetwork = ref.read(ConfigOptions.serversByNetwork);
     // the phone's network decides the servers and, for "only blocked through the VPN", the rules (Wi-Fi only):
     // either way the config is made for one network and has to be remade when it changes
-    final current = serversByNetwork || _blockedOnlyFollowsNetwork(ref)
-        ? await ServerRegionFilter.currentNetwork()
-        : NetworkKind.unknown;
-    final network = serversByNetwork ? current : NetworkKind.unknown;
+    final follows = serversByNetwork || _blockedOnlyFollowsNetwork(ref);
+    final current = follows ? await ServerRegionFilter.currentNetwork() : NetworkKind.unknown;
+    final filtered = await _configFor(path, current);
+    ServerRegionFilter.lastApplied = current;
+    if (Platform.isAndroid) {
+      // the phone: the configs for Wi-Fi and mobile data left for the VPN service, which switches between them
+      // when the network changes, with the app closed too (it waited for the app to be opened)
+      if (follows && current != NetworkKind.unknown && !ref.read(ConfigOptions.homeNetwork)) {
+        Future<String> variant(NetworkKind kind) =>
+            kind == current ? Future.value(filtered) : _configFor(path, kind, variant: true);
+        await ServerRegionFilter.leaveVariants(
+          wifi: await variant(NetworkKind.wifi),
+          mobile: await variant(NetworkKind.mobile),
+        );
+      } else {
+        await ServerRegionFilter.leaveVariants();
+      }
+    }
+    return filtered;
+  }
+
+  /// The config for the phone on [current] (unknown: whatever the network). [variant]: one made ahead for another
+  /// network than the one running, in files of its own.
+  Future<String> _configFor(String path, NetworkKind current, {bool variant = false}) async {
+    final cisOnly = ref.read(ConfigOptions.cisOnlyServers);
+    final europeOnly = !cisOnly && ref.read(ConfigOptions.europeOnlyServers);
+    final network = ref.read(ConfigOptions.serversByNetwork) ? current : NetworkKind.unknown;
     var filtered = path;
     if (europeOnly || cisOnly || network != NetworkKind.unknown) {
-      filtered = await ServerRegionFilter.apply(path, europeOnly: europeOnly, cisOnly: cisOnly, network: network);
+      filtered = await ServerRegionFilter.apply(
+        path,
+        europeOnly: europeOnly,
+        cisOnly: cisOnly,
+        network: network,
+        remember: !variant,
+      );
     }
-    ServerRegionFilter.lastApplied = current;
     if (ref.read(ConfigOptions.homeNetwork)) {
       // Server mode decides every connection itself
       filtered = await HomeNetwork.attach(filtered, activeConfigPath: path);
@@ -234,6 +261,8 @@ class HiddifyCoreService with InfraLogger {
         activeConfigPath: path,
         extraProxyHosts: [if (testHost != null && testHost.isNotEmpty) testHost],
         list: ref.read(rulesNotifierProvider),
+        desktop: PlatformUtils.isDesktop,
+        variant: variant ? '-${current.name}' : '',
       );
     }
     return filtered;

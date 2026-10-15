@@ -8,7 +8,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
+import com.hiddify.hiddify.NetworkKinds
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
@@ -176,6 +181,67 @@ class BoxService(
         }
     }
 
+    // A-VPN: the servers follow the phone's network with the app closed too. The app leaves a config for Wi-Fi
+    // and one for mobile data ("LTE Only" servers on mobile, the others on Wi-Fi); when the network under the VPN
+    // changes this restarts the core on the other one. It waited for the app to be opened before, the VPN up but
+    // its servers dead on the new network.
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var networkCheck: Job? = null
+
+    private fun watchNetwork() {
+        // also after a pause or a reload: the network may have changed meanwhile
+        scheduleNetworkCheck()
+        if (networkCallback != null) return
+        val cm = service.getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = scheduleNetworkCheck()
+            override fun onLost(network: Network) = scheduleNetworkCheck()
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = scheduleNetworkCheck()
+        }
+        // the physical networks only (a request leaves VPNs out unless asked)
+        val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
+        runCatching { cm.registerNetworkCallback(request, callback) }
+            .onSuccess { networkCallback = callback }
+            .onFailure { Log.w(TAG, "network watch failed: ${it.message}") }
+    }
+
+    private fun unwatchNetwork() {
+        networkCheck?.cancel()
+        networkCheck = null
+        val callback = networkCallback ?: return
+        networkCallback = null
+        runCatching { service.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun scheduleNetworkCheck() {
+        networkCheck?.cancel()
+        // a new network takes a moment to come up and be validated (Wi-Fi's "validated" decides it)
+        networkCheck = GlobalScope.launch(Dispatchers.IO) {
+            delay(4_000)
+            switchToNetwork()
+        }
+    }
+
+    private fun switchToNetwork() {
+        if (status.value != Status.Started || paused || fileDescriptor == null) return
+        val network = NetworkKinds.underlying(service)
+        val applied = Settings.appliedNetwork
+        if (network == "unknown" || network == applied) return
+        val path = Settings.networkConfig(network)
+        if (path.isBlank() || !File(path).exists()) return
+        Log.d(TAG, "network is now $network, was $applied: restarting on its servers")
+        try {
+            runCatching { Mobile.stop() }
+            Mobile.start(path, "")
+            Settings.appliedNetwork = network
+        } catch (e: Exception) {
+            Log.w(TAG, "restart for the $network network failed: ${e.message}")
+            // back on the config it had rather than no VPN at all
+            runCatching { Mobile.start(Settings.networkConfig(applied), "") }
+        }
+    }
+
     private suspend fun pause(app: String) {
         Log.d(TAG, "auto-pause for $app")
         paused = true
@@ -280,6 +346,7 @@ class BoxService(
             }
             notification.start()
             startAutoPause()
+            watchNetwork()
         } catch (e: Exception) {
             stopAndAlert(Alert.StartService, e.message)
             return
@@ -346,6 +413,7 @@ class BoxService(
         if (status.value == Status.Stopped && !paused) return
         autoPauseJob?.cancel()
         autoPauseJob = null
+        unwatchNetwork()
         paused = false
         status.value = Status.Stopping
         if (receiverRegistered) {

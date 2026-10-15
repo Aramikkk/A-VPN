@@ -33,13 +33,21 @@ class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "underlyingNetwork" -> result.success(underlyingNetwork())
+            "underlyingNetwork" -> result.success(NetworkKinds.underlying(context))
+            // the service switches the config by itself when it has both variants: where it stands, else null
+            "serviceAppliedNetwork" -> result.success(
+                if (Settings.networkConfig("wifi").isNotBlank() && Settings.networkConfig("mobile").isNotBlank())
+                    Settings.appliedNetwork else null
+            )
             else -> result.notImplemented()
         }
     }
 
+}
+
+object NetworkKinds {
     @Suppress("DEPRECATION") // allNetworks is the one call that lists every network, VPN or not
-    private fun underlyingNetwork(): String {
+    fun underlying(context: Context?): String {
         val cm = context?.getSystemService(ConnectivityManager::class.java) ?: return "unknown"
         var wifi = false
         var mobile = false

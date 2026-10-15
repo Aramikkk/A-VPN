@@ -21,15 +21,67 @@ abstract class BlockedOnlyRouting {
   /// networks and the blocked sites through the VPN, Russian sites and apps direct), then everything else
   /// direct. [extraProxyHosts]: hosts that must also go through the VPN (the ping test URL, so the ping shows
   /// the VPN's latency).
-  static List<Map<String, dynamic>> rules({required List<Rule> list, List<String> extraProxyHosts = const []}) => [
+  ///
+  /// [desktop]: a computer's way, after the list: the big downloads (games, updates, drivers) direct, every
+  /// other site with a name (abroad, as the Russian ones are the list's) through the VPN, and what goes by its
+  /// address alone (game servers, torrent peers) direct. One program then goes one way for its sites, not half
+  /// and half by which of them happen to be listed.
+  static List<Map<String, dynamic>> rules({
+    required List<Rule> list,
+    List<String> extraProxyHosts = const [],
+    bool desktop = false,
+  }) => [
     if (extraProxyHosts.isNotEmpty) {'domain_suffix': extraProxyHosts, 'action': 'route', 'outbound': _proxyTag},
     ...splitGroups(list.where((rule) => rule.enabled)).map(ruleJson).nonNulls,
+    if (desktop) ...[
+      {'domain_suffix': desktopDirectDomains, 'action': 'route', 'outbound': _directTag},
+      // a site by its name: any name at all
+      {
+        'domain_regex': [r'\.'],
+        'action': 'route',
+        'outbound': _proxyTag,
+      },
+    ],
     // the rest of the internet
     {
       'network': ['tcp', 'udp'],
       'action': 'route',
       'outbound': _directTag,
     },
+  ];
+
+  /// A computer's big downloads, direct though their sites are abroad: games (Steam, Epic, Battle.net), Windows
+  /// and driver updates. Fast and plentiful from Russia; through the VPN they'd only load it.
+  static const desktopDirectDomains = [
+    // Steam (its community is blocked and goes by the list, ahead of this)
+    'steamcontent.com',
+    'steampipe.akamaized.net',
+    'steamstatic.com',
+    'steamserver.net',
+    'steampowered.com',
+    'steamusercontent.com',
+    'valvesoftware.com',
+    'dota2.com',
+    // Epic Games and Battle.net downloads
+    'epicgames-download1.akamaized.net',
+    'download.epicgames.com',
+    'fastly-download.epicgames.com',
+    'level3.blizzard.com',
+    'blzddist1-a.akamaihd.net',
+    // Windows updates and its network check
+    'windowsupdate.com',
+    'update.microsoft.com',
+    'delivery.mp.microsoft.com',
+    'do.dsp.mp.microsoft.com',
+    'msftconnecttest.com',
+    'msftncsi.com',
+    // Russian services on foreign domains (the rest are in the list)
+    'kontur.tools',
+    'kontur.host',
+    // drivers
+    'download.nvidia.com',
+    'download.amd.com',
+    'downloadmirror.intel.com',
   ];
 
   /// A rule of the list as a sing-box route rule; null when it has nothing this mode can match on. Its rule-sets
@@ -93,6 +145,9 @@ abstract class BlockedOnlyRouting {
     required String activeConfigPath,
     required List<Rule> list,
     List<String> extraProxyHosts = const [],
+    bool desktop = false,
+    // the variant's name in the file's ("-wifi"): one made ahead for another network keeps its own file
+    String variant = '',
   }) async {
     try {
       final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
@@ -100,11 +155,15 @@ abstract class BlockedOnlyRouting {
       final existing = (route['rules'] as List?)?.toList() ?? [];
       config['route'] = {
         ...route,
-        'rules': [...existing, ...rules(list: list, extraProxyHosts: extraProxyHosts)],
+        'rules': [...existing, ...rules(list: list, extraProxyHosts: extraProxyHosts, desktop: desktop)],
       };
-      final out = File('$activeConfigPath.blocked-only.json');
+      final out = File('$activeConfigPath.blocked-only$variant.json');
       await out.writeAsString(jsonEncode(config));
-      _logger.info('only blocked sites through the VPN, everything else direct');
+      _logger.info(
+        desktop
+            ? 'blocked and foreign sites through the VPN, Russian ones and big downloads direct'
+            : 'only blocked sites through the VPN, everything else direct',
+      );
       return out.path;
     } catch (e, st) {
       _logger.warning('could not add the blocked-only rules, everything goes through the VPN', e, st);

@@ -179,6 +179,34 @@ abstract class ServerRegionFilter {
   static NetworkKind _lastApplied = NetworkKind.unknown;
   static const _lastKey = 'aravpn-last-applied-network';
 
+  /// The network the phone's service switched the running config to by itself (null: it doesn't switch, the app
+  /// does). It does that with the app closed too, from the two variants the app leaves it; the app then only
+  /// reads where it stands.
+  static Future<NetworkKind?> serviceApplied() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final kind = await _networkChannel.invokeMethod<String>('serviceAppliedNetwork');
+      if (kind == null) return null;
+      final applied = NetworkKind.values.firstWhere((k) => k.name == kind, orElse: () => NetworkKind.unknown);
+      _lastApplied = applied;
+      return applied;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The configs for Wi-Fi and for mobile data, for the phone's service to switch between when the network
+  /// changes (with the app closed too); empty paths: it leaves the switching to the app.
+  static Future<void> leaveVariants({String wifi = '', String mobile = ''}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('aravpn-net-config-wifi', wifi);
+      await prefs.setString('aravpn-net-config-mobile', mobile);
+    } catch (e) {
+      _logger.warning('could not leave the network variants', e);
+    }
+  }
+
   /// The network the running config was made for, as the app saved it before it was closed.
   static Future<NetworkKind> restoreLastApplied() async {
     if (_lastApplied != NetworkKind.unknown) return _lastApplied;
@@ -230,8 +258,10 @@ abstract class ServerRegionFilter {
     bool europeOnly = true,
     bool cisOnly = false,
     NetworkKind network = NetworkKind.unknown,
+    // a variant made ahead for the other network (the phone switches to it by itself): not the one running
+    bool remember = true,
   }) async {
-    lastApplied = network;
+    if (remember) lastApplied = network;
     try {
       final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
       final servers = <String, Map<String, dynamic>>{};
@@ -276,7 +306,7 @@ abstract class ServerRegionFilter {
           }
         }
       }
-      final out = File('$path.filtered.json');
+      final out = File(remember ? '$path.filtered.json' : '$path.filtered-${network.name}.json');
       await out.writeAsString(jsonEncode(config));
       _logger.info('network ${network.name}: hid ${renamed.length} servers, kept ${kept.length}');
       return out.path;

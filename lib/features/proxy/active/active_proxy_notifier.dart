@@ -107,6 +107,8 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
               ref.read(ConfigOptions.blockedOnlyViaVpn) &&
               !ref.read(ConfigOptions.homeNetwork));
       if (switching || !follows) return;
+      // the phone's VPN service switches the config itself when it was left the two variants: only follow it
+      if (await ServerRegionFilter.serviceApplied() != null) return;
       final network = await ServerRegionFilter.currentNetwork();
       if (network == NetworkKind.unknown) return;
       // the app was closed and opened again while the VPN ran on: the network its config was made for, as saved

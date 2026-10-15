@@ -101,6 +101,18 @@ object Settings {
         get() = preferences.getString(SettingsKey.AUTO_PAUSE_APPS, "")!!
             .split(";").filter { it.isNotBlank() }.toSet()
 
+    /** The config the app made for [network] ("wifi" or "mobile"); blank: the app switches, not the service. */
+    fun networkConfig(network: String): String = when (network) {
+        "wifi" -> preferences.getString(SettingsKey.NET_CONFIG_WIFI, "")!!
+        "mobile" -> preferences.getString(SettingsKey.NET_CONFIG_MOBILE, "")!!
+        else -> ""
+    }
+
+    /** The network the running config was made for, as the app or the service last set it. */
+    var appliedNetwork: String
+        get() = preferences.getString(SettingsKey.APPLIED_NETWORK, "unknown")!!
+        set(value) = preferences.edit().putString(SettingsKey.APPLIED_NETWORK, value).apply()
+
     /** The app's "turn the VPN on when the phone starts" switch. */
     val connectOnBoot: Boolean
         get() = preferences.getBoolean(SettingsKey.CONNECT_ON_BOOT, false)

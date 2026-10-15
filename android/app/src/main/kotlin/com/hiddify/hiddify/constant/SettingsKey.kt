@@ -26,6 +26,11 @@ object SettingsKey {
     // A-VPN "Global": everything through the VPN, the apps set to bypass it too
     const val GLOBAL_MODE = "${KEY_PREFIX}global-mode"
 
+    // A-VPN: the configs for Wi-Fi and mobile data the app leaves, and the network the running one was made for
+    const val NET_CONFIG_WIFI = "${KEY_PREFIX}aravpn-net-config-wifi"
+    const val NET_CONFIG_MOBILE = "${KEY_PREFIX}aravpn-net-config-mobile"
+    const val APPLIED_NETWORK = "${KEY_PREFIX}aravpn-last-applied-network"
+
     const val AUTO_PAUSE_ENABLED = "${KEY_PREFIX}auto_pause_enabled"
     const val AUTO_PAUSE_APPS = "${KEY_PREFIX}auto_pause_apps"
     const val CONFIG_OPTIONS = "config_options_json"

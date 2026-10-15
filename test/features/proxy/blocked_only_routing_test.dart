@@ -195,4 +195,21 @@ void main() {
     final adult = rules.where((r) => (r['domain_keyword'] as List?)?.contains('porn') ?? false);
     expect(adult.single['outbound'], 'select');
   });
+
+  test("a computer: big downloads direct, any other named site through the VPN, bare addresses direct", () {
+    final pc = BlockedOnlyRouting.rules(list: _defaults, extraProxyHosts: ['www.gstatic.com'], desktop: true);
+    expect(pc.length, rules.length + 2);
+    // the list first, as on the phone
+    expect(pc.sublist(0, rules.length - 1), rules.sublist(0, rules.length - 1));
+    expect(pc[rules.length - 1]['domain_suffix'], containsAll(['steamcontent.com', 'windowsupdate.com']));
+    expect(pc[rules.length - 1]['outbound'], 'direct §hide§');
+    expect(pc[rules.length], {
+      'domain_regex': [r'\.'],
+      'action': 'route',
+      'outbound': 'select',
+    });
+    expect(pc.last, rules.last);
+    // the Russian sites stay direct ahead of it
+    expect(route('mail.ru'), 'direct §hide§');
+  });
 }
