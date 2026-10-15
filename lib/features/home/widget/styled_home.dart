@@ -838,7 +838,9 @@ class _GraphiteDock extends HookConsumerWidget {
     final content = Row(
       children: [
         Expanded(
-          child: Center(
+          // Contrast: the ping button a little to the left of its half's middle
+          child: Align(
+            alignment: theme.araLook.style == AraStyle.contrast ? const Alignment(-.45, 0) : Alignment.center,
             child: side(
               top: on && testing
                   ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: ink))
@@ -1033,7 +1035,8 @@ class _Orb extends HookWidget {
             child: TweenAnimationBuilder<Offset>(
               // both arcs glide to new values; started over when switching ends, from where the wave was
               key: ValueKey(busy),
-              tween: Tween(begin: drawn.value, end: on && !busy ? Offset(ping, loss) : Offset.zero),
+              // in steps of 2%: each second's ping doesn't start the arcs gliding again for a hair's change
+              tween: Tween(begin: drawn.value, end: on && !busy ? Offset(_step(ping), _step(loss)) : Offset.zero),
               duration: const Duration(milliseconds: 700),
               curve: Curves.easeOutCubic,
               builder: (context, filled, _) => AnimatedBuilder(
@@ -1917,42 +1920,37 @@ class _ContrastRow extends StatelessWidget {
                   const Gap(11),
                   Expanded(
                     child: country != null
-                        ? (() {
-                            final line = Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: title,
-                                    style: titleStyle?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                  const TextSpan(text: '   '),
-                                  TextSpan(
-                                    text: country,
-                                    style: titleStyle?.copyWith(color: ink.withValues(alpha: .8)),
-                                  ),
-                                ],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            );
-                            if (note == null) return line;
-                            return Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                line,
-                                Text(
-                                  note[1]!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: ink.withValues(alpha: .7),
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                        // "Авто" at the left, the country it's on in the middle of the row (a test server's note
+                        // under it)
+                        ? Row(
+                            children: [
+                              Text(title, style: titleStyle?.copyWith(fontWeight: FontWeight.w700)),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      country,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: titleStyle?.copyWith(color: ink.withValues(alpha: .8)),
+                                    ),
+                                    if (note != null)
+                                      Text(
+                                        note[1]!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: ink.withValues(alpha: .7),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ],
-                            );
-                          })()
+                              ),
+                            ],
+                          )
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2027,7 +2025,8 @@ class _ContrastStats extends StatelessWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     Widget water(double level, Color colour) => TweenAnimationBuilder<double>(
-      tween: Tween(end: level.clamp(0.0, 1.0)),
+      // in whole percents: the traffic moving every second doesn't restart it each time (the screen redrew nonstop)
+      tween: Tween(end: _percent(level.clamp(0.0, 1.0))),
       duration: const Duration(milliseconds: 900),
       curve: Curves.easeOutCubic,
       builder: (context, l, _) => l < .005
@@ -2318,7 +2317,7 @@ class _WaterTile extends ConsumerWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(2),
                 child: TweenAnimationBuilder<double>(
-                  tween: Tween(end: share),
+                  tween: Tween(end: _percent(share)),
                   duration: const Duration(milliseconds: 900),
                   curve: Curves.easeOutCubic,
                   builder: (context, v, _) => LinearProgressIndicator(
@@ -2332,7 +2331,7 @@ class _WaterTile extends ConsumerWidget {
             ),
             Expanded(
               child: TweenAnimationBuilder<double>(
-                tween: Tween(end: level),
+                tween: Tween(end: _percent(level)),
                 duration: const Duration(milliseconds: 900),
                 curve: Curves.easeOutCubic,
                 builder: (context, level, _) => Stack(
@@ -2988,3 +2987,9 @@ class ContrastPlate extends ConsumerWidget {
     );
   }
 }
+
+/// [v] in whole percents (0 to 1): an animation to it starts again only when it moves by one.
+double _percent(double v) => v.isFinite ? (v * 100).round() / 100 : 0;
+
+/// [v] in steps of 2% (0 to 1).
+double _step(double v) => v.isFinite ? (v * 50).round() / 50 : 0;

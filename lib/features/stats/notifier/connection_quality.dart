@@ -72,9 +72,9 @@ typedef LossEpisode = ({DateTime start, int minutes, int sent, int lost});
 typedef LossDay = ({PingBucket total, List<double?> minutes, List<LossEpisode> episodes});
 
 class ConnectionQuality extends Notifier<List<int?>> {
-  /// one minute of samples
+  /// three minutes of samples (one every three seconds)
   static const length = 60;
-  static const interval = Duration(seconds: 1);
+  static const interval = Duration(seconds: 3);
   static const timeout = Duration(seconds: 2);
   static const _minutesKept = 2 * 24 * 60;
 

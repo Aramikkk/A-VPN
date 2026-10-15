@@ -39,6 +39,9 @@ object NotificationQuality {
         prefs.getString("flutter.connection-test-url", null)?.takeIf { it.isNotBlank() }
             ?: "http://www.gstatic.com/generate_204"
 
+    // when the last probe went out: once every three seconds
+    private var lastProbe = 0L
+
     /** Starts a probe unless one is out; [sessionId] changing (a new connection) starts the minute over. */
     @Synchronized
     fun probe(sessionId: Long) {
@@ -50,6 +53,10 @@ object NotificationQuality {
             worker.execute { drop() }
         }
         if (inFlight || !prefs.getBoolean("flutter.enable-mixed-port", true)) return
+        // once every three seconds, as the app does
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastProbe < 3000) return
+        lastProbe = now
         inFlight = true
         val forSession = session
         val port = port()
