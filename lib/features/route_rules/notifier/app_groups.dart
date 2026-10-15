@@ -2,11 +2,10 @@
 /// marketplaces and banks direct. Each takes its apps (and the sites they need) out of the broader groups after
 /// it; the Russian ones stay in the Russian apps too, so they still go direct with their group switched off.
 
-/// App stores: through the VPN (Play's downloads and its region need it). RuStore is Russian and stays direct
-/// with the Russian apps.
+/// App stores: through the VPN (Play's downloads and its region need it). RuStore and Galaxy Store work direct
+/// and go with the Russian apps.
 const storeApps = [
   'com.android.vending', // Google Play
-  'com.sec.android.app.samsungapps', // Galaxy Store
   'org.fdroid.fdroid',
   'com.aurora.store',
   'com.apkpure.installer',
@@ -21,12 +20,10 @@ const storeDomains = [
   'apkpure.com',
   'apkpure.net',
   'f-droid.org',
-  'galaxystore.samsung.com',
   'play-fe.googleapis.com',
   'play-lh.googleusercontent.com',
   'play.google.com',
   'play.googleapis.com',
-  'samsungapps.com',
 ];
 
 /// YouTube and Twitch: the apps and their video servers.

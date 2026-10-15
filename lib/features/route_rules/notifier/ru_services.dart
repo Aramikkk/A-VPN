@@ -2,6 +2,9 @@
 /// files on userapi.com…). They go direct with the Russian zones: through a foreign server they're slower, and
 /// some of them refuse foreign addresses (Yandex Music plays fewer tracks abroad).
 const ruServiceDomains = [
+  // Galaxy Store works direct
+  'galaxystore.samsung.com',
+  'samsungapps.com',
   // Yandex: music and video streams, static files, maps, cloud
   'yandex.net',
   'yandex.com',
@@ -190,6 +193,7 @@ const ruAppPackages = [
   'ru.litres.android',
   'ru.sbcs.store',
   'ru.vk.store',
+  'com.sec.android.app.samsungapps', // Galaxy Store: works direct
   'com.kaspersky.security.cloud',
   // the ones on the owner's phone the list above missed
   'com.yandex.aliceapp',

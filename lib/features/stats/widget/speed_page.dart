@@ -15,7 +15,22 @@ class SpeedPage extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final contrast = Theme.of(context).araLook.style == AraStyle.contrast;
     return Scaffold(
-      appBar: AppBar(title: Text(t.avpn.speedTab)),
+      appBar: AppBar(
+        // what the page counts: this session (as Topology says its day)
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(t.avpn.speedTab),
+            Text(
+              t.avpn.statsForSession,
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
       // it all at once, no scroll: two columns on a wide screen (the unfolded phone), otherwise one column whose
       // graph takes the height the rest leaves; a short window (landscape) still scrolls
       body: LayoutBuilder(

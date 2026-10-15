@@ -260,7 +260,8 @@ class _StatusBlock extends HookConsumerWidget {
             vpn.$2,
             true,
             today.total == 0 ? 0 : vpnShare,
-            scheme.primary,
+            // the water in the palette's own colour (the primary is graphite by day)
+            theme.araAccent,
           ),
           (
             Icons.alt_route_rounded,
@@ -812,7 +813,12 @@ class _GraphiteDock extends HookConsumerWidget {
     final iconSize = (large ? 28.0 : 26.0) * (theme.araLook.style == AraStyle.contrast ? 1.05 : 1);
     // no plates: an icon (or a number) over a small caption, pressed as one
     // on a barely-there plate, as the toggles above
-    Widget side({required Widget top, required String label, VoidCallback? onTap}) => Material(
+    // Contrast: the ping and the servers' figures in the ping frame's colour (their signs in the text colour), the
+    // loss in its frame's grey
+    final contrastOn = theme.araLook.style == AraStyle.contrast && on;
+    final gaugeInk = contrastOn ? accent : ink;
+    final lossInk = dark ? const Color(0xFFA3A9B0) : const Color(0xFF8C939C);
+    Widget side({required Widget top, required String label, VoidCallback? onTap, Color? labelColor}) => Material(
       // Contrast: no plate, right on its black panel
       color: theme.araLook.style == AraStyle.contrast
           ? Colors.transparent
@@ -835,7 +841,7 @@ class _GraphiteDock extends HookConsumerWidget {
                   child: Center(child: top),
                 ),
                 const Gap(4),
-                Text(label, style: caption),
+                Text(label, style: labelColor == null ? caption : caption?.copyWith(color: labelColor)),
               ],
             ),
           ),
@@ -857,7 +863,7 @@ class _GraphiteDock extends HookConsumerWidget {
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.network_ping_rounded, size: iconSize, color: ink),
+                        Icon(Icons.network_ping_rounded, size: iconSize, color: contrastOn ? scheme.onSurface : ink),
                         const Gap(6),
                         Text.rich(
                           TextSpan(
@@ -874,6 +880,7 @@ class _GraphiteDock extends HookConsumerWidget {
                             fontWeight: FontWeight.w900,
                             height: 1,
                             fontSize: sideFigure,
+                            color: contrastOn && measured && !busy ? gaugeInk : null,
                           ),
                         ),
                       ],
@@ -883,6 +890,7 @@ class _GraphiteDock extends HookConsumerWidget {
               label: theme.araLook.style == AraStyle.contrast && on && measured && !busy
                   ? t.avpn.dockLoss(loss: lossText)
                   : t.avpn.stPingButton,
+              labelColor: theme.araLook.style == AraStyle.contrast && on && measured && !busy ? lossInk : null,
               onTap: on && !busy && !testing ? onCheck : null,
             ),
           ),
@@ -912,7 +920,7 @@ class _GraphiteDock extends HookConsumerWidget {
                   top: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.dns_rounded, size: iconSize - 2, color: ink),
+                      Icon(Icons.dns_rounded, size: iconSize - 2, color: contrastOn ? scheme.onSurface : ink),
                       const Gap(6),
                       Text(
                         on ? '$answering' : '—',
@@ -920,6 +928,7 @@ class _GraphiteDock extends HookConsumerWidget {
                           fontWeight: FontWeight.w900,
                           height: 1,
                           fontSize: sideFigure,
+                          color: contrastOn ? gaugeInk : null,
                         ),
                       ),
                     ],
