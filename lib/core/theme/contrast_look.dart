@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -60,9 +61,10 @@ enum ContrastPalette {
 
 /// How see-through Contrast's blocks are: the tint over the backdrop (by day, by night) and how much they blur it.
 enum ContrastClarity {
-  weak('Слабо', 'Low', .62, .62, 10),
-  medium('Средне', 'Medium', .3, .35, 18),
-  strong('Сильно', 'High', .12, .18, 26);
+  // low: nearly solid; medium a little more see-through; high a little more again
+  weak('Слабо', 'Low', .92, .9, 18),
+  medium('Средне', 'Medium', .8, .78, 18),
+  strong('Сильно', 'High', .66, .64, 18);
 
   const ContrastClarity(this.ru, this.en, this.day, this.night, this.blur);
 
@@ -290,4 +292,53 @@ class ContrastBackdropPainter extends CustomPainter {
       old.dark != dark ||
       old.seed != seed ||
       old.area != area;
+}
+
+/// The backdrop as frosted glass shows it: drawn once, blurred, into a small picture (half the screen's size: it's
+/// blurred anyway) and kept until the look or the screen changes. The blocks show their part of it instead of
+/// blurring what's behind them on every frame, which made the whole interface lag.
+class ContrastFrostImage {
+  ContrastFrostImage._();
+
+  /// the picture's pixels per logical pixel
+  static const scale = .5;
+
+  static final _kept = <String, ui.Image>{};
+
+  static ui.Image of({
+    required ContrastBackdrop kind,
+    required Color warm,
+    required Color cool,
+    required bool dark,
+    required Size area,
+    required double blur,
+  }) {
+    final key =
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur';
+    final kept = _kept[key];
+    if (kept != null) return kept;
+    // a handful at most (day and night, a few clarities); the old ones go to the collector
+    if (_kept.length > 8) _kept.clear();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(scale);
+    canvas.saveLayer(
+      Offset.zero & area,
+      Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur, tileMode: TileMode.clamp),
+    );
+    ContrastBackdropPainter(
+      kind: kind,
+      warm: warm,
+      cool: cool,
+      dark: dark,
+      seed: contrastBackdropSeed,
+      area: area,
+    ).paint(canvas, area);
+    canvas.restore();
+    final image = recorder.endRecording().toImageSync(
+      math.max(1, (area.width * scale).ceil()),
+      math.max(1, (area.height * scale).ceil()),
+    );
+    return _kept[key] = image;
+  }
 }

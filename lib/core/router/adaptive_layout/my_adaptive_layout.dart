@@ -291,13 +291,11 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = ContrastClarity.medium]) {
   final scheme = theme.colorScheme;
   final dark = theme.brightness == Brightness.dark;
-  // the cards as see-through as chosen in Settings → Themes: these are the medium ones' alphas, scaled
-  final k = switch (clarity) {
-    ContrastClarity.weak => 1.6,
-    ContrastClarity.medium => 1.0,
-    ContrastClarity.strong => .55,
-  };
-  Color pane(double day, double night) => Colors.white.withValues(alpha: ((dark ? night : day) * k).clamp(0, .95));
+  // the cards as see-through as the blocks, as chosen in Settings → Themes (a level above or below them for the
+  // lighter and the deeper containers)
+  Color pane(double level) => dark
+      ? const Color(0xFF1E1E22).withValues(alpha: (clarity.night * level).clamp(0, .97))
+      : Colors.white.withValues(alpha: (clarity.day * level).clamp(0, .97));
   return theme.copyWith(
     scaffoldBackgroundColor: Colors.transparent,
     canvasColor: Colors.transparent,
@@ -307,21 +305,21 @@ ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = Contrast
       scrolledUnderElevation: 0,
     ),
     cardTheme: theme.cardTheme.copyWith(
-      color: pane(.55, .1),
+      color: pane(1),
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: pane(.8, .1)),
+        side: BorderSide(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
       ),
     ),
     colorScheme: scheme.copyWith(
       surface: Colors.transparent,
-      surfaceContainerLowest: pane(.4, .08),
-      surfaceContainerLow: pane(.55, .1),
-      surfaceContainer: pane(.6, .11),
-      surfaceContainerHigh: pane(.65, .12),
-      surfaceContainerHighest: pane(.7, .14),
+      surfaceContainerLowest: pane(.85),
+      surfaceContainerLow: pane(1),
+      surfaceContainer: pane(1.05),
+      surfaceContainerHigh: pane(1.1),
+      surfaceContainerHighest: pane(1.15),
     ),
     // what opens over the page stays solid
     dialogTheme: theme.dialogTheme.copyWith(backgroundColor: scheme.surfaceContainerHigh),

@@ -1611,17 +1611,26 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
     final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
     final (warm, cool) = palette.backdrop(brightness);
-    return CustomPaint(
-      painter: ContrastBackdropPainter(
-        kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
-        warm: warm,
-        cool: cool,
-        dark: brightness == Brightness.dark,
-        seed: contrastBackdropSeed,
-        // laid out on the screen, so every page's lines up with the rest
-        area: MediaQuery.sizeOf(context),
-      ),
-      child: widget.child,
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: ContrastBackdropPainter(
+                kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
+                warm: warm,
+                cool: cool,
+                dark: brightness == Brightness.dark,
+                seed: contrastBackdropSeed,
+                // laid out on the screen, so every page's lines up with the rest
+                area: MediaQuery.sizeOf(context),
+              ),
+            ),
+          ),
+        ),
+        widget.child,
+      ],
     );
   }
 }
@@ -1639,7 +1648,9 @@ class _ContrastBlock extends StatelessWidget {
   Widget build(BuildContext context) => ContrastFrost(child: child);
 }
 
-/// Contrast's frosted glass: the crisp discs behind it blurred, a light tint and a bright edge.
+/// Contrast's frosted glass: the backdrop behind it blurred, a light tint and a bright edge. The blur is the
+/// backdrop's picture blurred once ([ContrastFrostImage]), its part under the block shown, not a live blur on every
+/// frame.
 class ContrastFrost extends ConsumerWidget {
   const ContrastFrost({super.key, required this.child, this.radius = 24, this.padding = const EdgeInsets.all(8)});
 
@@ -1654,23 +1665,97 @@ class ContrastFrost extends ConsumerWidget {
     final clarity = ref.watch(sharedPreferencesProvider).hasValue
         ? ref.watch(Preferences.contrastClarity)
         : ContrastClarity.fallback;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: clarity.blur, sigmaY: clarity.blur),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: dark
-                ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
-                : Colors.white.withValues(alpha: clarity.day),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
-          ),
-          child: child,
+    return _FrostedBackdrop(
+      radius: radius,
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: dark
+              ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
+              : Colors.white.withValues(alpha: clarity.day),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
         ),
+        child: child,
       ),
     );
+  }
+}
+
+/// The blurred backdrop's part under [child], clipped to its rounded shape.
+class _FrostedBackdrop extends ConsumerWidget {
+  const _FrostedBackdrop({required this.child, required this.radius});
+
+  final Widget child;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final brightness = Theme.of(context).brightness;
+    final ready = ref.watch(sharedPreferencesProvider).hasValue;
+    final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
+    final clarity = ready ? ref.watch(Preferences.contrastClarity) : ContrastClarity.fallback;
+    final (warm, cool) = palette.backdrop(brightness);
+    final image = ContrastFrostImage.of(
+      kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
+      warm: warm,
+      cool: cool,
+      dark: brightness == Brightness.dark,
+      area: MediaQuery.sizeOf(context),
+      blur: clarity.blur,
+    );
+    return _FrostPart(image: image, radius: radius, child: child);
+  }
+}
+
+class _FrostPart extends SingleChildRenderObjectWidget {
+  const _FrostPart({required this.image, required this.radius, super.child});
+
+  final ui.Image image;
+  final double radius;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderFrostPart(image, radius);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderFrostPart renderObject) => renderObject
+    ..image = image
+    ..radius = radius;
+}
+
+class _RenderFrostPart extends RenderProxyBox {
+  _RenderFrostPart(this._image, this._radius);
+
+  ui.Image _image;
+  set image(ui.Image v) {
+    if (identical(v, _image)) return;
+    _image = v;
+    markNeedsPaint();
+  }
+
+  double _radius;
+  set radius(double v) {
+    if (v == _radius) return;
+    _radius = v;
+    markNeedsPaint();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    // where the block is on the screen: its part of the screen-sized picture
+    final at = localToGlobal(Offset.zero);
+    const k = ContrastFrostImage.scale;
+    final canvas = context.canvas;
+    canvas.save();
+    canvas.clipRRect(RRect.fromRectAndRadius(offset & size, Radius.circular(_radius)));
+    canvas.drawImageRect(
+      _image,
+      Rect.fromLTWH(at.dx * k, at.dy * k, size.width * k, size.height * k),
+      offset & size,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+    canvas.restore();
+    super.paint(context, offset);
   }
 }
 
@@ -2887,19 +2972,17 @@ class ContrastPlate extends ConsumerWidget {
     final clarity = ref.watch(Preferences.contrastClarity);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: clarity.blur, sigmaY: clarity.blur),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: dark
-                  ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
-                  : Colors.white.withValues(alpha: clarity.day),
-              border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
-            ),
-            child: child,
+      child: _FrostedBackdrop(
+        radius: 100,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: dark
+                ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
+                : Colors.white.withValues(alpha: clarity.day),
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
           ),
+          child: child,
         ),
       ),
     );
