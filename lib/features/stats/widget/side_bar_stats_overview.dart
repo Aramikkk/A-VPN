@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -269,6 +272,8 @@ class SideBarStatsOverview extends ConsumerWidget {
 
     if (contrast) {
       final accent = theme.araAccent;
+      // the figures and labels in the accent: graphite by day when it's too light to read (Contrast's citrus)
+      final accentText = theme.araIcon;
       const grey = Color(0xFF9AA0A6);
       final dark = theme.brightness == Brightness.dark;
       final ink = scheme.onSurface;
@@ -312,7 +317,7 @@ class SideBarStatsOverview extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              Icon(icon, size: 16, color: lit ? accent : muted),
+              Icon(icon, size: 16, color: lit ? accentText : muted),
               const Gap(8),
               Expanded(
                 child: Text(
@@ -322,7 +327,7 @@ class SideBarStatsOverview extends ConsumerWidget {
                   style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
                 ),
               ),
-              FittedBox(child: figure(value, color: lit ? accent : null)),
+              FittedBox(child: figure(value, color: lit ? accentText : null)),
             ],
           ),
         ),
@@ -389,7 +394,7 @@ class SideBarStatsOverview extends ConsumerWidget {
                             WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(accent)),
                             TextSpan(
                               text: ' VPN ${share == null ? '—' : '${(share * 100).round()}%'}   ',
-                              style: TextStyle(color: accent),
+                              style: TextStyle(color: accentText),
                             ),
                             WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(grey)),
                             TextSpan(
@@ -457,7 +462,7 @@ class SideBarStatsOverview extends ConsumerWidget {
               ),
             ),
             const Gap(6),
-            _RangePicker(range: range, color: accent),
+            _RangePicker(range: range, color: accentText),
           ],
         ),
       );
@@ -1384,7 +1389,12 @@ class _LossDay extends ConsumerWidget {
     // this session's, in the theme's colour
     final start = ref.watch(sessionStartProvider);
     final day = ref.read(connectionQualityProvider.notifier).lossDay(since: start ?? DateTime.now());
-    final loss = theme.araAccent;
+    // the loss in the accent; Citrus: grey (its light green read as good news), its figures a darker grey
+    final citrus =
+        ref.watch(sharedPreferencesProvider).hasValue &&
+        ref.watch(Preferences.contrastPalette) == ContrastPalette.citrus;
+    final loss = citrus ? const Color(0xFF9AA0A6) : theme.araAccent;
+    final lossText = citrus ? const Color(0xFF5F656D) : theme.araIcon;
     String two(int n) => n.toString().padLeft(2, '0');
     String clock(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
     String percent(double v) => v == 0
@@ -1431,7 +1441,7 @@ class _LossDay extends ConsumerWidget {
                   fontWeight: FontWeight.w600,
                   letterSpacing: -1,
                   height: 1,
-                  color: share > 0 ? loss : scheme.onSurface,
+                  color: share > 0 ? lossText : scheme.onSurface,
                 ),
               ),
             ],
@@ -1496,7 +1506,7 @@ class _LossDay extends ConsumerWidget {
                             ),
                             Text(
                               percent(part),
-                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800, color: loss),
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800, color: lossText),
                             ),
                           ],
                         ),
