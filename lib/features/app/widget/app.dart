@@ -136,9 +136,13 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                             ? Brightness.light
                             : Brightness.dark,
                         statusBarBrightness: theme.brightness,
+                        // Contrast: the gesture strip under the menu in the panel's colour (it showed a grey band)
                         systemNavigationBarColor: glass
                             ? glassScheme.look(theme.brightness).base
+                            : style == AraStyle.contrast
+                            ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white)
                             : theme.scaffoldBackgroundColor,
+                        systemNavigationBarDividerColor: Colors.transparent,
                         systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
                             ? Brightness.light
                             : Brightness.dark,

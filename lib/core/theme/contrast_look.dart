@@ -125,6 +125,7 @@ enum ContrastBackdrop {
   horizon('Горизонт', 'Horizon'),
   grain('Зерно', 'Grain'),
   chevron('Шеврон', 'Chevron'),
+  chevronGlow('Шеврон · свечение', 'Chevron glow'),
   // in the chevron's way: thin repeated lines, a few in the palette's colour
   zigzag('Зигзаг', 'Zigzag'),
   waveLines('Волнистые линии', 'Wavy lines'),
@@ -201,10 +202,9 @@ class ContrastBackdropPainter extends CustomPainter {
     // the quiet backdrops' lines: near the page's own colour, thin
     final faint = dark ? const Color(0xFF3A3A42) : const Color(0xFFD9D4CC);
     final thin = math.max(1.0, w / 411 * 1.4);
-    // the line families' lit rows: the ones nearest a quarter, a half and three quarters down (in the gaps between
-    // the blocks there), the same every time
-    bool lit(double y, double pitch) => const [.24, .52, .8].any((f) => (y - f * h).abs() < pitch / 2);
-    Paint line(bool on) => stroke(on ? warm : faint, on ? thin * 1.6 : thin);
+    // the line families' lit rows: every sixth, as thin as the rest, evenly down the screen
+    bool lit(int row) => row % 6 == 3;
+    Paint line(bool on) => stroke(on ? warm : faint, thin);
     canvas.save();
     canvas.clipRect(Offset.zero & box);
     switch (kind) {
@@ -449,7 +449,21 @@ class ContrastBackdropPainter extends CustomPainter {
               ..moveTo(x, y + c * .3)
               ..lineTo(x + c / 2, y)
               ..lineTo(x + c, y + c * .3);
-            canvas.drawPath(path, line(lit(y, c * .6)));
+            canvas.drawPath(path, line(lit(row)));
+          }
+        }
+      case ContrastBackdrop.chevronGlow:
+        // the middle of the screen glows: the lines there turn to the palette's colour and back
+        final c = w / 7;
+        for (var y = 0.0; y < h + c; y += c * .6) {
+          final k = (1 - (y - h * .5).abs() / (h * .18)).clamp(0.0, 1.0);
+          final paint = stroke(Color.lerp(faint, warm, k * .9)!, thin);
+          for (var x = 0.0; x < w + c; x += c) {
+            final path = Path()
+              ..moveTo(x, y + c * .3)
+              ..lineTo(x + c / 2, y)
+              ..lineTo(x + c, y + c * .3);
+            canvas.drawPath(path, paint);
           }
         }
       case ContrastBackdrop.zigzag:
@@ -462,7 +476,7 @@ class ContrastBackdropPainter extends CustomPainter {
               ..lineTo(x + c / 2, y + c * .45)
               ..lineTo(x + c, y);
           }
-          canvas.drawPath(path, line(lit(y, c * .9)));
+          canvas.drawPath(path, line(lit(row)));
         }
       case ContrastBackdrop.waveLines:
         final c = w / 6;
@@ -474,14 +488,14 @@ class ContrastBackdropPainter extends CustomPainter {
               ..quadraticBezierTo(x + c / 4, y - c * .18, x + c / 2, y)
               ..quadraticBezierTo(x + c * .75, y + c * .18, x + c, y);
           }
-          canvas.drawPath(path, line(lit(y, c * .42)));
+          canvas.drawPath(path, line(lit(row)));
         }
       case ContrastBackdrop.herringbone:
         final c = w / 9;
         final rowH = c * .55;
         var row = 0;
         for (var y = 0.0; y < h + c; y += rowH, row++) {
-          final on = lit(y, rowH);
+          final on = lit(row);
           for (var x = row.isOdd ? c / 2 : 0.0; x < w + c; x += c) {
             canvas.drawLine(Offset(x, y), Offset(x + c * .4, y + rowH * .8), line(on));
             canvas.drawLine(Offset(x + c * .9, y), Offset(x + c * .5, y + rowH * .8), line(on));
@@ -499,7 +513,7 @@ class ContrastBackdropPainter extends CustomPainter {
               ..lineTo(x + c, y - c * .3)
               ..lineTo(x + c, y);
           }
-          canvas.drawPath(path, line(lit(y, c * .7)));
+          canvas.drawPath(path, line(lit(row)));
         }
       case ContrastBackdrop.circuit:
         final g = w / 10;

@@ -1470,7 +1470,8 @@ class _PingGraph extends CustomPainter {
     }
     final answered = bars.whereType<int>().where((v) => v > 0);
     if (answered.isEmpty) return;
-    final top = (answered.reduce(math.max) / 50).ceil() * 50.0;
+    // the scale from the slowest, 150 to 500 ms: a spike runs off the top instead of flattening the usual ping
+    final top = ((answered.reduce(math.max) / 50).ceil() * 50.0).clamp(150.0, 500.0);
     final n = math.max(slots, bars.length);
     final w = size.width / n;
     final start = n - bars.length;
@@ -1478,7 +1479,7 @@ class _PingGraph extends CustomPainter {
     for (var i = 0; i < bars.length; i++) {
       final v = bars[i];
       if (v == null || v <= 0) continue;
-      final h = math.max(2.0, size.height * v / top);
+      final h = math.max(2.0, size.height * math.min(1.0, v / top));
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH((start + i) * w + w * .15, size.height - h, w * .7, h),

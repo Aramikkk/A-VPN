@@ -131,6 +131,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         child: Material(
           type: glass != null ? MaterialType.transparency : MaterialType.canvas,
           child: Scaffold(
+            // Contrast: the panel's colour under everything, so the system's gesture strip under the menu is of a
+            // piece with it (it showed the page's grey there)
+            backgroundColor: contrastPhone ? contrastPanelColor(dark) : null,
             body: contrastPhone
                 ? ContrastGlow(
                     child: Flex(
