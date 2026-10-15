@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/features/proxy/data/hidden_servers.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -40,11 +39,6 @@ class TopologyPage extends HookConsumerWidget {
     String value(double w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}';
     final total = items.fold<double>(0, (s, c) => s + weight(c));
     double sum(Iterable<SeenConnection> cs) => cs.fold<double>(0, (s, c) => s + weight(c));
-    final viaVpn = sum(items.where((c) => c.route == ConnectionRoute.vpn));
-    final servers = groupConnections(
-      items.where((c) => c.route == ConnectionRoute.vpn && c.outbound.isNotEmpty && !isHiddenServer(c.outbound)),
-      (c) => c.outbound,
-    );
     // a rule and the way it sent its traffic: the same list can send some of it through the VPN and some direct
     final rules = groupConnections(items, (c) => '${c.route.index}${ruleLabel(c.rule, t) ?? t.avpn.connRuleDefault}');
 
@@ -122,22 +116,6 @@ class TopologyPage extends HookConsumerWidget {
                   onSelectionChanged: (s) => byTraffic.value = s.first,
                 ),
               ),
-              // the VPN servers this traffic went through, first
-              if (servers.isNotEmpty) ...[
-                const Gap(12),
-                _Section(
-                  title: t.avpn.topoServersTitle,
-                  child: TrafficRanking(
-                    rows: [
-                      for (final g in (servers..sort((a, b) => sum(b.items).compareTo(sum(a.items)))).take(8))
-                        (g.key, sum(g.items)),
-                    ],
-                    total: viaVpn,
-                    value: value,
-                    colour: theme.araLook.neonFill ?? scheme.primary,
-                  ),
-                ),
-              ],
               const Gap(12),
               _Section(
                 title: t.avpn.topoFlow,

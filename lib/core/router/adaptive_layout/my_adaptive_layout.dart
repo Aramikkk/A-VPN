@@ -11,6 +11,7 @@ import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
@@ -76,6 +77,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     // by go router before it reaches here, so this only sees presses at the
     // root of a branch.
     final glass = Theme.of(context).araLook.glass;
+    final contrastPhone = isMobileBreakpoint && Theme.of(context).araLook.style == AraStyle.contrast;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final rail = FocusScope(
       node: navScopeNode,
       child: NavigationRail(
@@ -126,7 +129,19 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         child: Material(
           type: glass != null ? MaterialType.transparency : MaterialType.canvas,
           child: Scaffold(
-            body: isMobileBreakpoint
+            body: contrastPhone
+                ? Column(
+                    children: [
+                      Expanded(
+                        child: ContrastGlow(
+                          key: ValueKey(GoRouter.of(context).state.matchedLocation),
+                          child: Theme(data: contrastPageTheme(Theme.of(context)), child: navigationShell),
+                        ),
+                      ),
+                      const ContrastShellDock(),
+                    ],
+                  )
+                : isMobileBreakpoint
                 ? navigationShell
                 : Row(
                     children: [
@@ -199,16 +214,21 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                           AraStyle.contrast || AraStyle.glass || AraStyle.classic => null,
                         },
                       ),
-                      // Contrast: three tabs, Statistics, Home and Topology (the branches 1 to 3); Connections open from
-                      // the home screen's tab, Settings from the cog by the "+"
+                      // Contrast: three tabs, Statistics, Home and Topology (the branches 1 to 3); Connections come up
+                      // with a long swipe up on the home screen, Settings down with one down (or the cog by the "+")
                       child: Theme.of(context).araLook.style == AraStyle.contrast
                           ? NavigationBar(
-                              // a lower menu: the room goes to the connect panel; flat, no shadow line over it
+                              // a lower menu, of a piece with the panel over it (white by day, black by night); flat
                               height: 62,
                               elevation: 0,
                               shadowColor: Colors.transparent,
-                              backgroundColor: const Color(0xFF0B0B0C),
-                              selectedIndex: (navigationShell.currentIndex - 1).clamp(0, 2),
+                              backgroundColor: contrastPanelColor(dark),
+                              // Connections and Settings (not in the menu) keep Home lit
+                              selectedIndex: switch (navigationShell.currentIndex) {
+                                1 => 0,
+                                3 => 2,
+                                _ => 1,
+                              },
                               destinations: _navDests(
                                 _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
                               ),
@@ -260,4 +280,51 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         (e) => NavigationRailDestination(icon: _icon(e), selectedIcon: _icon(e, selected: true), label: Text(e.title)),
       )
       .toList();
+}
+
+/// The pages over Contrast's suns: see-through, their cards and blocks frosted panes the light shows through; the
+/// dialogs, sheets and menus they open stay solid.
+ThemeData contrastPageTheme(ThemeData theme) {
+  final scheme = theme.colorScheme;
+  final dark = theme.brightness == Brightness.dark;
+  Color pane(double day, double night) => Colors.white.withValues(alpha: dark ? night : day);
+  return theme.copyWith(
+    scaffoldBackgroundColor: Colors.transparent,
+    canvasColor: Colors.transparent,
+    appBarTheme: theme.appBarTheme.copyWith(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+    ),
+    cardTheme: theme.cardTheme.copyWith(
+      color: pane(.3, .06),
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: pane(.8, .1)),
+      ),
+    ),
+    colorScheme: scheme.copyWith(
+      surface: Colors.transparent,
+      surfaceContainerLowest: pane(.18, .04),
+      surfaceContainerLow: pane(.3, .06),
+      surfaceContainer: pane(.36, .07),
+      surfaceContainerHigh: pane(.42, .08),
+      surfaceContainerHighest: pane(.5, .1),
+    ),
+    // what opens over the page stays solid
+    dialogTheme: theme.dialogTheme.copyWith(backgroundColor: scheme.surfaceContainerHigh),
+    bottomSheetTheme: theme.bottomSheetTheme.copyWith(
+      backgroundColor: scheme.surfaceContainerLow,
+      modalBackgroundColor: scheme.surfaceContainerLow,
+    ),
+    popupMenuTheme: theme.popupMenuTheme.copyWith(color: scheme.surfaceContainer),
+    menuTheme: MenuThemeData(
+      style: (theme.menuTheme.style ?? const MenuStyle()).copyWith(
+        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainer),
+      ),
+    ),
+    snackBarTheme: theme.snackBarTheme.copyWith(backgroundColor: scheme.inverseSurface),
+  );
 }

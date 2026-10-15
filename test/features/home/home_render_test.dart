@@ -235,9 +235,31 @@ void main() {
                                   ),
                                 ],
                               )
+                            : style == AraStyle.contrast
+                            // Contrast: the panel under the page, as the shell draws it
+                            ? const Column(children: [Expanded(child: AraHomeBody()), ContrastShellDock()])
                             : const AraHomeBody(),
                         bottomNavigationBar: pc
                             ? null
+                            : style == AraStyle.contrast
+                            ? NavigationBar(
+                                height: 62,
+                                elevation: 0,
+                                backgroundColor: contrastPanelColor(dark),
+                                selectedIndex: 1,
+                                destinations: [
+                                  for (final (svg, label) in [
+                                    (NavIcons.stats, 'Статистика'),
+                                    (NavIcons.home, 'Главная'),
+                                    (NavIcons.topology, 'Топология'),
+                                  ])
+                                    NavigationDestination(
+                                      icon: NavIcon(svg),
+                                      selectedIcon: NavIcon(svg, selected: true),
+                                      label: label,
+                                    ),
+                                ],
+                              )
                             : NavigationBar(
                                 destinations: [
                                   for (final (svg, label) in [
@@ -265,6 +287,13 @@ void main() {
         await tester.pump(const Duration(milliseconds: 500));
         await tester.pump(const Duration(milliseconds: 600));
         expect(find.byType(AraHomeBody), findsOneWidget);
+        // TAP=<text>: a tap on it first, to look at what it opens
+        final tap = Platform.environment['TAP'];
+        if (tap != null && tap.isNotEmpty) {
+          await tester.tap(find.text(tap).first);
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.pump(const Duration(milliseconds: 400));
+        }
         if (Platform.environment['RENDER'] == '1') {
           await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/home_$name.png'));
         }

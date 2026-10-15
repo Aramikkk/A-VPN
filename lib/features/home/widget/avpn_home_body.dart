@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
@@ -54,21 +55,9 @@ class AraHomeBody extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final profile = ref.watch(activeProfileProvider).valueOrNull;
-    // set while a ping of every server runs, so the list can show spinners
-    final testing = useState(false);
-
-    Future<void> pingAll() async {
-      if (testing.value) return;
-      testing.value = true;
-      try {
-        await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select");
-        await Future<void>.delayed(const Duration(seconds: 4));
-      } catch (_) {
-        // not connected: nothing to ping
-      } finally {
-        if (context.mounted) testing.value = false;
-      }
-    }
+    // set while a ping of every server runs, so the list can show spinners (the panel's button runs it too)
+    final testing = useValueListenable(homePingTesting);
+    Future<void> pingAll() => pingAllServers(ref);
 
     // the servers' pings kept fresh: once a minute while connected and on screen, quietly (the list just updates,
     // no spinners); back from the background after longer, at once
@@ -77,7 +66,7 @@ class AraHomeBody extends HookConsumerWidget {
       if (!connected) return null;
       var last = DateTime.now();
       Future<void> refresh() async {
-        if (testing.value) return;
+        if (homePingTesting.value) return;
         last = DateTime.now();
         try {
           await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select", quiet: true);
@@ -132,7 +121,7 @@ class AraHomeBody extends HookConsumerWidget {
 
     final style = Theme.of(context).araLook.style;
     if (style != AraStyle.classic) {
-      return _StyledHome(testing: testing.value, onCheck: pingAll, traffic: traffic);
+      return _StyledHome(testing: testing, onCheck: pingAll, traffic: traffic);
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -149,10 +138,10 @@ class AraHomeBody extends HookConsumerWidget {
           Expanded(
             child: profile == null
                 ? _EmptyCard(text: t.avpn.noProfile)
-                : _ProviderCard(profile: profile, testing: testing.value),
+                : _ProviderCard(profile: profile, testing: testing),
           ),
           const Gap(10),
-          _CheckRow(onCheck: pingAll, testing: testing.value),
+          _CheckRow(onCheck: pingAll, testing: testing),
           const Gap(10),
           const _ConnectionCard(),
         ],
@@ -1046,8 +1035,12 @@ String sigmaName(String name) =>
     name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
 
 /// A server's flag emoji (if its name has one) and its name without the flag and the core's " § N" suffix.
-({String? flag, String title}) serverName(OutboundInfo server) {
-  var name = server.tagDisplay.isNotEmpty ? server.tagDisplay : server.tag;
+({String? flag, String title}) serverName(OutboundInfo server) =>
+    serverNameOf(server.tagDisplay.isNotEmpty ? server.tagDisplay : server.tag);
+
+/// The same from a bare name (a connection's outbound).
+({String? flag, String title}) serverNameOf(String raw) {
+  var name = raw;
   name = name.replaceAll('§hide§', '').replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '').trim();
   name = sigmaName(name);
   final runes = name.runes.toList();

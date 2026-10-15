@@ -142,6 +142,8 @@
     "bigWait": "ЖДИТЕ",
     "styleTitle": "Стиль",
     "contrastSession": "Сессия",
+    "contrastServersTab": "Серверы VPN",
+    "contrastDay": "за сутки",
     "contrastMore": "Ещё $n",
     "contrastThisSession": "текущая сессия",
     "contrastAppsShort": "прил.",

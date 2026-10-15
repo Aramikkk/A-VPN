@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 
 /// The phone's tabs, kept alive like an indexed stack. A sideways drag moves the tab under the finger with the next
 /// (or previous) one coming in beside it; let go past a quarter of the width, or with a flick, and it goes on to
@@ -26,6 +28,13 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
   /// 1: the new tab comes in from the right, -1: from the left
   double _direction = 1;
 
+  /// Contrast: the change goes up or down instead (Settings and Connections, the branches off the menu)
+  bool _vertical = false;
+
+  /// the phone's branches off Contrast's menu: Connections (from below) and Settings (from the top)
+  static const _connections = 0;
+  static const _settings = 4;
+
   /// how far the finger has moved the tab, as a share of the width: below 0 towards the next tab
   double _drag = 0;
 
@@ -46,6 +55,11 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     final index = widget.navigationShell.currentIndex;
     if (index != _current) {
       _direction = index > _current ? 1 : -1;
+      _vertical = _contrast && {index, _current}.any((i) => i == _connections || i == _settings);
+      if (_vertical) {
+        // Settings come down from the top and go back up; Connections come up from below and go back down
+        _direction = index == _settings || _current == _connections ? -1 : 1;
+      }
       _previous = _current;
       _current = index;
       final from = _from ?? 0;
@@ -66,6 +80,8 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     _back.dispose();
     super.dispose();
   }
+
+  bool get _contrast => Theme.of(context).araLook.style == AraStyle.contrast;
 
   int? _neighbour(double drag) {
     final next = _current + (drag < 0 ? 1 : -1);
@@ -104,18 +120,20 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     Widget tab(int i, {double x = 0, bool shown = false, bool live = false}) => Offstage(
       offstage: !shown,
       child: FractionalTranslation(
-        translation: Offset(x, 0),
+        translation: _vertical && _previous != null ? Offset(0, x) : Offset(x, 0),
         child: IgnorePointer(
           ignoring: !live,
           child: TickerMode(enabled: live, child: widget.children[i]),
         ),
       ),
     );
+    // Contrast: no sideways dragging between the tabs (the menu, and the home screen's long swipes up and down)
+    final drags = !_contrast;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragUpdate: _dragged,
-      onHorizontalDragEnd: _released,
-      onHorizontalDragCancel: () => _released(DragEndDetails()),
+      onHorizontalDragUpdate: drags ? _dragged : null,
+      onHorizontalDragEnd: drags ? _released : null,
+      onHorizontalDragCancel: drags ? () => _released(DragEndDetails()) : null,
       child: ClipRect(
         child: AnimatedBuilder(
           animation: _slide,

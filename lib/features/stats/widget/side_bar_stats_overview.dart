@@ -25,7 +25,13 @@ class SideBarStatsOverview extends ConsumerWidget {
     this.dense = false,
     this.fill = false,
     this.split = false,
+    this.contrast = false,
   });
+
+  /// the phone's Statistics tab in Contrast, over the panel: a ring of the session's routes with its traffic in
+  /// the middle beside the speed and the connections, the graph under them taking the room left, the period
+  /// under it
+  final bool contrast;
 
   final bool large;
 
@@ -259,6 +265,223 @@ class SideBarStatsOverview extends ConsumerWidget {
       ),
     );
 
+    if (contrast) {
+      final accent = theme.araLook.neonFill ?? scheme.primary;
+      const grey = Color(0xFF9AA0A6);
+      final dark = theme.brightness == Brightness.dark;
+      final ink = scheme.onSurface;
+      final muted = scheme.onSurfaceVariant;
+      Widget pane({required Widget child, EdgeInsets padding = const EdgeInsets.all(10)}) => Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: dark ? .07 : .24),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+        ),
+        child: child,
+      );
+      Widget block(Widget child) => Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: dark ? .05 : .18),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .6)),
+        ),
+        child: child,
+      );
+      Widget figure(String text, {Color? color, double size = 18}) {
+        final cut = text.lastIndexOf(' ');
+        return Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: cut < 0 ? text : text.substring(0, cut)),
+              if (cut >= 0)
+                TextSpan(
+                  text: text.substring(cut),
+                  style: TextStyle(fontSize: size * .5, letterSpacing: 0, color: muted),
+                ),
+            ],
+          ),
+          maxLines: 1,
+          style: TextStyle(
+            fontSize: size,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -.8,
+            color: color ?? ink,
+            height: 1,
+          ),
+        );
+      }
+
+      Widget row(IconData icon, String label, String value, {bool lit = false}) => Expanded(
+        child: pane(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: lit ? accent : muted),
+              const Gap(8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
+                ),
+              ),
+              FittedBox(child: figure(value, color: lit ? accent : null)),
+            ],
+          ),
+        ),
+      );
+      Widget dot(Color c) => Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+      );
+      final sessionAmount = size(total).split(' ');
+      final contrastGraph = _SlidingGraph(
+        samples: history,
+        live: range == StatsRange.minute,
+        painter: (slide) => _SpeedGraph(
+          history,
+          slide: slide,
+          color: ink,
+          downColor: accent,
+          upColor: dark ? const Color(0xFF9FB4C7) : const Color(0xFF6F8BA3),
+          label: (value, top) => size(value.round()) + t.avpn.perSecond,
+          detailed: true,
+          textStyle: theme.textTheme.labelSmall!.copyWith(color: muted, fontSize: 10),
+          ticks: ticks,
+          slots: slots,
+        ),
+      );
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            block(
+              SizedBox(
+                height: 168,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // the session's traffic in a ring of its routes: through the VPN in the accent, the bypass grey
+                    SizedBox(
+                      width: 148,
+                      child: pane(
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: CustomPaint(
+                                painter: _RouteRing(share: share ?? 0, vpn: accent, direct: grey),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      figure(sessionAmount.first, size: 22),
+                                      Text(
+                                        '${sessionAmount.length > 1 ? sessionAmount.last : ''} ${t.avpn.statsSessionShort.toLowerCase()}',
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: muted,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 9.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const Gap(6),
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(accent)),
+                                  TextSpan(
+                                    text: ' VPN ${share == null ? '—' : '${(share * 100).round()}%'}   ',
+                                    style: TextStyle(color: accent),
+                                  ),
+                                  WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(grey)),
+                                  TextSpan(
+                                    text: ' ${share == null ? '—' : '${((1 - share) * 100).round()}%'}',
+                                    style: TextStyle(color: muted),
+                                  ),
+                                ],
+                              ),
+                              style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Gap(6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          row(Icons.south_rounded, t.avpn.statsDownload, speed(stats.downlink.toInt()), lit: true),
+                          const Gap(6),
+                          row(Icons.north_rounded, t.avpn.statsUpload, speed(stats.uplink.toInt())),
+                          const Gap(6),
+                          row(Icons.lan_rounded, t.avpn.statsConnectionsShort, '${stats.connectionsIn}'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Gap(8),
+            Expanded(
+              child: block(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: pane(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    t.avpn.statsSpeedFor(period: periodName),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      color: muted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                if (period != null)
+                                  Text(
+                                    period.total > 0
+                                        ? '${size(period.total)} · VPN ${(period.vpn * 100 / period.total).round()}%'
+                                        : size(period.total),
+                                    style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                              ],
+                            ),
+                            const Gap(8),
+                            Expanded(child: contrastGraph),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Gap(6),
+                    _RangePicker(range: range, color: accent),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     if (split) {
       // both columns end on the same line, filling the screen with no scroll: the graph and the ping bars take
       // what the rest leaves
@@ -1097,4 +1320,28 @@ class _SlidingGraph extends HookWidget {
     }, [samples, live]);
     return CustomPaint(painter: painter(live ? controller : null));
   }
+}
+
+/// A ring of the session's two routes: through the VPN (from the top, clockwise) and the bypass, the rest.
+class _RouteRing extends CustomPainter {
+  _RouteRing({required this.share, required this.vpn, required this.direct});
+
+  final double share;
+  final Color vpn;
+  final Color direct;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = math.min(size.width, size.height) / 2 - 6;
+    final rect = Rect.fromCircle(center: size.center(Offset.zero), radius: r);
+    final pen = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(rect.center, r, pen..color = direct.withValues(alpha: .35));
+    if (share > 0) canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * share.clamp(0, 1), false, pen..color = vpn);
+  }
+
+  @override
+  bool shouldRepaint(_RouteRing old) => old.share != share || old.vpn != vpn || old.direct != direct;
 }

@@ -142,6 +142,8 @@
     "bigWait": "WAIT",
     "styleTitle": "Style",
     "contrastSession": "Session",
+    "contrastServersTab": "VPN servers",
+    "contrastDay": "last 24 hours",
     "contrastMore": "$n more",
     "contrastThisSession": "this session",
     "contrastAppsShort": "apps",

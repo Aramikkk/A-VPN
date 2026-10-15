@@ -86,21 +86,23 @@ class _StyledHome extends HookConsumerWidget {
                       selectedTag: group?.selected,
                       autoNow: autoNow,
                       testing: testing,
-                      onRowTap: () => showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        showDragHandle: true,
-                        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .8),
-                        builder: (sheet) => Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-                          child: SizedBox(
-                            height: math.min(servers.length * 64.0, MediaQuery.sizeOf(context).height * .8 - 60),
-                            child: _StyledServerList(
-                              servers: servers,
-                              selectedTag: group?.selected,
-                              autoNow: autoNow,
-                              testing: testing,
-                              afterSelect: () => Navigator.of(sheet).pop(),
+                      onRowTap: () => showGlassPopup(
+                        context,
+                        Builder(
+                          builder: (popup) => Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: SizedBox(
+                              height: math.min(
+                                servers.length * 64.0,
+                                (MediaQuery.sizeOf(context).height - 120) * .8 - 16,
+                              ),
+                              child: _StyledServerList(
+                                servers: servers,
+                                selectedTag: group?.selected,
+                                autoNow: autoNow,
+                                testing: testing,
+                                afterSelect: () => Navigator.of(popup).pop(),
+                              ),
                             ),
                           ),
                         ),
@@ -124,7 +126,6 @@ class _StyledHome extends HookConsumerWidget {
               ),
         traffic: traffic && hasList ? const _HomeTraffic() : null,
         toggles: _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
-        dock: dock,
       );
     }
     return Padding(
@@ -996,6 +997,7 @@ class _Orb extends HookWidget {
     // the theme's own colour, the same as the chosen server (not the darker one text uses on white)
     final accent = theme.araLook.neonFill ?? scheme.primary;
     final lossColor = deep(accent);
+    final contrastDay = !dark && theme.araLook.style == AraStyle.contrast;
     // the numbers readable: by day a light accent goes to the text colour; the deep shade lifted a little by night
     final pingInk = dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface;
     final lossInk = dark ? Color.lerp(lossColor, Colors.white, .35)! : lossColor;
@@ -1072,10 +1074,13 @@ class _Orb extends HookWidget {
                   // one colour, no gradient; Contrast's is light on its black panel
                   color: dark && theme.araLook.style != AraStyle.contrast
                       ? const Color(0xFF16161A)
-                      : const Color(0xFFF7F5F1),
-                  boxShadow: on && !busy
-                      ? [BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28)]
-                      : null,
+                      : (contrastDay ? Colors.white : const Color(0xFFF7F5F1)),
+                  boxShadow: [
+                    if (on && !busy) BoxShadow(color: accent.withValues(alpha: dark ? .45 : .3), blurRadius: 28),
+                    // Contrast by day: white on the white panel, lifted off it by a soft shadow
+                    if (contrastDay)
+                      BoxShadow(color: Colors.black.withValues(alpha: .13), blurRadius: 16, offset: const Offset(0, 5)),
+                  ],
                 ),
                 child: Center(
                   child: theme.araLook.style == AraStyle.contrast && mode != null
@@ -1454,7 +1459,6 @@ class _ContrastHome extends StatelessWidget {
     required this.servers,
     required this.traffic,
     required this.toggles,
-    required this.dock,
   });
 
   /// "Серверы · Sigma · 23 дн. · Обновить", over the blocks
@@ -1463,132 +1467,191 @@ class _ContrastHome extends StatelessWidget {
   final Widget servers;
   final Widget? traffic;
   final Widget toggles;
-  final Widget dock;
 
   @override
-  Widget build(BuildContext context, [WidgetRef? _]) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final t = ref.watch(translationsProvider).requireValue;
-        final theme = Theme.of(context);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: LayoutBuilder(
-                // a short screen: no room for the traffic block (it's on the Statistics tab)
-                builder: (context, box) => Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
-                      _ContrastBlock(child: status),
-                      const Gap(8),
-                      _ContrastBlock(child: servers),
-                      const Gap(8),
-                      if (traffic != null && box.maxHeight >= 500)
-                        Expanded(child: _ContrastBlock(expand: true, child: traffic!))
-                      else
-                        const Spacer(),
-                      const Gap(8),
-                      _ContrastBlock(child: toggles),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Theme(
-              data: contrastPanelTheme(theme),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    // the connect control lower, with room above it
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    decoration: BoxDecoration(
-                      color: contrastPanel,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                      border: Border(top: BorderSide(color: Colors.white.withValues(alpha: .08))),
-                    ),
-                    child: dock,
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: -13,
-                    child: Center(child: _SeamTab(label: t.avpn.connectionsTab)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
+  Widget build(BuildContext context) {
+    return _LongSwipe(
+      // down: the settings come down from the top; up: the day's connections come up from the panel
+      onDown: () => context.goNamed('settings'),
+      onUp: () => context.goNamed('connections'),
+      child: LayoutBuilder(
+        // a short screen: no room for the traffic block (it's on the Statistics tab)
+        builder: (context, box) => Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
+              _ContrastBlock(child: status),
+              const Gap(8),
+              _ContrastBlock(child: servers),
+              const Gap(8),
+              if (traffic != null && box.maxHeight >= 440)
+                Expanded(child: _ContrastBlock(expand: true, child: traffic!))
+              else
+                const Spacer(),
+              const Gap(8),
+              _ContrastBlock(child: toggles),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-/// Contrast's light on the upper zone, behind the app bar too: a sun at the top left (a bright disc of the accent
-/// with its halo) and two calmer colour fields at the right, warm in the middle and cool at the bottom; by night
-/// too, so the zone stands apart from the black panel.
-class ContrastGlow extends StatelessWidget {
+/// A vertical swipe that has to go a little further than usual (a fifth of the height) before it counts: down or
+/// up. Shorter ones do nothing.
+class _LongSwipe extends HookWidget {
+  const _LongSwipe({required this.child, required this.onDown, required this.onUp});
+
+  final Widget child;
+  final VoidCallback onDown;
+  final VoidCallback onUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final drag = useRef(0.0);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragStart: (_) => drag.value = 0,
+      onVerticalDragUpdate: (d) => drag.value += d.primaryDelta ?? 0,
+      onVerticalDragEnd: (_) {
+        final need = MediaQuery.sizeOf(context).height * .2;
+        if (drag.value > need) {
+          onDown();
+        } else if (drag.value < -need) {
+          onUp();
+        }
+        drag.value = 0;
+      },
+      child: child,
+    );
+  }
+}
+
+/// Contrast's panel at the bottom of every page (the shell keeps it): white by day, black by night, the connect
+/// control on it and the "Серверы VPN" tab on its top edge.
+class ContrastShellDock extends HookConsumerWidget {
+  const ContrastShellDock({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final testing = useValueListenable(homePingTesting);
+    final status = ref.watch(shownConnectionProvider);
+    return Theme(
+      data: contrastPanelTheme(theme),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            decoration: BoxDecoration(
+              color: contrastPanelColor(dark),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              border: dark ? Border(top: BorderSide(color: Colors.white.withValues(alpha: .08))) : null,
+              boxShadow: dark
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .07),
+                        blurRadius: 30,
+                        offset: const Offset(0, -6),
+                      ),
+                    ],
+            ),
+            child: _GraphiteDock(
+              status: status,
+              server: null,
+              testing: testing,
+              onCheck: () => pingAllServers(ref),
+              large: MediaQuery.sizeOf(context).height >= 900,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: -13,
+            child: Center(child: _SeamTab(label: t.avpn.contrastServersTab)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Contrast's light behind a page, behind the app bar too: three or four suns, bright discs of the accent with
+/// their halo, scattered at random, a new set for every page (the same while it stays). Inside another one it
+/// draws nothing of its own.
+class ContrastGlow extends StatefulWidget {
   const ContrastGlow({super.key, required this.child});
 
   final Widget child;
 
   @override
+  State<ContrastGlow> createState() => _ContrastGlowState();
+}
+
+class _ContrastGlowState extends State<ContrastGlow> {
+  /// (left, top, size) as shares of the width and the height (the size of the width)
+  late final List<(double, double, double)> _suns = () {
+    final random = math.Random();
+    final count = 3 + random.nextInt(2);
+    final suns = <(double, double, double)>[];
+    // spread down the page: each in its own band, at either side or in the middle
+    for (var i = 0; i < count; i++) {
+      final size = .55 + random.nextDouble() * .3;
+      final band = 1 / count;
+      final top = i * band + random.nextDouble() * band - size * .35;
+      final left = -size * .35 + random.nextDouble() * (1 - size * .3);
+      suns.add((left, top, size));
+    }
+    return suns;
+  }();
+
+  @override
   Widget build(BuildContext context) {
+    if (context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
     final warm = HSLColor.fromColor(accent);
     // the sun: the accent itself by night; by day lifted towards a soft peach
     final sun = dark ? accent : Color.lerp(warm.withLightness(.68).toColor(), const Color(0xFFFFB07A), .5)!;
-    final amber = dark ? const Color(0xFF5A3A1A) : const Color(0xFFFFD08A);
-    final steel = dark ? const Color(0xFF2F3B55) : const Color(0xFFC9D8EA);
-    // a soft round field of colour; [radius] against the screen's width
-    Widget field(Alignment at, double radius, Color c) => Positioned.fill(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: at,
-            radius: radius,
-            colors: [c, c.withValues(alpha: 0)],
-            stops: const [0, .75],
-          ),
-        ),
-      ),
+    final gradient = RadialGradient(
+      colors: [
+        sun,
+        sun.withValues(alpha: dark ? .67 : .75),
+        sun.withValues(alpha: dark ? .2 : .3),
+        sun.withValues(alpha: 0),
+      ],
+      stops: const [0, .28, .52, .7],
     );
     return DecoratedBox(
       decoration: BoxDecoration(color: dark ? const Color(0xFF1D1D20) : const Color(0xFFEFEDE8)),
-      child: Stack(
-        children: [
-          field(const Alignment(.95, -.25), 1.15, amber),
-          field(const Alignment(.8, .75), 1.2, steel),
-          // the sun
-          Positioned(
-            left: -110,
-            top: -90,
-            width: 330,
-            height: 330,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    sun,
-                    sun.withValues(alpha: dark ? .67 : .75),
-                    sun.withValues(alpha: dark ? .2 : .3),
-                    sun.withValues(alpha: 0),
-                  ],
-                  stops: const [0, .28, .52, .7],
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final w = box.maxWidth.isFinite ? box.maxWidth : 411.0;
+          final h = box.maxHeight.isFinite ? box.maxHeight : 900.0;
+          return Stack(
+            children: [
+              for (final (x, y, d) in _suns)
+                Positioned(
+                  left: x * w,
+                  top: y * h,
+                  width: d * w,
+                  height: d * w,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: gradient),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          child,
-        ],
+              Positioned.fill(child: widget.child),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1618,53 +1681,30 @@ class _ContrastBlock extends StatelessWidget {
   }
 }
 
-/// The tab on the black panel's top edge: "Соединения"; a tap brings the connections in from the top.
+/// The tab on the panel's top edge: "Серверы VPN"; a tap shows the servers this session went through.
 class _SeamTab extends StatelessWidget {
   const _SeamTab({required this.label});
 
   final String label;
 
-  static void _connections(BuildContext context) {
-    final theme = Theme.of(context);
-    showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black38,
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (_, _, _) => Theme(data: theme, child: const _SessionConnections()),
-      transitionBuilder: (context, animation, _, child) {
-        final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6 * animation.value, sigmaY: 6 * animation.value),
-          child: FadeTransition(
-            opacity: curve,
-            child: ScaleTransition(
-              scale: Tween(begin: .9, end: 1.0).animate(curve),
-              alignment: const Alignment(0, .9),
-              child: child,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final ink = Colors.white.withValues(alpha: .72);
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? Colors.white.withValues(alpha: .75) : const Color(0xFF4A4743);
+    final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
     return Material(
-      color: contrastPanel,
+      color: contrastPanelColor(dark),
       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       child: InkWell(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        onTap: () => _connections(context),
+        onTap: () => showGlassPopup(context, const _SessionServers()),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.swap_horiz_rounded, size: 15, color: ink),
+              Icon(Icons.dns_rounded, size: 14, color: accent),
               const Gap(5),
               Text(
                 label,
@@ -1678,30 +1718,31 @@ class _SeamTab extends StatelessWidget {
   }
 }
 
-/// Contrast's black panel.
-const contrastPanel = Color(0xFF0B0B0C);
+/// Contrast's panel: pure white by day, pure black by night.
+Color contrastPanelColor(bool dark) => dark ? Colors.black : Colors.white;
 
-/// The dark look Contrast's panel is drawn in, by day too: light text, dark tiles, the accent lifted to read on
-/// black.
+/// The look Contrast's panel is drawn in: by night light text on black, the accent lifted to read on it; by day
+/// the page's own look on white.
 ThemeData contrastPanelTheme(ThemeData theme) {
+  if (theme.brightness == Brightness.light) {
+    return theme.copyWith(colorScheme: theme.colorScheme.copyWith(surface: Colors.white));
+  }
   const ink = Color(0xFFF3F1EC);
   final hsl = HSLColor.fromColor(theme.colorScheme.primary);
   final primary = hsl.lightness < .55 ? hsl.withLightness(.62).toColor() : theme.colorScheme.primary;
   return theme.copyWith(
-    brightness: Brightness.dark,
     textTheme: theme.textTheme.apply(bodyColor: ink, displayColor: ink),
     iconTheme: const IconThemeData(color: ink),
     colorScheme: theme.colorScheme.copyWith(
-      brightness: Brightness.dark,
       primary: primary,
       onPrimary: const Color(0xFF111111),
-      surface: contrastPanel,
+      surface: Colors.black,
       onSurface: ink,
       onSurfaceVariant: const Color(0xFF8F8C86),
-      surfaceContainerLow: const Color(0xFF161618),
-      surfaceContainer: const Color(0xFF1C1C1F),
-      surfaceContainerHigh: const Color(0xFF222225),
-      surfaceContainerHighest: const Color(0xFF2A2A2E),
+      surfaceContainerLow: const Color(0xFF111113),
+      surfaceContainer: const Color(0xFF18181B),
+      surfaceContainerHigh: const Color(0xFF1F1F22),
+      surfaceContainerHighest: const Color(0xFF27272B),
       outlineVariant: const Color(0xFF34343A),
       outline: const Color(0xFF55555B),
     ),
@@ -1760,6 +1801,10 @@ class _ContrastRow extends StatelessWidget {
             border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
           );
     final ms = delay <= 0 ? '—' : (delay > 65000 ? '×' : '$delay');
+    // Auto: the country it's on now right after its name ("Авто 🇵🇱 Польша"), no line under it
+    final now = group ? subtitle.indexOf(': ') : -1;
+    final country = now < 0 ? null : subtitle.substring(now + 2);
+    final titleStyle = theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, color: ink);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
@@ -1787,27 +1832,40 @@ class _ContrastRow extends StatelessWidget {
                   ),
                   const Gap(11),
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, color: ink),
-                        ),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: selected ? ink.withValues(alpha: .75) : scheme.onSurfaceVariant,
-                            fontWeight: group ? FontWeight.w700 : FontWeight.w500,
+                    child: country != null
+                        ? Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: title,
+                                  style: titleStyle?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const TextSpan(text: '   '),
+                                TextSpan(
+                                  text: country,
+                                  style: titleStyle?.copyWith(color: ink.withValues(alpha: .8)),
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: titleStyle),
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: selected ? ink.withValues(alpha: .75) : scheme.onSurfaceVariant,
+                                  fontWeight: group ? FontWeight.w700 : FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                   const Gap(8),
                   if (testing)
@@ -1824,12 +1882,8 @@ class _ContrastRow extends StatelessWidget {
                             ),
                         ],
                       ),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -1,
-                        color: selected ? accent : ink,
-                        fontSize: 19,
-                      ),
+                      // the same size as the name, in the text's colour
+                      style: titleStyle?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   const Gap(10),
                   Container(
@@ -2477,85 +2531,191 @@ class _RouteCard extends ConsumerWidget {
   }
 }
 
-/// This session's connections by app, in a see-through card in the middle of the screen: each app with its icon,
-/// amount, the way it went (through the VPN with the servers' flags, direct) and how many sites.
-class _SessionConnections extends ConsumerWidget {
-  const _SessionConnections();
+/// Contrast's popups: a see-through frosted card in the middle of the screen, a fifth smaller than the screen's
+/// free room, growing from just above the panel.
+void showGlassPopup(BuildContext context, Widget child) {
+  showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black26,
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (_, _, _) => _GlassPopup(child: child),
+    transitionBuilder: (context, animation, _, child) {
+      final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+      return FadeTransition(
+        opacity: curve,
+        child: ScaleTransition(
+          scale: Tween(begin: .9, end: 1.0).animate(curve),
+          alignment: const Alignment(0, .9),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class _GlassPopup extends StatelessWidget {
+  const _GlassPopup({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final screen = MediaQuery.sizeOf(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: math.min((screen.width - 28) * .8, 370),
+          maxHeight: (screen.height - 120) * .8,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Material(
+              color: dark ? const Color(0x6B1C1C1F) : const Color(0x47FFFFFF),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(26),
+                side: BorderSide(color: Colors.white.withValues(alpha: dark ? .14 : .85)),
+              ),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The VPN servers this session went through, in a see-through card: each with its flag, name, protocol and ping,
+/// the traffic through it and its share; the one in use now marked.
+class _SessionServers extends ConsumerWidget {
+  const _SessionServers();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
     final accent = theme.araLook.neonFill ?? scheme.primary;
     final units = t.avpn.bytesUnits.split(',');
-    final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     final start = ref.watch(sessionStartProvider);
-    final session = [
+    final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
+    final inUse = current != null && current.isGroup ? autoPick(current, group!.items) : current;
+    final servers = groupConnections([
       for (final c in ref.watch(connectionsProvider).items)
-        if (start != null && !c.start.isBefore(start)) c,
-    ];
-    final groups = groupConnections(session, (c) => c.app)..sort((a, b) => b.total.compareTo(a.total));
+        if (start != null &&
+            !c.start.isBefore(start) &&
+            c.route == ConnectionRoute.vpn &&
+            c.outbound.isNotEmpty &&
+            !isHiddenServer(c.outbound))
+          c,
+    ], (c) => c.outbound)..sort((a, b) => b.total.compareTo(a.total));
+    final total = servers.fold<int>(0, (s, g) => s + g.total);
     final ink = scheme.onSurface;
-    Widget pill(String text, bool vpn) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: vpn ? accent.withValues(alpha: .16) : null,
-        borderRadius: BorderRadius.circular(9),
-        border: vpn ? null : Border.all(color: ink.withValues(alpha: .16)),
-      ),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: vpn ? accent : scheme.onSurfaceVariant,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 60),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              child: Material(
-                color: dark ? const Color(0xB81C1C1F) : const Color(0x9EFFFFFF),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                  side: BorderSide(color: Colors.white.withValues(alpha: dark ? .12 : .9)),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accent, width: 1.4),
+                  ),
+                  child: Icon(Icons.dns_rounded, size: 16, color: accent),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 16, 14, 8),
+                const Gap(10),
+                Expanded(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-                        child: Row(
+                      Text(t.avpn.contrastServersTab, style: theme.textTheme.titleMedium),
+                      Text(
+                        t.avpn.contrastThisSession,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${servers.length}',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500, letterSpacing: -1),
+                ),
+              ],
+            ),
+          ),
+          if (servers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 30),
+              child: Center(child: TrafficPlaceholder(height: 60)),
+            )
+          else
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: servers.length,
+                itemBuilder: (context, i) {
+                  final g = servers[i];
+                  final info = group?.items.where((s) => s.tag == g.key).firstOrNull;
+                  final name = info == null ? serverNameOf(g.key) : serverName(info);
+                  final dash = name.title.indexOf(' - ');
+                  final title = dash < 0 ? name.title : name.title.substring(dash + 3).trim();
+                  final delay = info?.urlTestDelay ?? 0;
+                  final share = total == 0 ? 0.0 : g.total / total;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: ink.withValues(alpha: .07))),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
                           children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: accent, width: 1.4),
-                              ),
-                              child: Icon(Icons.swap_horiz_rounded, size: 18, color: accent),
+                            Text(
+                              name.flag ?? '🌐',
+                              style: const TextStyle(fontSize: 20, fontFamilyFallback: ['Emoji']),
                             ),
-                            const Gap(10),
+                            const Gap(9),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(t.avpn.connectionsTab, style: theme.textTheme.titleLarge),
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(text: title),
+                                        if (info != null && info.tag == inUse?.tag)
+                                          TextSpan(
+                                            text: ' · ${t.avpn.stNow}',
+                                            style: TextStyle(fontSize: 11, color: accent, fontWeight: FontWeight.w800),
+                                          ),
+                                      ],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
                                   Text(
-                                    t.avpn.contrastThisSession,
-                                    style: theme.textTheme.bodySmall?.copyWith(
+                                    [
+                                      if (info != null) info.type.toUpperCase(),
+                                      if (delay > 0 && delay < 65000) '$delay ms',
+                                    ].join(' · '),
+                                    style: theme.textTheme.labelSmall?.copyWith(
                                       color: scheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -2563,123 +2723,64 @@ class _SessionConnections extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(text: '${groups.length}'),
-                                  TextSpan(
-                                    text: ' ${t.avpn.contrastAppsShort}',
-                                    style: TextStyle(fontSize: 11, letterSpacing: 0, color: scheme.onSurfaceVariant),
-                                  ),
-                                ],
+                            Text(
+                              formatBytes(g.total, units),
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                        const Gap(6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(2),
+                                child: LinearProgressIndicator(
+                                  value: share,
+                                  minHeight: 4,
+                                  color: accent,
+                                  backgroundColor: ink.withValues(alpha: .08),
+                                ),
                               ),
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: -1,
+                            ),
+                            SizedBox(
+                              width: 38,
+                              child: Text(
+                                '${(share * 100).round()}%',
+                                textAlign: TextAlign.right,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      if (groups.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 30),
-                          child: Center(child: TrafficPlaceholder(height: 60)),
-                        )
-                      else
-                        Flexible(
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            padding: EdgeInsets.zero,
-                            itemCount: groups.length,
-                            itemBuilder: (context, i) {
-                              final g = groups[i];
-                              final icon = installed[g.key]?.icon;
-                              final name = connectionAppName(t, installed, g.key);
-                              final vpn = g.items.where((c) => c.route == ConnectionRoute.vpn).length;
-                              final direct = g.items.where((c) => c.route == ConnectionRoute.direct).length;
-                              final sites = {for (final c in g.items) c.host}.length;
-                              final flags = serverFlags(g.servers.where((s) => !isHiddenServer(s)));
-                              return Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                decoration: BoxDecoration(
-                                  border: Border(top: BorderSide(color: ink.withValues(alpha: .07))),
-                                ),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: icon == null
-                                          ? Container(
-                                              width: 34,
-                                              height: 34,
-                                              color: accent.withValues(alpha: .2),
-                                              alignment: Alignment.center,
-                                              child: Text(
-                                                name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-                                                style: TextStyle(color: accent, fontWeight: FontWeight.w800),
-                                              ),
-                                            )
-                                          : Image.memory(icon, width: 34, height: 34, gaplessPlayback: true),
-                                    ),
-                                    const Gap(11),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  name,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ),
-                                              Text(
-                                                formatBytes(g.total, units),
-                                                style: theme.textTheme.bodyMedium?.copyWith(
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const Gap(4),
-                                          Row(
-                                            children: [
-                                              if (vpn > 0)
-                                                pill(['VPN', if (flags.isNotEmpty) flags, '$vpn'].join(' · '), true),
-                                              if (vpn > 0 && direct > 0) const Gap(5),
-                                              if (direct > 0) pill('${t.avpn.statsDirect} $direct', false),
-                                              const Spacer(),
-                                              Text(
-                                                t.avpn.contrastSites(n: sites),
-                                                style: theme.textTheme.labelSmall?.copyWith(
-                                                  color: scheme.onSurfaceVariant,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-        ),
+        ],
       ),
     );
+  }
+}
+
+/// Set while a ping of every server runs (from the home screen or the panel), so the lists can show spinners.
+final homePingTesting = ValueNotifier(false);
+
+/// Pings every server, unless that's already running.
+Future<void> pingAllServers(WidgetRef ref) async {
+  if (homePingTesting.value) return;
+  homePingTesting.value = true;
+  try {
+    await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select");
+    await Future<void>.delayed(const Duration(seconds: 4));
+  } catch (_) {
+    // not connected: nothing to ping
+  } finally {
+    homePingTesting.value = false;
   }
 }
