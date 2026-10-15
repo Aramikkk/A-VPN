@@ -157,6 +157,8 @@
     "contrastClarityTitle": "1 · Прозрачность блоков",
     "contrastBackdropTitle": "2 · Фон",
     "contrastPaletteTitle": "3 · Цвет",
+    "noAdminNote": "Без прав администратора: режим системного прокси — браузеры и большинство программ идут через VPN",
+    "noAdminRestart": "Перезапустить от админа",
     "contrastServersTab": "Серверы VPN",
     "contrastDay": "за сутки",
     "contrastMore": "Ещё $n",

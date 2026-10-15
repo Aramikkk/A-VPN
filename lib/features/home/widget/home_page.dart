@@ -82,7 +82,7 @@ class HomePage extends HookConsumerWidget {
               ),
             ),
           ),
-          if (contrast && !PlatformUtils.isDesktop)
+          if (contrast)
             plate(
               IconButton(
                 tooltip: t.pages.settings.title,
@@ -96,7 +96,7 @@ class HomePage extends HookConsumerWidget {
       body: LayoutBuilder(
         builder: (context, constraints) {
           // an unfolded phone (a Fold is ~750 dp wide) or a tablet: the servers on the left, the statistics on the right
-          if (!PlatformUtils.isDesktop && constraints.maxWidth >= 700) {
+          if ((contrast || !PlatformUtils.isDesktop) && constraints.maxWidth >= 700) {
             // the right column mirrors the left one: a heading like "Current provider", the same outer margin, and
             // the panel stretched to end level with the connection card (when the screen is tall enough for it)
             final heading = Padding(

@@ -3,7 +3,6 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
-import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The Statistics tab: the traffic panel, large, with the speed graph, ping and loss, and active connections.
@@ -34,7 +33,7 @@ class SpeedPage extends ConsumerWidget {
       // it all at once, no scroll: two columns on a wide screen (the unfolded phone), otherwise one column whose
       // graph takes the height the rest leaves; a short window (landscape) still scrolls
       body: LayoutBuilder(
-        builder: (context, constraints) => contrast && (!PlatformUtils.isDesktop || constraints.maxWidth < 640)
+        builder: (context, constraints) => contrast
             // Contrast on the phone, folded or unfolded: fitted over the panel, the graph taking what the rest leaves
             ? const SideBarStatsOverview(large: true, contrast: true)
             : constraints.maxWidth >= 640 && constraints.maxHeight >= 480

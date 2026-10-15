@@ -67,6 +67,13 @@ class _StyledHome extends HookConsumerWidget {
     if (theme.araLook.style == AraStyle.contrast) {
       return _ContrastHome(
         header: header,
+        // Windows without the administrator's rights: the system proxy instead of the VPN mode chosen, and a way to
+        // the full one
+        notice: PlatformUtils.isWindows &&
+                !WindowsElevation.elevated &&
+                ref.watch(ConfigOptions.serviceMode) == ServiceMode.tun
+            ? const _NoAdminNote()
+            : null,
         status: _StatusBlock(status: status, lastServer: currentName),
         servers: hasList
             ? Column(
@@ -1172,7 +1179,8 @@ class _Orb extends HookWidget {
                   ],
                 ),
                 child: Center(
-                  child: theme.araLook.style == AraStyle.contrast && mode != null
+                  // a computer, on: the computer's sign (it has no LTE or Wi-Fi of its own to tell)
+                  child: theme.araLook.style == AraStyle.contrast && (mode != null || (PlatformUtils.isDesktop && on && !busy))
                       // Contrast: the mode under the sign, inside the button
                       // Contrast: the network it runs on, large, instead of the power sign (that only while off)
                       ? Column(
@@ -1180,12 +1188,14 @@ class _Orb extends HookWidget {
                           children: [
                             // the network it runs on (the ping and the loss are by the ping button)
                             Icon(
-                              mode! ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded,
+                              mode == null
+                                  ? Icons.computer_rounded
+                                  : (mode! ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded),
                               size: size * .36,
                               color: onButton,
                             ),
                             Text(
-                              mode! ? 'LTE' : 'Wi‑Fi',
+                              mode == null ? 'ПК' : (mode! ? 'LTE' : 'Wi‑Fi'),
                               style: TextStyle(
                                 fontSize: size * .14,
                                 height: 1.1,
@@ -1600,10 +1610,14 @@ class _ContrastHome extends StatelessWidget {
     required this.servers,
     required this.traffic,
     required this.toggles,
+    this.notice,
   });
 
   /// "Серверы · Sigma · 23 дн. · Обновить", over the blocks
   final Widget header;
+
+  /// a note over the blocks (Windows without the administrator's rights)
+  final Widget? notice;
   final Widget status;
   final Widget servers;
   final Widget? traffic;
@@ -1623,6 +1637,7 @@ class _ContrastHome extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
+              if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(8)],
               _ContrastBlock(child: status),
               const Gap(8),
               _ContrastBlock(child: servers),
@@ -1636,6 +1651,35 @@ class _ContrastHome extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Windows without the administrator's rights: the VPN mode (a TUN adapter) can't start, so the system proxy runs
+/// instead; the button starts the app again with the rights (Windows asks).
+class _NoAdminNote extends ConsumerWidget {
+  const _NoAdminNote();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      child: Row(
+        children: [
+          Icon(Icons.admin_panel_settings_outlined, size: 22, color: theme.araIcon),
+          const Gap(10),
+          Expanded(child: Text(t.avpn.noAdminNote, style: theme.textTheme.bodySmall?.copyWith(height: 1.3))),
+          const Gap(8),
+          FilledButton.tonal(
+            onPressed: () async {
+              if (await WindowsElevation.relaunchElevated()) await ref.read(windowNotifierProvider.notifier).exit();
+            },
+            child: Text(t.avpn.noAdminRestart),
+          ),
+        ],
       ),
     );
   }
@@ -1795,9 +1839,9 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
     final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
     final (warm, cool) = palette.backdrop(brightness);
-    final area = MediaQuery.sizeOf(context);
+    final area = contrastImageArea(MediaQuery.sizeOf(context));
     // the picture at the screen's sharpness, two pixels a point at most (blurrier lines aren't seen, memory is)
-    final scale = math.min(MediaQuery.devicePixelRatioOf(context), 2.0);
+    final scale = math.min(MediaQuery.devicePixelRatioOf(context), PlatformUtils.isDesktop ? 1.25 : 2.0);
     final image = ContrastBackdropImage.of(
       kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
       warm: warm,
@@ -1821,6 +1865,12 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     );
   }
 }
+
+/// The area Contrast's backdrop and frost pictures are laid out on: the screen's; a computer's window rounded up to
+/// the next 96 points, so dragging its edge doesn't draw both pictures afresh at every step (that stuttered)
+Size contrastImageArea(Size screen) => PlatformUtils.isDesktop
+    ? Size((screen.width / 96).ceil() * 96.0, (screen.height / 96).ceil() * 96.0)
+    : screen;
 
 /// A block on Contrast's upper zone: a pane of frosted glass, what's behind it blurred.
 class _ContrastBlock extends StatelessWidget {
@@ -1894,14 +1944,14 @@ class _FrostedBackdrop extends ConsumerWidget {
     final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
     final clarity = ready ? ref.watch(Preferences.contrastClarity) : ContrastClarity.fallback;
     final (warm, cool) = palette.backdrop(brightness);
-    final scale = math.min(MediaQuery.devicePixelRatioOf(context), 2.0);
+    final scale = math.min(MediaQuery.devicePixelRatioOf(context), PlatformUtils.isDesktop ? 1.25 : 2.0);
     final kind = ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback;
     final image = ContrastFrostImage.of(
       kind: kind,
       warm: warm,
       cool: cool,
       dark: brightness == Brightness.dark,
-      area: MediaQuery.sizeOf(context),
+      area: contrastImageArea(MediaQuery.sizeOf(context)),
       // thin lines blurred lightly (they still show), filled shapes harder (their bright edges ran through the text)
       blur: kind.lines ? clarity.blur : 12,
       scale: scale,

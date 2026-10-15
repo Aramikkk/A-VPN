@@ -42,7 +42,10 @@ import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/features/window/notifier/window_notifier.dart';
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/platform_utils.dart';
+import 'package:hiddify/utils/windows_elevation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 part 'styled_home.dart';

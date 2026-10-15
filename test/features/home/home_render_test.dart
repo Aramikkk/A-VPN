@@ -157,22 +157,27 @@ void main() {
           if ((Platform.environment['PAL'] ?? '').isNotEmpty) 'contrast_palette': Platform.environment['PAL']!,
         });
         // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
-        final unfolded = Platform.environment['UNFOLDED'] == '1';
+        final pcw = Platform.environment['PCW'] == '1';
+        final unfolded = Platform.environment['UNFOLDED'] == '1' || pcw;
         // PC=1: the computer's home pane in the default window (1048 x 904 less the side bar and the title bar)
         final pc = Platform.environment['PC'] == '1';
         // LAND=1: the folded phone turned, about 960 x 411
         final land = Platform.environment['LAND'] == '1';
         await tester.binding.setSurfaceSize(
-          pc
+          pcw
+              ? const Size(960, 828)
+              : pc
               ? const Size(745, 870)
               : (unfolded ? const Size(750, 832) : (land ? const Size(960, 411) : const Size(411, 960))),
         );
         // the screen size the app reads too (MediaQuery), not only the surface drawn on
         // the folded Fold 7: 1080 x 2520 at 2.625, about 411 x 960
-        tester.view.physicalSize = pc
+        tester.view.physicalSize = pcw
+            ? const Size(960, 828)
+            : pc
             ? const Size(745, 870)
             : (unfolded ? const Size(1968, 2184) : (land ? const Size(2520, 1080) : const Size(1080, 2520)));
-        tester.view.devicePixelRatio = pc ? 1 : 2.625;
+        tester.view.devicePixelRatio = pc || pcw ? 1 : 2.625;
         addTearDown(tester.view.reset);
         final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
         final prefs = await tester.runAsync(SharedPreferences.getInstance);

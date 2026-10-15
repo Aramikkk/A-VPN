@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -25,6 +27,9 @@ bool? isMobileBreakpoint(Ref ref) {
   // A-VPN: a phone keeps the phone navigation (bottom bar, Statistics tab) also unfolded or on a tablet;
   // the wide home screen shows the statistics next to the servers instead
   if (PlatformUtils.isAndroid || PlatformUtils.isIOS) return true;
+  // Contrast on a computer: the phone's layout too (the panel with the connect control, the three tabs), one
+  // look everywhere
+  if (ref.watch(Preferences.araStyle) == AraStyle.contrast) return true;
   return breakpoint == Breakpoints.mobile;
 }
 

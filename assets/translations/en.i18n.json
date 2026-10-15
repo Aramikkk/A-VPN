@@ -157,6 +157,8 @@
     "contrastClarityTitle": "1 · Block transparency",
     "contrastBackdropTitle": "2 · Backdrop",
     "contrastPaletteTitle": "3 · Colour",
+    "noAdminNote": "No administrator rights: system proxy mode — browsers and most programs go through the VPN",
+    "noAdminRestart": "Restart as admin",
     "contrastServersTab": "VPN servers",
     "contrastDay": "last 24 hours",
     "contrastMore": "$n more",

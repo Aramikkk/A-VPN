@@ -14,8 +14,10 @@ import 'package:window_manager/window_manager.dart';
 part 'window_notifier.g.dart';
 
 const minimumWindowSize = Size(368, 568);
-// the size the home screen fits with no empty band: the stats on the left, the servers, traffic and VPN servers
-const defaultWindowSize = Size(1048, 904);
+// the unfolded phone's layout in a window: the home column and the connections side by side, the panel with the
+// connect control under them (the stored size and the maximized state were renamed in 5.9.20, so every window
+// opens at this once, not left maximized from the old layout)
+const defaultWindowSize = Size(960, 860);
 
 @Riverpod(keepAlive: true)
 class WindowNotifier extends _$WindowNotifier with AppLogger {

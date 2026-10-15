@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/core/router/adaptive_layout/branch_swiper.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
@@ -406,7 +408,10 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
 Widget settingsWidth(Widget page) => !PlatformUtils.isDesktop
     ? page
     : Builder(
-        builder: (context) => ColoredBox(
+        // Contrast: the phone's layout, the page over the backdrop as on the phone
+        builder: (context) => Theme.of(context).araLook.style == AraStyle.contrast
+            ? page
+            : ColoredBox(
           color: Theme.of(context).scaffoldBackgroundColor,
           child: Center(
             child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: page),

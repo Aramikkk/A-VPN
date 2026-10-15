@@ -55,10 +55,10 @@ abstract class Preferences {
     <String>[],
   );
 
-  static final windowMaximized = PreferencesNotifier.create<bool, bool>("window_maximized", false);
+  static final windowMaximized = PreferencesNotifier.create<bool, bool>("window_maximized_v2", false);
 
   static final windowPosition = PreferencesNotifier.create<Offset?, String?>(
-    "window_position",
+    "window_position_v2",
     null,
     mapFrom: (value) {
       if (value == null) return null;
@@ -72,7 +72,7 @@ abstract class Preferences {
   );
 
   static final windowSize = PreferencesNotifier.create<Size, String>(
-    "window_size",
+    "window_size_v2",
     defaultWindowSize,
     mapFrom: (value) {
       final list = value.split(',').map((e) => double.tryParse(e)).toList();

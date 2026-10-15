@@ -13,6 +13,7 @@ import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/singbox/model/singbox_config_option.dart';
 import 'package:hiddify/utils/utils.dart';
+import 'package:hiddify/utils/windows_elevation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -502,7 +503,10 @@ abstract class ConfigOptions {
     //   _ => <SingboxRule>[],
     // };
 
-    final mode = ref.watch(serviceMode);
+    // the VPN mode needs the administrator's rights on Windows; without them the system proxy instead (the browsers
+    // and most programs through it), not a start that fails
+    final chosen = ref.watch(serviceMode);
+    final mode = chosen == ServiceMode.tun && !WindowsElevation.elevated ? ServiceMode.systemProxy : chosen;
     // final reg = ref.watch(Preferences.region.notifier).raw();
     return SingboxConfigOption(
       region: ref.watch(region).name,
