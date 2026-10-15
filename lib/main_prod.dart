@@ -19,6 +19,10 @@ Future<void> main(List<String> args) async {
 
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
+  // A-VPN: the phone's screen stays upright, the app doesn't turn with it
+  if (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS) {
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  }
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent, systemNavigationBarColor: Colors.transparent),

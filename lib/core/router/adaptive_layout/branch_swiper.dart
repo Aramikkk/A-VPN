@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 
 /// The phone's tabs, kept alive like an indexed stack. A sideways drag moves the tab under the finger with the next
 /// (or previous) one coming in beside it; let go past a quarter of the width, or with a flick, and it goes on to
@@ -150,7 +151,11 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
         translation: _vertical && _previous != null ? Offset(0, x) : Offset(x, 0),
         child: IgnorePointer(
           ignoring: !live,
-          child: TickerMode(enabled: live, child: widget.children[i]),
+          child: TickerMode(
+            enabled: live,
+            // Contrast: the tab on its own backdrop, sliding with it (its frosted blocks stay right as it moves)
+            child: _contrast ? ContrastGlow(own: true, child: widget.children[i]) : widget.children[i],
+          ),
         ),
       ),
     );

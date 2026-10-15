@@ -1614,26 +1614,28 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
     final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
     final (warm, cool) = palette.backdrop(brightness);
-    return Stack(
-      fit: StackFit.passthrough,
-      children: [
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: CustomPaint(
-              painter: ContrastBackdropPainter(
-                kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
-                warm: warm,
-                cool: cool,
-                dark: brightness == Brightness.dark,
-                seed: contrastBackdropSeed,
-                // laid out on the screen, so every page's lines up with the rest
-                area: MediaQuery.sizeOf(context),
+    return _GlowAnchor(
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: ContrastBackdropPainter(
+                  kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
+                  warm: warm,
+                  cool: cool,
+                  dark: brightness == Brightness.dark,
+                  seed: contrastBackdropSeed,
+                  // laid out on the screen, so every page's lines up with the rest
+                  area: MediaQuery.sizeOf(context),
+                ),
               ),
             ),
           ),
-        ),
-        widget.child,
-      ],
+          widget.child,
+        ],
+      ),
     );
   }
 }
@@ -1707,27 +1709,62 @@ class _FrostedBackdrop extends ConsumerWidget {
       area: MediaQuery.sizeOf(context),
       blur: clarity.blur,
     );
-    return _FrostPart(image: image, radius: radius, child: child);
+    return _FrostPart(image: image, radius: radius, scroll: Scrollable.maybeOf(context)?.position, child: child);
   }
 }
 
+/// Marks a backdrop's box: frost inside it takes its part of the picture by its place in this box, so a page
+/// sliding with its backdrop keeps its frost right without being repainted (it jumped when the tabs changed).
+class _GlowAnchor extends SingleChildRenderObjectWidget {
+  const _GlowAnchor({super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderGlowAnchor();
+}
+
+class _RenderGlowAnchor extends RenderProxyBox {}
+
 class _FrostPart extends SingleChildRenderObjectWidget {
-  const _FrostPart({required this.image, required this.radius, super.child});
+  const _FrostPart({required this.image, required this.radius, this.scroll, super.child});
 
   final ui.Image image;
   final double radius;
 
+  /// the list it's in: it moves over the backdrop as that scrolls
+  final Listenable? scroll;
+
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderFrostPart(image, radius);
+  RenderObject createRenderObject(BuildContext context) => _RenderFrostPart(image, radius, scroll);
 
   @override
   void updateRenderObject(BuildContext context, _RenderFrostPart renderObject) => renderObject
     ..image = image
-    ..radius = radius;
+    ..radius = radius
+    ..scroll = scroll;
 }
 
 class _RenderFrostPart extends RenderProxyBox {
-  _RenderFrostPart(this._image, this._radius);
+  _RenderFrostPart(this._image, this._radius, this._scroll);
+
+  Listenable? _scroll;
+  set scroll(Listenable? v) {
+    if (identical(v, _scroll)) return;
+    if (attached) _scroll?.removeListener(markNeedsPaint);
+    _scroll = v;
+    if (attached) _scroll?.addListener(markNeedsPaint);
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _scroll?.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    _scroll?.removeListener(markNeedsPaint);
+    super.detach();
+  }
 
   ui.Image _image;
   set image(ui.Image v) {
@@ -1745,8 +1782,13 @@ class _RenderFrostPart extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    // where the block is on the screen: its part of the screen-sized picture
-    final at = localToGlobal(Offset.zero);
+    // where the block is on its backdrop (laid out from the backdrop's corner, as the picture is): found from the
+    // nearest one round it, which moves with the page; the screen when there's none
+    RenderObject? up = parent;
+    while (up != null && up is! _RenderGlowAnchor) {
+      up = up.parent;
+    }
+    final at = localToGlobal(Offset.zero, ancestor: up);
     const k = ContrastFrostImage.scale;
     final canvas = context.canvas;
     canvas.save();
