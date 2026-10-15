@@ -1,5 +1,6 @@
 import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/core/widget/app_logo.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -99,6 +100,17 @@ class HomePage extends HookConsumerWidget {
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 1.2),
               ),
             );
+            if (contrast) {
+              // Contrast: the folded phone's column on the left (its session tiles half as high), the connections on
+              // the right
+              return const Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 11, child: AraHomeBody()),
+                  Expanded(flex: 10, child: ConnectionsPage()),
+                ],
+              );
+            }
             return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

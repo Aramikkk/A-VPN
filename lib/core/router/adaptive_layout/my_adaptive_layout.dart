@@ -131,8 +131,6 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           child: Scaffold(
             body: contrastPhone
                 ? ContrastGlow(
-                    key: ValueKey(GoRouter.of(context).state.matchedLocation),
-                    page: GoRouter.of(context).state.matchedLocation,
                     child: Column(
                       children: [
                         Expanded(

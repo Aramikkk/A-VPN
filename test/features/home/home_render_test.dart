@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -219,7 +220,24 @@ void main() {
                           title: const Text('A-VPN'),
                           backgroundColor: style == AraStyle.contrast ? Colors.transparent : null,
                         ),
-                        body: unfolded
+                        body: unfolded && style == AraStyle.contrast
+                            // Contrast unfolded: the folded column on the left, the connections on the right, the
+                            // panel under both
+                            ? const Column(
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(flex: 11, child: AraHomeBody()),
+                                        Expanded(flex: 10, child: _ShellPage(child: ConnectionsPage())),
+                                      ],
+                                    ),
+                                  ),
+                                  ContrastShellDock(),
+                                ],
+                              )
+                            : unfolded
                             ? const Row(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -360,4 +378,14 @@ class _Quality extends ConnectionQuality {
     sinceConnect = ConnectionQuality.length;
     return [for (var i = 0; i < ConnectionQuality.length; i++) i == 30 ? null : 64];
   }
+}
+
+/// A page as Contrast's shell shows it: see-through over the light.
+class _ShellPage extends StatelessWidget {
+  const _ShellPage({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Theme(data: contrastPageTheme(Theme.of(context)), child: child);
 }

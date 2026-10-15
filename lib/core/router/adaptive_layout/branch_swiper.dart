@@ -90,8 +90,9 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     return drag == 0 || _current < first || _current > last || next < first || next > last ? null : next;
   }
 
-  /// Contrast: how far a sideways swipe has to go (a long one), as a share of the width
-  double get _needed => _contrast ? .4 : .25;
+  /// how far a sideways swipe has to go, as a share of the width: Contrast about 110 dp, whatever the width (the
+  /// unfolded phone's share was far too long)
+  double get _needed => _contrast ? (110 / (context.size?.width ?? 411)).clamp(.12, .3) : .25;
 
   /// the finger's way since it went down, on Settings or Connections, and whether a list scrolled meanwhile
   Offset? _down;
@@ -129,7 +130,7 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     final velocity = details.primaryVelocity ?? 0;
     final next = _neighbour(_drag);
     final flick = velocity.abs() > 350 && (velocity < 0) == (_drag < 0);
-    if (next != null && (_drag.abs() > _needed || (flick && !_contrast))) {
+    if (next != null && (_drag.abs() > _needed || flick)) {
       _from = _drag.abs();
       widget.navigationShell.goBranch(next);
     } else {

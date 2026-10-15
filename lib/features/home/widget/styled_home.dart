@@ -1583,18 +1583,36 @@ class ContrastShellDock extends HookConsumerWidget {
   }
 }
 
-/// Contrast's light behind a page, behind the app bar too: three or four crisp discs, warm and cool in turn, scattered at random once per page when the app starts (the same until it's closed). Inside another
-/// one it draws nothing of its own.
+/// Contrast's light behind a page, behind the app bar too: four or five small crisp discs, warm and cool in turn,
+/// scattered at random once when the app starts, the same on every page until it's closed. Inside another one it
+/// draws nothing of its own.
 class ContrastGlow extends StatefulWidget {
   const ContrastGlow({super.key, required this.child, this.page = ''});
 
   final Widget child;
 
-  /// the page it's behind: each page gets its own suns, picked the first time it shows after the app starts
+  /// the page it's behind (the discs are the same on every page)
   final String page;
 
-  /// the suns picked so far, by page, kept until the app is closed
-  static final _picked = <String, List<(double, double, double)>>{};
+  /// the discs, picked once when the app starts: the same on every page until it's closed. (left, top, size) as
+  /// shares of the width and the height (the size of the width); each a half or a third of the old suns' size
+  static final _suns = () {
+    final random = math.Random();
+    final count = 4 + random.nextInt(2);
+    final band = 1 / count;
+    return <(double, double, double)>[
+      // spread down the screen, each in its own band, anywhere across
+      for (var i = 0; i < count; i++)
+        () {
+          final size = (.4 + random.nextDouble() * .2) / (random.nextBool() ? 2 : 3);
+          return (
+            -size * .2 + random.nextDouble() * (1 - size * .6),
+            i * band + random.nextDouble() * (band - size * .5),
+            size,
+          );
+        }(),
+    ];
+  }();
 
   @override
   State<ContrastGlow> createState() => _ContrastGlowState();
@@ -1602,20 +1620,7 @@ class ContrastGlow extends StatefulWidget {
 
 class _ContrastGlowState extends State<ContrastGlow> {
   /// (left, top, size) as shares of the width and the height (the size of the width)
-  late final List<(double, double, double)> _suns = ContrastGlow._picked.putIfAbsent(widget.page, () {
-    final random = math.Random();
-    final count = 3 + random.nextInt(2);
-    final suns = <(double, double, double)>[];
-    // spread down the page: each in its own band, at either side or in the middle
-    for (var i = 0; i < count; i++) {
-      final size = .4 + random.nextDouble() * .2;
-      final band = 1 / count;
-      final top = i * band + random.nextDouble() * band - size * .3;
-      final left = -size * .3 + random.nextDouble() * (1 - size * .4);
-      suns.add((left, top, size));
-    }
-    return suns;
-  });
+  List<(double, double, double)> get _suns => ContrastGlow._suns;
 
   @override
   Widget build(BuildContext context) {
@@ -1993,17 +1998,80 @@ class _ContrastStats extends StatelessWidget {
               ),
             ),
     );
-    Widget tile(IconData icon, String label, String figure, String unit, bool lit, double level, Color colour) =>
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow.withValues(alpha: .3),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(child: water(level, colour)),
+    // the unfolded phone (or a tablet): half as high, the sign beside the label and the figure
+    final compact = MediaQuery.sizeOf(context).width >= 700;
+    Widget tile(IconData icon, String label, String figure, String unit, bool lit, double level, Color colour) {
+      Widget value(double size) => Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(text: figure),
+            if (unit.isNotEmpty)
+              TextSpan(
+                text: ' $unit',
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 0,
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
+        ),
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontSize: size,
+          fontWeight: FontWeight.w500,
+          letterSpacing: -1,
+          color: lit ? scheme.primary : scheme.onSurface,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      );
+      return Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow.withValues(alpha: .3),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(child: water(level, colour)),
+            if (compact)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: scheme.outlineVariant, width: 1.3),
+                      ),
+                      child: Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+                    ),
+                    const Gap(8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: value(19)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
               Padding(
                 padding: const EdgeInsets.fromLTRB(6, 8, 6, 9),
                 child: Center(
@@ -2022,40 +2090,16 @@ class _ContrastStats extends StatelessWidget {
                       const Gap(5),
                       Text(label, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
                       const Gap(2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: figure),
-                              if (unit.isNotEmpty)
-                                TextSpan(
-                                  text: ' $unit',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    letterSpacing: 0,
-                                    color: scheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: -1,
-                            color: lit ? scheme.primary : scheme.onSurface,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ),
+                      FittedBox(fit: BoxFit.scaleDown, child: value(22)),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
-        );
+          ],
+        ),
+      );
+    }
+
     return Row(
       children: [
         for (final (i, (icon, label, figure, unit, lit, level, colour)) in items.indexed) ...[
