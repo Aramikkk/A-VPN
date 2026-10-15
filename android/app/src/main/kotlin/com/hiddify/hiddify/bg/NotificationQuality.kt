@@ -17,7 +17,8 @@ import java.util.concurrent.Executors
  * allows plain HTTP to 127.0.0.1 only, and refused every probe to the test URL.
  */
 object NotificationQuality {
-    private const val KEEP = 60
+    // five minutes of probes
+    private const val KEEP = 20
     private const val TIMEOUT_MS = 2_000
     private val samples = ArrayDeque<Long?>()
     private var session = Long.MIN_VALUE
@@ -53,9 +54,10 @@ object NotificationQuality {
             worker.execute { drop() }
         }
         if (inFlight || !prefs.getBoolean("flutter.enable-mixed-port", true)) return
-        // once every three seconds, as the app does
+        // once every 15 seconds: a request through the VPN every 3 seconds kept the mobile radio awake all the time
+        // the screen was on (the app measures every 3 seconds itself while it's open)
         val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastProbe < 3000) return
+        if (now - lastProbe < 15_000) return
         lastProbe = now
         inFlight = true
         val forSession = session

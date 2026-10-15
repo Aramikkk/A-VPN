@@ -155,9 +155,15 @@ class BoxService(
         autoPauseJob = GlobalScope.launch(Dispatchers.IO) {
             while (isActive) {
                 delay(1_000)
+                // off: the settings looked at every 5 seconds; the screen off: nothing is on it, nothing to check
                 val apps = Settings.autoPauseApps
                 if (!Settings.autoPauseEnabled || apps.isEmpty() || !ForegroundApp.hasPermission(service)) {
                     if (paused) resume()
+                    delay(4_000)
+                    continue
+                }
+                if (!Application.powerManager.isInteractive) {
+                    delay(4_000)
                     continue
                 }
                 val app = runCatching { ForegroundApp.current(service) }.getOrNull() ?: continue

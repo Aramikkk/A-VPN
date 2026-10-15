@@ -222,7 +222,7 @@ class Connections extends Notifier<ConnectionsState> {
 
   /// while A-VPN is in the background (or the screen is off): fewer wake-ups, the battery lasts longer; the
   /// traffic still adds up from the core's own totals
-  static const backgroundInterval = Duration(seconds: 15);
+  static const backgroundInterval = Duration(seconds: 30);
   static const keepClosed = 400;
   static const saveEvery = Duration(seconds: 10);
 
