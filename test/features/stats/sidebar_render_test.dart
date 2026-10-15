@@ -54,7 +54,7 @@ class _Quality extends ConnectionQuality {
 
   // three stretches of loss through the day
   @override
-  LossDay lossDay() {
+  LossDay lossDay({DateTime? since}) {
     final now = DateTime(2026, 10, 15, 21, 40);
     final minutes = List<double?>.filled(24 * 60, 0);
     for (final (ago, length, share) in [(30, 4, .2), (320, 1, .05), (790, 12, .6)]) {

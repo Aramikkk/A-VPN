@@ -107,7 +107,12 @@ class ContrastBackdropPainter extends CustomPainter {
     required this.cool,
     required this.dark,
     required this.seed,
+    this.area,
   });
+
+  /// the size it's laid out on (the screen), so a page's own backdrop lines up with the one round it; its own size
+  /// when not given
+  final Size? area;
 
   final ContrastBackdrop kind;
   final Color warm;
@@ -119,7 +124,8 @@ class ContrastBackdropPainter extends CustomPainter {
   static Color base(bool dark) => dark ? const Color(0xFF1D1D20) : const Color(0xFFEFEDE8);
 
   @override
-  void paint(Canvas canvas, Size size) {
+  void paint(Canvas canvas, Size box) {
+    final size = area ?? box;
     final w = size.width;
     final h = size.height;
     final r = math.Random(seed);
@@ -129,9 +135,9 @@ class ContrastBackdropPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = width
       ..color = c;
-    canvas.drawRect(Offset.zero & size, Paint()..color = base(dark));
+    canvas.drawRect(Offset.zero & box, Paint()..color = base(dark));
     canvas.save();
-    canvas.clipRect(Offset.zero & size);
+    canvas.clipRect(Offset.zero & box);
     switch (kind) {
       case ContrastBackdrop.circles:
         // four or five small discs, warm and cool in turn, each in its own band down the screen and on the other
@@ -278,5 +284,10 @@ class ContrastBackdropPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(ContrastBackdropPainter old) =>
-      old.kind != kind || old.warm != warm || old.cool != cool || old.dark != dark || old.seed != seed;
+      old.kind != kind ||
+      old.warm != warm ||
+      old.cool != cool ||
+      old.dark != dark ||
+      old.seed != seed ||
+      old.area != area;
 }

@@ -8,7 +8,9 @@ import 'package:hiddify/core/router/adaptive_layout/nav_icons.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
@@ -134,7 +136,10 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                     child: Column(
                       children: [
                         Expanded(
-                          child: Theme(data: contrastPageTheme(Theme.of(context)), child: navigationShell),
+                          child: Theme(
+                            data: contrastPageTheme(Theme.of(context), ref.watch(Preferences.contrastClarity)),
+                            child: navigationShell,
+                          ),
                         ),
                         const ContrastShellDock(),
                       ],
@@ -283,10 +288,16 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 
 /// The pages over Contrast's suns: see-through, their cards and blocks frosted panes the light shows through; the
 /// dialogs, sheets and menus they open stay solid.
-ThemeData contrastPageTheme(ThemeData theme) {
+ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = ContrastClarity.medium]) {
   final scheme = theme.colorScheme;
   final dark = theme.brightness == Brightness.dark;
-  Color pane(double day, double night) => Colors.white.withValues(alpha: dark ? night : day);
+  // the cards as see-through as chosen in Settings → Themes: these are the medium ones' alphas, scaled
+  final k = switch (clarity) {
+    ContrastClarity.weak => 1.6,
+    ContrastClarity.medium => 1.0,
+    ContrastClarity.strong => .55,
+  };
+  Color pane(double day, double night) => Colors.white.withValues(alpha: ((dark ? night : day) * k).clamp(0, .95));
   return theme.copyWith(
     scaffoldBackgroundColor: Colors.transparent,
     canvasColor: Colors.transparent,

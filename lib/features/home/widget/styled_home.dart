@@ -1587,9 +1587,13 @@ class ContrastShellDock extends HookConsumerWidget {
 /// Themes, laid out at random once when the app starts (the same on every page until it's closed). Inside another
 /// one it draws nothing of its own.
 class ContrastGlow extends ConsumerStatefulWidget {
-  const ContrastGlow({super.key, required this.child, this.page = ''});
+  const ContrastGlow({super.key, required this.child, this.page = '', this.own = false});
 
   final Widget child;
+
+  /// draws its own backdrop inside another one too: a page sliding over another carries its own, so the one under
+  /// it doesn't show through
+  final bool own;
 
   /// the page it's behind (the backdrop is the same on every page)
   final String page;
@@ -1601,7 +1605,7 @@ class ContrastGlow extends ConsumerStatefulWidget {
 class _ContrastGlowState extends ConsumerState<ContrastGlow> {
   @override
   Widget build(BuildContext context) {
-    if (context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
+    if (!widget.own && context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
     final brightness = Theme.of(context).brightness;
     // the settings not read yet (the first frames): the defaults
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
@@ -1614,6 +1618,8 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
         cool: cool,
         dark: brightness == Brightness.dark,
         seed: contrastBackdropSeed,
+        // laid out on the screen, so every page's lines up with the rest
+        area: MediaQuery.sizeOf(context),
       ),
       child: widget.child,
     );
@@ -2382,7 +2388,6 @@ class _RouteCard extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
     final units = t.avpn.bytesUnits.split(',');
     final bytes = apps.fold<int>(0, (s, a) => s + a.bytes);
     final top = apps.isEmpty ? 1 : apps.first.bytes;
@@ -2391,188 +2396,193 @@ class _RouteCard extends ConsumerWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 60),
-        child: Material(
-          color: dark ? const Color(0xFF1C1C1F) : const Color(0xFFF7F5F1),
-          borderRadius: BorderRadius.circular(28),
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
+        child: ContrastClear(
+          radius: 28,
+          builder: (tint) => Material(
+            color: tint,
             borderRadius: BorderRadius.circular(28),
-            side: BorderSide(color: colour.withValues(alpha: .35), width: 1.5),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: colour, width: 1.6),
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+              side: BorderSide(color: colour.withValues(alpha: .35), width: 1.5),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: colour, width: 1.6),
+                          ),
+                          child: Icon(icon, size: 20, color: colour),
                         ),
-                        child: Icon(icon, size: 20, color: colour),
-                      ),
-                      const Gap(12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(vpn ? t.avpn.statsViaVpn : t.avpn.homeBypass, style: theme.textTheme.titleLarge),
-                            Text(
-                              vpn
-                                  ? t.avpn.contrastRouteVpn(
-                                      share: total == 0 ? 0 : (bytes * 100 / total).round(),
-                                      n: servers,
-                                    )
-                                  : t.avpn.contrastRouteDirect(share: total == 0 ? 0 : (bytes * 100 / total).round()),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: amount.first),
-                            if (amount.length > 1)
-                              TextSpan(
-                                text: ' ${amount.sublist(1).join(' ')}',
-                                style: TextStyle(fontSize: 13, letterSpacing: 0, color: scheme.onSurfaceVariant),
-                              ),
-                          ],
-                        ),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Gap(16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(5),
-                    child: SizedBox(
-                      height: 10,
-                      child: Row(
-                        spacing: 2,
-                        children: [
-                          for (final (i, a) in apps.indexed)
-                            Expanded(
-                              flex: (a.bytes * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
-                              child: ColoredBox(color: colour.withValues(alpha: (1 - i * .15).clamp(.2, 1))),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Gap(14),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 2, bottom: 4),
-                    child: Text(
-                      t.avpn.contrastApps.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.3,
-                      ),
-                    ),
-                  ),
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      padding: EdgeInsets.zero,
-                      itemCount: apps.length,
-                      separatorBuilder: (_, _) =>
-                          Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: .5)),
-                      itemBuilder: (context, i) {
-                        final a = apps[i];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-                          child: Row(
+                        const Gap(12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: a.icon == null
-                                    ? Container(
-                                        width: 36,
-                                        height: 36,
-                                        color: colour.withValues(alpha: .2),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          a.name.isEmpty ? '?' : a.name.characters.first.toUpperCase(),
-                                          style: TextStyle(color: colour, fontWeight: FontWeight.w800),
-                                        ),
+                              Text(vpn ? t.avpn.statsViaVpn : t.avpn.homeBypass, style: theme.textTheme.titleLarge),
+                              Text(
+                                vpn
+                                    ? t.avpn.contrastRouteVpn(
+                                        share: total == 0 ? 0 : (bytes * 100 / total).round(),
+                                        n: servers,
                                       )
-                                    : Image.memory(a.icon!, width: 36, height: 36, gaplessPlayback: true),
-                              ),
-                              const Gap(12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            a.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
-                                          ),
-                                        ),
-                                        Text(
-                                          formatBytes(a.bytes, units),
-                                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                                        ),
-                                      ],
-                                    ),
-                                    const Gap(5),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(3),
-                                            child: LinearProgressIndicator(
-                                              value: a.bytes / top,
-                                              minHeight: 5,
-                                              color: colour,
-                                              backgroundColor: scheme.outlineVariant.withValues(alpha: .4),
-                                            ),
-                                          ),
-                                        ),
-                                        const Gap(10),
-                                        Text(
-                                          [
-                                            if (a.servers.isNotEmpty) a.servers,
-                                            '${bytes == 0 ? 0 : (a.bytes * 100 / bytes).round()}%',
-                                          ].join(' · '),
-                                          style: theme.textTheme.labelSmall?.copyWith(
-                                            color: scheme.onSurfaceVariant,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                    : t.avpn.contrastRouteDirect(
+                                        share: total == 0 ? 0 : (bytes * 100 / total).round(),
+                                      ),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: amount.first),
+                              if (amount.length > 1)
+                                TextSpan(
+                                  text: ' ${amount.sublist(1).join(' ')}',
+                                  style: TextStyle(fontSize: 13, letterSpacing: 0, color: scheme.onSurfaceVariant),
+                                ),
+                            ],
+                          ),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -1.2,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const Gap(16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: SizedBox(
+                        height: 10,
+                        child: Row(
+                          spacing: 2,
+                          children: [
+                            for (final (i, a) in apps.indexed)
+                              Expanded(
+                                flex: (a.bytes * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
+                                child: ColoredBox(color: colour.withValues(alpha: (1 - i * .15).clamp(.2, 1))),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Gap(14),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, bottom: 4),
+                      child: Text(
+                        t.avpn.contrastApps.toUpperCase(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.3,
+                        ),
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        itemCount: apps.length,
+                        separatorBuilder: (_, _) =>
+                            Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: .5)),
+                        itemBuilder: (context, i) {
+                          final a = apps[i];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: a.icon == null
+                                      ? Container(
+                                          width: 36,
+                                          height: 36,
+                                          color: colour.withValues(alpha: .2),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            a.name.isEmpty ? '?' : a.name.characters.first.toUpperCase(),
+                                            style: TextStyle(color: colour, fontWeight: FontWeight.w800),
+                                          ),
+                                        )
+                                      : Image.memory(a.icon!, width: 36, height: 36, gaplessPlayback: true),
+                                ),
+                                const Gap(12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              a.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                                            ),
+                                          ),
+                                          Text(
+                                            formatBytes(a.bytes, units),
+                                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                                          ),
+                                        ],
+                                      ),
+                                      const Gap(5),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(3),
+                                              child: LinearProgressIndicator(
+                                                value: a.bytes / top,
+                                                minHeight: 5,
+                                                color: colour,
+                                                backgroundColor: scheme.outlineVariant.withValues(alpha: .4),
+                                              ),
+                                            ),
+                                          ),
+                                          const Gap(10),
+                                          Text(
+                                            [
+                                              if (a.servers.isNotEmpty) a.servers,
+                                              '${bytes == 0 ? 0 : (a.bytes * 100 / bytes).round()}%',
+                                            ].join(' · '),
+                                            style: theme.textTheme.labelSmall?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2606,13 +2616,14 @@ void showGlassPopup(BuildContext context, Widget child) {
   );
 }
 
-class _GlassPopup extends StatelessWidget {
+class _GlassPopup extends ConsumerWidget {
   const _GlassPopup({required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clarity = ref.watch(Preferences.contrastClarity);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final screen = MediaQuery.sizeOf(context);
     return Center(
@@ -2624,9 +2635,12 @@ class _GlassPopup extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(26),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            filter: ImageFilter.blur(sigmaX: clarity.blur * .8, sigmaY: clarity.blur * .8),
             child: Material(
-              color: dark ? const Color(0x6B1C1C1F) : const Color(0x47FFFFFF),
+              // as see-through as the blocks, as chosen in Settings → Themes
+              color: dark
+                  ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.2).clamp(0, 1))
+                  : Colors.white.withValues(alpha: clarity.day * .9),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(26),
                 side: BorderSide(color: Colors.white.withValues(alpha: dark ? .14 : .85)),
@@ -2833,5 +2847,61 @@ Future<void> pingAllServers(WidgetRef ref) async {
     // not connected: nothing to ping
   } finally {
     homePingTesting.value = false;
+  }
+}
+
+/// A window's glass by the clarity chosen in Settings → Themes: what's behind it blurred, [builder] given the tint.
+class ContrastClear extends ConsumerWidget {
+  const ContrastClear({super.key, required this.builder, this.radius = 26});
+
+  final Widget Function(Color tint) builder;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final clarity = ref.watch(Preferences.contrastClarity);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: clarity.blur * .8, sigmaY: clarity.blur * .8),
+        child: builder(
+          dark
+              ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.6).clamp(0, 1))
+              : Colors.white.withValues(alpha: (clarity.day * 1.3).clamp(0, 1)),
+        ),
+      ),
+    );
+  }
+}
+
+/// A round frosted plate under an icon button (Contrast's "+" and cog).
+class ContrastPlate extends ConsumerWidget {
+  const ContrastPlate({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final clarity = ref.watch(Preferences.contrastClarity);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: clarity.blur, sigmaY: clarity.blur),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: dark
+                  ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
+                  : Colors.white.withValues(alpha: clarity.day),
+              border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
   }
 }

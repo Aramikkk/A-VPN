@@ -144,7 +144,7 @@
     "contrastSession": "Session",
     "unitHourShort": "h",
     "unitMinuteShort": "min",
-    "contrastLossTitle": "Loss, last 24 hours",
+    "contrastLossTitle": "Loss this session",
     "contrastLossNone": "No loss",
     "contrastLossEpisodes": "Stretches: $n",
     "contrastClarityTitle": "1 · Block transparency",

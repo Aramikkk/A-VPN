@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -51,6 +53,8 @@ class _Opaque extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final glass = theme.araLook.glass;
+    // Contrast: its backdrop (the page colour is see-through there), laid out as the one round it
+    if (theme.araLook.style == AraStyle.contrast) return ContrastGlow(own: true, child: child);
     if (glass == null) return ColoredBox(color: theme.scaffoldBackgroundColor, child: child);
     return Stack(
       fit: StackFit.expand,

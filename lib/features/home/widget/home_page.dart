@@ -27,6 +27,8 @@ class HomePage extends HookConsumerWidget {
     final graphite = theme.araLook.style == AraStyle.graphite;
     // Contrast: the app bar on the upper zone's light, no band of its own; the settings by the "+"
     final contrast = theme.araLook.style == AraStyle.contrast;
+    // Contrast: the "+" and the cog each on a frosted plate
+    Widget plate(Widget button) => contrast ? ContrastPlate(child: button) : button;
     final scaffold = Scaffold(
       backgroundColor: graphite || contrast ? Colors.transparent : null,
       appBar: AppBar(
@@ -73,16 +75,20 @@ class HomePage extends HookConsumerWidget {
           Semantics(
             key: const ValueKey("profile_add_button"),
             label: t.pages.profiles.add,
-            child: IconButton(
-              icon: Icon(Icons.add_rounded, color: theme.colorScheme.primary),
-              onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
+            child: plate(
+              IconButton(
+                icon: Icon(Icons.add_rounded, color: theme.colorScheme.primary),
+                onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
+              ),
             ),
           ),
           if (contrast && !PlatformUtils.isDesktop)
-            IconButton(
-              tooltip: t.pages.settings.title,
-              icon: Icon(Icons.settings_outlined, color: theme.colorScheme.primary),
-              onPressed: () => context.goNamed('settings'),
+            plate(
+              IconButton(
+                tooltip: t.pages.settings.title,
+                icon: Icon(Icons.settings_outlined, color: theme.colorScheme.primary),
+                onPressed: () => context.goNamed('settings'),
+              ),
             ),
           const Gap(8),
         ],

@@ -225,11 +225,14 @@ class ConnectionQuality extends Notifier<List<int?>> {
     state = List.of(_samples);
   }
 
-  /// The last day's loss: the day's total, the share lost in each of its minutes (null: no probes then; the oldest
-  /// first) and the stretches of loss, the latest first (minutes with loss next to each other make one).
-  LossDay lossDay() {
+  /// The loss since [since] (the session's start; the last day when null): the total, the share lost in each
+  /// minute (null: no probes then; the oldest first) and the stretches of loss, the latest first (minutes with loss
+  /// next to each other make one).
+  LossDay lossDay({DateTime? since}) {
     final minuteNow = DateTime.now().millisecondsSinceEpoch ~/ 60000;
-    const span = 24 * 60;
+    final span = since == null
+        ? 24 * 60
+        : (minuteNow - since.millisecondsSinceEpoch ~/ 60000 + 1).clamp(1, _minutesKept);
     final total = PingBucket();
     final minutes = <double?>[];
     final episodes = <LossEpisode>[];

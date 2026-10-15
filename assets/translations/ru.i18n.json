@@ -144,7 +144,7 @@
     "contrastSession": "Сессия",
     "unitHourShort": "ч",
     "unitMinuteShort": "мин",
-    "contrastLossTitle": "Потери за сутки",
+    "contrastLossTitle": "Потери за сессию",
     "contrastLossNone": "Потерь не было",
     "contrastLossEpisodes": "Эпизодов: $n",
     "contrastClarityTitle": "1 · Прозрачность блоков",

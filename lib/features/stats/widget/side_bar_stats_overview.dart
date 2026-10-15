@@ -8,6 +8,7 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
@@ -1346,7 +1347,7 @@ class _RouteRing extends CustomPainter {
   bool shouldRepaint(_RouteRing old) => old.share != share || old.vpn != vpn || old.direct != direct;
 }
 
-/// The last day's packet loss: its share of the day's probes, a strip of the day with each loss where it fell, and
+/// This session's packet loss: its share of the probes, a strip of the session with each loss where it fell, and
 /// each stretch of loss with when it began, how long it went on and how much was lost.
 class _LossDay extends ConsumerWidget {
   const _LossDay();
@@ -1360,8 +1361,10 @@ class _LossDay extends ConsumerWidget {
     final muted = scheme.onSurfaceVariant;
     // followed with the probes (one a second); worked out from the minutes kept
     ref.watch(connectionQualityProvider);
-    final day = ref.read(connectionQualityProvider.notifier).lossDay();
-    const loss = Color(0xFFE5484D);
+    // this session's, in the theme's colour
+    final start = ref.watch(sessionStartProvider);
+    final day = ref.read(connectionQualityProvider.notifier).lossDay(since: start ?? DateTime.now());
+    final loss = theme.araLook.neonFill ?? scheme.primary;
     String two(int n) => n.toString().padLeft(2, '0');
     String clock(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
     String percent(double v) => v == 0
@@ -1425,7 +1428,7 @@ class _LossDay extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              for (final label in ['−24 ч', '−18', '−12', '−6', t.avpn.graphNow])
+              for (final label in [if (start != null) clock(start) else '', t.avpn.graphNow])
                 Text(label, style: theme.textTheme.labelSmall?.copyWith(color: muted, fontSize: 10)),
             ],
           ),
@@ -1453,7 +1456,7 @@ class _LossDay extends ConsumerWidget {
                             Container(
                               width: 8,
                               height: 8,
-                              decoration: const BoxDecoration(color: loss, shape: BoxShape.circle),
+                              decoration: BoxDecoration(color: loss, shape: BoxShape.circle),
                             ),
                             const Gap(10),
                             SizedBox(
