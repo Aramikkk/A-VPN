@@ -126,7 +126,9 @@ abstract class BlockedOnlyRouting {
     const protocols = {0: 'tls', 1: 'http', 2: 'quic', 3: 'stun', 4: 'dns', 5: 'bittorrent'};
     put('protocol', rule.protocols.map((p) => protocols[p.value]).nonNulls);
     return switch (rule.outbound) {
-      Outbound.block => {...json, 'action': 'reject'},
+      // refused at once every time: past 50 refusals in 30 s sing-box drops silently, and an app trying QUIC
+      // (Instagram, YouTube) waited for a timeout before falling back to TCP, the feed loading slowly
+      Outbound.block => {...json, 'action': 'reject', 'no_drop': true},
       Outbound.proxy => {...json, 'action': 'route', 'outbound': _proxyTag},
       _ => {...json, 'action': 'route', 'outbound': _directTag},
     };

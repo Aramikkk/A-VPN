@@ -35,6 +35,7 @@ void main() {
     expect(rules[2], {
       'protocol': ['quic'],
       'action': 'reject',
+      'no_drop': true,
     });
     expect(rules.last, {
       'network': ['tcp', 'udp'],
@@ -52,6 +53,7 @@ void main() {
         'geoip-phishing',
       ],
       'action': 'reject',
+      'no_drop': true,
     });
   });
 
@@ -164,6 +166,7 @@ void main() {
       'port': [25],
       'port_range': ['1000:2000'],
       'action': 'reject',
+      'no_drop': true,
     });
     expect(withUser[2], {
       'rule_set': ['x'],
