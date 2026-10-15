@@ -76,9 +76,11 @@ enum ContrastPalette {
 /// How see-through Contrast's blocks are: the tint over the backdrop (by day, by night) and how much they blur it.
 enum ContrastClarity {
   // low: nearly solid; medium a little more see-through; high a little more again
-  weak('Слабо', 'Low', .92, .9, 18),
-  medium('Средне', 'Medium', .8, .78, 18),
-  strong('Сильно', 'High', .66, .64, 18);
+  // the blur light: the thin line backdrops still show through the blocks (a strong one wiped them out and the
+  // blocks looked solid next to the other pages' see-through cards)
+  weak('Слабо', 'Low', .92, .9, 3),
+  medium('Средне', 'Medium', .8, .78, 3),
+  strong('Сильно', 'High', .66, .64, 3);
 
   const ContrastClarity(this.ru, this.en, this.day, this.night, this.blur);
 

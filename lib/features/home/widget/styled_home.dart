@@ -1828,9 +1828,11 @@ class ContrastFrost extends ConsumerWidget {
       child: Container(
         padding: padding,
         decoration: BoxDecoration(
+          // lighter than the chosen clarity: the tiles inside add their own pane, and the two together came out
+          // nearly solid next to the other pages' single see-through cards
           color: dark
-              ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
-              : Colors.white.withValues(alpha: clarity.day),
+              ? const Color(0xFF1E1E22).withValues(alpha: clarity.night * .6)
+              : Colors.white.withValues(alpha: clarity.day * .6),
           borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
         ),

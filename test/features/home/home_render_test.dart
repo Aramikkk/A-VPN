@@ -150,7 +150,11 @@ void main() {
       final name = '${style.name}_${dark ? 'night' : 'day'}_${connected ? 'on' : 'off'}';
       testWidgets('home: $name', (tester) async {
         _connected = connected;
-        SharedPreferences.setMockInitialValues({});
+        // BG=<backdrop>, PAL=<palette>: Contrast's look
+        SharedPreferences.setMockInitialValues({
+          if ((Platform.environment['BG'] ?? '').isNotEmpty) 'contrast_backdrop': Platform.environment['BG']!,
+          if ((Platform.environment['PAL'] ?? '').isNotEmpty) 'contrast_palette': Platform.environment['PAL']!,
+        });
         // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
         final unfolded = Platform.environment['UNFOLDED'] == '1';
         // PC=1: the computer's home pane in the default window (1048 x 904 less the side bar and the title bar)
