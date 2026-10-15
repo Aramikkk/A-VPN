@@ -736,7 +736,8 @@ class EverythingElseTile extends ConsumerWidget {
       child: Opacity(
         opacity: overridden ? .45 : 1,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          // only the row with its choice (the hint under it is gone)
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -781,14 +782,6 @@ class EverythingElseTile extends ConsumerWidget {
                     ],
                   );
                 },
-              ),
-              const Gap(6),
-              Padding(
-                padding: const EdgeInsets.only(left: 40),
-                child: Text(
-                  direct ? routing.everythingElseDirectSettingsHint : routing.everythingElseVpnSettingsHint,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
               ),
             ],
           ),

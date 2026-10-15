@@ -140,7 +140,7 @@ class SettingsPage extends HookConsumerWidget {
       ),
       // the sections in one outlined block, so the list reads as a whole
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         children: [
           Container(
             clipBehavior: Clip.antiAlias,
@@ -210,19 +210,7 @@ class SettingsPage extends HookConsumerWidget {
                         },
                       ),
                     ),
-                  // the logs and About are in the computer's side menu too, but the list is the same as on the phone
-                  ...[
-                    SettingsSection(
-                      title: t.pages.logs.title,
-                      icon: Icons.description_rounded,
-                      namedLocation: context.namedLocation('logs'),
-                    ),
-                    SettingsSection(
-                      title: t.pages.about.title,
-                      icon: Icons.info_rounded,
-                      namedLocation: context.namedLocation('about'),
-                    ),
-                  ],
+                  // the logs and About are in General now
                 ],
               ),
             ),
@@ -250,8 +238,11 @@ class SettingsSection extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
+      // dense: the whole list on one screen, over the panel
+      dense: true,
+      visualDensity: VisualDensity.compact,
       leading: Icon(icon),
-      title: Text(title),
+      title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
       subtitle: subtitle,
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => context.go(namedLocation),

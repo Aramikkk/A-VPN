@@ -570,3 +570,63 @@ class ContrastFrostImage {
     return _kept[key] = image;
   }
 }
+
+/// The backdrop drawn once into a picture at the screen's size (no more than two pixels per point) and kept until
+/// the look or the screen changes: each frame then shows one image instead of drawing hundreds or thousands of
+/// shapes again (the grain alone is thousands), which the phone did on every frame anything moved.
+class ContrastBackdropImage {
+  ContrastBackdropImage._();
+
+  static final _kept = <String, ui.Image>{};
+
+  static ui.Image of({
+    required ContrastBackdrop kind,
+    required Color warm,
+    required Color cool,
+    required bool dark,
+    required Size area,
+    required double scale,
+  }) {
+    final key =
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$scale';
+    final kept = _kept[key];
+    if (kept != null) return kept;
+    // a few at most (day and night, folded and unfolded); the old ones go to the collector
+    if (_kept.length > 4) _kept.clear();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(scale);
+    ContrastBackdropPainter(
+      kind: kind,
+      warm: warm,
+      cool: cool,
+      dark: dark,
+      seed: contrastBackdropSeed,
+      area: area,
+    ).paint(canvas, area);
+    final image = recorder.endRecording().toImageSync(
+      math.max(1, (area.width * scale).ceil()),
+      math.max(1, (area.height * scale).ceil()),
+    );
+    return _kept[key] = image;
+  }
+}
+
+/// Paints a [ContrastBackdropImage] from its box's corner, at its points' size.
+class ContrastImagePainter extends CustomPainter {
+  ContrastImagePainter(this.image, this.scale);
+
+  final ui.Image image;
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    canvas.scale(1 / scale);
+    canvas.drawImage(image, Offset.zero, Paint()..filterQuality = FilterQuality.low);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(ContrastImagePainter old) => !identical(old.image, image) || old.scale != scale;
+}

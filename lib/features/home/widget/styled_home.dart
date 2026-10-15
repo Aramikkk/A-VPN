@@ -1767,24 +1767,24 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
     final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
     final (warm, cool) = palette.backdrop(brightness);
+    final area = MediaQuery.sizeOf(context);
+    // the picture at the screen's sharpness, two pixels a point at most (blurrier lines aren't seen, memory is)
+    final scale = math.min(MediaQuery.devicePixelRatioOf(context), 2.0);
+    final image = ContrastBackdropImage.of(
+      kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
+      warm: warm,
+      cool: cool,
+      dark: brightness == Brightness.dark,
+      // laid out on the screen, so every page's lines up with the rest
+      area: area,
+      scale: scale,
+    );
     return _GlowAnchor(
       child: Stack(
         fit: StackFit.passthrough,
         children: [
           Positioned.fill(
-            child: RepaintBoundary(
-              child: CustomPaint(
-                painter: ContrastBackdropPainter(
-                  kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
-                  warm: warm,
-                  cool: cool,
-                  dark: brightness == Brightness.dark,
-                  seed: contrastBackdropSeed,
-                  // laid out on the screen, so every page's lines up with the rest
-                  area: MediaQuery.sizeOf(context),
-                ),
-              ),
-            ),
+            child: RepaintBoundary(child: CustomPaint(painter: ContrastImagePainter(image, scale))),
           ),
           widget.child,
         ],
@@ -2904,7 +2904,6 @@ class _GlassPopup extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final clarity = ref.watch(Preferences.contrastClarity);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final screen = MediaQuery.sizeOf(context);
     return Center(
@@ -2914,21 +2913,15 @@ class _GlassPopup extends ConsumerWidget {
           maxWidth: math.min(screen.width - 32, 440),
           maxHeight: (screen.height - 120) * .8,
         ),
-        // the backdrop's picture blurred once, as the blocks have it: a live blur on every frame of the popup's
-        // opening made it stutter
-        child: _FrostedBackdrop(
-          radius: 26,
-          child: Material(
-            // as see-through as the blocks, as chosen in Settings → Themes
-            color: dark
-                ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.2).clamp(0, 1))
-                : Colors.white.withValues(alpha: clarity.day * .9),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(26),
-              side: BorderSide(color: Colors.white.withValues(alpha: dark ? .14 : .85)),
-            ),
-            child: child,
+        // solid: the see-through glass still stuttered as it opened
+        child: Material(
+          color: dark ? const Color(0xFF1C1C1F) : const Color(0xFFF7F5F1),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(26),
+            side: BorderSide(color: dark ? Colors.white.withValues(alpha: .1) : Colors.black.withValues(alpha: .06)),
           ),
+          child: child,
         ),
       ),
     );
@@ -3141,16 +3134,8 @@ class ContrastClear extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final clarity = ref.watch(Preferences.contrastClarity);
-    // the backdrop's picture blurred once, not a live blur on every frame of the card's opening
-    return _FrostedBackdrop(
-      radius: radius,
-      child: builder(
-        dark
-            ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.6).clamp(0, 1))
-            : Colors.white.withValues(alpha: (clarity.day * 1.3).clamp(0, 1)),
-      ),
-    );
+    // solid: the see-through glass still stuttered as the card opened
+    return builder(dark ? const Color(0xFF1C1C1F) : const Color(0xFFF7F5F1));
   }
 }
 

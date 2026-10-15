@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -84,6 +85,19 @@ class GeneralPage extends HookConsumerWidget {
                   secondary: const Icon(Icons.memory_rounded),
                   value: !ref.watch(Preferences.disableMemoryLimit),
                   onChanged: (value) async => await ref.read(Preferences.disableMemoryLimit.notifier).update(!value),
+                ),
+                // the logs and About, moved here from the settings list
+                ListTile(
+                  leading: const Icon(Icons.description_rounded),
+                  title: Text(t.pages.logs.title),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.goNamed('logs'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_rounded),
+                  title: Text(t.pages.about.title),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.goNamed('about'),
                 ),
                 // Debug mode and log level moved to the Logs page. Both decide how
                 // much is recorded, which is only meaningful next to the logs
