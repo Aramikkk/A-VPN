@@ -85,13 +85,39 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
 
   int? _neighbour(double drag) {
     final next = _current + (drag < 0 ? 1 : -1);
-    return drag == 0 || next < 0 || next >= widget.children.length ? null : next;
+    // Contrast: only between the menu's three (Statistics, Home, Topology)
+    final (first, last) = _contrast ? (1, 3) : (0, widget.children.length - 1);
+    return drag == 0 || _current < first || _current > last || next < first || next > last ? null : next;
+  }
+
+  /// Contrast: how far a sideways swipe has to go (a long one), as a share of the width
+  double get _needed => _contrast ? .4 : .25;
+
+  /// the finger's way since it went down, on Settings or Connections, and whether a list scrolled meanwhile
+  Offset? _down;
+  Offset _moved = Offset.zero;
+  bool _scrolled = false;
+
+  /// back home from Settings (a swipe up) or Connections (down): a little longer than the swipe that opened them,
+  /// mostly upright, and only where their list didn't scroll (at its end, or off it)
+  void _pointerUp() {
+    final down = _down;
+    _down = null;
+    if (down == null || _scrolled || _previous != null) return;
+    final need = (context.size?.height ?? 800) * .14;
+    final dy = _moved.dy;
+    if (dy.abs() < need || dy.abs() < _moved.dx.abs() * 1.5) return;
+    if ((_current == _settings && dy < 0) || (_current == _connections && dy > 0)) {
+      widget.navigationShell.goBranch(2);
+    }
   }
 
   void _dragged(DragUpdateDetails details) {
     if (_previous != null) return;
     _back.stop();
     final width = context.size?.width ?? 1;
+    // Contrast: Settings and Connections don't move sideways at all
+    if (_contrast && (_current == _settings || _current == _connections)) return;
     var drag = _drag + (details.primaryDelta ?? 0) / width;
     // no tab that way: it gives a little and stops
     if (_neighbour(drag) == null) drag = drag.clamp(-.06, .06);
@@ -103,7 +129,7 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     final velocity = details.primaryVelocity ?? 0;
     final next = _neighbour(_drag);
     final flick = velocity.abs() > 350 && (velocity < 0) == (_drag < 0);
-    if (next != null && (_drag.abs() > .25 || flick)) {
+    if (next != null && (_drag.abs() > _needed || (flick && !_contrast))) {
       _from = _drag.abs();
       widget.navigationShell.goBranch(next);
     } else {
@@ -127,13 +153,12 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
         ),
       ),
     );
-    // Contrast: no sideways dragging between the tabs (the menu, and the home screen's long swipes up and down)
-    final drags = !_contrast;
-    return GestureDetector(
+    final returns = _contrast && (_current == _settings || _current == _connections);
+    Widget swiper = GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragUpdate: drags ? _dragged : null,
-      onHorizontalDragEnd: drags ? _released : null,
-      onHorizontalDragCancel: drags ? () => _released(DragEndDetails()) : null,
+      onHorizontalDragUpdate: _dragged,
+      onHorizontalDragEnd: _released,
+      onHorizontalDragCancel: () => _released(DragEndDetails()),
       child: ClipRect(
         child: AnimatedBuilder(
           animation: _slide,
@@ -156,6 +181,28 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
         ),
       ),
     );
+    if (returns) {
+      swiper = NotificationListener<ScrollUpdateNotification>(
+        onNotification: (n) {
+          if (_down != null && n.dragDetails != null && n.scrollDelta != 0) _scrolled = true;
+          return false;
+        },
+        child: Listener(
+          onPointerDown: (e) {
+            _down = e.position;
+            _moved = Offset.zero;
+            _scrolled = false;
+          },
+          onPointerMove: (e) {
+            if (_down != null) _moved = e.position - _down!;
+          },
+          onPointerUp: (_) => _pointerUp(),
+          onPointerCancel: (_) => _down = null,
+          child: swiper,
+        ),
+      );
+    }
+    return swiper;
   }
 }
 

@@ -1477,7 +1477,7 @@ class _ContrastHome extends StatelessWidget {
       child: LayoutBuilder(
         // a short screen: no room for the traffic block (it's on the Statistics tab)
         builder: (context, box) => Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 22),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 9),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1500,8 +1500,7 @@ class _ContrastHome extends StatelessWidget {
   }
 }
 
-/// A vertical swipe that has to go a little further than usual (a fifth of the height) before it counts: down or
-/// up. Shorter ones do nothing.
+/// A short vertical swipe, down or up: past a twelfth of the height, or a flick.
 class _LongSwipe extends HookWidget {
   const _LongSwipe({required this.child, required this.onDown, required this.onUp});
 
@@ -1516,11 +1515,12 @@ class _LongSwipe extends HookWidget {
       behavior: HitTestBehavior.translucent,
       onVerticalDragStart: (_) => drag.value = 0,
       onVerticalDragUpdate: (d) => drag.value += d.primaryDelta ?? 0,
-      onVerticalDragEnd: (_) {
-        final need = MediaQuery.sizeOf(context).height * .2;
-        if (drag.value > need) {
+      onVerticalDragEnd: (details) {
+        final need = MediaQuery.sizeOf(context).height / 12;
+        final velocity = details.primaryVelocity ?? 0;
+        if (drag.value > need || (drag.value > 16 && velocity > 700)) {
           onDown();
-        } else if (drag.value < -need) {
+        } else if (drag.value < -need || (drag.value < -16 && velocity < -700)) {
           onUp();
         }
         drag.value = 0;
@@ -1545,9 +1545,9 @@ class ContrastShellDock extends HookConsumerWidget {
     return Theme(
       data: contrastPanelTheme(theme),
       child: Stack(
-        clipBehavior: Clip.none,
         children: [
           Container(
+            margin: const EdgeInsets.only(top: _SeamTab.overhang),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             decoration: BoxDecoration(
               color: contrastPanelColor(dark),
@@ -1574,7 +1574,7 @@ class ContrastShellDock extends HookConsumerWidget {
           Positioned(
             left: 0,
             right: 0,
-            top: -13,
+            top: 0,
             child: Center(child: _SeamTab(label: t.avpn.contrastServersTab)),
           ),
         ],
@@ -1584,12 +1584,18 @@ class ContrastShellDock extends HookConsumerWidget {
 }
 
 /// Contrast's light behind a page, behind the app bar too: three or four suns, bright discs of the accent with
-/// their halo, scattered at random, a new set for every page (the same while it stays). Inside another one it
-/// draws nothing of its own.
+/// their halo, scattered at random once per page when the app starts (the same until it's closed). Inside another
+/// one it draws nothing of its own.
 class ContrastGlow extends StatefulWidget {
-  const ContrastGlow({super.key, required this.child});
+  const ContrastGlow({super.key, required this.child, this.page = ''});
 
   final Widget child;
+
+  /// the page it's behind: each page gets its own suns, picked the first time it shows after the app starts
+  final String page;
+
+  /// the suns picked so far, by page, kept until the app is closed
+  static final _picked = <String, List<(double, double, double)>>{};
 
   @override
   State<ContrastGlow> createState() => _ContrastGlowState();
@@ -1597,7 +1603,7 @@ class ContrastGlow extends StatefulWidget {
 
 class _ContrastGlowState extends State<ContrastGlow> {
   /// (left, top, size) as shares of the width and the height (the size of the width)
-  late final List<(double, double, double)> _suns = () {
+  late final List<(double, double, double)> _suns = ContrastGlow._picked.putIfAbsent(widget.page, () {
     final random = math.Random();
     final count = 3 + random.nextInt(2);
     final suns = <(double, double, double)>[];
@@ -1610,7 +1616,7 @@ class _ContrastGlowState extends State<ContrastGlow> {
       suns.add((left, top, size));
     }
     return suns;
-  }();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1687,6 +1693,9 @@ class _SeamTab extends StatelessWidget {
 
   final String label;
 
+  /// how far the tab stands up over the panel's edge
+  static const overhang = 15.0;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1700,7 +1709,7 @@ class _SeamTab extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         onTap: () => showGlassPopup(context, const _SessionServers()),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+          padding: const EdgeInsets.fromLTRB(22, 7, 22, 6),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1803,7 +1812,10 @@ class _ContrastRow extends StatelessWidget {
     final ms = delay <= 0 ? '—' : (delay > 65000 ? '×' : '$delay');
     // Auto: the country it's on now right after its name ("Авто 🇵🇱 Польша"), no line under it
     final now = group ? subtitle.indexOf(': ') : -1;
-    final country = now < 0 ? null : subtitle.substring(now + 2);
+    final nowOn = now < 0 ? null : subtitle.substring(now + 2);
+    // a test server's note ("Финляндия (Тестовый)") goes to a second line under the name, not cut off at the end
+    final note = nowOn == null ? null : RegExp(r'\s*\(([^()]*)\)').firstMatch(nowOn);
+    final country = note == null ? nowOn : nowOn!.replaceRange(note.start, note.end, '').trim();
     final titleStyle = theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, color: ink);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -1833,23 +1845,42 @@ class _ContrastRow extends StatelessWidget {
                   const Gap(11),
                   Expanded(
                     child: country != null
-                        ? Text.rich(
-                            TextSpan(
+                        ? (() {
+                            final line = Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: title,
+                                    style: titleStyle?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const TextSpan(text: '   '),
+                                  TextSpan(
+                                    text: country,
+                                    style: titleStyle?.copyWith(color: ink.withValues(alpha: .8)),
+                                  ),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            );
+                            if (note == null) return line;
+                            return Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                TextSpan(
-                                  text: title,
-                                  style: titleStyle?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                const TextSpan(text: '   '),
-                                TextSpan(
-                                  text: country,
-                                  style: titleStyle?.copyWith(color: ink.withValues(alpha: .8)),
+                                line,
+                                Text(
+                                  note[1]!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: ink.withValues(alpha: .7),
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          )
+                            );
+                          })()
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,

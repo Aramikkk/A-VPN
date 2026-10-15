@@ -72,8 +72,12 @@ class _Proxies extends ProxiesOverviewNotifier {
                   urlTestDelay: group ? 108 : delay,
                   isGroup: group,
                   isVisible: true,
-                  // WL=1: Auto on a whitelist server
-                  groupSelectedTag: group ? (Platform.environment['WL'] == '1' ? 'lte' : 'pl5') : null,
+                  // WL=1: Auto on a whitelist server; AUTO=<tag>: on that one
+                  groupSelectedTag: group
+                      ? ((Platform.environment['AUTO'] ?? '').isNotEmpty
+                            ? Platform.environment['AUTO']
+                            : (Platform.environment['WL'] == '1' ? 'lte' : 'pl5'))
+                      : null,
                 ),
             ],
           )
@@ -237,7 +241,12 @@ void main() {
                               )
                             : style == AraStyle.contrast
                             // Contrast: the panel under the page, as the shell draws it
-                            ? const Column(children: [Expanded(child: AraHomeBody()), ContrastShellDock()])
+                            ? const Column(
+                                children: [
+                                  Expanded(child: AraHomeBody()),
+                                  ContrastShellDock(),
+                                ],
+                              )
                             : const AraHomeBody(),
                         bottomNavigationBar: pc
                             ? null

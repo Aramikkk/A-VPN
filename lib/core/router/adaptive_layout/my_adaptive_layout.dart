@@ -130,16 +130,17 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           type: glass != null ? MaterialType.transparency : MaterialType.canvas,
           child: Scaffold(
             body: contrastPhone
-                ? Column(
-                    children: [
-                      Expanded(
-                        child: ContrastGlow(
-                          key: ValueKey(GoRouter.of(context).state.matchedLocation),
+                ? ContrastGlow(
+                    key: ValueKey(GoRouter.of(context).state.matchedLocation),
+                    page: GoRouter.of(context).state.matchedLocation,
+                    child: Column(
+                      children: [
+                        Expanded(
                           child: Theme(data: contrastPageTheme(Theme.of(context)), child: navigationShell),
                         ),
-                      ),
-                      const ContrastShellDock(),
-                    ],
+                        const ContrastShellDock(),
+                      ],
+                    ),
                   )
                 : isMobileBreakpoint
                 ? navigationShell
