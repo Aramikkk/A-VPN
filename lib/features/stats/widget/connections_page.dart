@@ -94,7 +94,11 @@ enum _Filter { all, vpn, direct }
 /// The Connections tab: which apps connected to which sites, and whether each went through the VPN (and which
 /// server) or direct. Grouped by app or by site, the most traffic first; a group opens to its connections.
 class ConnectionsPage extends HookConsumerWidget {
-  const ConnectionsPage({super.key});
+  const ConnectionsPage({super.key, this.embedded = false});
+
+  /// inside the unfolded home screen (Contrast): no app bar, no filters nor apps/sites (by app, everything), a
+  /// small heading level with the servers' line on the left and the clear button beside it
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -149,17 +153,19 @@ class ConnectionsPage extends HookConsumerWidget {
     final direct = count(ConnectionRoute.direct);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.avpn.connectionsTab),
-        actions: [
-          if (all.any((c) => !c.active))
-            IconButton(
-              tooltip: t.avpn.connClear,
-              icon: const Icon(Icons.cleaning_services_rounded),
-              onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
+      appBar: embedded
+          ? null
+          : AppBar(
+              title: Text(t.avpn.connectionsTab),
+              actions: [
+                if (all.any((c) => !c.active))
+                  IconButton(
+                    tooltip: t.avpn.connClear,
+                    icon: const Icon(Icons.cleaning_services_rounded),
+                    onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
+                  ),
+              ],
             ),
-        ],
-      ),
       body: !state.available && all.isEmpty
           ? _Empty(icon: Icons.link_off_rounded, text: t.avpn.connNotConnected)
           : Center(
@@ -168,9 +174,36 @@ class ConnectionsPage extends HookConsumerWidget {
                 child: CustomScrollView(
                   slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 4, 16, 8),
                       sliver: SliverList.list(
                         children: [
+                          if (embedded)
+                            SizedBox(
+                              height: 22,
+                              child: Row(
+                                children: [
+                                  const Gap(6),
+                                  Text(
+                                    t.avpn.connectionsTab.toUpperCase(),
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.4,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (all.any((c) => !c.active))
+                                    IconButton(
+                                      tooltip: t.avpn.connClear,
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      iconSize: 18,
+                                      icon: Icon(Icons.cleaning_services_rounded, color: scheme.onSurfaceVariant),
+                                      onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          if (embedded) const Gap(8),
                           Row(
                             children: [
                               _Count(label: t.avpn.connOpen, value: open, color: scheme.onSurface),
@@ -180,41 +213,43 @@ class ConnectionsPage extends HookConsumerWidget {
                               _Count(label: t.avpn.statsDirect, value: direct, color: scheme.onSurfaceVariant),
                             ],
                           ),
-                          const Gap(12),
-                          SegmentedButton<_View>(
-                            segments: [
-                              ButtonSegment(
-                                value: _View.apps,
-                                icon: const Icon(Icons.apps_rounded),
-                                label: Text(t.avpn.connByApp),
-                              ),
-                              ButtonSegment(
-                                value: _View.sites,
-                                icon: const Icon(Icons.public_rounded),
-                                label: Text(t.avpn.connBySite),
-                              ),
-                            ],
-                            selected: {view.value},
-                            showSelectedIcon: false,
-                            onSelectionChanged: (s) => view.value = s.first,
-                          ),
-                          const Gap(10),
-                          Row(
-                            children: [
-                              for (final (f, label) in [
-                                (_Filter.all, t.avpn.connAll),
-                                (_Filter.vpn, 'VPN'),
-                                (_Filter.direct, t.avpn.statsDirect),
-                              ]) ...[
-                                ChoiceChip(
-                                  label: Text(label),
-                                  selected: filter.value == f,
-                                  onSelected: (_) => filter.value = f,
+                          if (!embedded) ...[
+                            const Gap(12),
+                            SegmentedButton<_View>(
+                              segments: [
+                                ButtonSegment(
+                                  value: _View.apps,
+                                  icon: const Icon(Icons.apps_rounded),
+                                  label: Text(t.avpn.connByApp),
                                 ),
-                                const Gap(6),
+                                ButtonSegment(
+                                  value: _View.sites,
+                                  icon: const Icon(Icons.public_rounded),
+                                  label: Text(t.avpn.connBySite),
+                                ),
                               ],
-                            ],
-                          ),
+                              selected: {view.value},
+                              showSelectedIcon: false,
+                              onSelectionChanged: (s) => view.value = s.first,
+                            ),
+                            const Gap(10),
+                            Row(
+                              children: [
+                                for (final (f, label) in [
+                                  (_Filter.all, t.avpn.connAll),
+                                  (_Filter.vpn, 'VPN'),
+                                  (_Filter.direct, t.avpn.statsDirect),
+                                ]) ...[
+                                  ChoiceChip(
+                                    label: Text(label),
+                                    selected: filter.value == f,
+                                    onSelected: (_) => filter.value = f,
+                                  ),
+                                  const Gap(6),
+                                ],
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),

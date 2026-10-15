@@ -113,7 +113,7 @@ class HomePage extends HookConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(flex: 11, child: AraHomeBody()),
-                  Expanded(flex: 10, child: ConnectionsPage()),
+                  Expanded(flex: 10, child: ConnectionsPage(embedded: true)),
                 ],
               );
             }

@@ -1004,14 +1004,19 @@ class _Orb extends HookWidget {
     final pingInk = dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface;
     final lossInk = dark ? Color.lerp(lossColor, Colors.white, .35)! : lossColor;
     final width = size * 2.1;
-    final centre = size * .98;
-    // Contrast keeps the mode inside the button: no room under it for a pill
-    final height = centre + size * .5 + size * (theme.araLook.style == AraStyle.contrast ? .04 : .26);
-    final outer = size * .86;
-    final inner = size * .7;
+    // Contrast: a rounded-square button in two square frames, the ping outside, the loss inside
+    final square = theme.araLook.style == AraStyle.contrast;
+    final centre = square ? size * .82 : size * .98;
+    // Contrast keeps the mode inside the button: no room under it for a pill; the square's frames reach below it
+    final height = square ? centre + size * .84 + size * .22 : centre + size * .5 + size * .26;
+    final outer = square ? size * .74 : size * .86;
+    final inner = square ? size * .58 : size * .7;
+    // the square's button a little smaller, inside its frames
+    final button = square ? size * .84 : size;
     final label = theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900, fontSize: size * .15);
     Widget number(String? text, Color ink, bool left) => Positioned(
-      top: centre + size * .12,
+      // the square's numbers under its frames, at their corners
+      top: square ? centre + outer + size * .1 : centre + size * .12,
       left: left ? 0 : null,
       right: left ? null : 0,
       width: (width - size) / 2,
@@ -1055,7 +1060,8 @@ class _Orb extends HookWidget {
                       fills: (filled.dx, filled.dy),
                       busy: busy,
                       rotation: spin.value,
-                      stroke: size * .1,
+                      stroke: square ? size * .085 : size * .1,
+                      square: square,
                     ),
                   );
                 },
@@ -1065,15 +1071,16 @@ class _Orb extends HookWidget {
           number(pingLabel, pingInk, true),
           number(lossLabel, lossInk, false),
           Positioned(
-            left: (width - size) / 2,
-            top: centre - size / 2,
-            width: size,
-            height: size,
+            left: (width - button) / 2,
+            top: centre - button / 2,
+            width: button,
+            height: button,
             child: GestureDetector(
               onTap: onTap,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  shape: square ? BoxShape.rectangle : BoxShape.circle,
+                  borderRadius: square ? BorderRadius.circular(button * .26) : null,
                   // one colour, no gradient; Contrast's is light on its black panel
                   color: dark && theme.araLook.style != AraStyle.contrast
                       ? const Color(0xFF16161A)
@@ -1220,7 +1227,11 @@ class _RainbowPainter extends CustomPainter {
     required this.busy,
     required this.rotation,
     required this.stroke,
+    this.square = false,
   });
+
+  /// rounded-square frames all round, filled from the top's middle both ways, instead of the upper half-circles
+  final bool square;
 
   final Offset centre;
 
@@ -1248,6 +1259,26 @@ class _RainbowPainter extends CustomPainter {
     // the arcs fade in as the ping's fill grows from nothing (a ping always fills at least .06)
     final shown = busy ? 1.0 : (ping / .06).clamp(0.0, 1.0);
     if (shown == 0) return;
+    if (square) {
+      for (final (r, c, f) in [(radii.$1, colors.$1, ping), (radii.$2, colors.$2, loss)]) {
+        final frame = _frame(r);
+        final metric = frame.computeMetrics().first;
+        final length = metric.length;
+        canvas.drawPath(frame, pen(track.withValues(alpha: track.a * shown)));
+        if (f < .001) continue;
+        // from the top's middle both ways at once: the start of the path and its end
+        final half = length * f.clamp(0.0, 1.0) / 2;
+        final fill = Path()
+          ..addPath(metric.extractPath(0, half), Offset.zero)
+          ..addPath(metric.extractPath(length - half, length), Offset.zero);
+        canvas.drawPath(
+          fill,
+          pen(c.withValues(alpha: .5 * shown))..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke * .7),
+        );
+        canvas.drawPath(fill, pen(c.withValues(alpha: shown)));
+      }
+      return;
+    }
     for (final (r, c, f) in [(radii.$1, colors.$1, ping), (radii.$2, colors.$2, loss)]) {
       canvas.drawArc(circle(r), math.pi, math.pi, false, pen(track.withValues(alpha: track.a * shown)));
       if (f < .001) continue;
@@ -1265,8 +1296,30 @@ class _RainbowPainter extends CustomPainter {
     }
   }
 
+  /// a rounded square [half] from the centre to each side, as one path from the top's middle round clockwise
+  Path _frame(double half) {
+    final l = centre.dx - half;
+    final t = centre.dy - half;
+    final r = centre.dx + half;
+    final b = centre.dy + half;
+    final round = Radius.circular(half * .42);
+    final k = half * .42;
+    return Path()
+      ..moveTo(centre.dx, t)
+      ..lineTo(r - k, t)
+      ..arcToPoint(Offset(r, t + k), radius: round)
+      ..lineTo(r, b - k)
+      ..arcToPoint(Offset(r - k, b), radius: round)
+      ..lineTo(l + k, b)
+      ..arcToPoint(Offset(l, b - k), radius: round)
+      ..lineTo(l, t + k)
+      ..arcToPoint(Offset(l + k, t), radius: round)
+      ..lineTo(centre.dx, t);
+  }
+
   @override
   bool shouldRepaint(_RainbowPainter old) =>
+      old.square != square ||
       old.rotation != rotation ||
       old.fills != fills ||
       old.busy != busy ||

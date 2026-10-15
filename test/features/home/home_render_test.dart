@@ -234,7 +234,7 @@ void main() {
                                       crossAxisAlignment: CrossAxisAlignment.stretch,
                                       children: [
                                         Expanded(flex: 11, child: AraHomeBody()),
-                                        Expanded(flex: 10, child: _ShellPage(child: ConnectionsPage())),
+                                        Expanded(flex: 10, child: _ShellPage(child: ConnectionsPage(embedded: true))),
                                       ],
                                     ),
                                   ),
