@@ -14,6 +14,7 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
 import 'package:hiddify/utils/utils.dart';
+import 'package:hiddify/utils/windows_elevation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -184,6 +185,14 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     await _connectionRepo.connect(activeProfile, ref.read(Preferences.disableMemoryLimit)).mapLeft((
       ConnectionFailure err,
     ) async {
+      // Windows wouldn't set the VPN mode's adapter up (no administrator's rights): once more on the system proxy
+      if (!ref.read(tunDeniedProvider) && isTunDenied(err)) {
+        loggy.warning("the VPN mode was refused (no administrator's rights): the system proxy instead", err);
+        ref.read(tunDeniedProvider.notifier).state = true;
+        await ref.read(Preferences.startedByUser.notifier).update(true);
+        await _connectThrottled();
+        return;
+      }
       loggy.warning("error connecting", err);
       //Go err is not normal object to see the go errors are string and need to be dumped
       await ref

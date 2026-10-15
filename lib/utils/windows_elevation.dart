@@ -1,21 +1,21 @@
 import 'dart:io';
 
-/// Whether the app runs with the administrator's rights on Windows, where the VPN mode (a TUN adapter) needs them;
-/// true elsewhere. Read once when the app starts.
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+/// Windows refused the VPN mode's adapter in this run ("Access is denied": no administrator's rights, where its
+/// driver wants them): the system proxy instead until the app is closed. Some computers let the adapter up without
+/// the rights, so it's tried first rather than guessed from the rights.
+final tunDeniedProvider = StateProvider<bool>((ref) => false);
+
+/// The core's error for an adapter Windows wouldn't set up.
+bool isTunDenied(Object error) {
+  final text = error.toString().toLowerCase();
+  return Platform.isWindows &&
+      text.contains('tun') &&
+      (text.contains('access is denied') || text.contains('отказано в доступе'));
+}
+
 abstract class WindowsElevation {
-  static bool elevated = true;
-
-  static Future<void> init() async {
-    if (!Platform.isWindows) return;
-    try {
-      // the high mandatory level is the elevated token's
-      final result = await Process.run('whoami', ['/groups']);
-      elevated = result.exitCode != 0 || (result.stdout as String).contains('S-1-16-12288');
-    } catch (_) {
-      elevated = true;
-    }
-  }
-
   /// Starts the app again with the administrator's rights (Windows asks) once this one has closed: a second copy
   /// started while it runs would only bring this one's window up. Then the caller closes the app.
   static Future<bool> relaunchElevated() async {

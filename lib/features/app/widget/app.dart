@@ -24,6 +24,8 @@ import 'package:hiddify/features/profile/notifier/profiles_update_notifier.dart'
 import 'package:hiddify/features/shortcut/shortcut_wrapper.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
 import 'package:hiddify/features/window/widget/window_wrapper.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -86,6 +88,15 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 
+    // Contrast on a computer: no system title bar (Windows' blue frame), the app's own strip in the panel's colour
+    final ownFrame = PlatformUtils.isDesktop && style == AraStyle.contrast;
+    useEffect(() {
+      if (PlatformUtils.isDesktop) {
+        windowManager.setTitleBarStyle(ownFrame ? TitleBarStyle.hidden : TitleBarStyle.normal);
+      }
+      return null;
+    }, [ownFrame]);
+
     // updating ActiveBreakpointNotifier value
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -122,6 +133,23 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                         children: [
                           Positioned.fill(child: GlassBackdrop(look: glassScheme.look(theme.brightness))),
                           child,
+                        ],
+                      );
+                    }
+                    // the window's own strip over the pages: dragged to move the window, a double click maximizes it,
+                    // the minimize, maximize and close buttons at the right; white by day, black by night, as the panel
+                    if (ownFrame) {
+                      final dark = theme.brightness == Brightness.dark;
+                      child = Column(
+                        children: [
+                          SizedBox(
+                            height: 30,
+                            child: WindowCaption(
+                              backgroundColor: contrastPanelColor(dark),
+                              brightness: theme.brightness,
+                            ),
+                          ),
+                          Expanded(child: child),
                         ],
                       );
                     }

@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hiddify/utils/windows_elevation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -101,7 +100,6 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   if (PlatformUtils.isDesktop) {
     await _init("window controller", () => container.read(windowNotifierProvider.future));
-    await _init("windows elevation", WindowsElevation.init);
 
     // started by the sign-in task: stay in the tray
     final silentStart = container.read(Preferences.silentStart) || LaunchArgs.atLogin;

@@ -69,9 +69,7 @@ class _StyledHome extends HookConsumerWidget {
         header: header,
         // Windows without the administrator's rights: the system proxy instead of the VPN mode chosen, and a way to
         // the full one
-        notice: PlatformUtils.isWindows &&
-                !WindowsElevation.elevated &&
-                ref.watch(ConfigOptions.serviceMode) == ServiceMode.tun
+        notice: ref.watch(tunDeniedProvider) && ref.watch(ConfigOptions.serviceMode) == ServiceMode.tun
             ? const _NoAdminNote()
             : null,
         status: _StatusBlock(status: status, lastServer: currentName),

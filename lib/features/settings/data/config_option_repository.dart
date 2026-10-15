@@ -503,10 +503,10 @@ abstract class ConfigOptions {
     //   _ => <SingboxRule>[],
     // };
 
-    // the VPN mode needs the administrator's rights on Windows; without them the system proxy instead (the browsers
-    // and most programs through it), not a start that fails
+    // Windows refused the VPN mode's adapter (no administrator's rights): the system proxy instead (the browsers and
+    // most programs through it), not a start that fails
     final chosen = ref.watch(serviceMode);
-    final mode = chosen == ServiceMode.tun && !WindowsElevation.elevated ? ServiceMode.systemProxy : chosen;
+    final mode = chosen == ServiceMode.tun && ref.watch(tunDeniedProvider) ? ServiceMode.systemProxy : chosen;
     // final reg = ref.watch(Preferences.region.notifier).raw();
     return SingboxConfigOption(
       region: ref.watch(region).name,
