@@ -1,9 +1,12 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/settings/widget/settings_block.dart';
@@ -19,7 +22,7 @@ class ThemesPage extends ConsumerWidget {
     // Glass has its own colour schemes (each by day and by night), not the colour themes the others share; Contrast
     // takes its colour from them too
     final style = ref.watch(Preferences.araStyle);
-    final glass = style == AraStyle.glass || style == AraStyle.contrast;
+    final glass = style == AraStyle.glass;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.themes)),
       body: ListView(
@@ -27,10 +30,14 @@ class ThemesPage extends ConsumerWidget {
         children: [
           // the colour themes are all true black now: OLED and the neon colours
           SettingsBlock(
-            children: glass
+            children: style == AraStyle.contrast
+                ? const [StylePicker(), ThemeModePrefTile()]
+                : glass
                 ? const [StylePicker(), ThemeModePrefTile(), GlassSchemePicker()]
                 : const [StylePicker(), ThemeModePrefTile(), AccentPicker(oled: true)],
           ),
+          // Contrast: three steps, how see-through the blocks are, the backdrop, the colour
+          if (style == AraStyle.contrast) const ContrastThemePicker(),
         ],
       ),
     );
@@ -544,6 +551,203 @@ class _GlassStylePreview extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Contrast's look in three steps: how see-through the blocks are, the backdrop (ten kinds) and the colour (thirty).
+class ContrastThemePicker extends ConsumerWidget {
+  const ContrastThemePicker({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final ru = t.$meta.locale.languageCode == 'ru';
+    final clarity = ref.watch(Preferences.contrastClarity);
+    final backdrop = ref.watch(Preferences.contrastBackdrop);
+    final palette = ref.watch(Preferences.contrastPalette);
+    final (warm, cool) = palette.backdrop(theme.brightness);
+    final accent = scheme.primary;
+    Widget heading(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(6, 18, 6, 8),
+      child: Text(
+        text.toUpperCase(),
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: scheme.onSurfaceVariant,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.3,
+        ),
+      ),
+    );
+    Widget card(Widget child) => Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: child,
+    );
+    Widget label(String text, bool on) => Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: on ? accent : scheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    Widget backdropOf(ContrastBackdrop kind, {double radius = 12}) => ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: CustomPaint(
+        painter: ContrastBackdropPainter(kind: kind, warm: warm, cool: cool, dark: dark, seed: 5),
+        child: const SizedBox.expand(),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        heading(t.avpn.contrastClarityTitle),
+        card(
+          Row(
+            children: [
+              for (final c in ContrastClarity.values) ...[
+                if (c != ContrastClarity.values.first) const SizedBox(width: 6),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => ref.read(Preferences.contrastClarity.notifier).update(c),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: c == clarity ? accent.withValues(alpha: .13) : null,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: c == clarity ? accent : scheme.outlineVariant, width: 1.4),
+                      ),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 40,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(child: backdropOf(ContrastBackdrop.stripes, radius: 10)),
+                                // a pane at this clarity over it
+                                Positioned.fill(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(sigmaX: c.blur / 3, sigmaY: c.blur / 3),
+                                        child: ColoredBox(
+                                          color: dark
+                                              ? const Color(0xFF1E1E22).withValues(alpha: c.night)
+                                              : Colors.white.withValues(alpha: c.day),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          label(ru ? c.ru : c.en, c == clarity),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        heading(t.avpn.contrastBackdropTitle),
+        card(
+          GridView.count(
+            crossAxisCount: 5,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 8,
+            childAspectRatio: .58,
+            children: [
+              for (final k in ContrastBackdrop.values)
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => ref.read(Preferences.contrastBackdrop.notifier).update(k),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: k == backdrop ? accent : Colors.transparent, width: 2),
+                          ),
+                          child: backdropOf(k),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      label(ru ? k.ru : k.en, k == backdrop),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        heading(t.avpn.contrastPaletteTitle),
+        card(
+          GridView.count(
+            crossAxisCount: 6,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 4,
+            childAspectRatio: .7,
+            children: [
+              for (final p in ContrastPalette.values)
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => ref.read(Preferences.contrastPalette.notifier).update(p),
+                  child: Column(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: p == palette ? accent : Colors.transparent, width: 2),
+                        ),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [p.warm, p.warm, p.cool, p.cool],
+                              stops: const [0, .5, .5, 1],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      label(ru ? p.ru : p.en, p == palette),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

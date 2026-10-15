@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -15,10 +16,14 @@ class AppTheme {
     AraAccent? accent,
     this.style = AraStyle.classic,
     this.glassScheme = GlassScheme.fallback,
+    this.contrastPalette = ContrastPalette.fallback,
   }) : accent = accent ?? AraAccent.platformDefault;
 
   /// Glass's own colour scheme (the accent above doesn't colour Glass)
   final GlassScheme glassScheme;
+
+  /// Contrast's colour
+  final ContrastPalette contrastPalette;
 
   bool get _glass => style == AraStyle.glass;
   final AppThemeMode mode;
@@ -285,12 +290,13 @@ class AppTheme {
             nav: dark ? Colors.black : Colors.white,
           )
         : styled;
-    // Glass and Contrast take their colour from the Glass scheme chosen (Contrast: its accent only)
+    // Glass takes its colour from its scheme, Contrast from its palette
     final fromScheme = glass || contrast;
-    final accentColour = fromScheme ? look.accent : (dark ? accent.darkPrimary : accent.lightPrimary);
+    final schemeAccent = contrast ? contrastPalette.accent(brightness) : look.accent;
+    final accentColour = fromScheme ? schemeAccent : (dark ? accent.darkPrimary : accent.lightPrimary);
     final primary = AraLook.readableOn(accentColour, glass ? look.panelOnBase : p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
-    final scheme = ColorScheme.fromSeed(seedColor: fromScheme ? look.accent : accent.seed, brightness: brightness)
+    final scheme = ColorScheme.fromSeed(seedColor: fromScheme ? schemeAccent : accent.seed, brightness: brightness)
         .copyWith(
           primary: primary,
           onPrimary: onPrimary,
@@ -463,7 +469,8 @@ class AppTheme {
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
     final block = glass ? look.panelOnBase : blockColours[blockColours.length ~/ 2];
-    final colourless = HSLColor.fromColor(fromScheme ? look.accent : accent.seed).saturation < .12;
+    final schemeAccent = style == AraStyle.contrast ? contrastPalette.accent(brightness) : look.accent;
+    final colourless = HSLColor.fromColor(fromScheme ? schemeAccent : accent.seed).saturation < .12;
     final Color down;
     final Color up;
     final filled = accent.filled && !fromScheme;

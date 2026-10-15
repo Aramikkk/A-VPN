@@ -4,6 +4,7 @@ import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/actions_at_closing.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
@@ -163,6 +164,33 @@ abstract class Preferences {
     "glass_scheme",
     GlassScheme.fallback,
     mapFrom: (value) => GlassScheme.values.firstWhere((e) => e.name == value, orElse: () => GlassScheme.fallback),
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: Contrast's colour (a warm accent and a cool second colour).
+  static final contrastPalette = PreferencesNotifier.create<ContrastPalette, String>(
+    "contrast_palette",
+    ContrastPalette.fallback,
+    mapFrom: (value) =>
+        ContrastPalette.values.firstWhere((e) => e.name == value, orElse: () => ContrastPalette.fallback),
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: Contrast's backdrop.
+  static final contrastBackdrop = PreferencesNotifier.create<ContrastBackdrop, String>(
+    "contrast_backdrop",
+    ContrastBackdrop.fallback,
+    mapFrom: (value) =>
+        ContrastBackdrop.values.firstWhere((e) => e.name == value, orElse: () => ContrastBackdrop.fallback),
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: how see-through Contrast's blocks are.
+  static final contrastClarity = PreferencesNotifier.create<ContrastClarity, String>(
+    "contrast_clarity",
+    ContrastClarity.fallback,
+    mapFrom: (value) =>
+        ContrastClarity.values.firstWhere((e) => e.name == value, orElse: () => ContrastClarity.fallback),
     mapTo: (value) => value.name,
   );
 

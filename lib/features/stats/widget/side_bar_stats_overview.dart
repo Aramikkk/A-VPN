@@ -348,131 +348,138 @@ class SideBarStatsOverview extends ConsumerWidget {
           slots: slots,
         ),
       );
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            block(
+      final summary = block(
+        SizedBox(
+          height: 168,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // the session's traffic in a ring of its routes: through the VPN in the accent, the bypass grey
               SizedBox(
-                height: 168,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // the session's traffic in a ring of its routes: through the VPN in the accent, the bypass grey
-                    SizedBox(
-                      width: 148,
-                      child: pane(
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: CustomPaint(
-                                painter: _RouteRing(share: share ?? 0, vpn: accent, direct: grey),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      figure(sessionAmount.first, size: 22),
-                                      Text(
-                                        '${sessionAmount.length > 1 ? sessionAmount.last : ''} ${t.avpn.statsSessionShort.toLowerCase()}',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: muted,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 9.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const Gap(6),
-                            Text.rich(
-                              TextSpan(
-                                children: [
-                                  WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(accent)),
-                                  TextSpan(
-                                    text: ' VPN ${share == null ? '—' : '${(share * 100).round()}%'}   ',
-                                    style: TextStyle(color: accent),
-                                  ),
-                                  WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(grey)),
-                                  TextSpan(
-                                    text: ' ${share == null ? '—' : '${((1 - share) * 100).round()}%'}',
-                                    style: TextStyle(color: muted),
-                                  ),
-                                ],
-                              ),
-                              style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Gap(6),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          row(Icons.south_rounded, t.avpn.statsDownload, speed(stats.downlink.toInt()), lit: true),
-                          const Gap(6),
-                          row(Icons.north_rounded, t.avpn.statsUpload, speed(stats.uplink.toInt())),
-                          const Gap(6),
-                          row(Icons.lan_rounded, t.avpn.statsConnectionsShort, '${stats.connectionsIn}'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Gap(8),
-            Expanded(
-              child: block(
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: pane(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
+                width: 148,
+                child: pane(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: CustomPaint(
+                          painter: _RouteRing(share: share ?? 0, vpn: accent, direct: grey),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    t.avpn.statsSpeedFor(period: periodName),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      color: muted,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                figure(sessionAmount.first, size: 22),
+                                Text(
+                                  '${sessionAmount.length > 1 ? sessionAmount.last : ''} ${t.avpn.statsSessionShort.toLowerCase()}',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: muted,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 9.5,
                                   ),
                                 ),
-                                if (period != null)
-                                  Text(
-                                    period.total > 0
-                                        ? '${size(period.total)} · VPN ${(period.vpn * 100 / period.total).round()}%'
-                                        : size(period.total),
-                                    style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
-                                  ),
                               ],
                             ),
-                            const Gap(8),
-                            Expanded(child: contrastGraph),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                      const Gap(6),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(accent)),
+                            TextSpan(
+                              text: ' VPN ${share == null ? '—' : '${(share * 100).round()}%'}   ',
+                              style: TextStyle(color: accent),
+                            ),
+                            WidgetSpan(alignment: PlaceholderAlignment.middle, child: dot(grey)),
+                            TextSpan(
+                              text: ' ${share == null ? '—' : '${((1 - share) * 100).round()}%'}',
+                              style: TextStyle(color: muted),
+                            ),
+                          ],
+                        ),
+                        style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Gap(6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    row(Icons.south_rounded, t.avpn.statsDownload, speed(stats.downlink.toInt()), lit: true),
                     const Gap(6),
-                    _RangePicker(range: range, color: accent),
+                    row(Icons.north_rounded, t.avpn.statsUpload, speed(stats.uplink.toInt())),
+                    const Gap(6),
+                    row(Icons.lan_rounded, t.avpn.statsConnectionsShort, '${stats.connectionsIn}'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      final speedPage = block(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: pane(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            t.avpn.statsSpeedFor(period: periodName),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        if (period != null)
+                          Text(
+                            period.total > 0
+                                ? '${size(period.total)} · VPN ${(period.vpn * 100 / period.total).round()}%'
+                                : size(period.total),
+                            style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                      ],
+                    ),
+                    const Gap(8),
+                    Expanded(child: contrastGraph),
                   ],
                 ),
               ),
             ),
+            const Gap(6),
+            _RangePicker(range: range, color: accent),
           ],
         ),
+      );
+      // two pages, one under the other: the session, the speed now and the day's losses; the speed graph a whole
+      // page down
+      return PageView(
+        scrollDirection: Axis.vertical,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                summary,
+                const Gap(8),
+                Expanded(child: block(const _LossDay())),
+                const Gap(4),
+                Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
+              ],
+            ),
+          ),
+          Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 22), child: speedPage),
+        ],
       );
     }
     if (split) {
@@ -1337,4 +1344,173 @@ class _RouteRing extends CustomPainter {
 
   @override
   bool shouldRepaint(_RouteRing old) => old.share != share || old.vpn != vpn || old.direct != direct;
+}
+
+/// The last day's packet loss: its share of the day's probes, a strip of the day with each loss where it fell, and
+/// each stretch of loss with when it began, how long it went on and how much was lost.
+class _LossDay extends ConsumerWidget {
+  const _LossDay();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final muted = scheme.onSurfaceVariant;
+    // followed with the probes (one a second); worked out from the minutes kept
+    ref.watch(connectionQualityProvider);
+    final day = ref.read(connectionQualityProvider.notifier).lossDay();
+    const loss = Color(0xFFE5484D);
+    String two(int n) => n.toString().padLeft(2, '0');
+    String clock(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
+    String percent(double v) => v == 0
+        ? '0%'
+        : v < .001
+        ? '<0,1%'
+        : '${(v * 100).toStringAsFixed(v < .1 ? 1 : 0).replaceAll('.', ',')}%';
+    final share = day.total.sent == 0 ? 0.0 : day.total.lost / day.total.sent;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: dark ? .07 : .24),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.avpn.contrastLossTitle,
+                      style: theme.textTheme.labelMedium?.copyWith(color: muted, fontWeight: FontWeight.w600),
+                    ),
+                    const Gap(2),
+                    Text(
+                      day.episodes.isEmpty
+                          ? t.avpn.contrastLossNone
+                          : t.avpn.contrastLossEpisodes(n: day.episodes.length),
+                      style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                percent(share),
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -1,
+                  height: 1,
+                  color: share > 0 ? loss : scheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const Gap(10),
+          // the day as a strip, now at the right: each minute with loss a mark, as high as the share lost
+          SizedBox(
+            height: 26,
+            child: CustomPaint(
+              painter: _LossStrip(day.minutes, colour: loss, track: scheme.onSurface.withValues(alpha: .08)),
+            ),
+          ),
+          const Gap(4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final label in ['−24 ч', '−18', '−12', '−6', t.avpn.graphNow])
+                Text(label, style: theme.textTheme.labelSmall?.copyWith(color: muted, fontSize: 10)),
+            ],
+          ),
+          const Gap(6),
+          Expanded(
+            child: day.episodes.isEmpty
+                ? Center(child: Icon(Icons.check_circle_outline_rounded, size: 34, color: muted.withValues(alpha: .5)))
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: day.episodes.length,
+                    itemBuilder: (context, i) {
+                      final e = day.episodes[i];
+                      final minutes = e.minutes;
+                      final lasted = minutes >= 60
+                          ? '${minutes ~/ 60} ${t.avpn.unitHourShort} ${minutes % 60} ${t.avpn.unitMinuteShort}'
+                          : '$minutes ${t.avpn.unitMinuteShort}';
+                      final part = e.sent == 0 ? 0.0 : e.lost / e.sent;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                        decoration: BoxDecoration(
+                          border: Border(top: BorderSide(color: scheme.onSurface.withValues(alpha: .07))),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(color: loss, shape: BoxShape.circle),
+                            ),
+                            const Gap(10),
+                            SizedBox(
+                              width: 104,
+                              child: Text(
+                                minutes <= 1
+                                    ? clock(e.start)
+                                    : '${clock(e.start)}–${clock(e.start.add(Duration(minutes: minutes)))}',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(lasted, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                            ),
+                            Text(
+                              percent(part),
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800, color: loss),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The day's minutes as a strip: the track, and a mark for each minute that lost probes, as high as its share lost.
+class _LossStrip extends CustomPainter {
+  _LossStrip(this.minutes, {required this.colour, required this.track});
+
+  /// the share lost in each minute of the day, the oldest first (null: no probes)
+  final List<double?> minutes;
+  final Color colour;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(6));
+    canvas.drawRRect(r, Paint()..color = track);
+    if (minutes.isEmpty) return;
+    final w = size.width / minutes.length;
+    final paint = Paint()..color = colour;
+    for (var i = 0; i < minutes.length; i++) {
+      final v = minutes[i];
+      if (v == null || v == 0) continue;
+      final h = size.height * (.35 + .65 * v.clamp(0.0, 1.0));
+      canvas.drawRect(Rect.fromLTWH(i * w, size.height - h, math.max(w, 1.5), h), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LossStrip old) => true;
 }

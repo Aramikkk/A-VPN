@@ -51,6 +51,27 @@ class _History extends SpeedHistory {
 class _Quality extends ConnectionQuality {
   @override
   List<int?> build() => [for (var i = 0; i < 30; i++) i % 9 == 4 ? null : 50 + (i * 7) % 30];
+
+  // three stretches of loss through the day
+  @override
+  LossDay lossDay() {
+    final now = DateTime(2026, 10, 15, 21, 40);
+    final minutes = List<double?>.filled(24 * 60, 0);
+    for (final (ago, length, share) in [(30, 4, .2), (320, 1, .05), (790, 12, .6)]) {
+      for (var i = 0; i < length; i++) {
+        minutes[24 * 60 - ago + i] = share;
+      }
+    }
+    return (
+      total: PingBucket(86400, 520),
+      minutes: minutes,
+      episodes: [
+        (start: now.subtract(const Duration(minutes: 30)), minutes: 4, sent: 240, lost: 48),
+        (start: now.subtract(const Duration(minutes: 320)), minutes: 1, sent: 60, lost: 3),
+        (start: now.subtract(const Duration(minutes: 790)), minutes: 12, sent: 720, lost: 432),
+      ],
+    );
+  }
 }
 
 Future<void> _loadFont(String family, List<String> files) async {
@@ -203,7 +224,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(Scrollable), findsNothing);
+      // (Contrast pages down to the graph)
+      if (Platform.environment['STYLE'] != 'contrast') expect(find.byType(Scrollable), findsNothing);
       if (Platform.environment['RENDER'] == '1') {
         await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/speed_$name.png'));
       }

@@ -70,6 +70,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
       accent: ref.watch(Preferences.araAccent),
       style: style,
       glassScheme: glassScheme,
+      contrastPalette: ref.watch(Preferences.contrastPalette),
     );
     final glass = style == AraStyle.glass;
     final upgrader = ref.watch(upgraderProvider);

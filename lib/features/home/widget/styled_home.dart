@@ -1583,81 +1583,39 @@ class ContrastShellDock extends HookConsumerWidget {
   }
 }
 
-/// Contrast's light behind a page, behind the app bar too: four or five small crisp discs, warm and cool in turn,
-/// scattered at random once when the app starts, the same on every page until it's closed. Inside another one it
-/// draws nothing of its own.
-class ContrastGlow extends StatefulWidget {
+/// Contrast's backdrop behind a page, behind the app bar too: the kind and the colours chosen in Settings →
+/// Themes, laid out at random once when the app starts (the same on every page until it's closed). Inside another
+/// one it draws nothing of its own.
+class ContrastGlow extends ConsumerStatefulWidget {
   const ContrastGlow({super.key, required this.child, this.page = ''});
 
   final Widget child;
 
-  /// the page it's behind (the discs are the same on every page)
+  /// the page it's behind (the backdrop is the same on every page)
   final String page;
 
-  /// the discs, picked once when the app starts: the same on every page until it's closed. (left, top, size) as
-  /// shares of the width and the height (the size of the width); each a half or a third of the old suns' size
-  static final _suns = () {
-    final random = math.Random();
-    final count = 4 + random.nextInt(2);
-    final band = 1 / count;
-    return <(double, double, double)>[
-      // spread down the screen, each in its own band, anywhere across
-      for (var i = 0; i < count; i++)
-        () {
-          final size = (.4 + random.nextDouble() * .2) / (random.nextBool() ? 2 : 3);
-          return (
-            -size * .2 + random.nextDouble() * (1 - size * .6),
-            i * band + random.nextDouble() * (band - size * .5),
-            size,
-          );
-        }(),
-    ];
-  }();
-
   @override
-  State<ContrastGlow> createState() => _ContrastGlowState();
+  ConsumerState<ContrastGlow> createState() => _ContrastGlowState();
 }
 
-class _ContrastGlowState extends State<ContrastGlow> {
-  /// (left, top, size) as shares of the width and the height (the size of the width)
-  List<(double, double, double)> get _suns => ContrastGlow._suns;
-
+class _ContrastGlowState extends ConsumerState<ContrastGlow> {
   @override
   Widget build(BuildContext context) {
     if (context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
-    final warm = HSLColor.fromColor(accent);
-    // crisp discs, warm and cool in turn: the warm one the accent by night, a soft peach of it by day; the cool one
-    // a grey blue. Only the blocks over them blur them
-    final colours = [
-      dark ? accent : Color.lerp(warm.withLightness(.68).toColor(), const Color(0xFFFFB07A), .5)!,
-      dark ? const Color(0xFF8FA8BD) : const Color(0xFFB9CCE3),
-    ];
-    return DecoratedBox(
-      decoration: BoxDecoration(color: dark ? const Color(0xFF1D1D20) : const Color(0xFFEFEDE8)),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final w = box.maxWidth.isFinite ? box.maxWidth : 411.0;
-          final h = box.maxHeight.isFinite ? box.maxHeight : 900.0;
-          return Stack(
-            children: [
-              for (final (i, (x, y, d)) in _suns.indexed)
-                Positioned(
-                  left: x * w,
-                  top: y * h,
-                  width: d * w,
-                  height: d * w,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: colours[i % 2]),
-                  ),
-                ),
-              Positioned.fill(child: widget.child),
-            ],
-          );
-        },
+    final brightness = Theme.of(context).brightness;
+    // the settings not read yet (the first frames): the defaults
+    final ready = ref.watch(sharedPreferencesProvider).hasValue;
+    final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
+    final (warm, cool) = palette.backdrop(brightness);
+    return CustomPaint(
+      painter: ContrastBackdropPainter(
+        kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
+        warm: warm,
+        cool: cool,
+        dark: brightness == Brightness.dark,
+        seed: contrastBackdropSeed,
       ),
+      child: widget.child,
     );
   }
 }
@@ -1676,7 +1634,7 @@ class _ContrastBlock extends StatelessWidget {
 }
 
 /// Contrast's frosted glass: the crisp discs behind it blurred, a light tint and a bright edge.
-class ContrastFrost extends StatelessWidget {
+class ContrastFrost extends ConsumerWidget {
   const ContrastFrost({super.key, required this.child, this.radius = 24, this.padding = const EdgeInsets.all(8)});
 
   final Widget child;
@@ -1684,16 +1642,22 @@ class ContrastFrost extends StatelessWidget {
   final EdgeInsets padding;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    // how see-through, as chosen in Settings → Themes
+    final clarity = ref.watch(sharedPreferencesProvider).hasValue
+        ? ref.watch(Preferences.contrastClarity)
+        : ContrastClarity.fallback;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: clarity.blur, sigmaY: clarity.blur),
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: dark ? const Color(0x591E1E22) : Colors.white.withValues(alpha: .3),
+            color: dark
+                ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
+                : Colors.white.withValues(alpha: clarity.day),
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
           ),

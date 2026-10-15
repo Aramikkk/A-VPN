@@ -19,7 +19,7 @@ class SpeedPage extends ConsumerWidget {
       // it all at once, no scroll: two columns on a wide screen (the unfolded phone), otherwise one column whose
       // graph takes the height the rest leaves; a short window (landscape) still scrolls
       body: LayoutBuilder(
-        builder: (context, constraints) => contrast && !PlatformUtils.isDesktop
+        builder: (context, constraints) => contrast && (!PlatformUtils.isDesktop || constraints.maxWidth < 640)
             // Contrast on the phone, folded or unfolded: fitted over the panel, the graph taking what the rest leaves
             ? const SideBarStatsOverview(large: true, contrast: true)
             : constraints.maxWidth >= 640 && constraints.maxHeight >= 480

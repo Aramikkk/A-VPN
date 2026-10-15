@@ -65,6 +65,12 @@ class PingBucket {
 /// lost (0 to 1), how many slots the width holds, and the totals.
 typedef PingPeriod = ({List<int?> bars, List<double> losses, int slots, PingBucket total});
 
+/// A stretch of loss: when it began, how many minutes it went on, and the probes sent and lost in it.
+typedef LossEpisode = ({DateTime start, int minutes, int sent, int lost});
+
+/// The last day's loss, from [ConnectionQuality.lossDay].
+typedef LossDay = ({PingBucket total, List<double?> minutes, List<LossEpisode> episodes});
+
 class ConnectionQuality extends Notifier<List<int?>> {
   /// one minute of samples
   static const length = 60;
@@ -217,6 +223,49 @@ class ConnectionQuality extends Notifier<List<int?>> {
     _minutes.removeWhere((m, _) => m < minute - _minutesKept);
     if (now.difference(_saved) > const Duration(minutes: 1)) _save();
     state = List.of(_samples);
+  }
+
+  /// The last day's loss: the day's total, the share lost in each of its minutes (null: no probes then; the oldest
+  /// first) and the stretches of loss, the latest first (minutes with loss next to each other make one).
+  LossDay lossDay() {
+    final minuteNow = DateTime.now().millisecondsSinceEpoch ~/ 60000;
+    const span = 24 * 60;
+    final total = PingBucket();
+    final minutes = <double?>[];
+    final episodes = <LossEpisode>[];
+    PingBucket? open;
+    int? openStart;
+    var openLength = 0;
+    void close() {
+      if (open != null) {
+        episodes.add((
+          start: DateTime.fromMillisecondsSinceEpoch(openStart! * 60000),
+          minutes: openLength,
+          sent: open!.sent,
+          lost: open!.lost,
+        ));
+      }
+      open = null;
+    }
+
+    for (var m = minuteNow - span + 1; m <= minuteNow; m++) {
+      final b = _minutes[m];
+      if (b != null) total.merge(b);
+      minutes.add(b == null || b.sent == 0 ? null : b.lost / b.sent);
+      if (b != null && b.lost > 0) {
+        if (open == null) {
+          open = PingBucket();
+          openStart = m;
+          openLength = 0;
+        }
+        open!.merge(b);
+        openLength++;
+      } else {
+        close();
+      }
+    }
+    close();
+    return (total: total, minutes: minutes, episodes: episodes.reversed.toList());
   }
 
   /// The ping and loss for [range]: the minute's probes one by one, longer periods averaged into slots.
