@@ -929,7 +929,8 @@ class _GraphiteDock extends HookConsumerWidget {
                           context: context,
                           showDragHandle: true,
                           isScrollControlled: true,
-                          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
+                          // 30% lower than it was
+                          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .42),
                           builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
                         )
                       : null,
@@ -1085,12 +1086,11 @@ class _Orb extends HookWidget {
               tween: Tween(begin: drawn.value, end: on && !busy ? Offset(_step(ping), _step(loss)) : Offset.zero),
               duration: const Duration(milliseconds: 700),
               curve: Curves.easeOutCubic,
-              builder: (context, filled, _) => AnimatedBuilder(
-                animation: spin,
-                builder: (context, _) {
-                  // switching: drawn whole (the gauge glides down from the full when it ends)
-                  drawn.value = busy ? const Offset(1, 1) : filled;
-                  return CustomPaint(
+              builder: (context, filled, _) {
+                // switching: drawn whole (the gauge glides down from the full when it ends)
+                drawn.value = busy ? const Offset(1, 1) : filled;
+                final gauge = RepaintBoundary(
+                  child: CustomPaint(
                     painter: _RainbowPainter(
                       centre: Offset(width / 2, centre),
                       radii: (outer, inner),
@@ -1099,15 +1099,23 @@ class _Orb extends HookWidget {
                           ? Color.lerp(scheme.outlineVariant, accent, .3)!.withValues(alpha: .45)
                           : scheme.onSurface.withValues(alpha: .1),
                       colors: (accent, lossColor),
-                      fills: (filled.dx, filled.dy),
-                      busy: busy,
-                      rotation: spin.value,
+                      fills: busy ? (1, 1) : (filled.dx, filled.dy),
+                      busy: false,
+                      rotation: 0,
                       stroke: square ? size * .085 : size * .1,
                       square: square,
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+                if (!busy) return gauge;
+                // the pulse: drawn once, only its opacity changing frame to frame (no repainting the glow)
+                return AnimatedBuilder(
+                  animation: spin,
+                  child: gauge,
+                  builder: (context, child) =>
+                      Opacity(opacity: .3 + .7 * _RainbowPainter.pulse(spin.value), child: child),
+                );
+              },
             ),
           ),
           // the square has them inside its button
@@ -1511,37 +1519,49 @@ class _AnsweringSheet extends ConsumerWidget {
           ),
         ),
         Flexible(
-          child: ListView.builder(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-            itemCount: servers.length,
-            itemBuilder: (context, i) {
-              final server = servers[i];
-              final name = serverName(server);
-              final chosen = server.tag == selected;
-              return ListTile(
-                dense: true,
-                visualDensity: VisualDensity.compact,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                selected: chosen,
-                selectedTileColor: scheme.primary.withValues(alpha: .12),
-                leading: Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 22, fontFamilyFallback: ['Emoji'])),
-                title: Text(
-                  _marked(name.title.contains(' - ') ? name.title.split(' - ').last.trim() : name.title, name.title),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: chosen ? FontWeight.w800 : FontWeight.w600,
-                    color: chosen ? scheme.primary : null,
-                  ),
-                ),
-                trailing: _Delay(delay: server.urlTestDelay, testing: false),
-                onTap: () {
-                  ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
-                  Navigator.of(context).pop();
-                },
-              );
+          // at the top of the list, a pull down anywhere on it closes the sheet
+          child: NotificationListener<OverscrollNotification>(
+            onNotification: (n) {
+              if (n.overscroll < -4 && n.dragDetails != null && n.metrics.pixels <= n.metrics.minScrollExtent) {
+                Navigator.of(context).maybePop();
+                return true;
+              }
+              return false;
             },
+            child: ListView.builder(
+              shrinkWrap: true,
+              // the pull down at its top reaches the listener above (no bouncing on any platform)
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+              itemCount: servers.length,
+              itemBuilder: (context, i) {
+                final server = servers[i];
+                final name = serverName(server);
+                final chosen = server.tag == selected;
+                return ListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  selected: chosen,
+                  selectedTileColor: scheme.primary.withValues(alpha: .12),
+                  leading: Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 22, fontFamilyFallback: ['Emoji'])),
+                  title: Text(
+                    _marked(name.title.contains(' - ') ? name.title.split(' - ').last.trim() : name.title, name.title),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: chosen ? FontWeight.w800 : FontWeight.w600,
+                      color: chosen ? scheme.primary : null,
+                    ),
+                  ),
+                  trailing: _Delay(delay: server.urlTestDelay, testing: false),
+                  onTap: () {
+                    ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
+                    Navigator.of(context).pop();
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -2888,24 +2908,24 @@ class _GlassPopup extends ConsumerWidget {
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: math.min((screen.width - 28) * .8, 370),
+          // as wide as the route's card (a traffic tile's): the screen less 16 at each side
+          maxWidth: math.min(screen.width - 32, 440),
           maxHeight: (screen.height - 120) * .8,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: clarity.blur * .8, sigmaY: clarity.blur * .8),
-            child: Material(
-              // as see-through as the blocks, as chosen in Settings → Themes
-              color: dark
-                  ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.2).clamp(0, 1))
-                  : Colors.white.withValues(alpha: clarity.day * .9),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(26),
-                side: BorderSide(color: Colors.white.withValues(alpha: dark ? .14 : .85)),
-              ),
-              child: child,
+        // the backdrop's picture blurred once, as the blocks have it: a live blur on every frame of the popup's
+        // opening made it stutter
+        child: _FrostedBackdrop(
+          radius: 26,
+          child: Material(
+            // as see-through as the blocks, as chosen in Settings → Themes
+            color: dark
+                ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.2).clamp(0, 1))
+                : Colors.white.withValues(alpha: clarity.day * .9),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(26),
+              side: BorderSide(color: Colors.white.withValues(alpha: dark ? .14 : .85)),
             ),
+            child: child,
           ),
         ),
       ),
@@ -3120,15 +3140,13 @@ class ContrastClear extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final clarity = ref.watch(Preferences.contrastClarity);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: clarity.blur * .8, sigmaY: clarity.blur * .8),
-        child: builder(
-          dark
-              ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.6).clamp(0, 1))
-              : Colors.white.withValues(alpha: (clarity.day * 1.3).clamp(0, 1)),
-        ),
+    // the backdrop's picture blurred once, not a live blur on every frame of the card's opening
+    return _FrostedBackdrop(
+      radius: radius,
+      child: builder(
+        dark
+            ? const Color(0xFF1C1C1F).withValues(alpha: (clarity.night * 1.6).clamp(0, 1))
+            : Colors.white.withValues(alpha: (clarity.day * 1.3).clamp(0, 1)),
       ),
     );
   }

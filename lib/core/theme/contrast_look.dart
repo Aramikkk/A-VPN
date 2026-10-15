@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 enum ContrastPalette {
   claude('Claude', 'Claude', Color(0xFFC96442), Color(0xFF8FA8BD)),
   peach('Персик', 'Peach', Color(0xFFF08A5D), Color(0xFF9EC1CF)),
-  coral('Коралл', 'Coral', Color(0xFFFF6F61), Color(0xFF6EC6CA)),
   terracotta('Терракота', 'Terracotta', Color(0xFFB5553A), Color(0xFF7D9D9C)),
   amber('Янтарь', 'Amber', Color(0xFFE8A33D), Color(0xFF6C8EBF)),
   honey('Мёд', 'Honey', Color(0xFFD9A441), Color(0xFF8C7AA9)),
@@ -26,16 +25,20 @@ enum ContrastPalette {
   lavender('Лаванда', 'Lavender', Color(0xFF8E7CC3), Color(0xFFF3B391)),
   lilac('Сирень', 'Lilac', Color(0xFFA26BBF), Color(0xFF79C2A8)),
   amethyst('Аметист', 'Amethyst', Color(0xFF7A3FA8), Color(0xFFE8A87C)),
-  plum('Слива', 'Plum', Color(0xFF7B2D5B), Color(0xFF9CB8A0)),
-  fuchsia('Фуксия', 'Fuchsia', Color(0xFFD13C8F), Color(0xFF4FB3BF)),
-  rose('Роза', 'Rose', Color(0xFFE07A9A), Color(0xFF8AA6C1)),
-  raspberry('Малина', 'Raspberry', Color(0xFFC2185B), Color(0xFFF2C14E)),
   cherry('Вишня', 'Cherry', Color(0xFFA4161A), Color(0xFF7FA7B5)),
   chocolate('Шоколад', 'Chocolate', Color(0xFF7B4B2A), Color(0xFFC9A86A)),
   sand('Песок', 'Sand', Color(0xFFC2A878), Color(0xFF7A9E9F)),
   graphite('Графит', 'Graphite', Color(0xFF4A4E57), Color(0xFFC96442)),
   mono('Монохром', 'Mono', Color(0xFF2B2B2B), Color(0xFF9A9A9A)),
-  neon('Неон', 'Neon', Color(0xFFFF2E88), Color(0xFF2EF2C8)),
+  // plain ones
+  yellow('Жёлтый', 'Yellow', Color(0xFFE6B800), Color(0xFF8C939C)),
+  orange('Оранжевый', 'Orange', Color(0xFFF07B1A), Color(0xFF8C939C)),
+  red('Красный', 'Red', Color(0xFFD9342B), Color(0xFF8C939C)),
+  green('Зелёный', 'Green', Color(0xFF2E9E4F), Color(0xFF9AA3AD)),
+  blue('Синий', 'Blue', Color(0xFF1F6FE0), Color(0xFF9AA3AD)),
+  lightBlue('Голубой', 'Light blue', Color(0xFF2AA7E0), Color(0xFF9AA3AD)),
+  grey('Серый', 'Grey', Color(0xFF7E858E), Color(0xFFB0B6BD)),
+  darkGrey('Тёмно-серый', 'Dark grey', Color(0xFF4C525A), Color(0xFF9AA0A8)),
   // stricter, darker ones
   steel('Сталь', 'Steel', Color(0xFF4A6A8A), Color(0xFF9AA3AD)),
   carbon('Карбон', 'Carbon', Color(0xFFE8681C), Color(0xFF4A4E55)),
@@ -108,6 +111,12 @@ enum ContrastBackdrop {
   grain('Зерно', 'Grain'),
   slabs('Плиты', 'Slabs'),
   chevron('Шеврон', 'Chevron'),
+  // in the chevron's way: thin repeated lines, a few in the palette's colour
+  zigzag('Зигзаг', 'Zigzag'),
+  waveLines('Волнистые линии', 'Wavy lines'),
+  diamonds('Ромбы', 'Diamonds'),
+  herringbone('Ёлочка', 'Herringbone'),
+  steps('Ступени', 'Steps'),
   constellations('Созвездия', 'Constellations'),
   radar('Радар', 'Radar'),
   circuit('Схема', 'Circuit');
@@ -386,6 +395,75 @@ class ContrastBackdropPainter extends CustomPainter {
               ..lineTo(x + c, y + c * .3);
             canvas.drawPath(path, stroke(row % 5 == lit ? warm : faint, thin));
           }
+        }
+      case ContrastBackdrop.zigzag:
+        final c = w / 12;
+        final lit = r.nextInt(6);
+        var row = 0;
+        for (var y = 0.0; y < h + c; y += c * .9, row++) {
+          final path = Path()..moveTo(0, y);
+          for (var x = 0.0; x < w + c; x += c) {
+            path
+              ..lineTo(x + c / 2, y + c * .45)
+              ..lineTo(x + c, y);
+          }
+          canvas.drawPath(path, stroke(row % 6 == lit ? warm : faint, thin));
+        }
+      case ContrastBackdrop.waveLines:
+        final c = w / 6;
+        final lit = r.nextInt(7);
+        var row = 0;
+        for (var y = 0.0; y < h + c; y += c * .42, row++) {
+          final path = Path()..moveTo(0, y);
+          for (var x = 0.0; x < w + c; x += c) {
+            path
+              ..quadraticBezierTo(x + c / 4, y - c * .18, x + c / 2, y)
+              ..quadraticBezierTo(x + c * .75, y + c * .18, x + c, y);
+          }
+          canvas.drawPath(path, stroke(row % 7 == lit ? warm : faint, thin));
+        }
+      case ContrastBackdrop.diamonds:
+        final c = w / 6;
+        for (var x = -h; x < w + h; x += c) {
+          canvas.drawLine(Offset(x, 0), Offset(x + h * .6, h), stroke(faint, thin));
+          canvas.drawLine(Offset(x, 0), Offset(x - h * .6, h), stroke(faint, thin));
+        }
+        // one band of the lattice drawn in the palette's colour
+        final y0 = h * (.25 + r.nextDouble() * .5);
+        final rise = c / 2 / .6;
+        final band = Path()..moveTo(0, y0);
+        for (var x = 0.0; x < w + c; x += c) {
+          band
+            ..lineTo(x + c / 2, y0 - rise * .5)
+            ..lineTo(x + c, y0);
+        }
+        canvas.drawPath(band, stroke(warm, thin * 1.3));
+      case ContrastBackdrop.herringbone:
+        final c = w / 9;
+        final rowH = c * .55;
+        final lit = r.nextInt(8);
+        var row = 0;
+        for (var y = 0.0; y < h + c; y += rowH, row++) {
+          final colour = row % 8 == lit ? warm : faint;
+          for (var x = row.isOdd ? c / 2 : 0.0; x < w + c; x += c) {
+            canvas.drawLine(Offset(x, y), Offset(x + c * .4, y + rowH * .8), stroke(colour, thin));
+            canvas.drawLine(Offset(x + c * .9, y), Offset(x + c * .5, y + rowH * .8), stroke(colour, thin));
+          }
+        }
+      case ContrastBackdrop.steps:
+        final c = w / 8;
+        final lit = r.nextInt(6);
+        var row = 0;
+        for (var y = 0.0; y < h + c; y += c * .7, row++) {
+          final path = Path()..moveTo(0, y);
+          for (var x = 0.0; x < w + c; x += c) {
+            path
+              ..lineTo(x + c / 2, y)
+              ..lineTo(x + c / 2, y - c * .3)
+              ..lineTo(x + c, y - c * .3)
+              ..lineTo(x + c, y);
+          }
+          canvas.drawPath(path, stroke(row % 6 == lit ? warm : faint, thin));
         }
       case ContrastBackdrop.constellations:
         final points = [for (var k = 0; k < 26; k++) Offset(r.nextDouble() * w, r.nextDouble() * h)];

@@ -19,7 +19,7 @@ class BranchSwiper extends StatefulWidget {
 
 class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMixin {
   /// the change of tab: 0 the old one in place, 1 the new one in place
-  late final _slide = AnimationController(vsync: this, duration: const Duration(milliseconds: 260));
+  late final _slide = AnimationController(vsync: this, duration: const Duration(milliseconds: 320));
 
   /// a drag let go short of the next tab, sliding back
   late final _back = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
