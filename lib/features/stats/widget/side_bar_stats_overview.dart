@@ -4,9 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/core/preferences/preferences_provider.dart';
-import 'package:hiddify/core/theme/contrast_look.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -1389,12 +1386,9 @@ class _LossDay extends ConsumerWidget {
     // this session's, in the theme's colour
     final start = ref.watch(sessionStartProvider);
     final day = ref.read(connectionQualityProvider.notifier).lossDay(since: start ?? DateTime.now());
-    // the loss in the accent; Citrus: grey (its light green read as good news), its figures a darker grey
-    final citrus =
-        ref.watch(sharedPreferencesProvider).hasValue &&
-        ref.watch(Preferences.contrastPalette) == ContrastPalette.citrus;
-    final loss = citrus ? const Color(0xFF9AA0A6) : theme.araAccent;
-    final lossText = citrus ? const Color(0xFF5F656D) : theme.araIcon;
+    // the loss's strip and dots in the accent, its figures grey
+    final loss = theme.araAccent;
+    final lossText = theme.brightness == Brightness.dark ? const Color(0xFFA3A9B0) : const Color(0xFF5F656D);
     String two(int n) => n.toString().padLeft(2, '0');
     String clock(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
     String percent(double v) => v == 0

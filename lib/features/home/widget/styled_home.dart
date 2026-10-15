@@ -1041,7 +1041,11 @@ class _Orb extends HookWidget {
     }, [busy]);
     // the theme's own colour, the same as the chosen server (not the darker one text uses on white)
     final accent = theme.araAccent;
-    final lossColor = deep(accent);
+    // the loss's inner frame a deep shade of the accent; Citrus: grey (its deep olive looked muddy)
+    // Contrast: the loss in grey on every palette (a deep shade of a light accent looked muddy)
+    final lossColor = theme.araLook.style == AraStyle.contrast
+        ? (dark ? const Color(0xFF6B7178) : const Color(0xFF8C939C))
+        : deep(accent);
     final contrastDay = !dark && theme.araLook.style == AraStyle.contrast;
     // the network's sign on the light button: graphite when the accent is too light to read on it (citrus, lemon)
     final onButton = AraLook.contrast(theme.araIcon, const Color(0xFFF7F5F1)) >= 2.2
@@ -1871,6 +1875,7 @@ class _FrostedBackdrop extends ConsumerWidget {
     final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
     final clarity = ready ? ref.watch(Preferences.contrastClarity) : ContrastClarity.fallback;
     final (warm, cool) = palette.backdrop(brightness);
+    final scale = math.min(MediaQuery.devicePixelRatioOf(context), 2.0);
     final image = ContrastFrostImage.of(
       kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
       warm: warm,
@@ -1878,8 +1883,15 @@ class _FrostedBackdrop extends ConsumerWidget {
       dark: brightness == Brightness.dark,
       area: MediaQuery.sizeOf(context),
       blur: clarity.blur,
+      scale: scale,
     );
-    return _FrostPart(image: image, radius: radius, scroll: Scrollable.maybeOf(context)?.position, child: child);
+    return _FrostPart(
+      image: image,
+      scale: scale,
+      radius: radius,
+      scroll: Scrollable.maybeOf(context)?.position,
+      child: child,
+    );
   }
 }
 
@@ -1895,26 +1907,37 @@ class _GlowAnchor extends SingleChildRenderObjectWidget {
 class _RenderGlowAnchor extends RenderProxyBox {}
 
 class _FrostPart extends SingleChildRenderObjectWidget {
-  const _FrostPart({required this.image, required this.radius, this.scroll, super.child});
+  const _FrostPart({required this.image, required this.scale, required this.radius, this.scroll, super.child});
 
   final ui.Image image;
+
+  /// the picture's pixels per point
+  final double scale;
   final double radius;
 
   /// the list it's in: it moves over the backdrop as that scrolls
   final Listenable? scroll;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderFrostPart(image, radius, scroll);
+  RenderObject createRenderObject(BuildContext context) => _RenderFrostPart(image, radius, scroll)..scale = scale;
 
   @override
   void updateRenderObject(BuildContext context, _RenderFrostPart renderObject) => renderObject
     ..image = image
+    ..scale = scale
     ..radius = radius
     ..scroll = scroll;
 }
 
 class _RenderFrostPart extends RenderProxyBox {
   _RenderFrostPart(this._image, this._radius, this._scroll);
+
+  double _scale = 1;
+  set scale(double v) {
+    if (v == _scale) return;
+    _scale = v;
+    markNeedsPaint();
+  }
 
   Listenable? _scroll;
   set scroll(Listenable? v) {
@@ -1959,15 +1982,16 @@ class _RenderFrostPart extends RenderProxyBox {
       up = up.parent;
     }
     final at = localToGlobal(Offset.zero, ancestor: up);
-    const k = ContrastFrostImage.scale;
+    final k = _scale;
     final canvas = context.canvas;
     canvas.save();
     canvas.clipRRect(RRect.fromRectAndRadius(offset & size, Radius.circular(_radius)));
+    // whole pixels of the picture: a part taken between them was resampled anew each frame and the lines shimmered
     canvas.drawImageRect(
       _image,
-      Rect.fromLTWH(at.dx * k, at.dy * k, size.width * k, size.height * k),
+      Rect.fromLTWH((at.dx * k).roundToDouble(), (at.dy * k).roundToDouble(), size.width * k, size.height * k),
       offset & size,
-      Paint()..filterQuality = FilterQuality.medium,
+      Paint()..filterQuality = FilterQuality.low,
     );
     canvas.restore();
     super.paint(context, offset);

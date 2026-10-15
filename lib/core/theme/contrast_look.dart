@@ -536,9 +536,6 @@ class ContrastBackdropPainter extends CustomPainter {
 class ContrastFrostImage {
   ContrastFrostImage._();
 
-  /// the picture's pixels per logical pixel
-  static const scale = .5;
-
   static final _kept = <String, ui.Image>{};
 
   static ui.Image of({
@@ -548,9 +545,12 @@ class ContrastFrostImage {
     required bool dark,
     required Size area,
     required double blur,
+    // the picture's pixels per point: the screen's own (up to 2), so it's drawn pixel for pixel and doesn't shimmer
+    // as a card moves over it
+    required double scale,
   }) {
     final key =
-        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur';
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur|$scale';
     final kept = _kept[key];
     if (kept != null) return kept;
     // a handful at most (day and night, a few clarities); the old ones go to the collector
