@@ -97,7 +97,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     }
     loggy.info("restoring previous connection on startup");
     await ref.read(Preferences.startedByUser.notifier).update(true);
-    await _connect();
+    // the core may still be settling just after the app starts (or after an update): once more before a failure
+    await _connect(retry: true);
   }
 
   /// Connects when the app opens if the user asked for it and nothing is running yet (the VPN may already be
@@ -165,10 +166,10 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
 
   final _singleStart = SingleCall();
 
-  Future<void> _connect() async {
+  Future<void> _connect({bool retry = false}) async {
     _singleStart.run(
       () async {
-        await _connectThrottled();
+        await _connectThrottled(retry: retry);
       },
       onIgnored: () {
         loggy.debug("connect called while another connect/disconnect is still running, ignoring");
@@ -176,7 +177,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     );
   }
 
-  Future<void> _connectThrottled() async {
+  Future<void> _connectThrottled({bool retry = false}) async {
     final activeProfile = await ref.read(activeProfileProvider.future);
     if (activeProfile == null) {
       loggy.info("no active profile, not connecting");
@@ -193,7 +194,13 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         await _connectThrottled();
         return;
       }
-      loggy.warning("error connecting", err);
+      if (retry) {
+        loggy.warning("error connecting, once more in 3 s: $err");
+        await Future<void>.delayed(const Duration(seconds: 3));
+        await _connectThrottled();
+        return;
+      }
+      loggy.warning("error connecting: $err");
       //Go err is not normal object to see the go errors are string and need to be dumped
       await ref
           .read(dialogNotifierProvider.notifier)
