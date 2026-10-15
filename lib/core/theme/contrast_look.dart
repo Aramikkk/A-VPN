@@ -35,7 +35,18 @@ enum ContrastPalette {
   sand('Песок', 'Sand', Color(0xFFC2A878), Color(0xFF7A9E9F)),
   graphite('Графит', 'Graphite', Color(0xFF4A4E57), Color(0xFFC96442)),
   mono('Монохром', 'Mono', Color(0xFF2B2B2B), Color(0xFF9A9A9A)),
-  neon('Неон', 'Neon', Color(0xFFFF2E88), Color(0xFF2EF2C8));
+  neon('Неон', 'Neon', Color(0xFFFF2E88), Color(0xFF2EF2C8)),
+  // stricter, darker ones
+  steel('Сталь', 'Steel', Color(0xFF4A6A8A), Color(0xFF9AA3AD)),
+  carbon('Карбон', 'Carbon', Color(0xFFE8681C), Color(0xFF4A4E55)),
+  military('Милитари', 'Military', Color(0xFF5B6B3A), Color(0xFFB8A47E)),
+  cobalt('Кобальт', 'Cobalt', Color(0xFF1E4FD8), Color(0xFF7C8794)),
+  burgundy('Бордо', 'Burgundy', Color(0xFF7A1F2B), Color(0xFF8A8F98)),
+  taiga('Тайга', 'Taiga', Color(0xFF2E5E4E), Color(0xFFB87333)),
+  petrol('Нефть', 'Petrol', Color(0xFF0E5A6B), Color(0xFFD9922E)),
+  bronze('Бронза', 'Bronze', Color(0xFFA0703C), Color(0xFF3A4A66)),
+  midnight('Полночь', 'Midnight', Color(0xFF1F3A6B), Color(0xFFC9A54C)),
+  racing('Гонка', 'Racing', Color(0xFFC8102E), Color(0xFF5A5F66));
 
   const ContrastPalette(this.ru, this.en, this.warm, this.cool);
 
@@ -88,7 +99,18 @@ enum ContrastBackdrop {
   rings('Кольца', 'Rings'),
   waves('Волны', 'Waves'),
   mosaic('Мозаика', 'Mosaic'),
-  grid('Клетка', 'Grid');
+  grid('Клетка', 'Grid'),
+  // quiet ones: thin lines near the page's own colour, the palette in a detail or two
+  contours('Контуры', 'Contours'),
+  honeycomb('Соты', 'Honeycomb'),
+  hatching('Штриховка', 'Hatching'),
+  horizon('Горизонт', 'Horizon'),
+  grain('Зерно', 'Grain'),
+  slabs('Плиты', 'Slabs'),
+  chevron('Шеврон', 'Chevron'),
+  constellations('Созвездия', 'Constellations'),
+  radar('Радар', 'Radar'),
+  circuit('Схема', 'Circuit');
 
   const ContrastBackdrop(this.ru, this.en);
 
@@ -138,6 +160,9 @@ class ContrastBackdropPainter extends CustomPainter {
       ..strokeWidth = width
       ..color = c;
     canvas.drawRect(Offset.zero & box, Paint()..color = base(dark));
+    // the quiet backdrops' lines: near the page's own colour, thin
+    final faint = dark ? const Color(0xFF3A3A42) : const Color(0xFFD9D4CC);
+    final thin = math.max(1.0, w / 411 * 1.4);
     canvas.save();
     canvas.clipRect(Offset.zero & box);
     switch (kind) {
@@ -279,6 +304,129 @@ class ContrastBackdropPainter extends CustomPainter {
             Rect.fromLTWH(cx * cell, cy * cell, cell * 2, cell * 2),
             fill..color = i.isEven ? warm : cool,
           );
+        }
+      case ContrastBackdrop.contours:
+        final c = Offset(w * (.3 + r.nextDouble() * .4), h * (.3 + r.nextDouble() * .3));
+        for (var j = 1; j < 16; j++) {
+          final path = Path();
+          for (var a = 0; a <= 64; a++) {
+            final t = a / 64 * math.pi * 2;
+            final rr = j * w * .07 * (1 + .18 * math.sin(t * 3 + j * .7) + .08 * math.cos(t * 5 + j));
+            final p = c + Offset(math.cos(t) * rr, math.sin(t) * rr * 1.1);
+            a == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+          }
+          canvas.drawPath(path..close(), stroke(j % 4 == 0 ? warm : faint, thin));
+        }
+      case ContrastBackdrop.honeycomb:
+        final a = w / 9;
+        final rowH = a * math.sqrt(3) / 2;
+        var row = 0;
+        for (var y = 0.0; y < h + a; y += rowH, row++) {
+          for (var x = row.isOdd ? a * .75 : 0.0; x < w + a; x += a * 1.5) {
+            final path = Path();
+            for (var k = 0; k < 6; k++) {
+              final t = math.pi / 3 * k;
+              final p = Offset(x + math.cos(t) * a / 2, y + math.sin(t) * a / 2);
+              k == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+            }
+            path.close();
+            if (r.nextDouble() < .07) {
+              canvas.drawPath(path, fill..color = (r.nextBool() ? warm : cool).withValues(alpha: .55));
+            }
+            canvas.drawPath(path, stroke(faint, thin));
+          }
+        }
+      case ContrastBackdrop.hatching:
+        for (var x = -h; x < w; x += w / 26) {
+          canvas.drawLine(Offset(x, h), Offset(x + h, 0), stroke(faint, thin));
+        }
+        final band = h * (.3 + r.nextDouble() * .4);
+        canvas.drawRect(Rect.fromLTWH(0, band, w, h * .12), fill..color = warm.withValues(alpha: .35));
+      case ContrastBackdrop.horizon:
+        final accentEvery = 6 + r.nextInt(4);
+        for (var j = 0; j < 42; j++) {
+          final y = h * .12 + j * h * .02;
+          canvas.drawLine(
+            Offset(0, y),
+            Offset(w, y),
+            stroke((j % accentEvery == 2 ? warm : faint).withValues(alpha: (1 - j / 50).clamp(.1, 1)), thin),
+          );
+        }
+      case ContrastBackdrop.grain:
+        final speck = dark ? const Color(0xFF45454D) : const Color(0xFFCFC9C0);
+        final count = (w * h / 400).round().clamp(400, 3000);
+        for (var k = 0; k < count; k++) {
+          canvas.drawCircle(
+            Offset(r.nextDouble() * w, r.nextDouble() * h),
+            w / 411 * (.6 + r.nextDouble() * .9),
+            fill..color = r.nextDouble() < .12 ? warm : speck,
+          );
+        }
+      case ContrastBackdrop.slabs:
+        for (var k = 0; k < 6; k++) {
+          final sw = w * (.35 + r.nextDouble() * .4);
+          final sh = h * (.12 + r.nextDouble() * .18);
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(r.nextDouble() * w - sw * .3, r.nextDouble() * h - sh * .3, sw, sh),
+              Radius.circular(w * .05),
+            ),
+            fill..color = (k.isOdd ? cool : warm).withValues(alpha: dark ? .22 : .28),
+          );
+        }
+      case ContrastBackdrop.chevron:
+        final c = w / 7;
+        final lit = r.nextInt(5);
+        var row = 0;
+        for (var y = 0.0; y < h + c; y += c * .6, row++) {
+          for (var x = 0.0; x < w + c; x += c) {
+            final path = Path()
+              ..moveTo(x, y + c * .3)
+              ..lineTo(x + c / 2, y)
+              ..lineTo(x + c, y + c * .3);
+            canvas.drawPath(path, stroke(row % 5 == lit ? warm : faint, thin));
+          }
+        }
+      case ContrastBackdrop.constellations:
+        final points = [for (var k = 0; k < 26; k++) Offset(r.nextDouble() * w, r.nextDouble() * h)];
+        for (var k = 0; k < points.length; k++) {
+          final q = points[(k * 7 + 3) % points.length];
+          if ((points[k] - q).distance < w * .5) canvas.drawLine(points[k], q, stroke(faint, thin));
+        }
+        for (var k = 0; k < points.length; k++) {
+          canvas.drawCircle(points[k], w / 411 * (k % 5 == 0 ? 3.4 : 2), fill..color = k % 5 == 0 ? warm : cool);
+        }
+      case ContrastBackdrop.radar:
+        final right = r.nextBool();
+        final c = Offset(right ? w * .85 : w * .15, h * .85);
+        for (var j = 1; j < 14; j++) {
+          canvas.drawCircle(c, j * w * .12, stroke(faint, thin));
+        }
+        final end = Offset(right ? c.dx - w * .7 : c.dx + w * .7, c.dy - h * .9);
+        final sweep = Path()
+          ..moveTo(c.dx, c.dy)
+          ..lineTo(right ? c.dx - w * 1.1 : c.dx + w * 1.1, c.dy - h * .5)
+          ..lineTo(end.dx, end.dy)
+          ..close();
+        canvas.drawPath(sweep, fill..color = warm.withValues(alpha: .18));
+        canvas.drawLine(c, end, stroke(warm, thin * 1.4));
+      case ContrastBackdrop.circuit:
+        final g = w / 10;
+        for (var k = 0; k < 22; k++) {
+          var x = (r.nextDouble() * 10).roundToDouble() * g;
+          var y = (r.nextDouble() * h / g).roundToDouble() * g;
+          final path = Path()..moveTo(x, y);
+          for (var st = 0; st < 4; st++) {
+            if (r.nextBool()) {
+              x += g * (1 + r.nextInt(3)) * (r.nextBool() ? -1 : 1);
+            } else {
+              y += g * (1 + r.nextInt(3));
+            }
+            path.lineTo(x, y);
+          }
+          final lit = k % 6 == 0;
+          canvas.drawPath(path, stroke(lit ? warm : faint, thin));
+          canvas.drawCircle(Offset(x, y), w / 411 * 3, fill..color = lit ? warm : cool);
         }
     }
     canvas.restore();
