@@ -1493,8 +1493,8 @@ class _ContrastHome extends StatelessWidget {
                 Expanded(child: _ContrastBlock(expand: true, child: traffic!))
               else
                 const Spacer(),
-              const Gap(8),
-              _ContrastBlock(child: toggles),
+              // a short screen (the phone turned): the toggles are under the connect control at the side
+              if (!ContrastShellDock.sideways(context)) ...[const Gap(8), _ContrastBlock(child: toggles)],
             ],
           ),
         ),
@@ -1536,7 +1536,13 @@ class _LongSwipe extends HookWidget {
 /// Contrast's panel at the bottom of every page (the shell keeps it): white by day, black by night, the connect
 /// control on it and the "Серверы VPN" tab on its top edge.
 class ContrastShellDock extends HookConsumerWidget {
-  const ContrastShellDock({super.key});
+  const ContrastShellDock({super.key, this.side = false});
+
+  /// a column at the right of the page (a short screen: the phone turned), not a panel under it
+  final bool side;
+
+  /// a screen too low for the panel under the page (the folded phone turned)
+  static bool sideways(BuildContext context) => MediaQuery.sizeOf(context).height < 600;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1545,6 +1551,42 @@ class ContrastShellDock extends HookConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final testing = useValueListenable(homePingTesting);
     final status = ref.watch(shownConnectionProvider);
+    final dock = _GraphiteDock(
+      status: status,
+      server: null,
+      testing: testing,
+      onCheck: () => pingAllServers(ref),
+      large: !side && MediaQuery.sizeOf(context).height >= 900,
+    );
+    if (side) {
+      // a column at the right: the tab at its top, the connect control in the middle
+      return Theme(
+        data: contrastPanelTheme(theme),
+        child: Container(
+          width: 340,
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
+          decoration: BoxDecoration(
+            color: contrastPanelColor(dark),
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(30)),
+            border: dark ? Border(left: BorderSide(color: Colors.white.withValues(alpha: .08))) : null,
+            boxShadow: dark
+                ? null
+                : [BoxShadow(color: Colors.black.withValues(alpha: .07), blurRadius: 30, offset: const Offset(-6, 0))],
+          ),
+          child: Column(
+            children: [
+              _SeamTab(label: t.avpn.contrastServersTab),
+              Expanded(child: Center(child: dock)),
+              // the home screen's toggles, here where there's room
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                child: _CheckRow(onCheck: () => pingAllServers(ref), testing: testing, showCheck: false),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Theme(
       data: contrastPanelTheme(theme),
       child: Stack(
@@ -1566,13 +1608,7 @@ class ContrastShellDock extends HookConsumerWidget {
                       ),
                     ],
             ),
-            child: _GraphiteDock(
-              status: status,
-              server: null,
-              testing: testing,
-              onCheck: () => pingAllServers(ref),
-              large: MediaQuery.sizeOf(context).height >= 900,
-            ),
+            child: dock,
           ),
           Positioned(
             left: 0,
@@ -2095,7 +2131,7 @@ class _ContrastStats extends StatelessWidget {
             ),
     );
     // the unfolded phone (or a tablet): half as high, the sign beside the label and the figure
-    final compact = MediaQuery.sizeOf(context).width >= 700;
+    final compact = MediaQuery.sizeOf(context).width >= 700 || MediaQuery.sizeOf(context).height < 600;
     Widget tile(IconData icon, String label, String figure, String unit, bool lit, double level, Color colour) {
       Widget value(double size) => Text.rich(
         TextSpan(

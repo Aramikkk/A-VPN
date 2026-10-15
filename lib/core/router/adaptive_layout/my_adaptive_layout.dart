@@ -133,7 +133,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           child: Scaffold(
             body: contrastPhone
                 ? ContrastGlow(
-                    child: Column(
+                    child: Flex(
+                      direction: ContrastShellDock.sideways(context) ? Axis.horizontal : Axis.vertical,
                       children: [
                         Expanded(
                           child: Theme(
@@ -141,7 +142,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                             child: navigationShell,
                           ),
                         ),
-                        const ContrastShellDock(),
+                        ContrastShellDock(side: ContrastShellDock.sideways(context)),
                       ],
                     ),
                   )

@@ -466,17 +466,37 @@ class SideBarStatsOverview extends ConsumerWidget {
       return PageView(
         scrollDirection: Axis.vertical,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                summary,
-                const Gap(8),
-                Expanded(child: block(const _LossDay())),
-                const Gap(4),
-                Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
-              ],
+          LayoutBuilder(
+            builder: (context, box) => Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              // a short, wide page (the phone turned): the summary and the losses side by side
+              child: box.maxHeight < 420 && box.maxWidth >= 560
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              summary,
+                              const Spacer(),
+                              Icon(Icons.keyboard_arrow_down_rounded, color: muted),
+                            ],
+                          ),
+                        ),
+                        const Gap(8),
+                        Expanded(child: block(const _LossDay())),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        summary,
+                        const Gap(8),
+                        Expanded(child: block(const _LossDay())),
+                        const Gap(4),
+                        Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
+                      ],
+                    ),
             ),
           ),
           Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 22), child: speedPage),
