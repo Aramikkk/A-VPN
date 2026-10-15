@@ -5,6 +5,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
@@ -280,15 +281,7 @@ class SideBarStatsOverview extends ConsumerWidget {
         ),
         child: child,
       );
-      Widget block(Widget child) => Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: dark ? .05 : .18),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: dark ? .08 : .6)),
-        ),
-        child: child,
-      );
+      Widget block(Widget child) => ContrastFrost(child: child);
       Widget figure(String text, {Color? color, double size = 18}) {
         final cut = text.lastIndexOf(' ');
         return Text.rich(

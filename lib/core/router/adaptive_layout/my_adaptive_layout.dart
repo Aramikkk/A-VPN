@@ -298,7 +298,7 @@ ThemeData contrastPageTheme(ThemeData theme) {
       scrolledUnderElevation: 0,
     ),
     cardTheme: theme.cardTheme.copyWith(
-      color: pane(.3, .06),
+      color: pane(.55, .1),
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -308,11 +308,11 @@ ThemeData contrastPageTheme(ThemeData theme) {
     ),
     colorScheme: scheme.copyWith(
       surface: Colors.transparent,
-      surfaceContainerLowest: pane(.18, .04),
-      surfaceContainerLow: pane(.3, .06),
-      surfaceContainer: pane(.36, .07),
-      surfaceContainerHigh: pane(.42, .08),
-      surfaceContainerHighest: pane(.5, .1),
+      surfaceContainerLowest: pane(.4, .08),
+      surfaceContainerLow: pane(.55, .1),
+      surfaceContainer: pane(.6, .11),
+      surfaceContainerHigh: pane(.65, .12),
+      surfaceContainerHighest: pane(.7, .14),
     ),
     // what opens over the page stays solid
     dialogTheme: theme.dialogTheme.copyWith(backgroundColor: scheme.surfaceContainerHigh),

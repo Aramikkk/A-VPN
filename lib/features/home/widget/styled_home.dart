@@ -1583,8 +1583,7 @@ class ContrastShellDock extends HookConsumerWidget {
   }
 }
 
-/// Contrast's light behind a page, behind the app bar too: three or four suns, bright discs of the accent with
-/// their halo, scattered at random once per page when the app starts (the same until it's closed). Inside another
+/// Contrast's light behind a page, behind the app bar too: three or four crisp discs, warm and cool in turn, scattered at random once per page when the app starts (the same until it's closed). Inside another
 /// one it draws nothing of its own.
 class ContrastGlow extends StatefulWidget {
   const ContrastGlow({super.key, required this.child, this.page = ''});
@@ -1609,10 +1608,10 @@ class _ContrastGlowState extends State<ContrastGlow> {
     final suns = <(double, double, double)>[];
     // spread down the page: each in its own band, at either side or in the middle
     for (var i = 0; i < count; i++) {
-      final size = .55 + random.nextDouble() * .3;
+      final size = .4 + random.nextDouble() * .2;
       final band = 1 / count;
-      final top = i * band + random.nextDouble() * band - size * .35;
-      final left = -size * .35 + random.nextDouble() * (1 - size * .3);
+      final top = i * band + random.nextDouble() * band - size * .3;
+      final left = -size * .3 + random.nextDouble() * (1 - size * .4);
       suns.add((left, top, size));
     }
     return suns;
@@ -1625,17 +1624,12 @@ class _ContrastGlowState extends State<ContrastGlow> {
     final dark = theme.brightness == Brightness.dark;
     final accent = theme.araLook.neonFill ?? theme.colorScheme.primary;
     final warm = HSLColor.fromColor(accent);
-    // the sun: the accent itself by night; by day lifted towards a soft peach
-    final sun = dark ? accent : Color.lerp(warm.withLightness(.68).toColor(), const Color(0xFFFFB07A), .5)!;
-    final gradient = RadialGradient(
-      colors: [
-        sun,
-        sun.withValues(alpha: dark ? .67 : .75),
-        sun.withValues(alpha: dark ? .2 : .3),
-        sun.withValues(alpha: 0),
-      ],
-      stops: const [0, .28, .52, .7],
-    );
+    // crisp discs, warm and cool in turn: the warm one the accent by night, a soft peach of it by day; the cool one
+    // a grey blue. Only the blocks over them blur them
+    final colours = [
+      dark ? accent : Color.lerp(warm.withLightness(.68).toColor(), const Color(0xFFFFB07A), .5)!,
+      dark ? const Color(0xFF8FA8BD) : const Color(0xFFB9CCE3),
+    ];
     return DecoratedBox(
       decoration: BoxDecoration(color: dark ? const Color(0xFF1D1D20) : const Color(0xFFEFEDE8)),
       child: LayoutBuilder(
@@ -1644,14 +1638,14 @@ class _ContrastGlowState extends State<ContrastGlow> {
           final h = box.maxHeight.isFinite ? box.maxHeight : 900.0;
           return Stack(
             children: [
-              for (final (x, y, d) in _suns)
+              for (final (i, (x, y, d)) in _suns.indexed)
                 Positioned(
                   left: x * w,
                   top: y * h,
                   width: d * w,
                   height: d * w,
                   child: DecoratedBox(
-                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: gradient),
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: colours[i % 2]),
                   ),
                 ),
               Positioned.fill(child: widget.child),
@@ -1663,7 +1657,7 @@ class _ContrastGlowState extends State<ContrastGlow> {
   }
 }
 
-/// A block on Contrast's upper zone: a pane of frosted glass with a small heading in capitals.
+/// A block on Contrast's upper zone: a pane of frosted glass, what's behind it blurred.
 class _ContrastBlock extends StatelessWidget {
   const _ContrastBlock({required this.child, this.expand = false});
 
@@ -1673,16 +1667,34 @@ class _ContrastBlock extends StatelessWidget {
   final bool expand;
 
   @override
+  Widget build(BuildContext context) => ContrastFrost(child: child);
+}
+
+/// Contrast's frosted glass: the crisp discs behind it blurred, a light tint and a bright edge.
+class ContrastFrost extends StatelessWidget {
+  const ContrastFrost({super.key, required this.child, this.radius = 24, this.padding = const EdgeInsets.all(8)});
+
+  final Widget child;
+  final double radius;
+  final EdgeInsets padding;
+
+  @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: dark ? Colors.white.withValues(alpha: .05) : Colors.white.withValues(alpha: .18),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: dark ? Colors.white.withValues(alpha: .08) : Colors.white.withValues(alpha: .6)),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: dark ? const Color(0x591E1E22) : Colors.white.withValues(alpha: .3),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
+          ),
+          child: child,
+        ),
       ),
-      child: child,
     );
   }
 }
