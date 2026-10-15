@@ -11,6 +11,7 @@ enum ContrastPalette {
   terracotta('Терракота', 'Terracotta', Color(0xFFB5553A), Color(0xFF7D9D9C)),
   amber('Янтарь', 'Amber', Color(0xFFE8A33D), Color(0xFF6C8EBF)),
   honey('Мёд', 'Honey', Color(0xFFD9A441), Color(0xFF8C7AA9)),
+  citrus('Цитрус', 'Citrus', Color(0xFFD4EE6A), Color(0xFF3A3E44)),
   lemon('Лимон', 'Lemon', Color(0xFFD6C13A), Color(0xFF5E8B7E)),
   olive('Олива', 'Olive', Color(0xFF8A9A3B), Color(0xFFC7956D)),
   mint('Мята', 'Mint', Color(0xFF3FB59A), Color(0xFFF2A07B)),

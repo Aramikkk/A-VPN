@@ -1810,7 +1810,16 @@ class _ContrastBlock extends StatelessWidget {
 /// backdrop's picture blurred once ([ContrastFrostImage]), its part under the block shown, not a live blur on every
 /// frame.
 class ContrastFrost extends ConsumerWidget {
-  const ContrastFrost({super.key, required this.child, this.radius = 24, this.padding = const EdgeInsets.all(8)});
+  const ContrastFrost({
+    super.key,
+    required this.child,
+    this.radius = 24,
+    this.padding = const EdgeInsets.all(8),
+    this.solo = false,
+  });
+
+  /// a card with nothing of its own inside (another page's): a little denser, as the home block with its tiles
+  final bool solo;
 
   final Widget child;
   final double radius;
@@ -1831,8 +1840,8 @@ class ContrastFrost extends ConsumerWidget {
           // lighter than the chosen clarity: the tiles inside add their own pane, and the two together came out
           // nearly solid next to the other pages' single see-through cards
           color: dark
-              ? const Color(0xFF1E1E22).withValues(alpha: clarity.night * .6)
-              : Colors.white.withValues(alpha: clarity.day * .6),
+              ? const Color(0xFF1E1E22).withValues(alpha: clarity.night * (solo ? .75 : .6))
+              : Colors.white.withValues(alpha: clarity.day * (solo ? .75 : .6)),
           borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
         ),

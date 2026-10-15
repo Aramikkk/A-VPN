@@ -5,6 +5,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
@@ -423,38 +426,43 @@ class _Count extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final padding = dense ? const EdgeInsets.fromLTRB(10, 5, 10, 6) : const EdgeInsets.fromLTRB(12, 8, 12, 10);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: .3,
+          ),
+        ),
+        const Gap(2),
+        Text(
+          '$value',
+          style: (dense ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
     return Expanded(
-      child: Container(
-        padding: dense ? const EdgeInsets.fromLTRB(10, 5, 10, 6) : const EdgeInsets.fromLTRB(12, 8, 12, 10),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-                letterSpacing: .3,
+      // Contrast: the same frosted glass as the home screen's blocks
+      child: theme.araLook.style == AraStyle.contrast
+          ? ContrastFrost(radius: 14, padding: padding, solo: true, child: content)
+          : Container(
+              padding: padding,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: scheme.outlineVariant),
               ),
+              child: content,
             ),
-            const Gap(2),
-            Text(
-              '$value',
-              style: (dense ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -526,6 +534,104 @@ class _GroupCard extends HookConsumerWidget {
     // inside: by site for an app, by app for a site
     final inner = groupConnections(group.items, byApp ? (c) => c.host : (c) => c.app);
 
+    final content = Column(
+      // dense: in the middle of its fixed height
+      mainAxisAlignment: dense ? MainAxisAlignment.center : MainAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: dense ? null : () => expanded.value = !expanded.value,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 7, 12, 7),
+            child: Row(
+              children: [
+                if (byApp)
+                  ConnectionAppIcon(icon: iconOf(group.key), name: title)
+                else
+                  _RouteDot(route: group.mainRoute, size: 32),
+                const Gap(10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const Gap(3),
+                      // where it went, then the package or the apps, on one line
+                      Row(
+                        children: [
+                          Flexible(
+                            flex: 3,
+                            child: _RouteBadge(group: group, oneLine: dense),
+                          ),
+                          const Gap(6),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Gap(8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      size(group.total),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const Gap(2),
+                    // the count shrinks rather than push the card's text aside on a narrow phone
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 76),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          group.open > 0
+                              ? t.avpn.connOpenOf(open: group.open, n: group.count)
+                              : t.avpn.connCount(n: group.count),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: group.open > 0 ? scheme.primary : scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (expanded.value) ...[
+          Divider(height: 1, color: scheme.outlineVariant),
+          for (final g in inner.take(50))
+            _InnerRow(title: byApp ? (g.key.isEmpty ? '—' : g.key) : appName(g.key), group: g, size: size),
+          if (inner.length > 50)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text('+${inner.length - 50}', style: theme.textTheme.labelSmall),
+            ),
+        ],
+      ],
+    );
+    // Contrast: the same frosted glass as the home screen's blocks
+    if (theme.araLook.style == AraStyle.contrast) {
+      return ContrastFrost(radius: 14, padding: EdgeInsets.zero, solo: true, child: content);
+    }
     return Container(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
@@ -533,100 +639,7 @@ class _GroupCard extends HookConsumerWidget {
         border: Border.all(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        // dense: in the middle of its fixed height
-        mainAxisAlignment: dense ? MainAxisAlignment.center : MainAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: dense ? null : () => expanded.value = !expanded.value,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 7, 12, 7),
-              child: Row(
-                children: [
-                  if (byApp)
-                    ConnectionAppIcon(icon: iconOf(group.key), name: title)
-                  else
-                    _RouteDot(route: group.mainRoute, size: 32),
-                  const Gap(10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const Gap(3),
-                        // where it went, then the package or the apps, on one line
-                        Row(
-                          children: [
-                            Flexible(
-                              flex: 3,
-                              child: _RouteBadge(group: group, oneLine: dense),
-                            ),
-                            const Gap(6),
-                            Expanded(
-                              flex: 2,
-                              child: Text(
-                                subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Gap(8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        size(group.total),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      const Gap(2),
-                      // the count shrinks rather than push the card's text aside on a narrow phone
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 76),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            group.open > 0
-                                ? t.avpn.connOpenOf(open: group.open, n: group.count)
-                                : t.avpn.connCount(n: group.count),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: group.open > 0 ? scheme.primary : scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (expanded.value) ...[
-            Divider(height: 1, color: scheme.outlineVariant),
-            for (final g in inner.take(50))
-              _InnerRow(title: byApp ? (g.key.isEmpty ? '—' : g.key) : appName(g.key), group: g, size: size),
-            if (inner.length > 50)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text('+${inner.length - 50}', style: theme.textTheme.labelSmall),
-              ),
-          ],
-        ],
-      ),
+      child: content,
     );
   }
 }
