@@ -1057,9 +1057,10 @@ class _Orb extends HookWidget {
         : deep(accent);
     final contrastDay = !dark && theme.araLook.style == AraStyle.contrast;
     // the network's sign on the light button: graphite when the accent is too light to read on it (citrus, lemon)
-    final onButton = AraLook.contrast(theme.araIcon, const Color(0xFFF7F5F1)) >= 2.2
-        ? theme.araIcon
-        : ContrastPalette.ink;
+    // by night on the dark button the accent itself
+    final onButton = dark
+        ? accent
+        : (AraLook.contrast(theme.araIcon, const Color(0xFFF7F5F1)) >= 2.2 ? theme.araIcon : ContrastPalette.ink);
     // the numbers readable: by day a light accent goes to the text colour; the deep shade lifted a little by night
     final pingInk = dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface;
     final lossInk = dark ? Color.lerp(lossColor, Colors.white, .35)! : lossColor;
@@ -1154,9 +1155,10 @@ class _Orb extends HookWidget {
                   // Contrast: a plain grey while off, light with a touch of the accent while on
                   color: square
                       ? (on
+                            // on: by night dark with a glow of the accent (it was near white on the black panel)
                             ? Color.alphaBlend(
-                                accent.withValues(alpha: dark ? .22 : .14),
-                                dark ? const Color(0xFFF7F5F1) : Colors.white,
+                                accent.withValues(alpha: dark ? .2 : .14),
+                                dark ? const Color(0xFF1E1E22) : Colors.white,
                               )
                             : (dark ? const Color(0xFF2C2C30) : const Color(0xFFECEAE6)))
                       : dark
@@ -1762,9 +1764,16 @@ class ContrastShellDock extends HookConsumerWidget {
 /// Themes, laid out at random once when the app starts (the same on every page until it's closed). Inside another
 /// one it draws nothing of its own.
 class ContrastGlow extends ConsumerStatefulWidget {
-  const ContrastGlow({super.key, required this.child, this.page = '', this.own = false});
+  const ContrastGlow({super.key, required this.child, this.page = '', this.own = false, this.muted = false});
 
   final Widget child;
+
+  /// a page with text right on the backdrop (the settings' sections, the profiles): the backdrop toned down under
+  /// a veil of the page colour, so the text reads over the bright stripes
+  final bool muted;
+
+  /// the veil over a muted page's backdrop
+  static Color veil(bool dark) => (dark ? const Color(0xFF1D1D20) : const Color(0xFFEFEDE8)).withValues(alpha: .78);
 
   /// draws its own backdrop inside another one too: a page sliding over another carries its own, so the one under
   /// it doesn't show through
@@ -1805,6 +1814,7 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
           Positioned.fill(
             child: RepaintBoundary(child: CustomPaint(painter: ContrastImagePainter(image, scale))),
           ),
+          if (widget.muted) Positioned.fill(child: ColoredBox(color: ContrastGlow.veil(brightness == Brightness.dark))),
           widget.child,
         ],
       ),
@@ -1885,21 +1895,39 @@ class _FrostedBackdrop extends ConsumerWidget {
     final clarity = ready ? ref.watch(Preferences.contrastClarity) : ContrastClarity.fallback;
     final (warm, cool) = palette.backdrop(brightness);
     final scale = math.min(MediaQuery.devicePixelRatioOf(context), 2.0);
+    final kind = ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback;
     final image = ContrastFrostImage.of(
-      kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
+      kind: kind,
       warm: warm,
       cool: cool,
       dark: brightness == Brightness.dark,
       area: MediaQuery.sizeOf(context),
-      blur: clarity.blur,
+      // thin lines blurred lightly (they still show), filled shapes harder (their bright edges ran through the text)
+      blur: kind.lines ? clarity.blur : 12,
       scale: scale,
     );
-    return _FrostPart(
+    // on a muted page the backdrop under the frost is toned down too
+    final muted = context.findAncestorStateOfType<_ContrastGlowState>()?.widget.muted ?? false;
+    final frost = _FrostPart(
       image: image,
       scale: scale,
       radius: radius,
       scroll: Scrollable.maybeOf(context)?.position,
       child: child,
+    );
+    if (!muted) return frost;
+    return _FrostPart(
+      image: image,
+      scale: scale,
+      radius: radius,
+      scroll: Scrollable.maybeOf(context)?.position,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: ContrastGlow.veil(brightness == Brightness.dark),
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        child: child,
+      ),
     );
   }
 }

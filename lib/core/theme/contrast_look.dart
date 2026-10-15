@@ -138,6 +138,24 @@ enum ContrastBackdrop {
   final String en;
 
   static const fallback = ContrastBackdrop.circles;
+
+  /// thin lines: frost over them blurs lightly, so they still show; over the filled kinds (stripes, discs) it blurs
+  /// harder, or the bright shapes ran through the blocks' text
+  bool get lines => switch (this) {
+    relief ||
+    dots ||
+    grid ||
+    honeycomb ||
+    horizon ||
+    grain ||
+    chevron ||
+    zigzag ||
+    waveLines ||
+    herringbone ||
+    steps ||
+    circuit => true,
+    _ => false,
+  };
 }
 
 /// The seed of this run's layout: picked when the app starts, the same until it's closed.

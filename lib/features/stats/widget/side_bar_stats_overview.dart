@@ -293,7 +293,7 @@ class SideBarStatsOverview extends ConsumerWidget {
           color: ink,
           downColor: accent,
           upColor: dark ? const Color(0xFF9FB4C7) : const Color(0xFF6F8BA3),
-          label: (value, top) => size(value.round()) + t.avpn.perSecond,
+          label: (value, top) => size(value) + t.avpn.perSecond,
           detailed: true,
           textStyle: theme.textTheme.labelSmall!.copyWith(color: muted, fontSize: 10),
           ticks: ticks,
@@ -1332,7 +1332,18 @@ class _PingBlock extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final muted = scheme.onSurfaceVariant;
     final samples = ref.watch(connectionQualityProvider);
-    final period = ref.read(connectionQualityProvider.notifier).period(range);
+    final full = ref.read(connectionQualityProvider.notifier).period(range);
+    // the minute: its last 20 probes (one every 3 seconds; the notifier keeps three minutes of them)
+    final period = range == StatsRange.minute
+        ? (() {
+            final bars = full.bars.length > 20 ? full.bars.sublist(full.bars.length - 20) : full.bars;
+            final total = PingBucket();
+            for (final b in bars) {
+              total.add(b);
+            }
+            return (bars: bars, losses: const <double>[], slots: 20, total: total);
+          })()
+        : full;
     final now = samples.reversed.firstWhere((v) => v != null, orElse: () => null);
     final total = period.total;
     final periodName = switch (range) {
@@ -1343,7 +1354,7 @@ class _PingBlock extends ConsumerWidget {
       StatsRange.all => t.avpn.periodAllTime,
     };
     final ticks = switch (range) {
-      StatsRange.minute => ['−3 мин', '−1,5', t.avpn.graphNow],
+      StatsRange.minute => ['−60 с', '−30', t.avpn.graphNow],
       StatsRange.tenMinutes => ['−10 мин', '−5', t.avpn.graphNow],
       StatsRange.hour => ['−60 мин', '−30', t.avpn.graphNow],
       StatsRange.day => ['−24 ч', '−12', t.avpn.graphNow],

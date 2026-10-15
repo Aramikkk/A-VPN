@@ -54,7 +54,8 @@ class _Opaque extends StatelessWidget {
     final theme = Theme.of(context);
     final glass = theme.araLook.glass;
     // Contrast: its backdrop (the page colour is see-through there), laid out as the one round it
-    if (theme.araLook.style == AraStyle.contrast) return ContrastGlow(own: true, child: child);
+    // (muted: these pages have their text right on it)
+    if (theme.araLook.style == AraStyle.contrast) return ContrastGlow(own: true, muted: true, child: child);
     if (glass == null) return ColoredBox(color: theme.scaffoldBackgroundColor, child: child);
     return Stack(
       fit: StackFit.expand,
