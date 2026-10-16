@@ -297,12 +297,15 @@ void main() {
                                 height: 62,
                                 elevation: 0,
                                 backgroundColor: contrastPanelColor(dark),
-                                selectedIndex: 1,
+                                // PCW=1: a computer's menu, every page in it
+                                selectedIndex: pcw ? 2 : 1,
                                 destinations: [
                                   for (final (svg, label) in [
+                                    if (pcw) (NavIcons.connections, 'Соединения'),
                                     (NavIcons.stats, 'Статистика'),
                                     (NavIcons.home, 'Главная'),
                                     (NavIcons.topology, 'Топология'),
+                                    if (pcw) (NavIcons.settings, 'Настройки'),
                                   ])
                                     NavigationDestination(
                                       icon: NavIcon(svg),

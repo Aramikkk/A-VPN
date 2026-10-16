@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
@@ -56,7 +57,8 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     final index = widget.navigationShell.currentIndex;
     if (index != _current) {
       _direction = index > _current ? 1 : -1;
-      _vertical = _contrast && {index, _current}.any((i) => i == _connections || i == _settings);
+      // a computer: every page in its menu, so they all slide sideways in the menu's order
+      _vertical = !PlatformUtils.isDesktop && _contrast && {index, _current}.any((i) => i == _connections || i == _settings);
       if (_vertical) {
         // Settings come down from the top and go back up; Connections come up from below and go back down
         _direction = index == _settings || _current == _connections ? -1 : 1;
@@ -160,6 +162,29 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
       ),
     );
     final returns = _contrast && (_current == _settings || _current == _connections);
+    final pages = ClipRect(
+      child: AnimatedBuilder(
+        animation: _slide,
+        builder: (context, _) {
+          final t = _slide.value;
+          return Stack(
+            children: [
+              for (var i = 0; i < widget.children.length; i++)
+                if (i == _current)
+                  tab(i, x: _previous != null ? _direction * (1 - t) : _drag, shown: true, live: true)
+                else if (i == _previous)
+                  tab(i, x: -_direction * t, shown: true)
+                else if (i == neighbour)
+                  tab(i, x: _drag + (_drag < 0 ? 1 : -1), shown: true)
+                else
+                  tab(i),
+            ],
+          );
+        },
+      ),
+    );
+    // a computer: no swipes (a drag of the mouse moved the page by accident), only its menu and keys
+    if (PlatformUtils.isDesktop) return pages;
     Widget swiper = GestureDetector(
       behavior: HitTestBehavior.translucent,
       onHorizontalDragUpdate: _dragged,

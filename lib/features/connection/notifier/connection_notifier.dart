@@ -135,7 +135,9 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     }
   }
 
-  Future<void> reconnect(ProfileEntity? profile) async {
+  /// [restart]: restart the core rather than hot reload it (LAN sharing switched: the proxy port changes, and the
+  /// hot reload left the VPN dead once sharing was turned off)
+  Future<void> reconnect(ProfileEntity? profile, {bool restart = false}) async {
     if (state case AsyncData(:final value) when value == const Connected()) {
       if (profile == null) {
         loggy.info("no active profile, disconnecting");
@@ -143,7 +145,9 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       }
       loggy.info("active profile changed, reconnecting");
       await ref.read(Preferences.startedByUser.notifier).update(true);
-      await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit)).mapLeft((err) async {
+      await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit), restart: restart).mapLeft((
+        err,
+      ) async {
         loggy.warning("error reconnecting", err);
         state = AsyncError(err, StackTrace.current);
         await ref

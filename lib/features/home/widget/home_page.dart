@@ -82,7 +82,8 @@ class HomePage extends HookConsumerWidget {
               ),
             ),
           ),
-          if (contrast)
+          // the cog: the phone's way to Settings (a computer has them in its menu)
+          if (contrast && !PlatformUtils.isDesktop)
             plate(
               IconButton(
                 tooltip: t.pages.settings.title,

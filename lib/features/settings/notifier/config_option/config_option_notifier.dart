@@ -35,7 +35,11 @@ class ConfigOptionNotifier extends _$ConfigOptionNotifier with AppLogger {
             await ref.read(connectionNotifierProvider.notifier).toggleConnection();
           } else {
             final activeProfile = await ref.read(activeProfileProvider.future);
-            return await ref.read(connectionNotifierProvider.notifier).reconnect(activeProfile);
+            // LAN sharing changes the proxy port's listening address: a full restart, not a hot reload
+            final sharingChanged = previous.allowConnectionFromLan != next.allowConnectionFromLan;
+            return await ref
+                .read(connectionNotifierProvider.notifier)
+                .reconnect(activeProfile, restart: sharingChanged);
           }
           state = const AsyncData(false);
         }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/nav_icons.dart';
@@ -43,6 +45,25 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     final navScopeNode = useFocusScopeNode();
     useEffect(() {
       bool handler(KeyEvent event) {
+        // a computer: Esc goes back (a page opened over a tab, else Home), Ctrl+1..5 open the menu's pages
+        if (PlatformUtils.isDesktop && event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.escape)
+            return _back(context, isMobileBreakpoint, showProfilesAction);
+          if (HardwareKeyboard.instance.isControlPressed) {
+            const digits = [
+              LogicalKeyboardKey.digit1,
+              LogicalKeyboardKey.digit2,
+              LogicalKeyboardKey.digit3,
+              LogicalKeyboardKey.digit4,
+              LogicalKeyboardKey.digit5,
+            ];
+            final index = digits.indexOf(event.logicalKey);
+            if (index >= 0 && index < _actions(t, showProfilesAction, isMobileBreakpoint).length) {
+              _onTap(context, index);
+              return true;
+            }
+          }
+        }
         final arrows = isMobileBreakpoint ? KeyboardConst.verticalArrows : KeyboardConst.horizontalArrows;
         if (!arrows.contains(event.logicalKey)) return false;
         if (event is KeyDownEvent) {
@@ -135,18 +156,26 @@ class MyAdaptiveLayout extends HookConsumerWidget {
             // piece with it (it showed the page's grey there)
             backgroundColor: contrastPhone ? contrastPanelColor(dark) : null,
             body: contrastPhone
-                ? ContrastGlow(
-                    child: Flex(
-                      direction: ContrastShellDock.sideways(context) ? Axis.horizontal : Axis.vertical,
-                      children: [
-                        Expanded(
-                          child: Theme(
-                            data: contrastPageTheme(Theme.of(context), ref.watch(Preferences.contrastClarity)),
-                            child: navigationShell,
+                ? Listener(
+                    // a computer: the mouse's back button goes back
+                    onPointerDown: (event) {
+                      if (PlatformUtils.isDesktop && event.buttons & kBackMouseButton != 0) {
+                        _back(context, isMobileBreakpoint, showProfilesAction);
+                      }
+                    },
+                    child: ContrastGlow(
+                      child: Flex(
+                        direction: ContrastShellDock.sideways(context) ? Axis.horizontal : Axis.vertical,
+                        children: [
+                          Expanded(
+                            child: Theme(
+                              data: contrastPageTheme(Theme.of(context), ref.watch(Preferences.contrastClarity)),
+                              child: navigationShell,
+                            ),
                           ),
-                        ),
-                        ContrastShellDock(side: ContrastShellDock.sideways(context)),
-                      ],
+                          ContrastShellDock(side: ContrastShellDock.sideways(context)),
+                        ],
+                      ),
                     ),
                   )
                 : isMobileBreakpoint
@@ -231,16 +260,22 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                               elevation: 0,
                               shadowColor: Colors.transparent,
                               backgroundColor: contrastPanelColor(dark),
-                              // Connections and Settings (not in the menu) keep Home lit
-                              selectedIndex: switch (navigationShell.currentIndex) {
-                                1 => 0,
-                                3 => 2,
-                                _ => 1,
-                              },
+                              // the phone: Connections and Settings (reached by swipes, not in the menu) keep Home lit; a
+                              // computer has no swipes, so every page is in its menu, where it can be seen
+                              selectedIndex: PlatformUtils.isDesktop
+                                  ? navigationShell.currentIndex
+                                  : switch (navigationShell.currentIndex) {
+                                      1 => 0,
+                                      3 => 2,
+                                      _ => 1,
+                                    },
                               destinations: _navDests(
-                                _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
+                                PlatformUtils.isDesktop
+                                    ? _actions(t, showProfilesAction, isMobileBreakpoint)
+                                    : _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
                               ),
-                              onDestinationSelected: (index) => _onTap(context, index + 1),
+                              onDestinationSelected: (index) =>
+                                  _onTap(context, PlatformUtils.isDesktop ? index : index + 1),
                             )
                           : NavigationBar(
                               selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 2,
@@ -254,6 +289,19 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Back on a computer (Esc, the mouse's back button): the page opened over a tab, else to Home.
+  bool _back(BuildContext context, bool isMobileBreakpoint, bool showProfilesAction) {
+    final router = GoRouter.of(context);
+    if (router.canPop()) {
+      router.pop();
+      return true;
+    }
+    final home = getIndexOfBranch(isMobileBreakpoint, showProfilesAction, 'home');
+    if (navigationShell.currentIndex == home) return false;
+    navigationShell.goBranch(home);
+    return true;
   }
 
   // shell route action onTap

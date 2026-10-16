@@ -534,8 +534,9 @@ class _CheckRow extends HookConsumerWidget {
     }
 
     Future<void> toggleSharing(bool on) async {
+      // the changed option reconnects by itself (ConfigOptionNotifier): a second reconnect here ran two hot reloads
+      // at once
       await ref.read(ConfigOptions.allowConnectionFromLan.notifier).update(on);
-      await reconnectIfConnected();
       if (on && context.mounted) await showDialog<void>(context: context, builder: (_) => const _SharingDialog());
     }
 

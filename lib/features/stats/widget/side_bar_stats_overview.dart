@@ -342,41 +342,58 @@ class SideBarStatsOverview extends ConsumerWidget {
       );
       // two pages, one under the other: the session, the speed now and the day's losses; the speed graph a whole
       // page down
-      return PageView(
-        scrollDirection: Axis.vertical,
-        children: [
-          LayoutBuilder(
-            builder: (context, box) {
-              final wide = box.maxHeight < 420 && box.maxWidth >= 560;
-              final ping = block(_PingBlock(range: range));
-              final losses = block(const _LossDay());
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-                // the ping over the period on top, the session's losses under it (side by side on a short, wide page)
-                child: wide
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: ping),
-                          const Gap(8),
-                          Expanded(child: losses),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(flex: 3, child: ping),
-                          const Gap(8),
-                          Expanded(flex: 2, child: losses),
-                          const Gap(4),
-                          Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
-                        ],
-                      ),
-              );
-            },
-          ),
-          Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 22), child: speedPage),
-        ],
+      final firstPage = LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxHeight < 420 && box.maxWidth >= 560;
+          final ping = block(_PingBlock(range: range));
+          final losses = block(const _LossDay());
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            // the ping over the period on top, the session's losses under it (side by side on a short, wide page)
+            child: wide
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: ping),
+                      const Gap(8),
+                      Expanded(child: losses),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 3, child: ping),
+                      const Gap(8),
+                      Expanded(flex: 2, child: losses),
+                      if (!PlatformUtils.isDesktop || MediaQuery.sizeOf(context).width < 760) ...[
+                        const Gap(4),
+                        Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
+                      ],
+                    ],
+                  ),
+          );
+        },
+      );
+      // a computer's window has the room: the speed graph beside the ping, nothing hidden a page down (the mouse
+      // can't swipe there)
+      return LayoutBuilder(
+        builder: (context, box) => PlatformUtils.isDesktop && box.maxWidth >= 760
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: firstPage),
+                  Expanded(
+                    child: Padding(padding: const EdgeInsets.fromLTRB(0, 0, 14, 10), child: speedPage),
+                  ),
+                ],
+              )
+            : PageView(
+                scrollDirection: Axis.vertical,
+                children: [
+                  firstPage,
+                  Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 22), child: speedPage),
+                ],
+              ),
       );
     }
     if (split) {

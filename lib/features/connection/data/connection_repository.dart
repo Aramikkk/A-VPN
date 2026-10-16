@@ -26,7 +26,13 @@ abstract interface class ConnectionRepository {
   Stream<bool> watchHotReloading();
   TaskEither<ConnectionFailure, Unit> connect(ProfileEntity activeProfile, bool disableMemoryLimit);
   TaskEither<ConnectionFailure, Unit> disconnect();
-  TaskEither<ConnectionFailure, Unit> reconnect(ProfileEntity activeProfile, bool disableMemoryLimit);
+
+  /// [restart]: a full restart of the core, not a hot reload (an inbound changing, as LAN sharing does)
+  TaskEither<ConnectionFailure, Unit> reconnect(
+    ProfileEntity activeProfile,
+    bool disableMemoryLimit, {
+    bool restart = false,
+  });
 }
 
 class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements ConnectionRepository {
@@ -97,13 +103,26 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
   TaskEither<ConnectionFailure, Unit> disconnect() => singbox.stop().mapLeft(UnexpectedConnectionFailure.new);
 
   @override
-  TaskEither<ConnectionFailure, Unit> reconnect(ProfileEntity activeProfile, bool disableMemoryLimit) =>
-      applyConfigOption(activeProfile).flatMap(
-        // hot reload when possible, restart otherwise
-        (_) => singbox
-            .reload(profilePathResolver.file(activeProfile.id).path, activeProfile.name, disableMemoryLimit)
+  TaskEither<ConnectionFailure, Unit> reconnect(
+    ProfileEntity activeProfile,
+    bool disableMemoryLimit, {
+    bool restart = false,
+  }) => applyConfigOption(activeProfile).flatMap(
+    // hot reload when possible, restart otherwise
+    (_) =>
+        (restart
+                ? singbox.restart(
+                    profilePathResolver.file(activeProfile.id).path,
+                    activeProfile.name,
+                    disableMemoryLimit,
+                  )
+                : singbox.reload(
+                    profilePathResolver.file(activeProfile.id).path,
+                    activeProfile.name,
+                    disableMemoryLimit,
+                  ))
             .mapLeft(UnexpectedConnectionFailure.new),
-      );
+  );
 
   @visibleForTesting
   TaskEither<ConnectionFailure, Unit> applyConfigOption(ProfileEntity prof) =>
