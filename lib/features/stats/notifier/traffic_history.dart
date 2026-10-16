@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -59,8 +62,10 @@ class TrafficHistory extends Notifier<int> {
   static const _secondsKept = 600;
   static const _minutesKept = 2 * 24 * 60;
 
-  /// per second, newest last
-  final _seconds = <TrafficAmount>[];
+  /// by second since the epoch: the readings come about once a second but not exactly, so each one is spread over
+  /// the seconds it covers, and the graph's slots are whole stretches of clock time (they kept shifting by a
+  /// reading, and the ten-minute graph jumped about as it redrew)
+  final _seconds = <int, TrafficAmount>{};
 
   /// by minute since the epoch
   final _minutes = <int, TrafficAmount>{};
@@ -72,6 +77,9 @@ class TrafficHistory extends Notifier<int> {
   int? _session;
   int _lastTotal = -1;
   int _lastVpn = 0;
+  // down and up apart (not kept on disk: the first reading after a start splits by the session's share)
+  int _lastDown = -1;
+  int _lastUp = -1;
   DateTime? _lastAt;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
   bool _loaded = false;
@@ -125,6 +133,10 @@ class TrafficHistory extends Notifier<int> {
     unawaited(file.writeAsString(json).then((_) {}, onError: (_) {}));
   }
 
+  /// A reading of the core's counters at [now], as the stats stream gives them.
+  @visibleForTesting
+  void take(SystemInfo stats, DateTime now) => _take(stats, now);
+
   void _take(SystemInfo stats, DateTime now) {
     if (!_loaded) _load();
     final session = stats.sessionStartedAt?.millisecondsSinceEpoch;
@@ -134,26 +146,36 @@ class TrafficHistory extends Notifier<int> {
     final vpn = (stats.vpnUplinkTotal ?? 0) + (stats.vpnDownlinkTotal ?? 0);
     int dTotal;
     int dVpn;
+    // the counters as they were before this reading (0: counting from the start)
+    var fromDown = _lastDown;
+    var fromUp = _lastUp;
     if (session == null || session != _session || _lastTotal < 0) {
       // a new VPN session (or the first reading): count from its start if it began after the last reading
       final fresh = session != null && (_lastAt == null || session >= _lastAt!.millisecondsSinceEpoch);
       dTotal = fresh ? total : 0;
       dVpn = fresh ? vpn : 0;
+      fromDown = fresh ? 0 : down;
+      fromUp = fresh ? 0 : up;
     } else if (total < _lastTotal) {
       // the core reloaded (a server or network change) and started its counters over
       dTotal = total;
       dVpn = vpn;
+      fromDown = 0;
+      fromUp = 0;
     } else {
       dTotal = total - _lastTotal;
       dVpn = (vpn - _lastVpn).clamp(0, dTotal);
     }
-    // the split between down and up follows the session's
-    final dDown = total == 0 ? 0 : (dTotal * down / total).round();
-    final dUp = dTotal - dDown;
+    // down and up as they moved; the session's share only when the last counters aren't known (just started)
+    final known = fromDown >= 0 && fromUp >= 0 && down >= fromDown && up >= fromUp;
+    final dDown = known ? down - fromDown : (total == 0 ? 0 : (dTotal * down / total).round());
+    final dUp = known ? up - fromUp : dTotal - dDown;
     final from = _lastAt;
     _session = session;
     _lastTotal = total;
     _lastVpn = vpn;
+    _lastDown = down;
+    _lastUp = up;
     _lastAt = now;
 
     final gap = from == null ? Duration.zero : now.difference(from);
@@ -167,8 +189,22 @@ class TrafficHistory extends Notifier<int> {
       }
     } else {
       _addMinute(now.millisecondsSinceEpoch ~/ 60000, dDown, dUp, dVpn);
-      _seconds.add(TrafficAmount(dDown, dUp, dVpn));
-      if (_seconds.length > _secondsKept) _seconds.removeAt(0);
+      // spread over the seconds since the last reading
+      final last = now.millisecondsSinceEpoch ~/ 1000;
+      final first = from == null ? last : math.min(last, from.millisecondsSinceEpoch ~/ 1000 + 1);
+      final n = last - first + 1;
+      for (var sec = first; sec <= last; sec++) {
+        // the remainder in the last second, so nothing is lost to rounding
+        final tail = sec == last;
+        _seconds
+            .putIfAbsent(sec, TrafficAmount.new)
+            .add(
+              tail ? dDown - dDown ~/ n * (n - 1) : dDown ~/ n,
+              tail ? dUp - dUp ~/ n * (n - 1) : dUp ~/ n,
+              tail ? dVpn - dVpn ~/ n * (n - 1) : dVpn ~/ n,
+            );
+      }
+      _seconds.removeWhere((sec, _) => sec <= last - _secondsKept);
     }
     final oldest = now.millisecondsSinceEpoch ~/ 60000 - _minutesKept;
     _minutes.removeWhere((m, _) => m < oldest);
@@ -187,45 +223,59 @@ class TrafficHistory extends Notifier<int> {
   RangeSeries series(StatsRange range, [DateTime? now]) {
     final at = now ?? DateTime.now();
     final minuteNow = at.millisecondsSinceEpoch ~/ 60000;
+    // the slots are whole stretches of clock time ending with the last complete one, so they don't shift as the
+    // readings come in; each shows its fastest second (an average of five flattened every burst to a fraction of
+    // the speed the phone had), and a second with nothing moved counts as nothing
     RangeSeries fromSeconds(int seconds, int perPoint) {
-      final recent = _seconds.length > seconds ? _seconds.sublist(_seconds.length - seconds) : List.of(_seconds);
       final total = TrafficAmount();
       final points = <({int down, int up})>[];
-      for (var i = 0; i < recent.length; i += perPoint) {
-        final chunk = recent.sublist(i, (i + perPoint).clamp(0, recent.length));
+      final nowSec = at.millisecondsSinceEpoch ~/ 1000;
+      final end = (nowSec ~/ perPoint) * perPoint;
+      final firstKnown = _seconds.isEmpty ? end : _seconds.keys.reduce(math.min);
+      var start = end - seconds;
+      // from the first second there is anything for, so a fresh start doesn't draw a long flat line
+      if (firstKnown > start) start = (firstKnown ~/ perPoint) * perPoint;
+      for (var slot = start; slot < end; slot += perPoint) {
         var d = 0;
         var u = 0;
-        for (final s in chunk) {
-          d += s.down;
-          u += s.up;
-          total.add(s.down, s.up, s.vpn);
+        for (var sec = slot; sec < slot + perPoint; sec++) {
+          final amount = _seconds[sec];
+          if (amount == null) continue;
+          d = math.max(d, amount.down);
+          u = math.max(u, amount.up);
+          total.add(amount.down, amount.up, amount.vpn);
         }
-        points.add((down: d ~/ chunk.length, up: u ~/ chunk.length));
+        points.add((down: d, up: u));
       }
       return (points: points, slots: seconds ~/ perPoint, slot: Duration(seconds: perPoint), total: total);
     }
 
+    // whole stretches of clock time again (a day's slots shifted every minute); each slot shows its fastest minute,
+    // and the minute under way counts by the seconds it has had (it read as a dip at the right edge)
     RangeSeries fromMinutes(int minutes, int perPoint) {
       final total = TrafficAmount();
       final points = <({int down, int up})>[];
-      final start = minuteNow - minutes + 1;
+      final end = (minuteNow ~/ perPoint) * perPoint + perPoint;
+      var start = end - minutes;
       // from the first minute there is anything for, so a fresh install doesn't draw a long flat line
       final firstKnown = _minutes.keys.where((m) => m >= start).fold<int?>(null, (a, m) => a == null || m < a ? m : a);
       if (firstKnown == null) {
         return (points: points, slots: minutes ~/ perPoint, slot: Duration(minutes: perPoint), total: total);
       }
-      final firstSlot = start + ((firstKnown - start) ~/ perPoint) * perPoint;
-      for (var m = firstSlot; m <= minuteNow; m += perPoint) {
+      start = math.max(start, (firstKnown ~/ perPoint) * perPoint);
+      final secondsNow = math.max(1, at.second);
+      for (var m = start; m < end; m += perPoint) {
         var d = 0;
         var u = 0;
         for (var k = m; k < m + perPoint && k <= minuteNow; k++) {
           final a = _minutes[k];
           if (a == null) continue;
-          d += a.down;
-          u += a.up;
+          final seconds = k == minuteNow ? secondsNow : 60;
+          d = math.max(d, a.down ~/ seconds);
+          u = math.max(u, a.up ~/ seconds);
           total.add(a.down, a.up, a.vpn);
         }
-        points.add((down: d ~/ (perPoint * 60), up: u ~/ (perPoint * 60)));
+        points.add((down: d, up: u));
       }
       return (points: points, slots: minutes ~/ perPoint, slot: Duration(minutes: perPoint), total: total);
     }
@@ -250,9 +300,16 @@ class TrafficHistory extends Notifier<int> {
           final r = fromMinutes(48 * 60, 60);
           return (points: r.points, slots: r.points.length.clamp(2, 48), slot: r.slot, total: total);
         }
+        // today by the seconds it has had so far, not a whole day's (it read as a dip at the end)
+        final local = at;
+        final today = DateTime.utc(local.year, local.month, local.day).millisecondsSinceEpoch ~/ 86400000;
+        final todaySeconds = math.max(1, local.hour * 3600 + local.minute * 60 + local.second);
         final points = [
           for (var d = days.first; d <= days.last; d++)
-            (down: (_days[d]?.down ?? 0) ~/ 86400, up: (_days[d]?.up ?? 0) ~/ 86400),
+            (
+              down: (_days[d]?.down ?? 0) ~/ (d == today ? todaySeconds : 86400),
+              up: (_days[d]?.up ?? 0) ~/ (d == today ? todaySeconds : 86400),
+            ),
         ];
         return (points: points, slots: points.length, slot: const Duration(days: 1), total: total);
     }
