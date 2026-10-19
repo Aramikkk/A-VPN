@@ -9,6 +9,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -107,6 +108,9 @@ class ConnectionQuality extends Notifier<List<int?>> {
   /// the last moment the VPN was seen up: a status that blinks off for a moment (the core's link restarting when
   /// the app comes back) isn't a new connection
   DateTime? _lastUp;
+
+  /// the core's session the probes so far belong to
+  DateTime? _session;
   bool _foreground = true;
 
   /// the phone probes while the app is on screen; a computer all the time (in the tray too), for its watchdog
@@ -134,7 +138,13 @@ class ConnectionQuality extends Notifier<List<int?>> {
       // a new connection: one that went through "connecting", or the VPN down for more than a few seconds; the
       // core's link restarting on resume rebuilds this without either, and the gauge kept starting over
       final now = DateTime.now();
-      final fresh = _sawConnecting || _lastUp == null || now.difference(_lastUp!) > const Duration(seconds: 10);
+      // The core's session start decides when it is known: an auto-pause or a home Wi-Fi pause keeps the session
+      // (the core resumes it), so the ping and the losses go on; only the on/off button starts a new one.
+      final session = ref.watch(sessionStartProvider);
+      final looksNew = _sawConnecting || _lastUp == null || now.difference(_lastUp!) > const Duration(seconds: 10);
+      // the session not known yet (the core says it a moment after it comes up): by the status, as before
+      final fresh = session != null && _session != null ? session != _session : looksNew;
+      if (session != null) _session = session;
       if (fresh) {
         _startedProbing = now;
         warmUp = _sawConnecting;
