@@ -207,7 +207,6 @@ enum AraAccent {
     this.darkOnGradient = Colors.white,
     this.pure = false,
     this.filled = false,
-    this.icon,
   });
 
   final Color seed;
@@ -224,8 +223,9 @@ enum AraAccent {
   /// the neon floods the chosen server, the connect button and the speed block (with black text on it)
   final bool filled;
 
-  /// the home-screen icon in this colour (Android): one of the launcher aliases; other themes keep the red one
-  final String? icon;
+  /// the home-screen icon in this colour (Android): one of the launcher aliases; no theme has its own any more,
+  /// so every one keeps the red
+  String? get icon => null;
 
   static AraAccent get platformDefault => oled;
 
