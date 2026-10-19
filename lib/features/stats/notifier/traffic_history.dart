@@ -77,6 +77,8 @@ class TrafficHistory extends Notifier<int> {
   int? _session;
   int _lastTotal = -1;
   int _lastVpn = 0;
+  int? _lastVpnUp;
+  int? _lastVpnDown;
   // down and up apart (not kept on disk: the first reading after a start splits by the session's share)
   int _lastDown = -1;
   int _lastUp = -1;
@@ -111,6 +113,10 @@ class TrafficHistory extends Notifier<int> {
       _session = json['session'] as int?;
       _lastTotal = (json['lastTotal'] as int?) ?? -1;
       _lastVpn = (json['lastVpn'] as int?) ?? 0;
+      _lastUp = json['lastUp'] as int? ?? -1;
+      _lastDown = json['lastDown'] as int? ?? -1;
+      _lastVpnUp = json['lastVpnUp'] as int?;
+      _lastVpnDown = json['lastVpnDown'] as int?;
       final at = json['lastAt'] as int?;
       _lastAt = at == null ? null : DateTime.fromMillisecondsSinceEpoch(at);
     } catch (_) {
@@ -128,6 +134,10 @@ class TrafficHistory extends Notifier<int> {
       'session': _session,
       'lastTotal': _lastTotal,
       'lastVpn': _lastVpn,
+      'lastUp': _lastUp,
+      'lastDown': _lastDown,
+      'lastVpnUp': _lastVpnUp,
+      'lastVpnDown': _lastVpnDown,
       'lastAt': _lastAt?.millisecondsSinceEpoch,
     });
     unawaited(file.writeAsString(json).then((_) {}, onError: (_) {}));
@@ -140,6 +150,7 @@ class TrafficHistory extends Notifier<int> {
   void _take(SystemInfo stats, DateTime now) {
     if (!_loaded) _load();
     final session = stats.sessionStartedAt?.millisecondsSinceEpoch;
+    if (session == null) return;
     final up = stats.uplinkTotal.toInt();
     final down = stats.downlinkTotal.toInt();
     final total = up + down;
@@ -149,24 +160,24 @@ class TrafficHistory extends Notifier<int> {
     // the counters as they were before this reading (0: counting from the start)
     var fromDown = _lastDown;
     var fromUp = _lastUp;
-    if (session == null || session != _session || _lastTotal < 0) {
+    if (session != _session || _lastTotal < 0) {
       // a new VPN session (or the first reading): count from its start if it began after the last reading
-      final fresh = session != null && (_lastAt == null || session >= _lastAt!.millisecondsSinceEpoch);
+      final fresh = _lastAt == null || session >= _lastAt!.millisecondsSinceEpoch;
       dTotal = fresh ? total : 0;
       dVpn = fresh ? vpn : 0;
       fromDown = fresh ? 0 : down;
       fromUp = fresh ? 0 : up;
-    } else if (total < _lastTotal) {
-      // the core reloaded (a server or network change) and started its counters over
-      dTotal = total;
-      dVpn = vpn;
-      fromDown = 0;
-      fromUp = 0;
     } else {
-      dTotal = total - _lastTotal;
-      dVpn = (vpn - _lastVpn).clamp(0, dTotal);
+      int delta(int current, int previous) => current < previous ? current : current - previous;
+      fromDown = _lastDown < 0 ? -1 : (down < _lastDown ? 0 : _lastDown);
+      fromUp = _lastUp < 0 ? -1 : (up < _lastUp ? 0 : _lastUp);
+      dTotal = _lastDown < 0 || _lastUp < 0 ? delta(total, _lastTotal) : down - fromDown + up - fromUp;
+      final vu = stats.vpnUplinkTotal;
+      final vd = stats.vpnDownlinkTotal;
+      dVpn = vu != null && vd != null && _lastVpnUp != null && _lastVpnDown != null
+          ? delta(vu, _lastVpnUp!) + delta(vd, _lastVpnDown!)
+          : delta(vpn, _lastVpn);
     }
-    // down and up as they moved; the session's share only when the last counters aren't known (just started)
     final known = fromDown >= 0 && fromUp >= 0 && down >= fromDown && up >= fromUp;
     final dDown = known ? down - fromDown : (total == 0 ? 0 : (dTotal * down / total).round());
     final dUp = known ? up - fromUp : dTotal - dDown;
@@ -174,6 +185,8 @@ class TrafficHistory extends Notifier<int> {
     _session = session;
     _lastTotal = total;
     _lastVpn = vpn;
+    _lastVpnUp = stats.vpnUplinkTotal;
+    _lastVpnDown = stats.vpnDownlinkTotal;
     _lastDown = down;
     _lastUp = up;
     _lastAt = now;

@@ -56,7 +56,7 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
   final port = 17078;
   static String generateRandomPassword(int length) {
     const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = Random();
+    final random = Random.secure();
     return List.generate(length, (_) => characters[random.nextInt(characters.length)]).join();
   }
 
@@ -68,8 +68,10 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
     // final errPtr2 = _box.stop();
     // final err = errPtr2.cast<Utf8>().toDartString();
     // throw Exception('stop: $err');
+    final authOptions = CallOptions(metadata: {'authorization': 'Bearer $secret'});
     const channelOption = ChannelCredentials.insecure();
     final helloClient = HelloClient(
+      options: authOptions,
       ClientChannel(
         '127.0.0.1',
         port: port,
@@ -102,6 +104,7 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
       loggy.info(res.toString());
     }
     bgClient = fgClient = CoreClient(
+      options: authOptions,
       ClientChannel(
         'localhost',
         port: port,

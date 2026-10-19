@@ -12,11 +12,24 @@ SOURCE = "https://community.antifilter.download/list/domains.lst"
 ZONE = re.compile(r"(^|\.)(ru|su|xn--p1ai)$")
 
 
+def normalize_domain(line):
+    domain = line.strip().lower().removeprefix("*.").lstrip(".")
+    if not domain or domain.startswith("#"):
+        return None
+    try:
+        domain = domain.encode("idna").decode("ascii")
+    except UnicodeError:
+        return None
+    if len(domain) > 253 or not all(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in domain.split(".")):
+        return None
+    return domain.removeprefix("www.")
+
+
 def main(repo):
     text = urllib.request.urlopen(SOURCE, timeout=60).read().decode("utf-8")
     domains = set()
     for line in text.splitlines():
-        d = line.strip().lower().encode("idna").decode("ascii") if line.strip() else ""
+        d = normalize_domain(line)
         if not d or not ZONE.search(d):
             continue
         domains.add(d[4:] if d.startswith("www.") else d)
@@ -28,7 +41,8 @@ def main(repo):
         f"const rknRuDomains = [\n{body}];\n"
     )
     path = f"{repo}/lib/features/route_rules/notifier/rkn_ru_domains.dart"
-    open(path, "w", encoding="utf-8", newline="\n").write(out)
+    with open(path, "w", encoding="utf-8", newline="\n") as stream:
+        stream.write(out)
     print(f"{len(domains)} domains -> {path}")
 
 

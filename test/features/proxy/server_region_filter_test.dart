@@ -5,6 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 
 void main() {
+  test('network changes use one stable stream subscription', () {
+    expect(ServerRegionFilter.networkChanges, same(ServerRegionFilter.networkChanges));
+  });
+
   test('keeps European servers, LTE Only ones included', () {
     for (final tag in [
       '🇪🇪 LTE Only - Эстония',

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/model/constants.dart';
@@ -13,6 +12,7 @@ import 'package:hiddify/features/proxy/data/proxy_repository.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/proxy/model/ip_info_entity.dart' as oldipinfo;
 import 'package:hiddify/features/proxy/model/proxy_failure.dart';
+import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 
@@ -90,7 +90,8 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     }
     // Ping every server right after connecting so the auto group can pick the fastest one now,
     // instead of waiting for the first periodic url-test.
-    Future.delayed(const Duration(seconds: 2), () => _proxyRepo.urlTest("select").run());
+    final initialPing = Timer(const Duration(seconds: 2), () => _proxyRepo.urlTest("select").run());
+    ref.onDispose(initialPing.cancel);
     // When the phone moves between Wi-Fi and mobile data, reload the config: the server filter keeps only the
     // "LTE Only" servers on mobile data and only the others on Wi-Fi. A ping can't tell this on its own:
     // with whitelists the other servers still answer a tiny test, then drop real traffic.
@@ -98,17 +99,28 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     // a few seconds after a change event (a new network takes a moment to come up and be validated) and
     // every 15 seconds as a safety net, since the events don't always show the switch to mobile data.
     var switching = false;
+    var uiNetwork = ServerRegionFilter.lastApplied;
     Future<void> refilterIfNetworkChanged() async {
       // the config follows the network when it picks servers by network, or when "only blocked through the VPN"
       // (Wi-Fi only on a phone) is on
       final follows =
+          !PlatformUtils.isDesktop ||
           ref.read(ConfigOptions.serversByNetwork) ||
           (!PlatformUtils.isDesktop &&
               ref.read(ConfigOptions.blockedOnlyViaVpn) &&
               !ref.read(ConfigOptions.homeNetwork));
       if (switching || !follows) return;
-      // the phone's VPN service switches the config itself when it was left the two variants: only follow it
-      if (await ServerRegionFilter.serviceApplied() != null) return;
+      // the phone's VPN service switches the config itself when it was left the two variants. Refresh the
+      // proxy list and pings after that switch so the foreground screen follows the config the service applied.
+      final serviceNetwork = await ServerRegionFilter.serviceApplied();
+      if (serviceNetwork != null) {
+        if (serviceNetwork != uiNetwork) {
+          uiNetwork = serviceNetwork;
+          await _proxyRepo.urlTest("select").run();
+          ref.invalidate(proxiesOverviewNotifierProvider);
+        }
+        return;
+      }
       final network = await ServerRegionFilter.currentNetwork();
       if (network == NetworkKind.unknown) return;
       // the app was closed and opened again while the VPN ran on: the network its config was made for, as saved
@@ -132,13 +144,15 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
               onTimeout: () => loggy.warning("reload after the network change timed out, carrying on"),
             );
         await _proxyRepo.urlTest("select").run();
+        uiNetwork = network;
+        ref.invalidate(proxiesOverviewNotifierProvider);
       } finally {
         switching = false;
       }
     }
 
     final checks = <Timer>[];
-    final networkChanges = Connectivity().onConnectivityChanged.skip(1).listen((_) {
+    final networkChanges = ServerRegionFilter.networkChanges.skip(1).listen((_) {
       for (final timer in checks) {
         timer.cancel();
       }

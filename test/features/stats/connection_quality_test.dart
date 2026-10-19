@@ -2,6 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 
 void main() {
+  test('a tunnel that never answers starts counting losses after bounded grace', () {
+    final start = DateTime(2026, 10, 16);
+    expect(startupGraceExpired(start, start.add(const Duration(seconds: 14))), isFalse);
+    expect(startupGraceExpired(start, start.add(const Duration(seconds: 15))), isTrue);
+    expect(startupGraceExpired(start, start.add(const Duration(minutes: 2))), isTrue);
+  });
   test('no samples: no ping, no loss', () {
     final s = summarize(const []);
     expect(s.ping, isNull);

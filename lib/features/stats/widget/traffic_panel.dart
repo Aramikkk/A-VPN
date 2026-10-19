@@ -38,8 +38,10 @@ class TrafficPanel extends ConsumerWidget {
     final current = [
       // the session's start not known yet: nothing rather than the whole day's list
       if (connected && sessionStart != null)
-        for (final c in state.items)
-          if (!c.start.isBefore(sessionStart)) c,
+        for (final c in state.sessionItems)
+          if (c.session == sessionStart.millisecondsSinceEpoch ||
+              (c.session == null && !c.start.isBefore(sessionStart)))
+            c,
     ];
     final groups = groupConnections(current, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
       ..sort((a, b) => b.total.compareTo(a.total));

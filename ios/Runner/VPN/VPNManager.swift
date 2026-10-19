@@ -207,6 +207,7 @@ class VPNManager: ObservableObject {
             try await enableVPNManager()
             try manager.connection.startVPNTunnel(options: [
                 "Config": config as NSString,
+                "GrpcSecret": try FilePath.grpcSecret() as NSString,
                 "GrpcServiceModePort":NSNumber(value: grpcServiceModePort),
                 "DisableMemoryLimit": (disableMemoryLimit ? "YES" : "NO") as NSString,
             ])

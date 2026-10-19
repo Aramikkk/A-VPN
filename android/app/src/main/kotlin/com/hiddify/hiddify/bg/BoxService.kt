@@ -48,12 +48,18 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.channels.Channel
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class BoxService(
         private val service: Service,
@@ -136,6 +142,8 @@ class BoxService(
                         serviceUpdateIdleMode()
                     }
                 }
+
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_SCREEN_OFF -> screenWake.trySend(Unit)
             }
         }
     }
@@ -149,29 +157,39 @@ class BoxService(
     // leaves the screen. Staying up matters: Android doesn't let a stopped VPN restart itself from the background.
     @Volatile
     private var paused = false
+    private val lifecycle = Mutex()
+    private val generation = AtomicLong()
+    @Volatile private var stopping = false
     private var autoPauseJob: Job? = null
+    private val screenWake = Channel<Unit>(Channel.CONFLATED)
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun startAutoPause() {
         autoPauseJob?.cancel()
         ForegroundApp.reset()
-        // runs for the whole session and reads the settings each time, so turning auto-pause on or off, or
-        // changing the list, works without reconnecting; while it's off it only reads two preferences a second
+        // Runs for the whole session so auto-pause settings can change without reconnecting. UsageStats is
+        // sampled less often when auto-pause is off, and much less often when screen time cannot be observed.
         autoPauseJob = GlobalScope.launch(Dispatchers.IO) {
             while (isActive) {
-                delay(1_000)
-                // off: the settings looked at every 5 seconds; the screen off: nothing is on it, nothing to check
+                val screenInteractive = Application.powerManager.isInteractive
                 val apps = Settings.autoPauseApps
-                if (!Settings.autoPauseEnabled || apps.isEmpty() || !ForegroundApp.hasPermission(service)) {
+                val autoPauseActive = Settings.autoPauseEnabled && apps.isNotEmpty()
+                val interval = ForegroundSampling.intervalMillis(
+                    autoPauseActive,
+                    screenInteractive && ForegroundApp.hasPermission(service),
+                    screenInteractive,
+                )
+                if (screenInteractive) delay(interval) else withTimeoutOrNull(interval) { screenWake.receive() }
+                val canObserve = Application.powerManager.isInteractive && ForegroundApp.hasPermission(service)
+                if (!canObserve) {
+                    ForegroundApp.observeScreen(service, null, android.os.SystemClock.elapsedRealtime())
                     if (paused) resume()
-                    delay(4_000)
                     continue
                 }
-                if (!Application.powerManager.isInteractive) {
-                    delay(4_000)
-                    continue
-                }
-                val app = runCatching { ForegroundApp.current(service) }.getOrNull() ?: continue
+                val app = runCatching { ForegroundApp.current(service) }.getOrNull()
+                ForegroundApp.observeScreen(service, app, android.os.SystemClock.elapsedRealtime())
+                if (app == null) continue
+                if (!autoPauseActive) { if (paused) resume(); continue }
                 if (!paused && app in apps && status.value == Status.Started) {
                     pause(app)
                 } else if (paused && app !in apps) {
@@ -183,7 +201,7 @@ class BoxService(
 
     // A-VPN: the servers follow the phone's network with the app closed too. The app leaves a config for Wi-Fi
     // and one for mobile data ("LTE Only" servers on mobile, the others on Wi-Fi); when the network under the VPN
-    // changes this restarts the core on the other one. It waited for the app to be opened before, the VPN up but
+    // changes this reloads the core on the other one. It waited for the app to be opened before, the VPN up but
     // its servers dead on the new network.
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var networkCheck: Job? = null
@@ -218,63 +236,109 @@ class BoxService(
         networkCheck?.cancel()
         // a new network takes a moment to come up and be validated (Wi-Fi's "validated" decides it)
         networkCheck = GlobalScope.launch(Dispatchers.IO) {
+            val operation = generation.get()
             delay(4_000)
-            switchToNetwork()
+            lifecycle.withLock { if (operation == generation.get() && !stopping) switchToNetwork(operation) }
         }
     }
 
-    private fun switchToNetwork() {
+    private suspend fun switchToNetwork(operation: Long) {
         if (status.value != Status.Started || paused || fileDescriptor == null) return
         val network = NetworkKinds.underlying(service)
         val applied = Settings.appliedNetwork
         if (network == "unknown" || network == applied) return
         val path = Settings.networkConfig(network)
         if (path.isBlank() || !File(path).exists()) return
-        Log.d(TAG, "network is now $network, was $applied: restarting on its servers")
+        Log.i(TAG, "network is now $network, was $applied: reloading its servers")
         try {
-            runCatching { Mobile.stop() }
-            Mobile.start(path, "")
+            try {
+                Mobile.reload(path, "")
+                Log.i(TAG, "network $network applied without restarting the tunnel")
+            } catch (e: Exception) {
+                Log.w(TAG, "network reload needs a restart: ${e.message}")
+                if (operation != generation.get() || stopping) return
+                // Release Android's copy too, as in serviceReload0: the core owns a duplicate.
+                fileDescriptor?.close()
+                fileDescriptor = null
+                Mobile.rebuild(path, "")
+            }
+            if (operation != generation.get() || stopping) return
             Settings.appliedNetwork = network
         } catch (e: Exception) {
             Log.w(TAG, "restart for the $network network failed: ${e.message}")
             // back on the config it had rather than no VPN at all
-            runCatching { Mobile.start(Settings.networkConfig(applied), "") }
+            if (operation != generation.get() || stopping) return
+            runCatching {
+                fileDescriptor?.close()
+                fileDescriptor = null
+                Mobile.rebuild(Settings.networkConfig(applied), "")
+            }.onFailure {
+                Log.e(TAG, "network rollback failed: ${it.message}")
+                terminateFailedSession(it.message)
+            }
         }
     }
 
-    private suspend fun pause(app: String) {
-        Log.d(TAG, "auto-pause for $app")
+    private suspend fun pause(app: String) = lifecycle.withLock {
+        if (stopping || status.value != Status.Started) return@withLock
         paused = true
         val label = runCatching {
             val pm = service.packageManager
             pm.getApplicationLabel(pm.getApplicationInfo(app, 0)).toString()
         }.getOrDefault(app)
-        withContext(Dispatchers.Main) {
-            notification.showText("A-VPN — пауза", "Открыто: $label. VPN включится, когда вы из него выйдете")
-        }
-        val pfd = fileDescriptor
-        if (pfd != null) {
-            pfd.close()
+        try {
+            fileDescriptor?.close()
             fileDescriptor = null
-        }
-        // a full close, as when the VPN is turned off: a core that is only stopped can't be set up again
-        // ("createService - null" on every later start)
-        DefaultNetworkMonitor.stop()
-        withContext(Dispatchers.Main) {
-            runCatching { Mobile.close(4L) }
-        }
-        status.postValue(Status.Stopped)
+            Mobile.suspend()
+            DefaultNetworkMonitor.stop()
+            if (stopping) return@withLock
+            withContext(Dispatchers.Main) {
+                if (stopping) return@withContext
+                notification.showText("A-VPN — пауза", "Открыто: $label. VPN включится, когда вы из него выйдете")
+                status.value = Status.Stopped
+            }
+        } catch (e: Exception) { terminateFailedSession(e.message) }
     }
 
-    /** [startCore]: start the core with its last configuration (as on boot); false when the app starts it. */
-    private suspend fun resume(startCore: Boolean = true) {
-        Log.d(TAG, "auto-pause over, reconnecting")
+    /** Resume the retained daemon; only manual stop ends its logical session. */
+    private suspend fun resume() = lifecycle.withLock {
+        if (stopping || !paused) return@withLock
+        val operation = generation.get()
+        try {
+            DefaultNetworkMonitor.start()
+            Mobile.rebuild("", "")
+            if (operation != generation.get() || stopping) return@withLock
+            paused = false
+            withContext(Dispatchers.Main) {
+                if (operation != generation.get() || stopping) return@withContext
+                status.value = Status.Started
+                notification.show(activeProfileName, R.string.status_started)
+            }
+            if (operation != generation.get() || stopping) return@withLock
+            watchNetwork()
+        } catch (e: Exception) { terminateFailedSession(e.message) }
+    }
+
+    private suspend fun terminateFailedSession(message: String?) = withContext(NonCancellable) {
+        generation.incrementAndGet()
+        stopping = true
+        autoPauseJob?.cancel()
+        unwatchNetwork()
         paused = false
-        if (startCore) Settings.startCoreAfterStartingService = true
-        startService()
+        runCatching { fileDescriptor?.close() }
+        fileDescriptor = null
+        DefaultNetworkMonitor.stop()
+        runCatching { Mobile.close(4L) }
+        stopAndAlert(Alert.StartService, message)
+        service.stopSelf()
     }
 
-    private suspend fun startService() {
+    private suspend fun startService() = lifecycle.withLock {
+        if (!stopping) startServiceLocked()
+    }
+
+    private suspend fun startServiceLocked() {
+        val operation = generation.get()
         try {
             status.postValue(Status.Starting)
             Log.d(TAG, "starting service")
@@ -306,7 +370,7 @@ class BoxService(
                 it.fixAndroidStack = com.hiddify.hiddify.bg.Bugs.fixAndroidStack
                 it.mode = 4L//mode.toLong()
                 it.listen = "127.0.0.1:${Settings.grpcServiceModePort}"
-                it.secret = ""
+                it.secret = Settings.grpcSecret
                 it.debug = Settings.debugMode
             }
             val newService = try {
@@ -327,11 +391,13 @@ class BoxService(
                 stopAndAlert(Alert.CreateService, e.message)
                 return
             }
-            status.postValue(Status.Started)
+            if (operation != generation.get() || stopping) return
 
             if (Settings.startCoreAfterStartingService){
                 Mobile.start("","")
                 }
+            if (operation != generation.get() || stopping) return
+            status.postValue(Status.Started)
 //            if (delayStart) {
 //                delay(1000L)
 //            }
@@ -342,8 +408,10 @@ class BoxService(
 
 
             withContext(Dispatchers.Main) {
+                if (operation != generation.get() || stopping) return@withContext
                 notification.show(activeProfileName, R.string.status_started)
             }
+            if (operation != generation.get() || stopping) return
             notification.start()
             startAutoPause()
             watchNetwork()
@@ -359,7 +427,8 @@ class BoxService(
         }
     }
 
-    suspend fun serviceReload0() {
+    suspend fun serviceReload0() = lifecycle.withLock {
+        if (stopping) return@withLock
         notification.close()
         status.postValue(Status.Starting)
 
@@ -380,7 +449,7 @@ class BoxService(
         Mobile.stop()
 //        boxService = null
         
-            startService()
+            if (!stopping) startServiceLocked()
         
     }
 
@@ -411,6 +480,8 @@ class BoxService(
     private fun stopService() {
         // a paused VPN is stopped too: the service is still up and has to go
         if (status.value == Status.Stopped && !paused) return
+        generation.incrementAndGet()
+        stopping = true
         autoPauseJob?.cancel()
         autoPauseJob = null
         unwatchNetwork()
@@ -422,6 +493,7 @@ class BoxService(
         }
         notification.close()
         GlobalScope.launch(Dispatchers.IO) {
+          lifecycle.withLock {
             val pfd = fileDescriptor
             if (pfd != null) {
                 pfd.close()
@@ -453,6 +525,7 @@ class BoxService(
                 service.stopSelf()
             }
             notification.close()
+          }
         }
     }
 
@@ -477,10 +550,10 @@ class BoxService(
         if (status.value != Status.Stopped) return Service.START_NOT_STICKY
         if (paused) {
             // the user turned it on by hand while paused: reconnect now, the watch goes on
-            paused = false
-            GlobalScope.launch(Dispatchers.IO) { resume(startCore = Settings.startCoreAfterStartingService) }
+            GlobalScope.launch(Dispatchers.IO) { resume() }
             return Service.START_NOT_STICKY
         }
+        stopping = false
         status.value = Status.Starting
 
         if (!receiverRegistered) {
@@ -489,6 +562,8 @@ class BoxService(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
                 }
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
             }, ContextCompat.RECEIVER_NOT_EXPORTED)
             receiverRegistered = true
         }

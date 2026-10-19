@@ -20,6 +20,25 @@ object Settings {
         context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
     }
 
+    // Shared by boot-started VPN service and Flutter, stored only in app-private data.
+    val grpcSecret: String
+        @Synchronized get() {
+            preferences.getString("grpc_auth_secret", null)?.let { return it }
+            val bytes = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+            val secret = Base64.encodeToString(bytes, Base64.NO_WRAP or Base64.URL_SAFE)
+            check(preferences.edit().putString("grpc_auth_secret", secret).commit())
+            return secret
+        }
+
+    val shortcutSecret: String
+        @Synchronized get() {
+            preferences.getString("shortcut_auth_secret", null)?.let { return it }
+            val bytes = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+            val secret = Base64.encodeToString(bytes, Base64.NO_WRAP or Base64.URL_SAFE)
+            check(preferences.edit().putString("shortcut_auth_secret", secret).commit())
+            return secret
+        }
+
     private const val LIST_IDENTIFIER = "VGhpcyBpcyB0aGUgcHJlZml4IGZvciBhIGxpc3Qu"
 
     var perAppProxyMode: String

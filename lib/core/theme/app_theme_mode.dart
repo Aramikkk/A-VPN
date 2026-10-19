@@ -7,6 +7,8 @@ enum AppThemeMode {
   // the black one is gone: the dark theme is black already
   dark;
 
+  static const fallback = AppThemeMode.light;
+
   String present(TranslationsEn t) => switch (this) {
     system => t.pages.settings.general.themeModes.system,
     light => t.pages.settings.general.themeModes.light,

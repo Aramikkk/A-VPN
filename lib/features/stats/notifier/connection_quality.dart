@@ -15,7 +15,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 final _logger = infraLogger('ConnectionQuality');
 
-/// Ping through the VPN and packet loss: every second, while the app is on screen and the VPN is up, a tiny
+/// Ping through the VPN and packet loss: every three seconds, while the app is on screen and the VPN is up, a tiny
 /// request (the connection test URL, which answers 204) goes through A-VPN's own proxy port, so it takes the same
 /// path as the rest of the traffic; a probe that gets no answer in time counts as lost. The state is the last
 /// minute's probes; every probe is also counted by the minute (two days) and by the day (for good) and saved, so
@@ -100,11 +100,12 @@ class ConnectionQuality extends Notifier<List<int?>> {
   /// an answer has come on this connection: the probes lost before it (the tunnel coming up) aren't recorded, nor
   /// the first answer itself after a fresh start
   bool _answered = false;
+  DateTime? _startedProbing;
+  static const startupGrace = Duration(seconds: 15);
 
   /// the last moment the VPN was seen up: a status that blinks off for a moment (the core's link restarting when
   /// the app comes back) isn't a new connection
   DateTime? _lastUp;
-  Uri? _url;
   bool _foreground = true;
 
   /// the phone probes while the app is on screen; a computer all the time (in the tray too), for its watchdog
@@ -112,7 +113,6 @@ class ConnectionQuality extends Notifier<List<int?>> {
 
   /// the last time the watchdog reconnected
   DateTime? _rescued;
-  AppLifecycleListener? _lifecycle;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
 
   File? get _file {
@@ -123,17 +123,9 @@ class ConnectionQuality extends Notifier<List<int?>> {
   @override
   List<int?> build() {
     if (!_loaded) _load();
-    _lifecycle ??= AppLifecycleListener(
-      // back from the background or the screen off: a probe at once, so the ping shows straight away
-      onResume: () {
-        _foreground = true;
-        final client = _client;
-        final url = _url;
-        if (client != null && url != null) unawaited(_probe(client, url));
-      },
-      onHide: () => _foreground = false,
-      onPause: () => _foreground = false,
-    );
+    _foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     final status = ref.watch(connectionNotifierProvider).valueOrNull;
     final connected = status is Connected;
     if (status is Connecting) _sawConnecting = true;
@@ -143,6 +135,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
       final now = DateTime.now();
       final fresh = _sawConnecting || _lastUp == null || now.difference(_lastUp!) > const Duration(seconds: 10);
       if (fresh) {
+        _startedProbing = now;
         warmUp = _sawConnecting;
         // a connection found up when the app opened (not started meanwhile): the tunnel is long warm, and the
         // last probes kept from before show at once (the fresh ones take over within the minute)
@@ -162,12 +155,30 @@ class ConnectionQuality extends Notifier<List<int?>> {
       ..connectionTimeout = timeout
       ..findProxy = ((_) => 'PROXY 127.0.0.1:$port');
     _client = client;
-    _url = url;
-    final timer = Timer.periodic(interval, (_) {
-      if (_probing) _probe(client, url);
-    });
+    Timer? timer;
+    void schedule() {
+      timer?.cancel();
+      if (_probing) timer = Timer.periodic(interval, (_) => unawaited(_probe(client, url)));
+    }
+
+    void background() {
+      _foreground = false;
+      schedule();
+    }
+
+    final lifecycle = AppLifecycleListener(
+      onResume: () {
+        _foreground = true;
+        unawaited(_probe(client, url));
+        schedule();
+      },
+      onHide: background,
+      onPause: background,
+    );
+    schedule();
     ref.onDispose(() {
-      timer.cancel();
+      lifecycle.dispose();
+      timer?.cancel();
       client.close(force: true);
       _client = null;
     });
@@ -219,9 +230,14 @@ class ConnectionQuality extends Notifier<List<int?>> {
     // the tunnel coming up: nothing recorded before the first answer, and that answer only when the connection was
     // found up (a fresh one's first answer is the warm-up, well over a second)
     if (!_answered) {
-      if (ms == null) return;
-      _answered = true;
-      if (warmUp) return;
+      if (ms == null && !startupGraceExpired(_startedProbing, now)) return;
+      if (ms != null) {
+        _answered = true;
+        if (warmUp) {
+          warmUp = false;
+          return;
+        }
+      }
     }
     _samples.add(ms);
     sinceConnect++;
@@ -402,3 +418,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     jitter: answered.length < 2 ? 0 : (change / (answered.length - 1)).round(),
   );
 }
+
+/// After a bounded startup grace, failures count even if the tunnel never answered.
+bool startupGraceExpired(DateTime? started, DateTime now) =>
+    started != null && now.difference(started) >= ConnectionQuality.startupGrace;

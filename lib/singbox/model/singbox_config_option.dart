@@ -18,6 +18,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required String region,
     required BalancerStrategy balancerStrategy,
     required int balancerTolerance,
+    required int balancerToleranceWifi,
+    required int balancerToleranceMobile,
     required bool balancerKeepConnections,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,

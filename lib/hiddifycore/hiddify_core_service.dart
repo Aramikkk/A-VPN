@@ -12,6 +12,7 @@ import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
 import 'package:hiddify/features/proxy/data/blocked_only_routing.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
+import 'package:hiddify/features/proxy/data/network_ping_timeout.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -114,14 +115,17 @@ class HiddifyCoreService with InfraLogger {
   TaskEither<String, Unit> changeOptions(SingboxConfigOption options) {
     return TaskEither(() async {
       loggy.debug("changing options");
+      final networkOptions = options.copyWith(
+        balancerTolerance: options.balancerToleranceWifi,
+      );
       // latestOptions = options;
       try {
         final res = await core.fgClient.changeHiddifySettings(
-          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(options.toJson())),
+          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(networkOptions.toJson())),
         );
         if (res.messageType != MessageType.EMPTY) return left("${res.messageType} ${res.message}");
         await core.bgClient.changeHiddifySettings(
-          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(options.toJson())),
+          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(networkOptions.toJson())),
         );
       } on GrpcError catch (e) {
         if (e.code == StatusCode.unavailable) {
@@ -212,14 +216,14 @@ class HiddifyCoreService with InfraLogger {
     final serversByNetwork = ref.read(ConfigOptions.serversByNetwork);
     // the phone's network decides the servers and, for "only blocked through the VPN", the rules (Wi-Fi only):
     // either way the config is made for one network and has to be remade when it changes
-    final follows = serversByNetwork || _blockedOnlyFollowsNetwork(ref);
+    final follows = !PlatformUtils.isDesktop || serversByNetwork || _blockedOnlyFollowsNetwork(ref);
     final current = follows ? await ServerRegionFilter.currentNetwork() : NetworkKind.unknown;
     final filtered = await _configFor(path, current);
     ServerRegionFilter.lastApplied = current;
     if (Platform.isAndroid) {
       // the phone: the configs for Wi-Fi and mobile data left for the VPN service, which switches between them
       // when the network changes, with the app closed too (it waited for the app to be opened)
-      if (follows && current != NetworkKind.unknown && !ref.read(ConfigOptions.homeNetwork)) {
+      if (follows && current != NetworkKind.unknown) {
         Future<String> variant(NetworkKind kind) =>
             kind == current ? Future.value(filtered) : _configFor(path, kind, variant: true);
         await ServerRegionFilter.leaveVariants(
@@ -263,6 +267,16 @@ class HiddifyCoreService with InfraLogger {
         list: ref.read(rulesNotifierProvider),
         desktop: PlatformUtils.isDesktop,
         variant: variant ? '-${current.name}' : '',
+      );
+    }
+    if (Platform.isAndroid) {
+      return withNetworkPingTimeout(
+        filtered,
+        current,
+        ref.read(current == NetworkKind.mobile ? ConfigOptions.urlTestTimeoutMobile : ConfigOptions.urlTestTimeoutWifi),
+        balancerTolerance: ref.read(current == NetworkKind.mobile
+            ? ConfigOptions.balancerToleranceMobile
+            : ConfigOptions.balancerToleranceWifi),
       );
     }
     return filtered;

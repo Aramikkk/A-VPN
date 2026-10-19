@@ -80,3 +80,6 @@ windows/sign.cer
 
 # render previews (RENDER=1 flutter test --update-goldens)
 test/**/goldens/
+
+# build and audit logs (local only)
+diagnostics/

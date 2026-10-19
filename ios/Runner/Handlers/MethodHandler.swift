@@ -60,6 +60,9 @@ public class MethodHandler: NSObject, FlutterPlugin {
             }
             VPNConfig.shared.configOptions = options
             result(true)
+        case "get_grpc_secret":
+            do { result(try FilePath.grpcSecret()) }
+            catch { result(FlutterError(code: "CORE_CREDENTIALS", message: "Cannot initialize core credentials", details: nil)) }
         case "setup":
                 Task {
                     guard
@@ -82,7 +85,11 @@ public class MethodHandler: NSObject, FlutterPlugin {
                     opts.workingDir = workingDir
                     opts.tempDir = tempDir
                     opts.listen = "127.0.0.1:\(grpcPort)"
-                    opts.secret = ""
+                    do { opts.secret = try FilePath.grpcSecret() }
+                    catch {
+                        result(FlutterError(code: "CORE_CREDENTIALS", message: "Cannot initialize core credentials", details: nil))
+                        return
+                    }
                     opts.debug = false
                     opts.mode = 4
                     opts.fixAndroidStack = false

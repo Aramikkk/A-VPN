@@ -43,7 +43,7 @@ void main() {
       'outbound': 'direct §hide§',
     });
     // ads are rule-sets, named by the core's tags (it sets up their download)
-    expect(rules[3], {
+    expect(rules.firstWhere((rule) => (rule['rule_set'] as List?)?.contains('geosite-category-ads-all') ?? false), {
       'rule_set': [
         'geosite-category-ads-all',
         'geosite-malware',

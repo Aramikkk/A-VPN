@@ -39,7 +39,8 @@ cp ./tools/hcore-build/bin/windows/{hiddify-core.dll,HiddifyCli.exe} ./hiddify/h
 
 ```bash
 export PATH="./tools/go/bin:$PATH" GOPATH="./tools/gopath" GOMODCACHE="./tools/gopath/pkg/mod" GOCACHE="./tools/gocache" GOTOOLCHAIN=local GOFLAGS=-mod=mod
-cd ./tools/hcore-build && go test -tags=with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_grpc,tfogo_checklinkname0 -ldflags=-checklinkname=0 ./v2/config/ ./v2/hcore/ ./hiddify-sing-box/protocol/group/balancer/
+cd ./tools/hcore-build && go test -tags=with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_grpc,with_awg,tfogo_checklinkname0,with_conntrack -ldflags=-checklinkname=0 ./v2/config/ ./v2/hcore/
+cd hiddify-sing-box && go test -tags=with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_grpc,with_awg,tfogo_checklinkname0,with_conntrack -ldflags=-checklinkname=0 ./protocol/group/balancer/
 ```
 
 ## 2. Android

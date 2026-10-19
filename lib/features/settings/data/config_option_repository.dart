@@ -201,6 +201,26 @@ abstract class ConfigOptions {
     mapTo: const IntervalInSecondsConverter().toJson,
   );
 
+  static final urlTestTimeoutWifi = PreferencesNotifier.create<Duration, int>(
+    "url-test-timeout-wifi",
+    const Duration(seconds: 5),
+    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, 30)),
+    mapFrom: const IntervalInSecondsConverter().fromJson,
+    mapTo: const IntervalInSecondsConverter().toJson,
+    validator: (value) => value.inSeconds >= 1 && value.inSeconds <= 30,
+  );
+  static final urlTestTimeoutMobile = PreferencesNotifier.create<Duration, int>(
+    "url-test-timeout-mobile",
+    const Duration(seconds: 5),
+    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, 30)),
+    mapFrom: const IntervalInSecondsConverter().fromJson,
+    mapTo: const IntervalInSecondsConverter().toJson,
+    validator: (value) => value.inSeconds >= 1 && value.inSeconds <= 30,
+  );
+
+  static final balancerToleranceWifi = PreferencesNotifier.create<int, int>('balancer-tolerance-wifi', 150);
+  static final balancerToleranceMobile = PreferencesNotifier.create<int, int>('balancer-tolerance-mobile', 50);
+
   static final enableClashApi = PreferencesNotifier.create<bool, bool>("enable-clash-api", true);
 
   /// the Clash API's key, made up once per install (bootstrap), so the Connections tab can read the core's list
@@ -415,6 +435,10 @@ abstract class ConfigOptions {
     "connection-test-url": connectionTestUrl,
     "url-test-interval": urlTestInterval,
     "url-test-timeout": urlTestTimeout,
+    "url-test-timeout-wifi": urlTestTimeoutWifi,
+    "url-test-timeout-mobile": urlTestTimeoutMobile,
+    "balancer-tolerance-wifi": balancerToleranceWifi,
+    "balancer-tolerance-mobile": balancerToleranceMobile,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
     "allow-connection-from-lan": allowConnectionFromLan,
@@ -511,10 +535,11 @@ abstract class ConfigOptions {
     return SingboxConfigOption(
       region: ref.watch(region).name,
       balancerStrategy: ref.watch(balancerStrategy),
-      // on a computer, stay on a server until another is faster by 150 ms or it stops answering, and don't cut
-      // open downloads and calls on a switch; the phone keeps taking the fastest, switching with the network
-      balancerTolerance: PlatformUtils.isDesktop ? 150 : 0,
-      balancerKeepConnections: PlatformUtils.isDesktop,
+      // Retain a working server across small latency changes, and keep existing connections during selection.
+      balancerTolerance: ref.watch(balancerToleranceWifi),
+      balancerToleranceWifi: ref.watch(balancerToleranceWifi),
+      balancerToleranceMobile: ref.watch(balancerToleranceMobile),
+      balancerKeepConnections: true,
       // blockAds: ref.watch(blockAds),
       useXrayCoreWhenPossible: ref.watch(useXrayCoreWhenPossible),
       executeConfigAsIs: false,
@@ -538,7 +563,7 @@ abstract class ConfigOptions {
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: ref.watch(connectionTestUrl),
       urlTestInterval: ref.watch(urlTestInterval),
-      urlTestTimeout: ref.watch(urlTestTimeout),
+      urlTestTimeout: ref.watch(urlTestTimeoutWifi),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),
       webSecret: ref.watch(clashApiSecret),

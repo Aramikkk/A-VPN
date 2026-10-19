@@ -3,9 +3,10 @@ part of 'avpn_home_body.dart';
 /// The home screen in Contrast, Glass or Graphite: the state at the top, the servers in the middle, and the connect
 /// control at the bottom, under the thumb.
 class _StyledHome extends HookConsumerWidget {
-  const _StyledHome({required this.testing, required this.onCheck, this.traffic = true});
+  const _StyledHome({required this.testing, required this.onCheck, required this.visible, this.traffic = true});
 
   final bool traffic;
+  final bool visible;
 
   final bool testing;
   final VoidCallback onCheck;
@@ -16,16 +17,24 @@ class _StyledHome extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final profile = ref.watch(activeProfileProvider).valueOrNull;
+    final activeOutbound = ref.watch(activeProxyNotifierProvider).valueOrNull;
     // the status as the screen shows it: a blink of "disconnected" while the core's link restarts doesn't show
     final status = ref.watch(shownConnectionProvider);
     final connected = status.isConnected;
+    // The home page listener resolves the physical network under the VPN.
+    final networkKind = useListenable(_actualNetworkKind).value;
+    final actualMobile = networkKind == NetworkKind.mobile;
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
     final autoGroup = group?.items
         .where((i) => i.tag == (group.selected == 'balance' ? 'balance' : 'lowest'))
         .firstOrNull;
-    final autoNow = autoGroup == null ? null : autoPick(autoGroup, group!.items);
+    final autoNow = autoGroup == null
+        ? null
+        : autoPick(autoGroup, group!.items, fallback: group.selected == autoGroup.tag ? activeOutbound : null);
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
-    final picked = current != null && current.isGroup ? autoPick(current, group!.items) : null;
+    final picked = current != null && current.isGroup
+        ? autoPick(current, group!.items, fallback: current.tag == group.selected ? activeOutbound : null)
+        : null;
     // with Auto chosen, the country it is on now shows in Auto's own row ("сейчас: Польша"), not again below it
     final servers = [
       for (final item in group?.items ?? <OutboundInfo>[])
@@ -50,6 +59,8 @@ class _StyledHome extends HookConsumerWidget {
     final dock = _GraphiteDock(
       status: status,
       server: connected ? currentName : null,
+      actualMobile: actualMobile,
+      networkKnown: networkKind != NetworkKind.unknown,
       testing: testing,
       onCheck: onCheck,
       // the bigger connect panel where there's room: a tall screen, or the unfolded phone (no strips under the
@@ -72,7 +83,7 @@ class _StyledHome extends HookConsumerWidget {
         notice: ref.watch(tunDeniedProvider) && ref.watch(ConfigOptions.serviceMode) == ServiceMode.tun
             ? const _NoAdminNote()
             : null,
-        status: _StatusBlock(status: status, lastServer: currentName),
+        status: _StatusBlock(status: status, lastServer: currentName, visible: visible),
         servers: hasList
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -82,6 +93,9 @@ class _StyledHome extends HookConsumerWidget {
                   SizedBox(
                     height: 64,
                     child: _StyledServerList(
+                      showCurrentServer: true,
+                      networkStyled: true,
+                      mobileNetwork: actualMobile,
                       servers: [
                         servers.firstWhere(
                           (s) => s.tag == group?.selected || (s.tag == 'lowest' && group?.selected == 'balance'),
@@ -90,6 +104,7 @@ class _StyledHome extends HookConsumerWidget {
                       ],
                       selectedTag: group?.selected,
                       autoNow: autoNow,
+                      activeOutbound: activeOutbound,
                       testing: testing,
                       onRowTap: () => showGlassPopup(
                         context,
@@ -105,6 +120,7 @@ class _StyledHome extends HookConsumerWidget {
                                 servers: servers,
                                 selectedTag: group?.selected,
                                 autoNow: autoNow,
+                                activeOutbound: activeOutbound,
                                 testing: testing,
                                 afterSelect: () => Navigator.of(popup).pop(),
                               ),
@@ -129,79 +145,87 @@ class _StyledHome extends HookConsumerWidget {
                   const Gap(30),
                 ],
               ),
-        traffic: traffic && hasList ? const _HomeTraffic() : null,
+        traffic: traffic && hasList ? _HomeTraffic(visible: visible) : null,
         toggles: _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
       );
     }
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18, 2, 18, spread ? 0 : 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _StatusBlock(status: status, lastServer: currentName),
-          if (hasList) ...[
-            gap,
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                header,
-                const Gap(6),
-                SizedBox(
-                  // always the same height, however many servers there are: the whitelist has fewer than the regular
-                  // list, and switching between them moved everything under it (most on the unfolded phone)
-                  height: rowsInSight * (62.0),
-                  child: _StyledServerList(
-                    servers: servers,
-                    selectedTag: group?.selected,
-                    autoNow: autoNow,
-                    testing: testing,
-                  ),
-                ),
-              ],
-            ),
-            gap,
-            // where the traffic went, under the servers (as on the Topology tab): always the same place and size,
-            // all the room between the servers and the toggles; the unfolded phone has it in a column of its own
-            if (traffic) const Expanded(child: _HomeTraffic()) else share(),
-          ] else ...[
-            Gap(roomy ? 20 : 14),
-            header,
-            Gap(roomy ? 10 : 6),
-            Expanded(
-              child: profile == null
-                  ? _EmptyCard(text: t.avpn.noProfile)
-                  : Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          t.avpn.connectToSeeServers,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
+    return LayoutBuilder(
+      builder: (context, box) {
+        final content = Padding(
+          padding: EdgeInsets.fromLTRB(18, 2, 18, spread ? 0 : 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _StatusBlock(status: status, lastServer: currentName, visible: visible),
+              if (hasList) ...[
+                gap,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    header,
+                    const Gap(6),
+                    SizedBox(
+                      // always the same height, however many servers there are: the whitelist has fewer than the regular
+                      // list, and switching between them moved everything under it (most on the unfolded phone)
+                      height: rowsInSight * (62.0),
+                      child: _StyledServerList(
+                        servers: servers,
+                        selectedTag: group?.selected,
+                        autoNow: autoNow,
+                        activeOutbound: activeOutbound,
+                        testing: testing,
                       ),
                     ),
-            ),
-          ],
-          // (spread: the gap under the servers is already there, before their share)
-          if (!spread) gap,
-          _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
-          share(),
-          gap,
-          dock,
-          if (spread) ...[share(), gap],
-        ],
-      ),
+                  ],
+                ),
+                gap,
+                // where the traffic went, under the servers (as on the Topology tab): always the same place and size,
+                // all the room between the servers and the toggles; the unfolded phone has it in a column of its own
+                if (traffic) Expanded(child: _HomeTraffic(visible: visible)) else share(),
+              ] else ...[
+                Gap(roomy ? 20 : 14),
+                header,
+                Gap(roomy ? 10 : 6),
+                Expanded(
+                  child: profile == null
+                      ? _EmptyCard(text: t.avpn.noProfile)
+                      : Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              t.avpn.connectToSeeServers,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+              // (spread: the gap under the servers is already there, before their share)
+              if (!spread) gap,
+              _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
+              share(),
+              gap,
+              dock,
+              if (spread) ...[share(), gap],
+            ],
+          ),
+        );
+        if (box.maxHeight >= 600) return content;
+        return SingleChildScrollView(child: SizedBox(height: 600, child: content));
+      },
     );
   }
 }
 
 /// "Защищено" with the time and the speed, or "Отключено".
 class _StatusBlock extends HookConsumerWidget {
-  const _StatusBlock({required this.status, required this.lastServer});
+  const _StatusBlock({required this.status, required this.lastServer, required this.visible});
 
   final ConnectionStatus status;
   final String? lastServer;
+  final bool visible;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -210,6 +234,13 @@ class _StatusBlock extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final connected = status.isConnected;
     final stats = ref.watch(statsNotifierProvider).valueOrNull;
+    // The native session survives a network rebuild, including its empty statistics frame.
+    final confirmedStart = useRef<DateTime?>(null);
+    if (!connected) {
+      confirmedStart.value = null;
+    } else if (stats?.sessionStartedAt case final DateTime start) {
+      confirmedStart.value = start;
+    }
     final now = useState(DateTime.now());
     final since = useState<DateTime?>(null);
     useEffect(() {
@@ -218,12 +249,14 @@ class _StatusBlock extends HookConsumerWidget {
         return null;
       }
       since.value ??= DateTime.now();
+      if (!visible) return null;
+      now.value = DateTime.now();
       final timer = Timer.periodic(const Duration(seconds: 1), (_) => now.value = DateTime.now());
       return timer.cancel;
-    }, [connected]);
+    }, [connected, visible]);
     final units = t.avpn.bytesUnits.split(',');
     String speed(int bytes) => '${formatBytes(bytes, units)}${t.avpn.perSecond}';
-    final time = _duration(now.value.difference(stats?.sessionStartedAt ?? since.value ?? now.value));
+    final time = _duration(now.value.difference(confirmedStart.value ?? since.value ?? now.value));
     final down = speed(stats?.downlink.toInt() ?? 0);
     final up = speed(stats?.uplink.toInt() ?? 0);
     final waiting = switch (status) {
@@ -233,19 +266,22 @@ class _StatusBlock extends HookConsumerWidget {
     };
 
     if (theme.araLook.style == AraStyle.contrast) {
-      // what moved today, from 03:00 to 03:00
-      ref.watch(trafficHistoryProvider);
-      final today = ref.read(trafficHistoryProvider.notifier).amountFrom(statsDayStart(DateTime.now()));
+      // Keep collecting daily history for Statistics; the headline uses the VPN session.
+      ref.read(trafficHistoryProvider);
+      // Native session totals survive configuration reloads; a new native session resets them.
+      final totals = ref.watch(sessionTotalsProvider);
+      final total = connected ? totals.up + totals.down : 0;
+      final viaVpn = connected ? ((totals.vpnUp ?? 0) + (totals.vpnDown ?? 0)).clamp(0, total) : 0;
       (String, String) amount(int bytes) {
         final parts = formatBytes(bytes, units).split(' ');
         return (parts.first, parts.length > 1 ? parts.last : '');
       }
 
-      final vpn = amount(today.vpn);
-      final direct = amount((today.total - today.vpn).clamp(0, 1 << 62));
-      final sessionLength = now.value.difference(stats?.sessionStartedAt ?? since.value ?? now.value);
-      final routed = today.total == 0 ? 1 : today.total;
-      final vpnShare = today.vpn / routed;
+      final vpn = amount(viaVpn);
+      final direct = amount(total - viaVpn);
+      final sessionLength = now.value.difference(confirmedStart.value ?? since.value ?? now.value);
+      final routed = total == 0 ? 1 : total;
+      final vpnShare = viaVpn / routed;
       return _ContrastStats(
         items: [
           // the time by the day, the two routes by each other
@@ -264,7 +300,7 @@ class _StatusBlock extends HookConsumerWidget {
             vpn.$1,
             vpn.$2,
             true,
-            today.total == 0 ? 0 : vpnShare,
+            total == 0 ? 0 : vpnShare,
             // the water in the palette's own colour (the primary is graphite by day)
             theme.araAccent,
           ),
@@ -274,7 +310,7 @@ class _StatusBlock extends HookConsumerWidget {
             direct.$1,
             direct.$2,
             false,
-            today.total == 0 ? 0 : 1 - vpnShare,
+            total == 0 ? 0 : 1 - vpnShare,
             const Color(0xFF9AA0A6),
           ),
         ],
@@ -456,9 +492,13 @@ class _StyledServerList extends ConsumerWidget {
     required this.servers,
     required this.selectedTag,
     required this.autoNow,
+    required this.activeOutbound,
     required this.testing,
     this.onRowTap,
     this.afterSelect,
+    this.showCurrentServer = false,
+    this.networkStyled = false,
+    this.mobileNetwork = false,
   });
 
   /// a tap on a row does this instead of choosing it (Contrast's one row opens the list)
@@ -467,9 +507,17 @@ class _StyledServerList extends ConsumerWidget {
   /// after a row is chosen (the list in a sheet closes)
   final VoidCallback? afterSelect;
 
+  /// In Contrast's one-row home panel, show the currently used country and protocol instead of "Auto".
+  final bool showCurrentServer;
+
+  /// The home panel uses a white Wi-Fi surface and a softly tinted LTE surface.
+  final bool networkStyled;
+  final bool mobileNetwork;
+
   final List<OutboundInfo> servers;
   final String? selectedTag;
   final OutboundInfo? autoNow;
+  final OutboundInfo? activeOutbound;
   final bool testing;
 
   @override
@@ -489,15 +537,25 @@ class _StyledServerList extends ConsumerWidget {
           itemBuilder: (context, i) {
             final server = servers[i];
             final selected = server.tag == selectedTag || (server.tag == 'lowest' && selectedTag == 'balance');
-            final name = serverName(server);
-            final auto = server.tag == 'lowest';
-            // "Финляндия" with "Sigma · VLESS" under it, rather than "Sigma - Финляндия"
+            final auto = server.tag == 'lowest' || server.tag == 'balance';
+            final currentServer = auto && showCurrentServer ? autoNow : null;
+            final displayedServer = currentServer ?? server;
+            final name = serverName(displayedServer);
+            // "Финляндия" with "VLESS" under it, rather than "Sigma - Финляндия"
             final dash = name.title.indexOf(' - ');
             // a note in brackets at the end ("Финляндия (Тестовый)") goes to the line under: "Тестовый · Sigma · VLESS"
             final full = _marked(dash < 0 ? name.title : name.title.substring(dash + 3).trim(), name.title);
             final note = RegExp(r'\s*\(([^()]*)\)$').firstMatch(full);
-            final title = auto ? t.avpn.auto : (note == null ? full : full.substring(0, note.start).trim());
-            final subtitle = auto
+            final title = currentServer != null
+                ? (note == null ? full : full.substring(0, note.start).trim())
+                : (auto ? t.avpn.server : (note == null ? full : full.substring(0, note.start).trim()));
+            final subtitle = currentServer != null
+                ? [
+                    if (note != null) note[1]!,
+                    if (dash > 0) name.title.substring(0, dash).trim(),
+                    currentServer.type.toUpperCase(),
+                  ].join(' · ')
+                : auto
                 ? (autoNow == null ? t.avpn.autoBestHint : '${t.avpn.stNow}: ${_withFlag(serverName(autoNow!))}')
                 : [
                     if (note != null) note[1]!,
@@ -510,12 +568,14 @@ class _StyledServerList extends ConsumerWidget {
             }
 
             return _GraphiteRow(
-              flag: server.isGroup ? null : name.flag,
-              group: server.isGroup,
+              flag: server.isGroup && currentServer == null ? null : name.flag,
+              group: server.isGroup && currentServer == null,
               title: title,
               subtitle: subtitle,
-              delay: server.urlTestDelay,
+              delay: displayedHomePingDelay(server, autoNow: autoNow, active: activeOutbound, selected: selected),
               selected: selected,
+              networkStyled: networkStyled,
+              mobileNetwork: mobileNetwork,
               testing: testing,
               first: i == 0,
               onTap: onRowTap ?? select,
@@ -540,6 +600,8 @@ class _GraphiteRow extends StatelessWidget {
     required this.testing,
     required this.first,
     required this.onTap,
+    this.networkStyled = false,
+    this.mobileNetwork = false,
     this.flooded = false,
   });
 
@@ -552,6 +614,9 @@ class _GraphiteRow extends StatelessWidget {
   final bool testing;
   final bool first;
   final VoidCallback onTap;
+
+  final bool networkStyled;
+  final bool mobileNetwork;
 
   /// already drawn inside the neon theme override
   final bool flooded;
@@ -570,6 +635,8 @@ class _GraphiteRow extends StatelessWidget {
         subtitle: subtitle,
         delay: delay,
         selected: selected,
+        networkStyled: networkStyled,
+        mobileNetwork: mobileNetwork,
         testing: testing,
         onTap: onTap,
       );
@@ -606,6 +673,8 @@ class _GraphiteRow extends StatelessWidget {
           subtitle: subtitle,
           delay: delay,
           selected: selected,
+          networkStyled: networkStyled,
+          mobileNetwork: mobileNetwork,
           testing: testing,
           first: first,
           onTap: onTap,
@@ -708,29 +777,49 @@ class _GraphiteRow extends StatelessWidget {
 /// time. The call returns at once while the core takes its time (right after turning off, a few seconds before it
 /// even says "connecting"), and the button looked off meanwhile. A tap while one is pending is dropped, so off and
 /// straight on again don't stack.
-final _pendingFrom = ValueNotifier<ConnectionStatus?>(null);
-Timer? _pendingTimeout;
+final _pendingConnectionProvider = NotifierProvider<_PendingConnection, ConnectionStatus?>(_PendingConnection.new);
+
+class _PendingConnection extends Notifier<ConnectionStatus?> {
+  Timer? _timeout;
+
+  @override
+  ConnectionStatus? build() {
+    ref.onDispose(() => _timeout?.cancel());
+    return null;
+  }
+
+  void begin(ConnectionStatus current) {
+    if (state != null) return;
+    state = current;
+    _timeout?.cancel();
+    _timeout = Timer(const Duration(seconds: 30), clear);
+  }
+
+  void clear() {
+    _timeout?.cancel();
+    _timeout = null;
+    state = null;
+  }
+}
 
 Future<void> _toggleConnection(WidgetRef ref) async {
-  if (_pendingFrom.value != null) return;
+  final pending = ref.read(_pendingConnectionProvider.notifier);
+  if (ref.read(_pendingConnectionProvider) != null) return;
   if (ref.read(activeProfileProvider).valueOrNull == null) {
     await ref.read(dialogNotifierProvider.notifier).showNoActiveProfile();
     ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
     return;
   }
-  _pendingFrom.value = ref.read(connectionNotifierProvider).valueOrNull ?? const Disconnected();
-  // never stuck: a core that doesn't answer lets the button go after a while
-  _pendingTimeout?.cancel();
-  _pendingTimeout = Timer(const Duration(seconds: 30), () => _pendingFrom.value = null);
+  pending.begin(ref.read(connectionNotifierProvider).valueOrNull ?? const Disconnected());
   try {
     await ref.read(connectionNotifierProvider.notifier).toggleConnection();
   } catch (_) {
-    _pendingFrom.value = null;
+    pending.clear();
     rethrow;
   }
 }
 
-/// Ping and loss through the VPN, measured every second (the probes the Statistics tab shows; the tunnel's warm-up
+/// Ping and loss through the VPN, measured every three seconds (the probes the Statistics tab shows; the tunnel's warm-up
 /// is left out there already), this connection's only. Null ping until there's an answer.
 ({int? ping, double loss}) _sessionQuality(WidgetRef ref, bool on) {
   final samples = ref.watch(connectionQualityProvider);
@@ -747,6 +836,8 @@ class _GraphiteDock extends HookConsumerWidget {
   const _GraphiteDock({
     required this.status,
     required this.server,
+    required this.actualMobile,
+    required this.networkKnown,
     required this.testing,
     required this.onCheck,
     this.large = false,
@@ -756,6 +847,8 @@ class _GraphiteDock extends HookConsumerWidget {
 
   final ConnectionStatus status;
   final String? server;
+  final bool actualMobile;
+  final bool networkKnown;
   final bool testing;
   final VoidCallback onCheck;
 
@@ -766,17 +859,16 @@ class _GraphiteDock extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final on = status.isConnected;
-    final pendingFrom = useValueListenable(_pendingFrom);
+    final pendingFrom = ref.watch(_pendingConnectionProvider);
     // the tap's done once the core has settled on another status (on, off, or a failure)
-    useEffect(() {
-      if (pendingFrom != null && !status.isSwitching && status != pendingFrom) {
-        Future.microtask(() {
-          _pendingTimeout?.cancel();
-          _pendingFrom.value = null;
-        });
+    ref.listen(shownConnectionProvider, (_, next) {
+      if (pendingFrom != null && !next.isSwitching && next != pendingFrom) {
+        ref.read(_pendingConnectionProvider.notifier).clear();
       }
-      return null;
-    }, [status, pendingFrom]);
+    });
+    if (pendingFrom != null && !status.isSwitching && status != pendingFrom) {
+      Future.microtask(() => ref.read(_pendingConnectionProvider.notifier).clear());
+    }
     final busy = status.isSwitching || pendingFrom != null;
     final glass = theme.araLook.glass;
     // Contrast: tight, on its black panel
@@ -793,14 +885,10 @@ class _GraphiteDock extends HookConsumerWidget {
     final (:ping, :loss) = _sessionQuality(ref, on);
     final measured = ping != null;
     final lossText = _lossText(loss);
-    // the whitelist ("LTE Only") servers or the regular ones: the server in use (Auto: the one it picked) tells; the
-    // computer only ever marks the whitelist
-    final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
-    final inUse = current != null && current.isGroup ? autoPick(current, group!.items) : current;
-    final whitelist =
-        inUse != null &&
-        (ServerRegionFilter.isMobileOnly(inUse.tag) || ServerRegionFilter.isMobileOnly(inUse.tagDisplay));
-    final mode = !on || busy || inUse == null ? null : (whitelist ? true : (PlatformUtils.isDesktop ? null : false));
+    // Keep the server type and physical network distinct: both can be shown during a handoff.
+    final networkLabel = !on || busy || !networkKnown || PlatformUtils.isDesktop
+        ? null
+        : (actualMobile ? 'LTE' : 'Wi‑Fi');
     final accent = theme.araAccent;
     // the side icons and the ping in the accent (by day a light accent goes to the text colour); grey while off
     final ink = on
@@ -908,12 +996,12 @@ class _GraphiteDock extends HookConsumerWidget {
           busy: busy || (on && !measured && ref.read(connectionQualityProvider.notifier).warmUp),
           // Contrast: a fifth smaller
           size: (large ? 88.0 : 76.0) * (theme.araLook.style == AraStyle.contrast ? .8 : 1),
-          below: padding.bottom,
           ping: measured ? _Orb.pingFill(ping) : 0,
           loss: measured ? _Orb.lossFill(loss) : 0,
           pingLabel: measured && !busy ? '$ping ms' : null,
           lossLabel: measured && !busy ? lossText : null,
-          mode: mode,
+          networkLabel: networkLabel,
+          actualMobile: actualMobile,
           onTap: busy ? null : () => _toggleConnection(ref),
         ),
         Expanded(
@@ -992,8 +1080,8 @@ class _Orb extends HookWidget {
     this.loss = 0,
     this.pingLabel,
     this.lossLabel,
-    this.mode,
-    this.below = 0,
+    this.networkLabel,
+    this.actualMobile = false,
   });
 
   /// the button's diameter; the arcs and numbers take about twice that across
@@ -1006,12 +1094,8 @@ class _Orb extends HookWidget {
   final String? pingLabel;
   final String? lossLabel;
 
-  /// which servers the connection runs on, on the button's lower edge: null hides it, true the whitelist
-  /// ("Белые списки", filled in the accent), false the regular ones ("Обычные", quiet)
-  final bool? mode;
-
-  /// the panel's room under this widget: the mode pill sits halfway between the button and the panel's edge
-  final double below;
+  final String? networkLabel;
+  final bool actualMobile;
 
   final bool on;
   final bool busy;
@@ -1074,8 +1158,8 @@ class _Orb extends HookWidget {
     final square = theme.araLook.style == AraStyle.contrast;
     // the square: its numbers inside the button, the frames reaching below it
     final centre = square ? size * .94 : size * .98;
-    // Contrast keeps the mode inside the button: no room under it for a pill
-    final height = square ? centre + size * .84 : centre + size * .5 + size * .26;
+    // There is no secondary mode pill under the button.
+    final height = square ? centre + size * .84 : centre + size * .5;
     final outer = square ? size * .74 : size * .86;
     final inner = square ? size * .58 : size * .7;
     // the square's button a little smaller, inside its frames
@@ -1178,33 +1262,23 @@ class _Orb extends HookWidget {
                 ),
                 child: Center(
                   // a computer, on: the computer's sign (it has no LTE or Wi-Fi of its own to tell)
-                  child: theme.araLook.style == AraStyle.contrast && (mode != null || (PlatformUtils.isDesktop && on && !busy))
+                  child:
+                      theme.araLook.style == AraStyle.contrast &&
+                          (networkLabel != null || (PlatformUtils.isDesktop && on && !busy))
                       // Contrast: the mode under the sign, inside the button
                       // Contrast: the network it runs on, large, instead of the power sign (that only while off)
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // the network it runs on (the ping and the loss are by the ping button)
-                            Icon(
-                              mode == null
-                                  ? Icons.computer_rounded
-                                  : (mode! ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded),
-                              size: size * .36,
-                              color: onButton,
-                            ),
-                            Text(
-                              mode == null ? 'ПК' : (mode! ? 'LTE' : 'Wi‑Fi'),
-                              style: TextStyle(
-                                fontSize: size * .14,
-                                height: 1.1,
-                                fontWeight: FontWeight.w800,
-                                color: onButton,
-                              ),
-                            ),
-                          ],
+                      ? Semantics(
+                          key: const ValueKey('home-network-indicator'),
+                          excludeSemantics: true,
+                          label: networkLabel ?? 'ПК',
+                          child: networkLabel == null
+                              ? Icon(Icons.computer_rounded, size: size * .36, color: onButton)
+                              : HomeNetworkIndicator(mobile: actualMobile, iconSize: size * .36, color: onButton),
                         )
                       : Icon(
-                          Icons.power_settings_new_rounded,
+                          networkLabel == null
+                              ? Icons.power_settings_new_rounded
+                              : (actualMobile ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded),
                           size: size * .42,
                           // the icon in the accent too; by day a light one (yellow, green) can't be read on white, so
                           // it goes black there, as the chosen server's text does
@@ -1216,75 +1290,6 @@ class _Orb extends HookWidget {
                         ),
                 ),
               ),
-            ),
-          ),
-          // the mode, under the button, as far from it as from the panel's lower edge
-          Positioned(
-            left: 0,
-            right: 0,
-            top: centre + size * .5 + (height - centre - size * .5 + below) / 2 - size * .13,
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: mode == null || theme.araLook.style == AraStyle.contrast
-                    ? const SizedBox.shrink()
-                    : _ModeBadge(key: ValueKey(mode), whitelist: mode!, size: size),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The servers the connection runs on, as a small pill: the whitelist filled in the accent with an antenna, the
-/// regular ones quiet (the button's own colour, a thin edge, the Wi-Fi sign).
-class _ModeBadge extends ConsumerWidget {
-  const _ModeBadge({super.key, required this.whitelist, required this.size});
-
-  final bool whitelist;
-  final double size;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
-    final accent = theme.araAccent;
-    final onAccent = AraLook.contrast(accent, Colors.black) >= AraLook.contrast(accent, Colors.white)
-        ? Colors.black
-        : Colors.white;
-    final ink = whitelist ? onAccent : scheme.onSurfaceVariant;
-    final height = size * .26;
-    return Container(
-      height: height,
-      padding: EdgeInsets.symmetric(horizontal: height * .45),
-      decoration: BoxDecoration(
-        color: whitelist ? accent : (dark ? const Color(0xFF16161A) : Colors.white),
-        borderRadius: BorderRadius.circular(height / 2),
-        border: whitelist ? null : Border.all(color: scheme.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? .3 : .08),
-            blurRadius: 6,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(whitelist ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded, size: height * .58, color: ink),
-          SizedBox(width: height * .2),
-          Text(
-            whitelist ? t.avpn.dockModeWhitelist : t.avpn.dockModeRegular,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontSize: height * .44,
-              height: 1,
-              fontWeight: FontWeight.w800,
-              color: ink,
             ),
           ),
         ],
@@ -1411,14 +1416,15 @@ class _RainbowPainter extends CustomPainter {
 
 /// The home screen's strip map: where today's traffic went, the apps under a megabyte left out.
 class _HomeTraffic extends ConsumerWidget {
-  const _HomeTraffic();
+  const _HomeTraffic({required this.visible});
+
+  final bool visible;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final units = t.avpn.bytesUnits.split(',');
     // followed only while the home screen is in sight
-    final visible = TickerMode.of(context);
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     // this session's connections only, as the right panel of the unfolded phone
     // held across the statistics stream's blinks, so the card doesn't flip when the app comes back
@@ -1428,8 +1434,10 @@ class _HomeTraffic extends ConsumerWidget {
     final current = [
       // the session's start not known yet: nothing rather than the whole day's list
       if (connected && sessionStart != null)
-        for (final c in state.items)
-          if (!c.start.isBefore(sessionStart)) c,
+        for (final c in state.sessionItems)
+          if (c.session == sessionStart.millisecondsSinceEpoch ||
+              (c.session == null && !c.start.isBefore(sessionStart)))
+            c,
     ];
     final big = {
       for (final g in groupConnections(current, (c) => c.app))
@@ -1443,14 +1451,54 @@ class _HomeTraffic extends ConsumerWidget {
     final theme = Theme.of(context);
     if (theme.araLook.style == AraStyle.contrast) {
       final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+      if (PlatformUtils.isAndroid) {
+        final screenTime = visible && connected ? ref.watch(foregroundScreenTimeProvider).valueOrNull : null;
+        if (screenTime != null && !screenTime.hasUsageAccess) return const _ScreenTimeAccessCard();
+        final byRoute = foregroundConnectionsByRoute(current, screenTime?.apps ?? const {});
+        List<_AppShare> screenTimeRoute(ConnectionRoute route) {
+          final groups = groupConnections(byRoute[route] ?? const [], (c) => c.app)
+            ..sort((a, b) {
+              final aTime = screenTime?.apps[a.key] ?? Duration.zero;
+              final bTime = screenTime?.apps[b.key] ?? Duration.zero;
+              return bTime.compareTo(aTime);
+            });
+          return [
+            for (final group in groups)
+              (
+                name: connectionAppName(t, installed, group.key),
+                bytes: group.total,
+                duration: screenTime?.apps[group.key] ?? Duration.zero,
+                servers: route == ConnectionRoute.vpn
+                    ? serverFlags(group.servers.where((server) => !isHiddenServer(server)))
+                    : '',
+                icon: installed[group.key]?.icon,
+              ),
+          ];
+        }
+
+        return _ContrastTraffic(
+          vpn: screenTimeRoute(ConnectionRoute.vpn),
+          direct: screenTimeRoute(ConnectionRoute.direct),
+        );
+      }
+      final activityStart = sessionStart ?? DateTime.now();
+      final activityNow = DateTime.now();
       List<_AppShare> route(ConnectionRoute r) {
-        final groups = groupConnections(items.where((c) => c.route == r), (c) => c.app)
-          ..sort((a, b) => b.total.compareTo(a.total));
+        final groups = groupConnections(current.where((c) => c.route == r && c.app.isNotEmpty), (c) => c.app)
+          ..sort((a, b) {
+            if (PlatformUtils.isDesktop) return b.total.compareTo(a.total);
+            final aUsage = routeAppUsageSince(state.routeUsage, r, a.key, activityStart, activityNow);
+            final bUsage = routeAppUsageSince(state.routeUsage, r, b.key, activityStart, activityNow);
+            return bUsage.compareTo(aUsage);
+          });
         return [
           for (final g in groups)
             (
               name: connectionAppName(t, installed, g.key),
               bytes: g.total,
+              duration: PlatformUtils.isDesktop
+                  ? Duration.zero
+                  : routeAppUsageSince(state.routeUsage, r, g.key, activityStart, activityNow),
               servers: r == ConnectionRoute.vpn ? serverFlags(g.servers.where((s) => !isHiddenServer(s))) : '',
               icon: installed[g.key]?.icon,
             ),
@@ -1518,6 +1566,46 @@ class _HomeTraffic extends ConsumerWidget {
               )
             // from the top, each part always in its place (the strips keep a fixed height)
             : Align(alignment: Alignment.topCenter, child: strips),
+      ),
+    );
+  }
+}
+
+class _ScreenTimeAccessCard extends ConsumerWidget {
+  const _ScreenTimeAccessCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow.withValues(alpha: .6),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .5)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.screen_search_desktop_rounded, size: 30),
+          const Gap(10),
+          Text(t.avpn.autoPauseNeedAccess, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+          const Gap(12),
+          FilledButton.icon(
+            onPressed: () async {
+              try {
+                await openForegroundUsageAccessSettings();
+              } on PlatformException {
+                // The phone's settings app may be unavailable; leave the home screen usable.
+              }
+            },
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: Text(t.avpn.autoPauseGrant),
+          ),
+        ],
       ),
     );
   }
@@ -1629,26 +1717,30 @@ class _ContrastHome extends StatelessWidget {
       onUp: () => context.goNamed('connections'),
       child: LayoutBuilder(
         // a short screen: no room for the traffic block (it's on the Statistics tab)
-        builder: (context, box) => Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 9),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
-              if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(8)],
-              _ContrastBlock(child: status),
-              const Gap(8),
-              _ContrastBlock(child: servers),
-              const Gap(8),
-              if (traffic != null && box.maxHeight >= 440)
-                Expanded(child: _ContrastBlock(expand: true, child: traffic!))
-              else
-                const Spacer(),
-              // a short screen (the phone turned): the toggles are under the connect control at the side
-              if (!ContrastShellDock.sideways(context)) ...[const Gap(8), _ContrastBlock(child: toggles)],
-            ],
-          ),
-        ),
+        builder: (context, box) {
+          final minimum = box.maxWidth > box.maxHeight ? 380.0 : 440.0;
+          final content = Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
+                if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(8)],
+                _ContrastBlock(child: status),
+                const Gap(8),
+                _ContrastBlock(child: servers),
+                const Gap(8),
+                if (traffic != null) Expanded(child: _ContrastBlock(expand: true, child: traffic!)) else const Spacer(),
+                // a short screen (the phone turned): the toggles are under the connect control at the side
+                if (!ContrastShellDock.sideways(context)) ...[const Gap(8), _ContrastBlock(child: toggles)],
+              ],
+            ),
+          );
+          if (box.maxHeight >= minimum) return content;
+          return SingleChildScrollView(
+            child: SizedBox(height: minimum, child: content),
+          );
+        },
       ),
     );
   }
@@ -1733,9 +1825,12 @@ class ContrastShellDock extends HookConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final testing = useValueListenable(homePingTesting);
     final status = ref.watch(shownConnectionProvider);
+    final networkKind = useListenable(_actualNetworkKind).value;
     final dock = _GraphiteDock(
       status: status,
       server: null,
+      actualMobile: networkKind == NetworkKind.mobile,
+      networkKnown: networkKind != NetworkKind.unknown,
       testing: testing,
       onCheck: () => pingAllServers(ref),
       large: !side && MediaQuery.sizeOf(context).height >= 900,
@@ -1868,9 +1963,8 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
 
 /// The area Contrast's backdrop and frost pictures are laid out on: the screen's; a computer's window rounded up to
 /// the next 96 points, so dragging its edge doesn't draw both pictures afresh at every step (that stuttered)
-Size contrastImageArea(Size screen) => PlatformUtils.isDesktop
-    ? Size((screen.width / 96).ceil() * 96.0, (screen.height / 96).ceil() * 96.0)
-    : screen;
+Size contrastImageArea(Size screen) =>
+    PlatformUtils.isDesktop ? Size((screen.width / 96).ceil() * 96.0, (screen.height / 96).ceil() * 96.0) : screen;
 
 /// A block on Contrast's upper zone: a pane of frosted glass, what's behind it blurred.
 class _ContrastBlock extends StatelessWidget {
@@ -1944,7 +2038,7 @@ class _FrostedBackdrop extends ConsumerWidget {
     final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
     final clarity = ready ? ref.watch(Preferences.contrastClarity) : ContrastClarity.fallback;
     final (warm, cool) = palette.backdrop(brightness);
-    final scale = math.min(MediaQuery.devicePixelRatioOf(context), PlatformUtils.isDesktop ? 1.25 : 2.0);
+    final scale = math.min(MediaQuery.devicePixelRatioOf(context), 1.0);
     final kind = ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback;
     final image = ContrastFrostImage.of(
       kind: kind,
@@ -2165,6 +2259,8 @@ class _ContrastRow extends StatelessWidget {
     required this.subtitle,
     required this.delay,
     required this.selected,
+    required this.networkStyled,
+    required this.mobileNetwork,
     required this.testing,
     required this.onTap,
   });
@@ -2175,6 +2271,8 @@ class _ContrastRow extends StatelessWidget {
   final String subtitle;
   final int delay;
   final bool selected;
+  final bool networkStyled;
+  final bool mobileNetwork;
   final bool testing;
   final VoidCallback onTap;
 
@@ -2185,26 +2283,36 @@ class _ContrastRow extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final accent = theme.araAccent;
     final ink = scheme.onSurface;
-    final decoration = selected
-        // the chosen one: see-through glass, cool at the left warming to the accent, a light edge and a glow
+    final accentFill = networkStyled ? mobileNetwork : selected;
+    final softNetworkTint = networkStyled && mobileNetwork;
+    final decoration = accentFill
+        // The chosen server is only lightly tinted with the theme accent, the same on Wi-Fi and mobile data.
         ? BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: LinearGradient(
               colors: [
-                const Color(0xFF8FA8BD).withValues(alpha: dark ? .28 : .32),
-                accent.withValues(alpha: dark ? .25 : .22),
-                accent.withValues(alpha: dark ? .4 : .36),
+                accent.withValues(alpha: dark ? .12 : (softNetworkTint ? .035 : .07)),
+                accent.withValues(alpha: dark ? .16 : (softNetworkTint ? .06 : .11)),
+                accent.withValues(alpha: dark ? .2 : (softNetworkTint ? .085 : .15)),
               ],
               stops: const [0, .6, 1],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: dark ? .14 : .85)),
-            boxShadow: [BoxShadow(color: accent.withValues(alpha: .15), blurRadius: 20, offset: const Offset(0, 6))],
+            border: Border.all(color: accent.withValues(alpha: dark ? .2 : (softNetworkTint ? .12 : .18))),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: softNetworkTint ? .035 : .08),
+                blurRadius: 16,
+                offset: const Offset(0, 5),
+              ),
+            ],
           )
         : BoxDecoration(
-            color: scheme.surfaceContainerLow.withValues(alpha: dark ? .3 : .3),
+            color: dark ? scheme.surfaceContainerHigh : Colors.white,
             borderRadius: BorderRadius.circular(22),
             // see-through: the zone's light shows through
-            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+            border: Border.all(
+              color: dark ? Colors.white.withValues(alpha: .1) : scheme.outlineVariant.withValues(alpha: .25),
+            ),
           );
     final ms = delay <= 0 ? '—' : (delay > 65000 ? '×' : '$delay');
     // Auto: the country it's on now right after its name ("Авто 🇵🇱 Польша"), no line under it
@@ -2241,18 +2349,17 @@ class _ContrastRow extends StatelessWidget {
                   ),
                   const Gap(11),
                   Expanded(
-                    child: country != null
-                        // "Авто" at the left, the country it's on in the middle of the row (a test server's note
-                        // under it)
+                    child: group
+                        // The home row shows the pending hint once, without a redundant "Server" prefix.
                         ? Row(
                             children: [
-                              Text(title, style: titleStyle?.copyWith(fontWeight: FontWeight.w700)),
+                              if (!networkStyled) Text(title, style: titleStyle?.copyWith(fontWeight: FontWeight.w700)),
                               Expanded(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      country,
+                                      country ?? subtitle,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       textAlign: TextAlign.center,
@@ -2488,11 +2595,11 @@ class _ContrastStats extends StatelessWidget {
 }
 
 /// An app's part of a route: its name, how much, the servers it went through (flags) and its icon.
-typedef _AppShare = ({String name, int bytes, String servers, Uint8List? icon});
+typedef _AppShare = ({String name, int bytes, Duration duration, String servers, Uint8List? icon});
 
 /// Contrast's traffic: two tiles, through the VPN (the accent) and the bypass (grey), each marked by its sign with
-/// its share and amount; each filled from the bottom like water to its share of the session's traffic, the water
-/// split into bands by app (the biggest at the bottom, deepest). A tap opens the route's apps in a card that grows
+/// its share and foreground time on Android, traffic on desktop. Water and app bands use that same metric,
+/// with the largest app at the bottom. A tap opens the route's apps in a card that grows
 /// out of the tile into the middle of the screen.
 class _ContrastTraffic extends StatelessWidget {
   const _ContrastTraffic({required this.vpn, required this.direct});
@@ -2504,22 +2611,35 @@ class _ContrastTraffic extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = theme.araAccent;
-    int sum(List<_AppShare> apps) => apps.fold(0, (s, a) => s + a.bytes);
+    Duration sum(List<_AppShare> apps) => apps.fold(Duration.zero, (s, a) => s + a.duration);
+    int sumBytes(List<_AppShare> apps) => apps.fold(0, (s, a) => s + a.bytes);
     final total = sum(vpn) + sum(direct);
+    final totalBytes = sumBytes(vpn) + sumBytes(direct);
     return Row(
+      key: const Key('contrast-traffic'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: _WaterTile(icon: Icons.shield_rounded, apps: vpn, total: total, colour: accent, vpn: true),
+          child: _WaterTile(
+            icon: Icons.shield_rounded,
+            apps: vpn,
+            totalActivity: total,
+            totalBytes: totalBytes,
+            colour: accent,
+            vpn: true,
+            compact: MediaQuery.sizeOf(context).height < 600,
+          ),
         ),
         const Gap(6),
         Expanded(
           child: _WaterTile(
             icon: Icons.alt_route_rounded,
             apps: direct,
-            total: total,
+            totalActivity: total,
+            totalBytes: totalBytes,
             colour: const Color(0xFF9AA0A6),
             vpn: false,
+            compact: MediaQuery.sizeOf(context).height < 600,
           ),
         ),
       ],
@@ -2531,16 +2651,20 @@ class _WaterTile extends ConsumerWidget {
   const _WaterTile({
     required this.icon,
     required this.apps,
-    required this.total,
+    required this.totalActivity,
+    required this.totalBytes,
     required this.colour,
     required this.vpn,
+    required this.compact,
   });
 
   final IconData icon;
   final List<_AppShare> apps;
-  final int total;
+  final Duration totalActivity;
+  final int totalBytes;
   final Color colour;
   final bool vpn;
+  final bool compact;
 
   static const _alphas = [.62, .46, .34, .25, .2];
 
@@ -2552,28 +2676,36 @@ class _WaterTile extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final units = t.avpn.bytesUnits.split(',');
     final bytes = apps.fold<int>(0, (s, a) => s + a.bytes);
-    final share = total == 0 ? 0.0 : bytes / total;
-    // the bands: the apps with at least 12% of the route, the rest in one ("Ещё N"), so no stack of thin lines
+    final activity = apps.fold(Duration.zero, (s, a) => s + a.duration);
+    final byBytes = PlatformUtils.isDesktop;
+    int weight(Duration time, int traffic) => byBytes ? traffic : time.inMilliseconds;
+    final routeWeight = weight(activity, bytes);
+    final totalWeight = weight(totalActivity, totalBytes);
+    final share = totalWeight == 0 ? 0.0 : routeWeight / totalWeight;
+    // Desktop water measures bytes; Android water measures foreground time.
+    // Apps below 12% of the route are combined into one band.
     final big = [
       for (final a in apps)
-        if (bytes > 0 && a.bytes / bytes >= .12) a,
-    ].take(4).toList();
+        if (routeWeight > 0 && weight(a.duration, a.bytes) / routeWeight >= .12) a,
+    ].take(3).toList();
     final rest = apps.where((a) => !big.contains(a)).toList();
-    final bands = <(String, int)>[
-      for (final a in big) (a.name, a.bytes),
+    final bands = <(String, Duration, int)>[
+      for (final a in big) (a.name, a.duration, a.bytes),
       if (rest.isNotEmpty)
         (
           rest.length == 1 ? rest.first.name : t.avpn.contrastMore(n: rest.length),
+          rest.fold(Duration.zero, (s, a) => s + a.duration),
           rest.fold<int>(0, (s, a) => s + a.bytes),
         ),
     ];
     final ink = scheme.onSurface;
     final amount = formatBytes(bytes, units).split(' ');
-    const header = 40.0;
+    final activeTime = byBytes ? formatBytes(bytes, units) : _duration(activity);
+    final header = compact ? 40.0 : 48.0;
     // by day the water lighter, so the light behind shows through
     final alphas = dark ? _alphas : const [.4, .3, .22, .16, .14];
     // always full of its own apps; the route's share is the thin bar under the header
-    final level = bytes == 0 ? 0.0 : 1.0;
+    final level = routeWeight > 0 ? 1.0 : 0.0;
     return GestureDetector(
       onTap: () => _open(context, t),
       child: Container(
@@ -2593,49 +2725,102 @@ class _WaterTile extends ConsumerWidget {
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: colour.withValues(alpha: .25))),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: colour, width: 1.3),
-                    ),
-                    child: Icon(icon, size: 13, color: vpn ? theme.araIcon : colour),
-                  ),
-                  const Gap(8),
-                  Text.rich(
-                    TextSpan(
+              child: compact
+                  ? Row(
                       children: [
-                        TextSpan(text: amount.first),
-                        if (amount.length > 1)
-                          TextSpan(
-                            text: ' ${amount.sublist(1).join(' ')}',
-                            style: TextStyle(fontSize: 10, letterSpacing: 0, color: ink.withValues(alpha: .6)),
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: colour, width: 1.3),
                           ),
+                          child: Icon(icon, size: 12, color: vpn ? theme.araIcon : colour),
+                        ),
+                        const Gap(7),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                activeTime,
+                                maxLines: 1,
+                                style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, color: ink),
+                              ),
+                              Text(
+                                byBytes
+                                    ? (bands.isEmpty ? '—' : bands.first.$1)
+                                    : '${bands.isEmpty ? '—' : bands.first.$1} · ${amount.join(' ')}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(color: ink.withValues(alpha: .65)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Gap(4),
+                        Text(
+                          '${(share * 100).round()}%',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: colour, width: 1.3),
+                          ),
+                          child: Icon(icon, size: 13, color: vpn ? theme.araIcon : colour),
+                        ),
+                        const Gap(8),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  activeTime,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -.5,
+                                    color: ink,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                byBytes ? (vpn ? t.avpn.statsViaVpn : t.avpn.homeBypass) : amount.join(' '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(color: ink.withValues(alpha: .6)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Gap(4),
+                        Text(
+                          '${(share * 100).round()}%',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ],
                     ),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -.6,
-                      color: ink,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${(share * 100).round()}%',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              padding: EdgeInsets.fromLTRB(10, compact ? 2 : 6, 10, compact ? 2 : 6),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(2),
                 child: TweenAnimationBuilder<double>(
@@ -2682,51 +2867,75 @@ class _WaterTile extends ConsumerWidget {
                         child: FractionallySizedBox(
                           heightFactor: level,
                           widthFactor: 1,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (final (i, (name, b)) in bands.indexed.toList().reversed)
-                                Expanded(
-                                  flex: (b * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: colour.withValues(alpha: alphas[i.clamp(0, 4)]),
-                                      border: i < bands.length - 1
-                                          ? Border(
-                                              top: BorderSide(color: Colors.white.withValues(alpha: dark ? .16 : .7)),
-                                            )
-                                          : null,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(horizontal: 11),
-                                    child: LayoutBuilder(
-                                      builder: (context, box) => box.maxHeight < 16
-                                          ? const SizedBox.shrink()
-                                          : Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    name,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: theme.textTheme.labelSmall?.copyWith(
-                                                      color: ink,
-                                                      fontWeight: FontWeight.w700,
-                                                    ),
+                          child: LayoutBuilder(
+                            builder: (context, area) {
+                              final minimum = math.min(
+                                MediaQuery.textScalerOf(context).scale(48),
+                                area.maxHeight / bands.length,
+                              );
+                              final remaining = math.max(0.0, area.maxHeight - minimum * bands.length);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (final (i, (name, duration, b)) in bands.indexed.toList().reversed)
+                                    SizedBox(
+                                      height:
+                                          minimum +
+                                          remaining * weight(duration, b) / (routeWeight == 0 ? 1 : routeWeight),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: colour.withValues(alpha: alphas[i.clamp(0, 4)]),
+                                          border: i < bands.length - 1
+                                              ? Border(
+                                                  top: BorderSide(
+                                                    color: Colors.white.withValues(alpha: dark ? .16 : .7),
+                                                  ),
+                                                )
+                                              : null,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 11),
+                                        child: LayoutBuilder(
+                                          builder: (context, box) => box.maxHeight < 27
+                                              ? const SizedBox.shrink()
+                                              : Padding(
+                                                  padding: EdgeInsets.symmetric(vertical: box.maxHeight < 42 ? 1 : 3),
+                                                  child: Column(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                    children: [
+                                                      Text(
+                                                        name,
+                                                        maxLines: box.maxHeight < 42 ? 1 : 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: theme.textTheme.labelSmall?.copyWith(
+                                                          color: ink,
+                                                          fontWeight: FontWeight.w700,
+                                                          height: 1,
+                                                        ),
+                                                      ),
+                                                      if (box.maxHeight >= 31) ...[
+                                                        const Gap(2),
+                                                        Text(
+                                                          byBytes
+                                                              ? formatBytes(b, units)
+                                                              : '${_duration(duration)} · ${formatBytes(b, units)}',
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: theme.textTheme.labelSmall?.copyWith(
+                                                            color: ink.withValues(alpha: .7),
+                                                            fontWeight: FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
                                                   ),
                                                 ),
-                                                Text(
-                                                  formatBytes(b, units),
-                                                  style: theme.textTheme.labelSmall?.copyWith(
-                                                    color: ink.withValues(alpha: .7),
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                            ],
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -2758,15 +2967,10 @@ class _WaterTile extends ConsumerWidget {
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (_, _, _) => Theme(
         data: theme,
-        child: _RouteCard(apps: apps, total: total, colour: colour, icon: icon, vpn: vpn),
+        child: _RouteCard(apps: apps, total: totalBytes, colour: colour, icon: icon, vpn: vpn),
       ),
-      transitionBuilder: (context, animation, _, child) {
-        final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-        return FadeTransition(
-          opacity: curve,
-          child: ScaleTransition(scale: Tween(begin: .25, end: 1.0).animate(curve), alignment: from, child: child),
-        );
-      },
+      transitionBuilder: (context, animation, _, child) =>
+          HomePopupTransition(animation: animation, alignment: from, child: child),
     );
   }
 }
@@ -2796,7 +3000,7 @@ class _RouteCard extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final units = t.avpn.bytesUnits.split(',');
     final bytes = apps.fold<int>(0, (s, a) => s + a.bytes);
-    final top = apps.isEmpty ? 1 : apps.first.bytes;
+    final top = apps.fold<int>(1, (largest, app) => app.bytes > largest ? app.bytes : largest);
     final servers = {for (final a in apps) ...a.servers.split(' ').where((f) => f.isNotEmpty)}.length;
     final amount = formatBytes(bytes, units).split(' ');
     return Center(
@@ -2935,20 +3139,28 @@ class _RouteCard extends ConsumerWidget {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
+                                      Text(
+                                        a.name,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                                      ),
+                                      const Gap(2),
                                       Row(
                                         children: [
-                                          Expanded(
-                                            child: Text(
-                                              a.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
-                                            ),
-                                          ),
                                           Text(
                                             formatBytes(a.bytes, units),
                                             style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                                           ),
+                                          const Spacer(),
+                                          if (!PlatformUtils.isDesktop)
+                                            Text(
+                                              _duration(a.duration),
+                                              style: theme.textTheme.labelMedium?.copyWith(
+                                                color: scheme.onSurfaceVariant,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
                                         ],
                                       ),
                                       const Gap(5),
@@ -3008,17 +3220,8 @@ void showGlassPopup(BuildContext context, Widget child) {
     barrierColor: Colors.black26,
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (_, _, _) => _GlassPopup(child: child),
-    transitionBuilder: (context, animation, _, child) {
-      final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-      return FadeTransition(
-        opacity: curve,
-        child: ScaleTransition(
-          scale: Tween(begin: .9, end: 1.0).animate(curve),
-          alignment: const Alignment(0, .9),
-          child: child,
-        ),
-      );
-    },
+    transitionBuilder: (context, animation, _, child) =>
+        HomePopupTransition(animation: animation, alignment: const Alignment(0, .9), child: child),
   );
 }
 
@@ -3067,12 +3270,15 @@ class _SessionServers extends ConsumerWidget {
     final units = t.avpn.bytesUnits.split(',');
     final start = ref.watch(sessionStartProvider);
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    final activeOutbound = ref.watch(activeProxyNotifierProvider).valueOrNull;
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
-    final inUse = current != null && current.isGroup ? autoPick(current, group!.items) : current;
+    final inUse = current != null && current.isGroup
+        ? autoPick(current, group!.items, fallback: current.tag == group.selected ? activeOutbound : null)
+        : current;
     final servers = groupConnections([
-      for (final c in ref.watch(connectionsProvider).items)
+      for (final c in ref.watch(connectionsProvider).sessionItems)
         if (start != null &&
-            !c.start.isBefore(start) &&
+            (c.session == start.millisecondsSinceEpoch || (c.session == null && !c.start.isBefore(start))) &&
             c.route == ConnectionRoute.vpn &&
             c.outbound.isNotEmpty &&
             !isHiddenServer(c.outbound))
@@ -3139,7 +3345,14 @@ class _SessionServers extends ConsumerWidget {
                   final name = info == null ? serverNameOf(g.key) : serverName(info);
                   final dash = name.title.indexOf(' - ');
                   final title = dash < 0 ? name.title : name.title.substring(dash + 3).trim();
-                  final delay = info?.urlTestDelay ?? 0;
+                  final delay = info == null
+                      ? 0
+                      : displayedHomePingDelay(
+                          info,
+                          autoNow: inUse,
+                          active: activeOutbound,
+                          selected: info.tag == group?.selected,
+                        );
                   final share = total == 0 ? 0.0 : g.total / total;
                   return Container(
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),

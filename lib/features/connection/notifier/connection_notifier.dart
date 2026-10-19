@@ -145,15 +145,16 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       }
       loggy.info("active profile changed, reconnecting");
       await ref.read(Preferences.startedByUser.notifier).update(true);
-      await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit), restart: restart).mapLeft((
-        err,
-      ) async {
+      final result = await _connectionRepo
+          .reconnect(profile, ref.read(Preferences.disableMemoryLimit), restart: restart)
+          .run();
+      await result.match<Future<void>>((err) async {
         loggy.warning("error reconnecting", err);
         state = AsyncError(err, StackTrace.current);
         await ref
             .read(dialogNotifierProvider.notifier)
             .showCustomAlertFromErr(err.present(ref.read(translationsProvider).requireValue));
-      }).run();
+      }, (_) async {});
     }
   }
 
@@ -171,7 +172,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   final _singleStart = SingleCall();
 
   Future<void> _connect({bool retry = false}) async {
-    _singleStart.run(
+    await _singleStart.run(
       () async {
         await _connectThrottled(retry: retry);
       },
@@ -187,9 +188,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       loggy.info("no active profile, not connecting");
       return;
     }
-    await _connectionRepo.connect(activeProfile, ref.read(Preferences.disableMemoryLimit)).mapLeft((
-      ConnectionFailure err,
-    ) async {
+    final result = await _connectionRepo.connect(activeProfile, ref.read(Preferences.disableMemoryLimit)).run();
+    await result.match<Future<void>>((ConnectionFailure err) async {
       // Windows wouldn't set the VPN mode's adapter up (no administrator's rights): once more on the system proxy
       if (!ref.read(tunDeniedProvider) && isTunDenied(err)) {
         loggy.warning("the VPN mode was refused (no administrator's rights): the system proxy instead", err);
@@ -215,7 +215,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       }
       await ref.read(Preferences.startedByUser.notifier).update(false);
       state = AsyncError(err, StackTrace.current);
-    }).run();
+    }, (_) async {});
   }
 
   Future<void> _disconnect() async {

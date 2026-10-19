@@ -80,6 +80,30 @@ Future<void> _loadFont(String family, List<String> files) async {
 }
 
 void main() {
+  test('session summaries and day projection retain independent traffic', () {
+    SeenConnection row(int session) => SeenConnection.fromJson({
+      'id': 'connection',
+      'app': 'app',
+      'host': 'site',
+      'port': 443,
+      'network': 'tcp',
+      'route': 'vpn',
+      'outbound': 'server',
+      'rule': 'final',
+      'start': session + 1,
+      'up': 100,
+      'down': 200,
+      'session': session,
+    })!;
+    final first = row(1000);
+    expect(connectionSummaryKey(first), isNot(connectionSummaryKey(row(2000))));
+    expect(SeenConnection.fromJson(first.closed().toJson())!.session, 1000);
+    expect(first.plus(first, 'sum:test').session, 1000);
+    final daily = dailyConnection(first, (80, 150), DateTime(2026, 10, 16, 3));
+    expect(daily.total, 70);
+    expect(first.total, 300);
+    expect(daily.session, first.session);
+  });
   test('a Clash API entry: app, site, route and server', () {
     final c = _sample.first;
     expect(c.app, 'com.google.android.youtube');
@@ -110,6 +134,96 @@ void main() {
     );
     expect(back.active, isFalse);
     expect(SeenConnection.fromJson({'id': 1}), isNull);
+  });
+
+  test('route activity is attributed per app and clipped to the current session', () {
+    final start = DateTime(2026, 10, 17, 10);
+    final now = start.add(const Duration(minutes: 40));
+    final usage = <ConnectionRoute, Map<String, List<(int, int)>>>{
+      ConnectionRoute.vpn: {
+        'youtube': [
+          (
+            start.subtract(const Duration(minutes: 10)).millisecondsSinceEpoch,
+            start.add(const Duration(minutes: 20)).millisecondsSinceEpoch,
+          ),
+        ],
+        'instagram': [(start.add(const Duration(minutes: 10)).millisecondsSinceEpoch, now.millisecondsSinceEpoch)],
+      },
+      ConnectionRoute.direct: {
+        'disk': [
+          (
+            start.add(const Duration(minutes: 5)).millisecondsSinceEpoch,
+            start.add(const Duration(minutes: 15)).millisecondsSinceEpoch,
+          ),
+        ],
+      },
+    };
+
+    expect(routeAppUsageSince(usage, ConnectionRoute.vpn, 'youtube', start, now), const Duration(minutes: 20));
+    expect(routeAppUsageSince(usage, ConnectionRoute.vpn, 'instagram', start, now), const Duration(minutes: 30));
+    expect(routeAppUsageSince(usage, ConnectionRoute.direct, 'disk', start, now), const Duration(minutes: 10));
+    expect(routeAppUsageSince(usage, ConnectionRoute.block, 'youtube', start, now), Duration.zero);
+  });
+
+  test('parallel connections are deduplicated per route while VPN and direct stay separate', () {
+    final start = DateTime(2026, 10, 17, 10);
+    final now = start.add(const Duration(minutes: 20));
+    SeenConnection connection(String id, ConnectionRoute route, DateTime opened) => SeenConnection(
+      id: id,
+      app: 'same-app',
+      host: 'site',
+      port: 443,
+      network: 'tcp',
+      route: route,
+      outbound: '',
+      rule: '',
+      start: opened,
+      up: 0,
+      down: 0,
+      active: true,
+    );
+    final usage = <ConnectionRoute, Map<String, List<(int, int)>>>{
+      for (final route in ConnectionRoute.values) route: {},
+    };
+
+    trackRouteUsage(usage, [
+      connection('vpn-a', ConnectionRoute.vpn, start.subtract(const Duration(minutes: 5))),
+      connection('vpn-b', ConnectionRoute.vpn, start.subtract(const Duration(minutes: 3))),
+      connection('direct', ConnectionRoute.direct, start.add(const Duration(minutes: 5))),
+    ], now);
+
+    expect(routeAppUsageSince(usage, ConnectionRoute.vpn, 'same-app', start, now), const Duration(minutes: 20));
+    expect(routeAppUsageSince(usage, ConnectionRoute.direct, 'same-app', start, now), const Duration(minutes: 15));
+  });
+
+  test('home screen-time cards keep foreground apps and assign each to its main route', () {
+    final now = DateTime.now();
+    SeenConnection item(String id, String app, ConnectionRoute route, int bytes) => SeenConnection(
+      id: id,
+      app: app,
+      host: 'example.com',
+      port: 443,
+      network: 'tcp',
+      route: route,
+      outbound: '',
+      rule: '',
+      start: now,
+      up: 0,
+      down: bytes,
+      active: false,
+    );
+
+    final split = foregroundConnectionsByRoute(
+      [
+        item('visible-vpn', 'visible', ConnectionRoute.vpn, 800),
+        item('visible-direct', 'visible', ConnectionRoute.direct, 200),
+        item('background', 'background-service', ConnectionRoute.vpn, 10_000),
+      ],
+      {'visible': const Duration(minutes: 12)},
+    );
+
+    expect(split[ConnectionRoute.vpn]!.map((c) => c.app), ['visible']);
+    expect(split[ConnectionRoute.direct], isEmpty);
   });
 
   test('the app own rules read by name', () async {

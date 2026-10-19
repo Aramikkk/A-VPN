@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'package:hiddify/core/logger/redaction.dart';
 
 import 'package:logging/logging.dart';
 
@@ -57,7 +58,7 @@ class LogRing {
   Iterable<LogRecord> get records => _records;
 
   void add(LogRecord record) {
-    _records.addLast(record);
+    _records.addLast(redactLogRecord(record));
     _trim();
     revision++;
   }

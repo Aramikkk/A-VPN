@@ -52,6 +52,7 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "get_grpc_secret" -> result.success(Settings.grpcSecret)
             Trigger.AddGrpcClientPublicKey.method -> {
                 GlobalScope.launch {
                     result.runCatching {
@@ -93,7 +94,7 @@ class MethodHandler(private val scope: CoroutineScope) : FlutterPlugin,
                                     it.fixAndroidStack = Bugs.fixAndroidStack
                                     it.mode=mode.toLong()
                                     it.listen= "127.0.0.1:" + grpcPort
-                                    it.secret=""
+                                    it.secret=Settings.grpcSecret
                                     it.debug = Settings.debugMode
                                 },null)
 

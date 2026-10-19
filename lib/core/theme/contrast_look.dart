@@ -50,7 +50,13 @@ enum ContrastPalette {
   petrol('Нефть', 'Petrol', Color(0xFF0E5A6B), Color(0xFFD9922E)),
   bronze('Бронза', 'Bronze', Color(0xFFA0703C), Color(0xFF3A4A66)),
   midnight('Полночь', 'Midnight', Color(0xFF1F3A6B), Color(0xFFC9A54C)),
-  racing('Гонка', 'Racing', Color(0xFFC8102E), Color(0xFF5A5F66));
+  racing('Гонка', 'Racing', Color(0xFFC8102E), Color(0xFF5A5F66)),
+  rosewood('Пудра', 'Rose powder', Color(0xFFBC7184), Color(0xFF7CAAB5)),
+  glacier('Ледник', 'Glacier', Color(0xFF3E9EBA), Color(0xFFA38BC4)),
+  sage('Шалфей', 'Sage', Color(0xFF708F72), Color(0xFFD2AE78)),
+  sakura('Сакура', 'Sakura', Color(0xFFD95F8C), Color(0xFF72A9C1)),
+  twilight('Сумерки', 'Twilight', Color(0xFF6655B2), Color(0xFFD986AC)),
+  copper('Медь', 'Copper', Color(0xFFC06442), Color(0xFF488F86));
 
   const ContrastPalette(this.ru, this.en, this.warm, this.cool);
 
@@ -138,7 +144,7 @@ enum ContrastBackdrop {
   final String ru;
   final String en;
 
-  static const fallback = ContrastBackdrop.circles;
+  static const fallback = ContrastBackdrop.pinstripes;
 
   /// thin lines: frost over them blurs lightly, so they still show; over the filled kinds (stripes, discs) it blurs
   /// harder, or the bright shapes ran through the blocks' text
@@ -562,8 +568,7 @@ class ContrastFrostImage {
     required bool dark,
     required Size area,
     required double blur,
-    // the picture's pixels per point: the screen's own (up to 2), so it's drawn pixel for pixel and doesn't shimmer
-    // as a card moves over it
+    // Blurred textures use at most one pixel per point; sharp backgrounds keep their own resolution.
     required double scale,
   }) {
     final key =
@@ -571,7 +576,7 @@ class ContrastFrostImage {
     final kept = _kept[key];
     if (kept != null) return kept;
     // a handful at most (day and night, a few clarities); the old ones go to the collector
-    if (_kept.length > 8) _kept.clear();
+    if (_kept.length > 2) _kept.clear();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.scale(scale);
@@ -588,10 +593,12 @@ class ContrastFrostImage {
       area: area,
     ).paint(canvas, area);
     canvas.restore();
-    final image = recorder.endRecording().toImageSync(
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(
       math.max(1, (area.width * scale).ceil()),
       math.max(1, (area.height * scale).ceil()),
     );
+    picture.dispose();
     return _kept[key] = image;
   }
 }
@@ -617,7 +624,7 @@ class ContrastBackdropImage {
     final kept = _kept[key];
     if (kept != null) return kept;
     // a few at most (day and night, folded and unfolded); the old ones go to the collector
-    if (_kept.length > 4) _kept.clear();
+    if (_kept.length > 2) _kept.clear();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)..scale(scale);
     ContrastBackdropPainter(
@@ -628,10 +635,12 @@ class ContrastBackdropImage {
       seed: contrastBackdropSeed,
       area: area,
     ).paint(canvas, area);
-    final image = recorder.endRecording().toImageSync(
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(
       math.max(1, (area.width * scale).ceil()),
       math.max(1, (area.height * scale).ceil()),
     );
+    picture.dispose();
     return _kept[key] = image;
   }
 }

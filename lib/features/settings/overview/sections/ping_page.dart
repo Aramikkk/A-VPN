@@ -10,10 +10,11 @@ import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/widget/preference_tile.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
-/// Settings → Ping: where the servers' pings go (a few known addresses, or one of the user's own, each measurable
+/// Settings / Ping: where the servers' pings go (a few known addresses, or one of the user's own, each measurable
 /// through the VPN here), switching to the next one when no server has answered for a minute, how long a ping may
 /// take, how often the servers are pinged by themselves, and how the pings look in the list.
 class PingPage extends HookConsumerWidget {
@@ -168,23 +169,54 @@ class PingPage extends HookConsumerWidget {
             onChanged: ref.read(Preferences.pingAutoSwitch.notifier).update,
           ),
           heading(t.avpn.pingChecks),
-          ListTile(
-            leading: const Icon(Icons.hourglass_bottom_rounded),
-            title: Text(t.avpn.pingTimeout),
-            subtitle: Text(
-              '${t.avpn.seconds(n: ref.watch(ConfigOptions.urlTestTimeout).inSeconds)} · ${t.avpn.pingTimeoutMsg}',
+          for (final entry in [
+            ('Wi-Fi', ConfigOptions.urlTestTimeoutWifi),
+            if (!PlatformUtils.isDesktop) ('LTE', ConfigOptions.urlTestTimeoutMobile),
+          ])
+            ListTile(
+              leading: const Icon(Icons.hourglass_bottom_rounded),
+              title: Text('${t.avpn.pingTimeout} · ${entry.$1}'),
+              subtitle: Text('${t.avpn.seconds(n: ref.watch(entry.$2).inSeconds)} · ${t.avpn.pingTimeoutMsg}'),
+              onTap: () async {
+                final picked = await pick(
+                  '${t.avpn.pingTimeout} · ${entry.$1}',
+                  List.generate(30, (i) => i + 1),
+                  ref.read(entry.$2).inSeconds,
+                  (n) => t.avpn.seconds(n: n),
+                );
+                if (picked == null) return;
+                await ref.read(entry.$2.notifier).update(Duration(seconds: picked));
+                if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                  await ref
+                      .read(connectionNotifierProvider.notifier)
+                      .reconnect(await ref.read(activeProfileProvider.future));
+                }
+              },
             ),
-            onTap: () async {
-              final picked = await pick(
-                t.avpn.pingTimeout,
-                const [2, 3, 5, 7, 10],
-                ref.read(ConfigOptions.urlTestTimeout).inSeconds,
-                (n) => t.avpn.seconds(n: n),
-              );
-              if (picked != null)
-                await ref.read(ConfigOptions.urlTestTimeout.notifier).update(Duration(seconds: picked));
-            },
-          ),
+          for (final entry in [
+            ('Wi-Fi', ConfigOptions.balancerToleranceWifi),
+            if (!PlatformUtils.isDesktop) ('LTE', ConfigOptions.balancerToleranceMobile),
+          ])
+            ListTile(
+              leading: const Icon(Icons.swap_horiz_rounded),
+              title: Text('Порог переключения · ${entry.$1}'),
+              subtitle: Text('${ref.watch(entry.$2)} мс'),
+              onTap: () async {
+                final picked = await pick(
+                  'Порог переключения · ${entry.$1}',
+                  [0, 25, 50, 75, 100, 150, 200, 300],
+                  ref.read(entry.$2),
+                  (n) => '$n мс',
+                );
+                if (picked == null) return;
+                await ref.read(entry.$2.notifier).update(picked);
+                if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                  await ref
+                      .read(connectionNotifierProvider.notifier)
+                      .reconnect(await ref.read(activeProfileProvider.future));
+                }
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.timer_rounded),
             title: Text(t.pages.settings.general.urlTestInterval),

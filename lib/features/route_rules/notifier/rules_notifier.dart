@@ -164,29 +164,45 @@ enum BuiltinRule {
 
 /// The rules as the core gets them. A group of sites, phone apps and computer programs is up to three rules:
 /// sing-box ANDs a rule's apps with its sites, and the group means any of them. All keep the group's place.
-List<Rule> splitGroups(Iterable<Rule> rules) => [
-  for (final rule in rules)
-    if (BuiltinRule.of(rule) == null)
-      rule
-    else ...[
-      if (rule.domainSuffixes.isNotEmpty || rule.ipCidrs.isNotEmpty || rule.ruleSets.isNotEmpty)
-        rule.deepCopy()
-          ..packageNames.clear()
-          ..processNames.clear()
-      else if (rule.packageNames.isEmpty && rule.processNames.isEmpty)
-        rule,
-      if (rule.packageNames.isNotEmpty)
-        rule.deepCopy()
-          ..domainSuffixes.clear()
-          ..ipCidrs.clear()
-          ..processNames.clear(),
-      if (rule.processNames.isNotEmpty)
-        rule.deepCopy()
-          ..domainSuffixes.clear()
-          ..ipCidrs.clear()
-          ..packageNames.clear(),
+List<Rule> splitGroups(Iterable<Rule> rules) {
+  final list = rules.toList();
+  return [
+    for (final rule in list) ...[
+      // Keep required bank/AI domains reachable when ad lists include telemetry
+      // under those domains. Do not exempt all traffic from these applications.
+      if (BuiltinRule.of(rule) == BuiltinRule.blockAds && rule.enabled)
+        for (final group in list)
+          if (group.enabled && const {BuiltinRule.banksDirect, BuiltinRule.aiProxy}.contains(BuiltinRule.of(group)))
+            Rule(
+              name: '${group.name}:adblock-compatibility',
+              listOrder: rule.listOrder,
+              enabled: true,
+              outbound: group.outbound,
+              domainSuffixes: group.domainSuffixes,
+            ),
+      if (BuiltinRule.of(rule) == null)
+        rule
+      else ...[
+        if (rule.domainSuffixes.isNotEmpty || rule.ipCidrs.isNotEmpty || rule.ruleSets.isNotEmpty)
+          rule.deepCopy()
+            ..packageNames.clear()
+            ..processNames.clear()
+        else if (rule.packageNames.isEmpty && rule.processNames.isEmpty)
+          rule,
+        if (rule.packageNames.isNotEmpty)
+          rule.deepCopy()
+            ..domainSuffixes.clear()
+            ..ipCidrs.clear()
+            ..processNames.clear(),
+        if (rule.processNames.isNotEmpty)
+          rule.deepCopy()
+            ..domainSuffixes.clear()
+            ..ipCidrs.clear()
+            ..packageNames.clear(),
+      ],
     ],
-];
+  ];
+}
 
 @riverpod
 class RulesNotifier extends _$RulesNotifier with AppLogger {

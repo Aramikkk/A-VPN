@@ -27,6 +27,15 @@ void main() {
   });
   tearDown(() => container.dispose());
 
+  test('blank readings and independent counter resets preserve history', () {
+    history.take(_reading(100, 100), _session);
+    history.take(SystemInfo(), _session.add(const Duration(seconds: 1)));
+    history.take(_reading(150, 10), _session.add(const Duration(seconds: 2)));
+    final total = history.series(StatsRange.all, _session.add(const Duration(seconds: 3))).total;
+    expect(total.down, 150);
+    expect(total.up, 110);
+  });
+
   test('ten minutes: slots on the clock, the fastest second, down and up apart', () {
     final start = _session.add(const Duration(seconds: 1));
     var down = 0;

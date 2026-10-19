@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/logger/logger_setup.dart';
+import 'package:hiddify/core/logger/redaction.dart';
 import 'package:hiddify/core/logger/ring/log_ring.dart';
 import 'package:hiddify/core/logger/sinks/file_sink.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
@@ -223,10 +224,12 @@ Future<void> _exportLines(
 /// Desktop gets a save dialog; a phone gets the share sheet, which is what
 /// "save this somewhere" means there.
 Future<void> _saveFileAs(
-  File file, {
+  File source, {
   required Translations t,
   required InAppNotificationController notifications,
 }) async {
+  final file = File('${source.path}.redacted.log');
+  await file.writeAsString(redactLogText(await source.readAsString()));
   if (!PlatformUtils.isDesktop) {
     await UriUtils.tryShareOrLaunchFile(Uri.parse(file.path));
     return;

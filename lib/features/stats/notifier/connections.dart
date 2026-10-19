@@ -9,11 +9,14 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Where a connection went.
 enum ConnectionRoute { vpn, direct, block }
+
+typedef RouteUsage = Map<ConnectionRoute, Map<String, List<(int, int)>>>;
 
 /// One connection the core has seen: which app opened it, to which site, which way it went and how much it moved.
 class SeenConnection {
@@ -31,9 +34,11 @@ class SeenConnection {
     required this.down,
     required this.active,
     this.count = 1,
+    this.session,
   });
 
   final String id;
+  final int? session;
 
   /// the app's package (Android) or program path (Windows); empty when the core couldn't tell
   final String app;
@@ -66,6 +71,7 @@ class SeenConnection {
 
   SeenConnection closed() => SeenConnection(
     id: id,
+    session: session,
     app: app,
     host: host,
     port: port,
@@ -83,6 +89,7 @@ class SeenConnection {
   /// [other] added to this one, kept under [id]
   SeenConnection plus(SeenConnection other, String id) => SeenConnection(
     id: id,
+    session: session,
     app: app,
     host: host,
     port: port == other.port ? port : 0,
@@ -99,6 +106,7 @@ class SeenConnection {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (session != null) 'session': session,
     'app': app,
     'host': host,
     'port': port,
@@ -117,6 +125,7 @@ class SeenConnection {
     try {
       return SeenConnection(
         id: json['id'] as String,
+        session: json['session'] as int?,
         app: json['app'] as String,
         host: json['host'] as String,
         port: json['port'] as int,
@@ -136,7 +145,7 @@ class SeenConnection {
   }
 
   /// One entry of the Clash API's /connections list.
-  static SeenConnection? fromClash(Map<String, dynamic> json) {
+  static SeenConnection? fromClash(Map<String, dynamic> json, {int? session}) {
     final id = json['id'];
     final meta = json['metadata'];
     if (id is! String || meta is! Map) return null;
@@ -145,6 +154,7 @@ class SeenConnection {
     final ip = (meta['destinationIP'] as String?)?.trim() ?? '';
     return SeenConnection(
       id: id,
+      session: session,
       app: appOf((meta['processPath'] as String?) ?? ''),
       host: host.isNotEmpty ? host : ip,
       port: int.tryParse('${meta['destinationPort']}') ?? 0,
@@ -199,16 +209,99 @@ class SeenConnection {
 
 /// What the Connections tab shows.
 class ConnectionsState {
-  const ConnectionsState({this.items = const [], this.available = true, this.since});
+  const ConnectionsState({
+    this.items = const [],
+    this.sessionItems = const [],
+    this.available = true,
+    this.since,
+    this.usage = const {},
+    this.routeUsage = const {},
+  });
+
+  /// by app: the stretches of time it had a connection open (ms since the epoch, from and to, merged, oldest
+  /// first); see [usageSince]
+  final Map<String, List<(int, int)>> usage;
+
+  /// by route, then app: open-connection stretches, oldest first
+  final RouteUsage routeUsage;
 
   /// open ones and the ones closed today (the latest [Connections.keepClosed]), newest first
   final List<SeenConnection> items;
+  final List<SeenConnection> sessionItems;
 
   /// false: the core's connection list can't be reached (not connected, or the Clash API is off)
   final bool available;
 
   /// when the list started: 03:00 today (the statistics day), or when it was last cleared
   final DateTime? since;
+}
+
+/// How long [app] had a connection open from [from] to [now]: its stretches in [usage], cut to that time.
+Duration usageSince(Map<String, List<(int, int)>> usage, String app, DateTime from, DateTime now) {
+  final a = from.millisecondsSinceEpoch;
+  final b = now.millisecondsSinceEpoch;
+  var ms = 0;
+  for (final (start, end) in usage[app] ?? const <(int, int)>[]) {
+    final s = start < a ? a : start;
+    final e = end > b ? b : end;
+    if (e > s) ms += e - s;
+  }
+  return Duration(milliseconds: ms);
+}
+
+/// How long [app] had a connection open through [route], clipped to the current session.
+Duration routeAppUsageSince(RouteUsage usage, ConnectionRoute route, String app, DateTime from, DateTime now) =>
+    usageSince(usage[route] ?? const {}, app, from, now);
+
+/// The connections attributable to screen-visible apps, with each app shown on the route carrying most of its
+/// traffic. This keeps background services and duplicate app rows out of the home screen's activity cards.
+Map<ConnectionRoute, List<SeenConnection>> foregroundConnectionsByRoute(
+  Iterable<SeenConnection> connections,
+  Map<String, Duration> foregroundTime,
+) {
+  final totals = <String, Map<ConnectionRoute, int>>{};
+  for (final connection in connections) {
+    if (connection.app.isEmpty || connection.route == ConnectionRoute.block) continue;
+    totals.putIfAbsent(connection.app, () => {})[connection.route] =
+        (totals[connection.app]![connection.route] ?? 0) + connection.total;
+  }
+
+  final mainRoute = <String, ConnectionRoute>{};
+  for (final entry in totals.entries) {
+    if ((foregroundTime[entry.key]?.inMilliseconds ?? 0) <= 0) continue;
+    final routes = entry.value.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    if (routes.isNotEmpty) mainRoute[entry.key] = routes.first.key;
+  }
+
+  return {
+    for (final route in [ConnectionRoute.vpn, ConnectionRoute.direct])
+      route: [
+        for (final app in mainRoute.entries.where((entry) => entry.value == route).map((entry) => entry.key))
+          ...connections.where((connection) => connection.app == app && connection.route == route),
+      ],
+  };
+}
+
+/// Add the open intervals for each route, counting parallel connections from one app only once per route.
+void trackRouteUsage(RouteUsage usage, Iterable<SeenConnection> open, DateTime now) {
+  final to = now.millisecondsSinceEpoch;
+  for (final route in ConnectionRoute.values) {
+    final earliestByApp = <String, int>{};
+    for (final c in open.where((c) => c.route == route && c.app.isNotEmpty)) {
+      final start = c.start.millisecondsSinceEpoch;
+      final known = earliestByApp[c.app];
+      if (known == null || start < known) earliestByApp[c.app] = start;
+    }
+    earliestByApp.forEach((app, start) => _extendRouteUsage(usage[route]!.putIfAbsent(app, () => []), start, to));
+  }
+}
+
+void _extendRouteUsage(List<(int, int)> stretches, int start, int to) {
+  if (stretches.isNotEmpty && stretches.last.$2 >= start) {
+    stretches[stretches.length - 1] = (stretches.last.$1, to);
+  } else {
+    stretches.add((start > to ? to : start, to));
+  }
 }
 
 /// The connections the core reports through its local Clash API, every 2 seconds from the app's start (main.dart
@@ -229,7 +322,14 @@ class Connections extends Notifier<ConnectionsState> {
   HttpClient? _client;
   final _seen = <String, SeenConnection>{};
 
+  /// by app: when it had a connection open (see [ConnectionsState.usage])
+  final _usage = <String, List<(int, int)>>{};
+
+  /// by route and app: connection stretches kept separately from the all-route app total
+  final RouteUsage _routeUsage = {for (final route in ConnectionRoute.values) route: {}};
+
   /// the statistics day the list belongs to (its 03:00), and when it starts (that, or the last clearing)
+  final _dayBaselines = <String, (int, int)>{};
   DateTime? _day;
   DateTime? _since;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
@@ -241,43 +341,74 @@ class Connections extends Notifier<ConnectionsState> {
 
   @override
   ConnectionsState build() {
+    ref.watch(sessionStartProvider);
     _rollDay();
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
     final enabled = ref.watch(ConfigOptions.enableClashApi);
     final port = ref.watch(ConfigOptions.clashApiPort);
     final secret = ref.watch(ConfigOptions.clashApiSecret);
     // not connected (or only for a moment while the app comes back): nothing to ask, the list stays as it is
-    if (!connected || !enabled) return ConnectionsState(items: _sorted(), available: false, since: _since);
+    if (!connected || !enabled) {
+      return ConnectionsState(
+        items: _sorted(),
+        sessionItems: _sessionItems(),
+        available: false,
+        since: _since,
+        usage: _usage,
+        routeUsage: _routeUsage,
+      );
+    }
     // the core's API is on this machine: never through a proxy
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 2)
       ..findProxy = ((_) => 'DIRECT');
     _client = client;
     final url = Uri.parse('http://127.0.0.1:$port/connections');
-    var last = DateTime.fromMillisecondsSinceEpoch(0);
-    var foreground = true;
+    var foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    var disposed = false;
+    Timer? timer;
+    void schedule() {
+      timer?.cancel();
+      timer = Timer(foreground ? interval : backgroundInterval, () {
+        if (disposed) return;
+        unawaited(_poll(client, url, secret));
+        schedule();
+      });
+    }
+
     final lifecycle = AppLifecycleListener(
       onResume: () {
         foreground = true;
         unawaited(_poll(client, url, secret));
+        schedule();
       },
-      onHide: () => foreground = false,
-      onPause: () => foreground = false,
+      onHide: () {
+        foreground = false;
+        schedule();
+      },
+      onPause: () {
+        foreground = false;
+        schedule();
+      },
     );
-    final timer = Timer.periodic(interval, (_) {
-      final now = DateTime.now();
-      if (!foreground && now.difference(last) < backgroundInterval) return;
-      last = now;
-      unawaited(_poll(client, url, secret));
-    });
+    schedule();
     ref.onDispose(() {
+      disposed = true;
       lifecycle.dispose();
-      timer.cancel();
+      timer?.cancel();
       client.close(force: true);
       _client = null;
     });
     unawaited(_poll(client, url, secret));
-    return ConnectionsState(items: _sorted(), since: _since);
+    return ConnectionsState(
+      items: _sorted(),
+      sessionItems: _sessionItems(),
+      since: _since,
+      usage: _usage,
+      routeUsage: _routeUsage,
+    );
   }
 
   /// Picks up the saved list once, and starts a new one when a new statistics day has begun (03:00).
@@ -289,8 +420,12 @@ class Connections extends Notifier<ConnectionsState> {
       _restore(day);
     }
     if (_day != null && _day != day) {
+      _dayBaselines.clear();
+      for (final c in _seen.values.where((c) => c.active)) {
+        _dayBaselines[c.id] = (c.up, c.down);
+      }
       // past 03:00: yesterday's closed connections go, the open ones carry on
-      _seen.removeWhere((_, c) => !c.active);
+      _seen.removeWhere((_, c) => !c.active && c.session != ref.read(sessionStartProvider)?.millisecondsSinceEpoch);
       _day = day;
       _since = day;
       _save();
@@ -302,13 +437,39 @@ class Connections extends Notifier<ConnectionsState> {
       final file = _file;
       if (file == null || !file.existsSync()) return;
       final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-      if (json['day'] != day.millisecondsSinceEpoch) return;
+      final sameDay = json['day'] == day.millisecondsSinceEpoch;
+      if (sameDay) {
+        (json['dayBaselines'] as Map<String, dynamic>? ?? {}).forEach((id, value) {
+          final pair = value as List;
+          _dayBaselines[id] = (pair[0] as int, pair[1] as int);
+        });
+      }
       final since = json['since'] as int?;
-      if (since != null) _since = DateTime.fromMillisecondsSinceEpoch(since);
+      if (sameDay && since != null) _since = DateTime.fromMillisecondsSinceEpoch(since);
       for (final item in (json['items'] as List).whereType<Map<String, dynamic>>()) {
         final c = SeenConnection.fromJson(item);
-        if (c != null && !isAdultHost(c.host) && !_hidden(c.app)) _seen[c.id] = c;
+        if (c != null && (sameDay || c.session != null) && !isAdultHost(c.host) && !_hidden(c.app)) {
+          _seen[c.id] = c;
+          if (!sameDay) _dayBaselines[c.id] = (c.up, c.down);
+        }
       }
+      (json['usage'] as Map<String, dynamic>? ?? {}).forEach((app, list) {
+        _usage[app] = [
+          for (final pair in (list as List).whereType<List>())
+            if (pair.length == 2) ((pair[0] as num).toInt(), (pair[1] as num).toInt()),
+        ];
+      });
+      (json['routeUsage'] as Map<String, dynamic>? ?? {}).forEach((routeName, byApp) {
+        final route = ConnectionRoute.values.where((value) => value.name == routeName).firstOrNull;
+        if (route == null || byApp is! Map<String, dynamic>) return;
+        byApp.forEach((app, list) {
+          if (list is! List) return;
+          _routeUsage[route]![app] = [
+            for (final pair in list.whereType<List>())
+              if (pair.length == 2) ((pair[0] as num).toInt(), (pair[1] as num).toInt()),
+          ];
+        });
+      });
     } catch (_) {
       // an unreadable list is just not restored
     }
@@ -323,6 +484,24 @@ class Connections extends Notifier<ConnectionsState> {
       'day': day.millisecondsSinceEpoch,
       'since': _since?.millisecondsSinceEpoch,
       'items': [for (final c in _seen.values) c.toJson()],
+      'dayBaselines': {
+        for (final e in _dayBaselines.entries) e.key: [e.value.$1, e.value.$2],
+      },
+      'usage': {
+        for (final e in _usage.entries)
+          e.key: [
+            for (final (a, b) in e.value) [a, b],
+          ],
+      },
+      'routeUsage': {
+        for (final route in ConnectionRoute.values)
+          route.name: {
+            for (final e in _routeUsage[route]!.entries)
+              e.key: [
+                for (final (a, b) in e.value) [a, b],
+              ],
+          },
+      },
     });
     unawaited(file.writeAsString(json).then((_) {}, onError: (_) {}));
   }
@@ -331,7 +510,14 @@ class Connections extends Notifier<ConnectionsState> {
   void clearClosed() {
     _seen.removeWhere((_, c) => !c.active);
     _since = DateTime.now();
-    state = ConnectionsState(items: _sorted(), since: _since);
+    _dropUsageBefore(_since!);
+    state = ConnectionsState(
+      items: _sorted(),
+      sessionItems: _sessionItems(),
+      since: _since,
+      usage: _usage,
+      routeUsage: _routeUsage,
+    );
     _save();
   }
 
@@ -355,7 +541,7 @@ class Connections extends Notifier<ConnectionsState> {
     final open = <String>{};
     for (final entry in list ?? const []) {
       if (entry is! Map<String, dynamic>) continue;
-      final c = SeenConnection.fromClash(entry);
+      final c = SeenConnection.fromClash(entry, session: ref.read(sessionStartProvider)?.millisecondsSinceEpoch);
       // adult sites go through the VPN but are never listed
       if (c == null || isAdultHost(c.host) || _hidden(c.app)) continue;
       open.add(c.id);
@@ -366,19 +552,67 @@ class Connections extends Notifier<ConnectionsState> {
         if (!open.contains(id) && _seen[id]!.active) _seen[id] = _seen[id]!.closed();
       }
     }
+    if (list != null) _track(open.map((id) => _seen[id]!), DateTime.now());
     _fold();
-    state = ConnectionsState(items: _sorted(), since: _since);
+    state = ConnectionsState(
+      items: _sorted(),
+      sessionItems: _sessionItems(),
+      since: _since,
+      usage: Map.of(_usage),
+      routeUsage: _routeUsage,
+    );
     if (DateTime.now().difference(_saved) > saveEvery) _save();
+  }
+
+  /// Each app with a connection open now: its stretch goes on to now, or a new one starts with the earliest of
+  /// them (when that began after the last stretch ended); parallel connections don't add up twice.
+  void _track(Iterable<SeenConnection> open, DateTime now) {
+    final earliest = <String, int>{};
+    for (final c in open) {
+      final start = c.start.millisecondsSinceEpoch;
+      final known = earliest[c.app];
+      if (known == null || start < known) earliest[c.app] = start;
+    }
+    final to = now.millisecondsSinceEpoch;
+    earliest.forEach((app, start) {
+      _extendUsage(_usage.putIfAbsent(app, () => []), start, to);
+    });
+    trackRouteUsage(_routeUsage, open, now);
+  }
+
+  void _extendUsage(List<(int, int)> stretches, int start, int to) {
+    if (stretches.isNotEmpty && stretches.last.$2 >= start) {
+      stretches[stretches.length - 1] = (stretches.last.$1, to);
+    } else {
+      stretches.add((start > to ? to : start, to));
+    }
+  }
+
+  void _dropUsageBefore(DateTime from) {
+    final a = from.millisecondsSinceEpoch;
+    for (final stretches in _usage.values) {
+      stretches.removeWhere((s) => s.$2 <= a);
+    }
+    _usage.removeWhere((_, s) => s.isEmpty);
+    for (final stretches in _routeUsage.values) {
+      for (final appStretches in stretches.values) {
+        appStretches.removeWhere((s) => s.$2 <= a);
+      }
+      stretches.removeWhere((_, appStretches) => appStretches.isEmpty);
+    }
   }
 
   /// The latest [keepClosed] closed connections are kept one by one; older ones are added up by app, site, route,
   /// server and rule, so their traffic still counts.
   void _fold() {
-    final closed = _seen.values.where((c) => !c.active && !c.id.startsWith(summaryPrefix)).toList()
-      ..sort((a, b) => b.start.compareTo(a.start));
+    final closed =
+        _seen.values
+            .where((c) => !c.active && !c.id.startsWith(summaryPrefix) && !_dayBaselines.containsKey(c.id))
+            .toList()
+          ..sort((a, b) => b.start.compareTo(a.start));
     for (final c in closed.skip(keepClosed)) {
       _seen.remove(c.id);
-      final key = '$summaryPrefix${c.app}|${c.host}|${c.route.name}|${c.outbound}|${c.rule}';
+      final key = connectionSummaryKey(c);
       final summary = _seen[key];
       _seen[key] = summary == null ? c.plus(_none, key) : summary.plus(c, key);
     }
@@ -401,7 +635,16 @@ class Connections extends Notifier<ConnectionsState> {
     count: 0,
   );
 
-  List<SeenConnection> _sorted() => _seen.values.toList()..sort((a, b) => b.start.compareTo(a.start));
+  List<SeenConnection> _sessionItems() => _seen.values.toList();
+
+  List<SeenConnection> _sorted() => [
+    for (final c in _seen.values)
+      if (_dayBaselines.containsKey(c.id) &&
+          (c.active || c.up > _dayBaselines[c.id]!.$1 || c.down > _dayBaselines[c.id]!.$2))
+        dailyConnection(c, _dayBaselines[c.id]!, _since!)
+      else if (c.active || _since == null || !c.start.isBefore(_since!))
+        c,
+  ]..sort((a, b) => b.start.compareTo(a.start));
 }
 
 /// Apps and sites that moved less than this are hidden by default (1 MB).
@@ -485,3 +728,25 @@ String serverFlags(Iterable<String> servers) {
 
 /// Programs left out of the traffic lists: Google Drive for desktop syncs in the background and would fill them.
 bool _hidden(String app) => app.toLowerCase().contains('googledrivefs');
+
+/// A summary can contain one logical VPN session only. Legacy rows stay isolated by start.
+String connectionSummaryKey(SeenConnection c) =>
+    '${Connections.summaryPrefix}${c.session ?? c.start.millisecondsSinceEpoch}|${statsDayStart(c.start).millisecondsSinceEpoch}|${c.app}|${c.host}|${c.route.name}|${c.outbound}|${c.rule}';
+
+/// The daily projection subtracts bytes already counted before 03:00; the session row remains intact.
+SeenConnection dailyConnection(SeenConnection c, (int, int) baseline, DateTime day) => SeenConnection(
+  id: c.id,
+  app: c.app,
+  host: c.host,
+  port: c.port,
+  network: c.network,
+  route: c.route,
+  outbound: c.outbound,
+  rule: c.rule,
+  start: day,
+  session: c.session,
+  up: (c.up - baseline.$1).clamp(0, c.up),
+  down: (c.down - baseline.$2).clamp(0, c.down),
+  active: c.active,
+  count: c.count,
+);

@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hiddify/utils/custom_loggers.dart';
 
@@ -166,6 +166,17 @@ abstract class ServerRegionFilter {
   static bool isMobileOnly(String tag) => tag.toLowerCase().contains('lte only') || tag.contains('БС');
 
   static const _networkChannel = MethodChannel('com.aravpn.app/network');
+  static const _networkEvents = EventChannel('com.aravpn.app/network/events');
+  static final Stream<NetworkKind> _networkChanges = _networkEvents.receiveBroadcastStream().map((event) {
+    return switch (event) {
+      'wifi' => NetworkKind.wifi,
+      'mobile' => NetworkKind.mobile,
+      _ => NetworkKind.unknown,
+    };
+  });
+
+  /// Emits the physical network beneath the VPN, independent of whether the app is foregrounded.
+  static Stream<NetworkKind> get networkChanges => _networkChanges;
 
   /// The network the running config was filtered for; the app re-filters when the phone's network differs.
   /// Kept across the app's restarts: the VPN outlives the app, and an app opened again took "unknown" for a

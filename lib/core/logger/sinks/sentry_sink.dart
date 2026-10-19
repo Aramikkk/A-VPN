@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hiddify/core/logger/redaction.dart';
 
 import 'package:hiddify/utils/sentry_utils.dart';
 import 'package:logging/logging.dart';
@@ -44,7 +45,8 @@ class SentryLogIntegration implements Integration<SentryOptions> {
   Future<void> close() async {}
 }
 
-Future<void> _toSentry(LogRecord record) async {
+Future<void> _toSentry(LogRecord original) async {
+  final record = redactLogRecord(original);
   if (!canLogEvent(record.error)) return;
 
   if (record.level >= _minEventLevel) {

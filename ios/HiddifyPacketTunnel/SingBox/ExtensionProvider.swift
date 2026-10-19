@@ -57,7 +57,12 @@ open class ExtensionProvider: NEPacketTunnelProvider {
             opts.workingDir = workDir
             opts.tempDir = cacheDir
             opts.listen = "127.0.0.1:\(grpcServiceModePort)"
-            opts.secret = ""
+            guard let grpcSecret = options?["GrpcSecret"] as? String ??
+                    UserDefaults(suiteName: FilePath.groupName)?.string(forKey: "grpc_auth_secret"),
+                    grpcSecret.count >= 32 else {
+                throw NSError(domain: "CoreCredentials", code: 1)
+            }
+            opts.secret = grpcSecret
             opts.debug = false
             opts.mode = 4
             opts.fixAndroidStack = false

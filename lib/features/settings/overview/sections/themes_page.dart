@@ -555,7 +555,7 @@ class _GlassStylePreview extends StatelessWidget {
   }
 }
 
-/// Contrast's look in three steps: how see-through the blocks are, the backdrop (ten kinds) and the colour (thirty).
+/// Contrast's look in three steps: clarity, backdrop and colour palettes.
 class ContrastThemePicker extends ConsumerWidget {
   const ContrastThemePicker({super.key});
 

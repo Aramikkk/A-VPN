@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F60718293A4B5C /* NetworkTypeEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5061728394A5B6C /* NetworkTypeEventHandler.swift */; };
 		032158B82ADDF8BF008D943B /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032158B72ADDF8BF008D943B /* VPNManager.swift */; };
 		032158BA2ADDFCC9008D943B /* TrafficReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032158B92ADDFCC9008D943B /* TrafficReader.swift */; };
 		032158BC2ADDFD09008D943B /* SingBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032158BB2ADDFD09008D943B /* SingBox.swift */; };
@@ -79,6 +80,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B1C2D3E4F5061728394A5B6C /* NetworkTypeEventHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkTypeEventHandler.swift; sourceTree = "<group>"; };
 		032158B72ADDF8BF008D943B /* VPNManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VPNManager.swift; sourceTree = "<group>"; };
 		032158B92ADDFCC9008D943B /* TrafficReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficReader.swift; sourceTree = "<group>"; };
 		032158BB2ADDFD09008D943B /* SingBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingBox.swift; sourceTree = "<group>"; };
@@ -218,6 +220,7 @@
 				03B5167C2AE7AC6200EA47E2 /* GroupsEventHandler.swift */,
 				0736958C2B3B79E0007249BE /* StatsEventHandler.swift */,
 				D703EE952B765176001D88B3 /* ActiveGroupsEventHandler.swift */,
+				B1C2D3E4F5061728394A5B6C /* NetworkTypeEventHandler.swift */,
 			);
 			path = Handlers;
 			sourceTree = "<group>";
@@ -667,6 +670,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F60718293A4B5C /* NetworkTypeEventHandler.swift in Sources */,
 				03B516742AE74D2200EA47E2 /* Stored.swift in Sources */,
 				03B5167B2AE79DB400EA47E2 /* FileMethodHandler.swift in Sources */,
 				03B516772AE7634400EA47E2 /* Logger.swift in Sources */,

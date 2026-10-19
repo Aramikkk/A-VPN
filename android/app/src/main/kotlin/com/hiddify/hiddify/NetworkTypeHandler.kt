@@ -3,7 +3,11 @@ package com.hiddify.hiddify
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -12,9 +16,14 @@ import io.flutter.plugin.common.MethodChannel
  * while it runs, so this looks at every other network instead: a validated Wi-Fi (or Ethernet) wins, else
  * a mobile one.
  */
-class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
+class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
     private var channel: MethodChannel? = null
+    private var events: EventChannel? = null
+    private var sink: EventChannel.EventSink? = null
     private var context: Context? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var publishTask: Runnable? = null
 
     companion object {
         const val channelName = "com.aravpn.app/network"
@@ -23,12 +32,65 @@ class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, channelName).also { it.setMethodCallHandler(this) }
+        events = EventChannel(binding.binaryMessenger, "$channelName/events").also { it.setStreamHandler(this) }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel?.setMethodCallHandler(null)
+        events?.setStreamHandler(null)
+        stopMonitoring()
+        sink = null
+        events = null
         channel = null
         context = null
+    }
+
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        stopMonitoring()
+        sink = events
+        publish()
+        val manager = context?.getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) = publish()
+            override fun onLost(network: android.net.Network) = publish()
+            override fun onCapabilitiesChanged(
+                network: android.net.Network,
+                networkCapabilities: NetworkCapabilities
+            ) = publish()
+        }
+        try {
+            manager.registerNetworkCallback(NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), callback)
+            networkCallback = callback
+        } catch (_: RuntimeException) {
+            networkCallback = null
+        }
+    }
+
+    override fun onCancel(arguments: Any?) {
+        sink = null
+        stopMonitoring()
+    }
+
+    private fun publish() {
+        publishTask?.let(handler::removeCallbacks)
+        val task = Runnable {
+            publishTask = null
+            sink?.success(NetworkKinds.underlying(context))
+        }
+        publishTask = task
+        handler.postDelayed(task, 250)
+    }
+
+    private fun stopMonitoring() {
+        publishTask?.let(handler::removeCallbacks)
+        publishTask = null
+        val callback = networkCallback ?: return
+        try {
+            context?.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback)
+        } catch (_: RuntimeException) {
+            // The system can detach the callback while the engine is shutting down.
+        }
+        networkCallback = null
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

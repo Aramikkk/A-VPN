@@ -23,15 +23,16 @@ extension VpnTraffic on SystemInfo {
   }
 }
 
-/// "12,4 МБ" with [units] such as Б, КБ, МБ, ГБ, ТБ; one decimal under 100, none above.
-String formatBytes(int bytes, List<String> units, {String decimalSeparator = ','}) {
+/// "12,4 МБ" with [units] such as Б, КБ, МБ, ГБ, ТБ; one decimal under 100, none above. [whole]: no decimals up
+/// to megabytes ("12 МБ"), gigabytes still with one ("4,5 ГБ", or 4 and 4,9 would read the same).
+String formatBytes(int bytes, List<String> units, {String decimalSeparator = ',', bool whole = false}) {
   var value = bytes.toDouble();
   var unit = 0;
   while (value >= 1024 && unit < units.length - 1) {
     value /= 1024;
     unit++;
   }
-  var text = unit == 0 || value >= 100 ? value.round().toString() : value.toStringAsFixed(1);
+  var text = unit == 0 || value >= 100 || (whole && unit <= 2) ? value.round().toString() : value.toStringAsFixed(1);
   if (text.endsWith('.0')) text = text.substring(0, text.length - 2); // "10 МБ", not "10,0 МБ"
   return '${text.replaceAll('.', decimalSeparator)} ${units[unit]}';
 }

@@ -1,3 +1,4 @@
+import 'package:hiddify/features/home/widget/popup_transition.dart';
 import 'dart:ui' as ui;
 import 'dart:async';
 import 'dart:math' as math;
@@ -21,8 +22,11 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/foreground_screen_time.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
+import 'package:hiddify/features/stats/notifier/session_totals.dart';
+import 'package:hiddify/features/home/widget/network_indicator.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -36,6 +40,7 @@ import 'package:hiddify/features/proxy/data/lan_sharing.dart';
 import 'package:hiddify/features/proxy/data/hidden_servers.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
+import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -50,6 +55,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 part 'styled_home.dart';
 
+final _actualNetworkKind = ValueNotifier<NetworkKind>(NetworkKind.unknown);
+
 /// Home screen: the provider card with the server list inside, a "check" row, and the connection card.
 class AraHomeBody extends HookConsumerWidget {
   const AraHomeBody({super.key, this.traffic = true});
@@ -61,6 +68,33 @@ class AraHomeBody extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final profile = ref.watch(activeProfileProvider).valueOrNull;
+    final appLifecycle = useState(WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.detached);
+    useEffect(() {
+      final listener = AppLifecycleListener(onStateChange: (state) => appLifecycle.value = state);
+      return listener.dispose;
+    }, const []);
+    final visible = TickerMode.of(context) && appLifecycle.value == AppLifecycleState.resumed;
+    final connectivity = useStream(visible ? ServerRegionFilter.networkChanges : const Stream<NetworkKind>.empty());
+    useEffect(() {
+      if (!visible) return null;
+      var mounted = true;
+      Future<void> refreshNetwork() async {
+        final kind = await ServerRegionFilter.currentNetwork();
+        if (mounted && kind != NetworkKind.unknown) _actualNetworkKind.value = kind;
+      }
+
+      unawaited(refreshNetwork());
+      final refresh = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(refreshNetwork()));
+      return () {
+        mounted = false;
+        refresh.cancel();
+      };
+    }, [visible]);
+    useEffect(() {
+      final kind = connectivity.data;
+      if (kind != null && kind != NetworkKind.unknown) _actualNetworkKind.value = kind;
+      return null;
+    }, [connectivity.data]);
     // set while a ping of every server runs, so the list can show spinners (the panel's button runs it too)
     final testing = useValueListenable(homePingTesting);
     Future<void> pingAll() => pingAllServers(ref);
@@ -69,7 +103,7 @@ class AraHomeBody extends HookConsumerWidget {
     // no spinners); back from the background after longer, at once
     final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
     useEffect(() {
-      if (!connected) return null;
+      if (!connected || !visible) return null;
       var last = DateTime.now();
       Future<void> refresh() async {
         if (homePingTesting.value) return;
@@ -123,11 +157,11 @@ class AraHomeBody extends HookConsumerWidget {
         retry.cancel();
         lifecycle.dispose();
       };
-    }, [connected]);
+    }, [connected, visible]);
 
     final style = Theme.of(context).araLook.style;
     if (style != AraStyle.classic) {
-      return _StyledHome(testing: testing, onCheck: pingAll, traffic: traffic);
+      return _StyledHome(testing: testing, onCheck: pingAll, traffic: traffic, visible: visible);
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -209,6 +243,7 @@ class _ProviderCard extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final proxies = ref.watch(proxiesOverviewNotifierProvider);
     final group = proxies.valueOrNull;
+    final activeOutbound = ref.watch(activeProxyNotifierProvider).valueOrNull;
     final servers = [
       for (final item in group?.items ?? <OutboundInfo>[])
         if (item.isVisible && item.tag != 'balance') item,
@@ -217,7 +252,9 @@ class _ProviderCard extends HookConsumerWidget {
     final autoGroup = group?.items
         .where((i) => i.tag == (group.selected == 'balance' ? 'balance' : 'lowest'))
         .firstOrNull;
-    final autoNow = autoGroup == null ? null : autoPick(autoGroup, group!.items);
+    final autoNow = autoGroup == null
+        ? null
+        : autoPick(autoGroup, group!.items, fallback: group.selected == autoGroup.tag ? activeOutbound : null);
     final remote = profile is RemoteProfileEntity ? profile as RemoteProfileEntity : null;
     final sub = remote?.subInfo;
     final updating = remote != null && ref.watch(updateProfileNotifierProvider(profile.id)).isLoading;
@@ -306,6 +343,7 @@ class _ProviderCard extends HookConsumerWidget {
                           (servers[i].tag == 'lowest' && group?.selected == 'balance'),
                       testing: testing,
                       autoNow: servers[i].tag == 'lowest' ? autoNow : null,
+                      activeOutbound: activeOutbound,
                       onTap: () =>
                           ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", servers[i].tag),
                     ),
@@ -324,12 +362,14 @@ class _ServerTile extends ConsumerWidget {
     required this.testing,
     required this.onTap,
     this.autoNow,
+    this.activeOutbound,
   });
 
   final OutboundInfo server;
 
   /// for the auto row: the server it uses right now
   final OutboundInfo? autoNow;
+  final OutboundInfo? activeOutbound;
   final bool selected;
   final bool testing;
   final VoidCallback onTap;
@@ -401,7 +441,10 @@ class _ServerTile extends ConsumerWidget {
                   ),
                 ),
                 const Gap(8),
-                _Delay(delay: server.urlTestDelay, testing: testing),
+                _Delay(
+                  delay: displayedHomePingDelay(server, autoNow: autoNow, active: activeOutbound, selected: selected),
+                  testing: testing,
+                ),
               ],
             ),
           ),
@@ -852,6 +895,7 @@ class _ConnectionCard extends HookConsumerWidget {
     final connected = status.isConnected;
     final stats = ref.watch(statsNotifierProvider).valueOrNull;
     final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    final activeOutbound = ref.watch(activeProxyNotifierProvider).valueOrNull;
 
     // how long the tunnel has been up, ticking every second while connected: from the core's session start, so
     // reopening the app doesn't restart the count (the local start is only the fallback for an older core)
@@ -869,7 +913,9 @@ class _ConnectionCard extends HookConsumerWidget {
 
     final current = group?.items.where((i) => i.tag == group.selected).firstOrNull;
     // on auto, the country it uses right now
-    final picked = current != null && current.isGroup ? autoPick(current, group!.items) : null;
+    final picked = current != null && current.isGroup
+        ? autoPick(current, group!.items, fallback: current.tag == group.selected ? activeOutbound : null)
+        : null;
     final currentName = switch (current?.tag) {
       'lowest' ||
       'balance' => picked == null ? t.avpn.autoBest : '${t.avpn.auto}: ${_withFlag(serverName(picked))}',
@@ -1025,16 +1071,31 @@ class _RoundButton extends StatelessWidget {
 }
 
 /// The server an auto group ("lowest", "balance") uses right now, if the core has said.
-OutboundInfo? autoPick(OutboundInfo group, List<OutboundInfo> items) {
-  if (!group.hasGroupSelectedTag() || group.groupSelectedTag.isEmpty) return null;
-  return items.where((i) => i.tag == group.groupSelectedTag).firstOrNull;
+OutboundInfo? autoPick(OutboundInfo group, List<OutboundInfo> items, {OutboundInfo? fallback}) {
+  if (!group.hasGroupSelectedTag() || group.groupSelectedTag.isEmpty) return fallback;
+  final selected = items.where((i) => i.tag == group.groupSelectedTag).firstOrNull;
+  final fallbackHasPing = fallback != null && fallback.urlTestDelay > 0 && fallback.urlTestDelay < 65000;
+  if (selected == null || selected.urlTestDelay <= 0 || selected.urlTestDelay >= 65000) {
+    return fallbackHasPing ? fallback : selected;
+  }
+  return selected;
+}
+
+int displayedHomePingDelay(OutboundInfo server, {OutboundInfo? autoNow, OutboundInfo? active, bool selected = false}) {
+  final measured = server.tag == 'lowest' || server.tag == 'balance' ? autoNow : server;
+  final delay = measured?.urlTestDelay ?? 0;
+  if (delay > 0 && delay < 65000) return delay;
+  final activeDelay = active?.urlTestDelay ?? 0;
+  final activeMatches = server.isGroup || active?.tag == server.tag;
+  if (selected && activeMatches && activeDelay > 0 && activeDelay < 65000) return activeDelay;
+  return delay;
 }
 
 /// "🇱🇹 Литва" from "Sigma - Литва": the flag and the country, without the provider's prefix.
 String _withFlag(({String? flag, String title}) name) {
   final dash = name.title.indexOf(' - ');
   final country = dash < 0 ? name.title : name.title.substring(dash + 3).trim();
-  return [name.flag, _marked(country, name.title)].whereType<String>().join(' ');
+  return [name.flag, country].whereType<String>().join(' ');
 }
 
 /// [text] with "· БС" after it when [name] is a whitelist server (the provider's "LTE Only" or "БС" ones, for

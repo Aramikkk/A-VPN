@@ -1,6 +1,6 @@
-/// The finer groups on the routing page: app stores, YouTube and Twitch, foreign apps through the VPN; Yandex,
-/// marketplaces and banks direct. Each takes its apps (and the sites they need) out of the broader groups after
-/// it; the Russian ones stay in the Russian apps too, so they still go direct with their group switched off.
+// The finer groups on the routing page: app stores, YouTube and Twitch, foreign apps through the VPN; Yandex,
+// marketplaces and banks direct. Each takes its apps (and the sites they need) out of the broader groups after
+// it; the Russian ones stay in the Russian apps too, so they still go direct with their group switched off.
 
 /// App stores: through the VPN (Play's downloads and its region need it). RuStore and Galaxy Store work direct
 /// and go with the Russian apps.
@@ -227,6 +227,7 @@ const bankApps = [
   'ru.cardsmobile.mw3', // Кошелёк
 ];
 const bankDomains = [
+  'sovcombank.ru',
   'alfabank.ru',
   'cdn-tinkoff.ru',
   'gazprombank.ru',

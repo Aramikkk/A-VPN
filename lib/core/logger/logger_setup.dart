@@ -12,6 +12,7 @@ import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart' show debugPrint, kReleaseMode;
 import 'package:hiddify/core/logger/log_level_compat.dart';
+import 'package:hiddify/core/logger/redaction.dart';
 import 'package:hiddify/core/logger/ring/log_ring.dart';
 import 'package:hiddify/core/logger/sinks/file_sink.dart';
 import 'package:logging/logging.dart';
@@ -28,7 +29,7 @@ String formatRecord(LogRecord r) {
 /// all show the message, so this is the one place that reaches all three.
 String messageOf(LogRecord r) {
   final origin = originOf(r.stackTrace);
-  return origin == null ? r.message : '${r.message}  <-  $origin';
+  return redactLogText(origin == null ? r.message : '${r.message}  <-  $origin');
 }
 
 /// the history the logs page reads
@@ -131,7 +132,8 @@ StackTrace? _ownFrames(StackTrace? stack) {
   return StackTrace.fromString(mine.join('\n'));
 }
 
-void _toConsole(LogRecord r) {
+void _toConsole(LogRecord record) {
+  final r = redactLogRecord(record);
   if (r.level < _consoleLevel) return;
   dev.log(
     messageOf(r),

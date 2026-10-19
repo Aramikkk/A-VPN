@@ -34,11 +34,15 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
   late LastStream<CoreStatus> _status;
   @override
   Future<String> setup(Directories directories, bool debug, int mode) async {
+    final secret = await methodChannel.invokeMethod<String>('get_grpc_secret');
+    if (secret == null || secret.length < 32) throw StateError('Missing core credentials');
+    final authOptions = CallOptions(metadata: {'authorization': 'Bearer $secret'});
     final channelOption = [1, 2].contains(mode)
         ? MTLSChannelCredentials(serverPublicKey: serverPublicKey, clientKey: cert)
         : const ChannelCredentials.insecure();
     _debug = debug;
     final helloClient = HelloClient(
+      options: authOptions,
       ClientChannel(
         '127.0.0.1',
         port: portFront,
@@ -79,6 +83,7 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
     //   credentials: MTLSChannelCredentials(serverPublicKey: serverPublicKey, clientPrivateKey: cert.privateKey as ECPrivateKey),
     // );
     fgClient = CoreClient(
+      options: authOptions,
       ClientChannel(
         '127.0.0.1',
         port: portFront,
@@ -87,6 +92,7 @@ class CoreInterfaceMobile extends CoreInterface with InfraLogger {
     );
 
     bgClient = CoreClient(
+      options: authOptions,
       ClientChannel(
         '127.0.0.1',
         port: portBack,
