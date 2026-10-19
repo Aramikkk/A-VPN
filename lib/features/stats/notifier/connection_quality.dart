@@ -7,6 +7,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
@@ -147,7 +148,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
       _lastUp = now;
     }
     final port = ref.watch(ConfigOptions.mixedPort);
-    final url = Uri.parse(ref.watch(ConfigOptions.connectionTestUrl));
+    final url = Uri.parse(pingUrl(ref.watch(ConfigOptions.connectionTestUrl), ref.watch(ConfigOptions.pingHttps)));
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
     if (!connected || !ref.watch(ConfigOptions.enableMixedPort)) return List.of(_samples);
 

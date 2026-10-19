@@ -7,6 +7,7 @@ import 'package:hiddify/core/utils/json_converters.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/log/model/log_level.dart';
 import 'package:hiddify/features/profile/data/profile_parser.dart';
+import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/settings/model/config_option_failure.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
@@ -167,6 +168,10 @@ abstract class ConfigOptions {
   /// Reach the networks of every WireGuard-only profile through it, alongside the active profile. Off until the
   /// user turns it on (the home screen's "Server" button) when they need their server.
   static final homeNetwork = PreferencesNotifier.create<bool, bool>("home-network", false);
+
+  /// The servers' pings over HTTPS (the TLS handshake counted too, closer to how sites open) instead of plain HTTP;
+  /// the address stays as it is kept (http://), see pingUrl.
+  static final pingHttps = PreferencesNotifier.create<bool, bool>("ping-https", false);
 
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
@@ -561,7 +566,7 @@ abstract class ConfigOptions {
       tunImplementation: ref.watch(tunImplementation),
       mtu: ref.watch(mtu),
       strictRoute: ref.watch(strictRoute),
-      connectionTestUrl: ref.watch(connectionTestUrl),
+      connectionTestUrl: pingUrl(ref.watch(connectionTestUrl), ref.watch(pingHttps)),
       urlTestInterval: ref.watch(urlTestInterval),
       urlTestTimeout: ref.watch(urlTestTimeoutWifi),
       enableClashApi: ref.watch(enableClashApi),

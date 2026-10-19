@@ -26,6 +26,8 @@ class PingPage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final target = ref.watch(ConfigOptions.connectionTestUrl);
+    final https = ref.watch(ConfigOptions.pingHttps);
+    final targets = pingTargetsFor(https);
     final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
     // each address's answer through the VPN, measured on request: ms, or null when it didn't answer
     final measured = useState<Map<String, int?>>({});
@@ -50,12 +52,14 @@ class PingPage extends HookConsumerWidget {
         ..findProxy = ((_) => 'PROXY 127.0.0.1:$port');
       try {
         await Future.wait([
-          for (final p in [...pingTargets.map((p) => p.url), if (pingTargetName(target) == null) target])
+          for (final p in [...targets.map((p) => p.url), if (pingTargetName(target) == null) target])
             () async {
               int? ms;
               final watch = Stopwatch()..start();
               try {
-                final request = await client.headUrl(Uri.parse(p)).timeout(const Duration(seconds: 3));
+                final request = await client
+                    .headUrl(Uri.parse(pingUrl(p, ref.read(ConfigOptions.pingHttps))))
+                    .timeout(const Duration(seconds: 3));
                 final response = await request.close().timeout(const Duration(seconds: 3));
                 await response.drain<void>();
                 ms = watch.elapsedMilliseconds;
@@ -130,16 +134,48 @@ class PingPage extends HookConsumerWidget {
               style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
+          // HTTP or HTTPS: how the servers' pings go
+          ListTile(
+            leading: const Icon(Icons.lock_outline_rounded),
+            title: Text(t.avpn.pingMethod),
+            subtitle: Text(t.avpn.pingMethodMsg),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('HTTP')),
+                ButtonSegment(value: true, label: Text('HTTPS')),
+              ],
+              selected: {https},
+              showSelectedIcon: false,
+              onSelectionChanged: (value) async {
+                final on = value.first;
+                await ref.read(ConfigOptions.pingHttps.notifier).update(on);
+                measured.value = {};
+                // a target without HTTPS: the first one with it instead
+                final current = ref.read(ConfigOptions.connectionTestUrl);
+                if (on && !pingTargetHasHttps(current)) {
+                  await ref.read(ConfigOptions.connectionTestUrl.notifier).update(pingTargetsFor(true).first.url);
+                }
+                if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                  await ref
+                      .read(connectionNotifierProvider.notifier)
+                      .reconnect(await ref.read(activeProfileProvider.future));
+                }
+              },
+            ),
+          ),
           RadioGroup<String>(
             groupValue: target,
             onChanged: (url) => url == null ? null : choose(url),
             child: Column(
               children: [
-                for (final p in pingTargets)
+                for (final p in targets)
                   RadioListTile<String>(
                     value: p.url,
                     title: Text(p.name),
-                    subtitle: Text(p.url, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(pingUrl(p.url, https), maxLines: 1, overflow: TextOverflow.ellipsis),
                     secondary: result(p.url),
                   ),
               ],

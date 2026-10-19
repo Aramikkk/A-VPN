@@ -9,11 +9,27 @@ const pingTargets = <({String name, String url})>[
   (name: 'Microsoft', url: 'http://www.msftconnecttest.com/connecttest.txt'),
 ];
 
+/// The targets that answer over HTTPS too (Microsoft's has no certificate for it).
+bool pingTargetHasHttps(String url) => !url.contains('msftconnecttest.com');
+
+/// The targets offered for the method: all for HTTP, those with HTTPS for HTTPS.
+List<({String name, String url})> pingTargetsFor(bool https) =>
+    https ? [for (final p in pingTargets) if (pingTargetHasHttps(p.url)) p] : pingTargets;
+
+/// The address a ping goes to: [url] (kept as http://) over HTTPS when [https] (the TLS handshake counted too, as
+/// sites open), over HTTP otherwise. An address of the user's own keeps any other scheme.
+String pingUrl(String url, bool https) {
+  if (https && url.startsWith('http://')) return 'https://${url.substring(7)}';
+  if (!https && url.startsWith('https://')) return 'http://${url.substring(8)}';
+  return url;
+}
+
 /// The known target's name for [url], or null for an address of the user's own.
 String? pingTargetName(String url) => pingTargets.where((p) => p.url == url).firstOrNull?.name;
 
 /// The known target after [url] (the first one after an address of the user's own), round the list.
-({String name, String url}) nextPingTarget(String url) {
-  final i = pingTargets.indexWhere((p) => p.url == url);
-  return pingTargets[(i + 1) % pingTargets.length];
+({String name, String url}) nextPingTarget(String url, {bool https = false}) {
+  final targets = pingTargetsFor(https);
+  final i = targets.indexWhere((p) => p.url == url);
+  return targets[(i + 1) % targets.length];
 }

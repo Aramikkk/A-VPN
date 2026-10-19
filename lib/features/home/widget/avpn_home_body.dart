@@ -134,7 +134,10 @@ class AraHomeBody extends HookConsumerWidget {
         if (ref.read(Preferences.pingAutoSwitch) &&
             DateTime.now().difference(lastAnswer) >= const Duration(minutes: 1)) {
           lastAnswer = DateTime.now();
-          final next = nextPingTarget(ref.read(ConfigOptions.connectionTestUrl));
+          final next = nextPingTarget(
+            ref.read(ConfigOptions.connectionTestUrl),
+            https: ref.read(ConfigOptions.pingHttps),
+          );
           await ref.read(ConfigOptions.connectionTestUrl.notifier).update(next.url);
           ref.read(inAppNotificationControllerProvider).showInfoToast(t.avpn.pingSwitched(name: next.name));
           try {
