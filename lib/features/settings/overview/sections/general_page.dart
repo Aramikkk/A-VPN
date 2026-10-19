@@ -6,6 +6,7 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/auto_pause/auto_pause_page.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
+import 'package:hiddify/features/home_wifi/home_wifi_page.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/widget/preference_tile.dart';
 import 'package:hiddify/features/settings/widget/settings_block.dart';
@@ -116,6 +117,18 @@ class GeneralPage extends HookConsumerWidget {
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () =>
                         Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AutoPausePage())),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.home_work_outlined),
+                    title: Text(t.avpn.homeWifi),
+                    subtitle: Text(
+                      ref.watch(Preferences.homeWifiEnabled)
+                          ? t.avpn.homeWifiCount(n: parseHomeRouters(ref.watch(Preferences.homeWifiList)).length)
+                          : t.avpn.homeWifiHint,
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () =>
+                        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HomeWifiPage())),
                   ),
                   SwitchListTile.adaptive(
                     title: Text(t.avpn.connectOnAppStart),

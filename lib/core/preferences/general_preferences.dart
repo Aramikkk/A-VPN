@@ -140,6 +140,12 @@ abstract class Preferences {
     mapTo: (value) => value.join(';'),
   );
 
+  /// A-VPN home Wi-Fi (Android): the VPN pauses on a Wi-Fi whose router runs a VPN of its own. Read by the VPN
+  /// service itself (SettingsKey.HOME_WIFI_*); the homes as JSON (see HomeWifiPage).
+  static final homeWifiEnabled = PreferencesNotifier.create<bool, bool>("aravpn-home-wifi-enabled", false);
+
+  static final homeWifiList = PreferencesNotifier.create<String, String>("aravpn-home-wifi-list", "[]");
+
   /// A-VPN: the accent colour and gradient.
   static final araAccent = PreferencesNotifier.create<AraAccent, String>(
     "ara_accent",

@@ -157,6 +157,9 @@ class BoxService(
     // leaves the screen. Staying up matters: Android doesn't let a stopped VPN restart itself from the background.
     @Volatile
     private var paused = false
+    /** paused for a home Wi-Fi, not for an app on screen: only leaving home ends it */
+    @Volatile private var pausedForHome = false
+    private var lastHomeCheck = 0L
     private val lifecycle = Mutex()
     private val generation = AtomicLong()
     @Volatile private var stopping = false
@@ -180,16 +183,24 @@ class BoxService(
                     screenInteractive,
                 )
                 if (screenInteractive) delay(interval) else withTimeoutOrNull(interval) { screenWake.receive() }
+                // a home Wi-Fi looked at every 15 seconds at most (besides every network change)
+                val now = android.os.SystemClock.elapsedRealtime()
+                if ((Settings.homeWifiEnabled || pausedForHome) && now - lastHomeCheck >= 15_000) {
+                    lastHomeCheck = now
+                    checkHome()
+                }
+                // at home the apps on screen change nothing
+                if (pausedForHome) continue
                 val canObserve = Application.powerManager.isInteractive && ForegroundApp.hasPermission(service)
                 if (!canObserve) {
                     ForegroundApp.observeScreen(service, null, android.os.SystemClock.elapsedRealtime())
-                    if (paused) resume()
+                    if (paused && !pausedForHome) resume()
                     continue
                 }
                 val app = runCatching { ForegroundApp.current(service) }.getOrNull()
                 ForegroundApp.observeScreen(service, app, android.os.SystemClock.elapsedRealtime())
                 if (app == null) continue
-                if (!autoPauseActive) { if (paused) resume(); continue }
+                if (!autoPauseActive) { if (paused && !pausedForHome) resume(); continue }
                 if (!paused && app in apps && status.value == Status.Started) {
                     pause(app)
                 } else if (paused && app !in apps) {
@@ -238,6 +249,10 @@ class BoxService(
         networkCheck = GlobalScope.launch(Dispatchers.IO) {
             val operation = generation.get()
             delay(4_000)
+            if (Settings.homeWifiEnabled || pausedForHome) {
+                lastHomeCheck = android.os.SystemClock.elapsedRealtime()
+                checkHome()
+            }
             lifecycle.withLock { if (operation == generation.get() && !stopping) switchToNetwork(operation) }
         }
     }
@@ -279,10 +294,24 @@ class BoxService(
         }
     }
 
-    private suspend fun pause(app: String) = lifecycle.withLock {
+    /** The VPN on a home Wi-Fi pauses (the router runs one of its own) and comes back off it. */
+    private suspend fun checkHome() {
+        val home = Settings.homeWifiEnabled && runCatching { HomeWifi.atHome(service) }.getOrDefault(false)
+        if (home && !paused && status.value == Status.Started) {
+            Log.i(TAG, "home Wi-Fi: pausing the VPN")
+            pause(null)
+        } else if (!home && paused && pausedForHome) {
+            Log.i(TAG, "off the home Wi-Fi: the VPN comes back")
+            resume()
+        }
+    }
+
+    /** [app]: paused while it is on screen; null: paused for a home Wi-Fi. */
+    private suspend fun pause(app: String?) = lifecycle.withLock {
         if (stopping || status.value != Status.Started) return@withLock
         paused = true
-        val label = runCatching {
+        pausedForHome = app == null
+        val label = if (app == null) "" else runCatching {
             val pm = service.packageManager
             pm.getApplicationLabel(pm.getApplicationInfo(app, 0)).toString()
         }.getOrDefault(app)
@@ -294,7 +323,11 @@ class BoxService(
             if (stopping) return@withLock
             withContext(Dispatchers.Main) {
                 if (stopping) return@withContext
-                notification.showText("A-VPN — пауза", "Открыто: $label. VPN включится, когда вы из него выйдете")
+                notification.showText(
+                    "A-VPN — пауза",
+                    if (app == null) "Домашний Wi-Fi: VPN уже на роутере. VPN включится, когда вы уйдёте из этой сети"
+                    else "Открыто: $label. VPN включится, когда вы из него выйдете",
+                )
                 status.value = Status.Stopped
             }
         } catch (e: Exception) { terminateFailedSession(e.message) }
@@ -309,6 +342,7 @@ class BoxService(
             Mobile.rebuild("", "")
             if (operation != generation.get() || stopping) return@withLock
             paused = false
+            pausedForHome = false
             withContext(Dispatchers.Main) {
                 if (operation != generation.get() || stopping) return@withContext
                 status.value = Status.Started
@@ -325,6 +359,7 @@ class BoxService(
         autoPauseJob?.cancel()
         unwatchNetwork()
         paused = false
+        pausedForHome = false
         runCatching { fileDescriptor?.close() }
         fileDescriptor = null
         DefaultNetworkMonitor.stop()
@@ -486,6 +521,7 @@ class BoxService(
         autoPauseJob = null
         unwatchNetwork()
         paused = false
+        pausedForHome = false
         status.value = Status.Stopping
         if (receiverRegistered) {
             service.unregisterReceiver(receiver)

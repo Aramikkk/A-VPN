@@ -115,6 +115,14 @@ object Settings {
     val autoPauseEnabled: Boolean
         get() = preferences.getBoolean(SettingsKey.AUTO_PAUSE_ENABLED, false)
 
+    /** Pause the VPN on a home Wi-Fi (its router runs a VPN of its own). */
+    val homeWifiEnabled: Boolean
+        get() = preferences.getBoolean(SettingsKey.HOME_WIFI_ENABLED, false)
+
+    /** The homes' routers, as the app saved them: JSON [{"name", "gateway", "ports"}]. */
+    val homeWifiList: String
+        get() = preferences.getString(SettingsKey.HOME_WIFI_LIST, "[]") ?: "[]"
+
     /** Package names, saved by the app as one ";"-separated string. */
     val autoPauseApps: Set<String>
         get() = preferences.getString(SettingsKey.AUTO_PAUSE_APPS, "")!!

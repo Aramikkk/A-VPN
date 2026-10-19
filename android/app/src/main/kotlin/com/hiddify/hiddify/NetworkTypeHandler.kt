@@ -96,6 +96,15 @@ class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Event
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "underlyingNetwork" -> result.success(NetworkKinds.underlying(context))
+            // the router of the Wi-Fi the phone is on, to save it as a home: its address and the VPN panel's ports
+            "homeWifiCapture" -> {
+                val appContext = context?.applicationContext
+                Thread {
+                    val router = appContext?.let { com.hiddify.hiddify.bg.HomeWifi.capture(it) }
+                    val answer = router?.let { mapOf("gateway" to it.gateway, "ports" to it.ports) }
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { result.success(answer) }
+                }.start()
+            }
             // the service switches the config by itself when it has both variants: where it stands, else null
             "serviceAppliedNetwork" -> result.success(
                 if (Settings.networkConfig("wifi").isNotBlank() && Settings.networkConfig("mobile").isNotBlank())
