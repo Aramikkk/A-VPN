@@ -11,6 +11,8 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/custom_transition.dart';
 import 'package:hiddify/core/router/go_router/refresh_listenable.dart';
+import 'package:hiddify/features/auto_pause/auto_pause_page.dart';
+import 'package:hiddify/features/home_wifi/home_wifi_page.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/home/widget/home_page.dart';
@@ -255,6 +257,22 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         state.pageKey,
                         settingsWidth(const GeneralPage(connection: true)),
                       ),
+                      // routed like the other settings pages (their backdrop, their slide, back to Launch and
+                      // connection): pushed by hand they came in bare and Back skipped them
+                      routes: <GoRoute>[
+                        GoRoute(
+                          name: 'autoPause',
+                          path: 'auto-pause',
+                          pageBuilder: (_, state) =>
+                              customTransition(TransitionType.slide, state.pageKey, settingsWidth(const AutoPausePage())),
+                        ),
+                        GoRoute(
+                          name: 'homeWifi',
+                          path: 'home-wifi',
+                          pageBuilder: (_, state) =>
+                              customTransition(TransitionType.slide, state.pageKey, settingsWidth(const HomeWifiPage())),
+                        ),
+                      ],
                     ),
                     GoRoute(
                       name: 'serversOptions',

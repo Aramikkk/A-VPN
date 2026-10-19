@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/features/auto_pause/auto_pause_page.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
 import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/home_wifi/home_wifi_page.dart';
@@ -115,8 +114,7 @@ class GeneralPage extends HookConsumerWidget {
                           : t.avpn.autoPauseHint,
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () =>
-                        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AutoPausePage())),
+                    onTap: () => context.goNamed('autoPause'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.home_work_outlined),
@@ -127,8 +125,7 @@ class GeneralPage extends HookConsumerWidget {
                           : t.avpn.homeWifiHint,
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () =>
-                        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HomeWifiPage())),
+                    onTap: () => context.goNamed('homeWifi'),
                   ),
                   SwitchListTile.adaptive(
                     title: Text(t.avpn.connectOnAppStart),

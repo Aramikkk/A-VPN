@@ -40,7 +40,15 @@ void main() {
     var disposed = false;
     addTearDown(() async {
       if (!disposed) container.dispose();
-      await _temporary.delete(recursive: true);
+      // the last checkpoint may still be writing (Windows holds the file a moment): try again, then let it be
+      for (var attempt = 0; attempt < 10; attempt++) {
+        try {
+          await _temporary.delete(recursive: true);
+          break;
+        } on FileSystemException {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
+      }
     });
     await container.read(appDirectoriesProvider.future);
     container.read(sessionTotalsProvider);
