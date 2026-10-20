@@ -108,6 +108,10 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     final down = _down;
     _down = null;
     if (down == null || _scrolled || _previous != null) return;
+    // only on the tab's own first page: on a page opened from it (Routing, Sites...) a swipe at the end of its list
+    // took the user home instead of leaving them where they were
+    final path = GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    if (path != '/settings' && path != '/connections') return;
     final need = (context.size?.height ?? 800) * .14;
     final dy = _moved.dy;
     if (dy.abs() < need || dy.abs() < _moved.dx.abs() * 1.5) return;
