@@ -9,17 +9,22 @@ import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// A site the home screen shows the delay to: its name, the letter in its circle and the page asked.
-typedef LatencySite = ({String key, String name, String letter, String url});
+/// [get]: asked with GET (a page that answers HEAD with a redirect and a closed connection).
+typedef LatencySite = ({String key, String name, String letter, String url, bool get});
 
 /// The sites, as the user uses them most. The address is kept as http:// and asked over HTTP or HTTPS as Settings →
 /// Ping says (pingUrl).
 const latencySites = <LatencySite>[
-  (key: 'instagram', name: 'Instagram', letter: 'I', url: 'http://www.instagram.com/'),
-  (key: 'whatsapp', name: 'WhatsApp', letter: 'W', url: 'http://web.whatsapp.com/'),
-  (key: 'telegram', name: 'Telegram', letter: 'T', url: 'http://telegram.org/'),
-  (key: 'chatgpt', name: 'ChatGPT', letter: 'G', url: 'http://chatgpt.com/'),
-  (key: 'youtube', name: 'YouTube', letter: 'Y', url: 'http://www.youtube.com/'),
-  (key: 'google', name: 'Google', letter: 'G', url: 'http://www.google.com/'),
+  (key: 'instagram', name: 'Instagram', letter: 'I', url: 'http://www.instagram.com/', get: false),
+  (key: 'whatsapp', name: 'WhatsApp', letter: 'W', url: 'http://web.whatsapp.com/', get: false),
+  (key: 'telegram', name: 'Telegram', letter: 'T', url: 'http://telegram.org/', get: false),
+  // chatgpt.com (Cloudflare) closes the connection on its page's redirect, so the second request opened a new one
+  // (~250 ms where the others read ~80): Cloudflare's tiny trace page keeps it, asked with GET
+  (key: 'chatgpt', name: 'ChatGPT', letter: 'G', url: 'http://chatgpt.com/cdn-cgi/trace', get: true),
+  // Google's and YouTube's home pages are built on every request (~350 ms of the server's own work): their empty
+  // answer, the same the servers' ping uses, times just the way there and back
+  (key: 'youtube', name: 'YouTube', letter: 'Y', url: 'http://www.youtube.com/generate_204', get: false),
+  (key: 'google', name: 'Google', letter: 'G', url: 'http://www.google.com/generate_204', get: false),
 ];
 
 /// The last round: each site's delay in ms (null: no answer in time), when it ran, and whether one runs now.
@@ -82,7 +87,7 @@ class SiteLatency extends Notifier<SiteLatencyState> {
             // a request that came back from the site (not the proxy's own error), timed
             Future<int?> once() async {
               final watch = Stopwatch()..start();
-              final request = await client.headUrl(url).timeout(timeout);
+              final request = await (site.get ? client.getUrl(url) : client.headUrl(url)).timeout(timeout);
               request.followRedirects = false;
               request.persistentConnection = true;
               final response = await request.close().timeout(timeout);
