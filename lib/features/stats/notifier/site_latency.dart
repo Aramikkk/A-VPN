@@ -25,14 +25,16 @@ const latencySites = <LatencySite>[
   // YouTube's home page is built on every request (~350 ms of the server's own work): its empty answer, the same
   // the servers' ping uses, times just the way there and back
   (key: 'youtube', name: 'YouTube', letter: 'Y', url: 'http://www.youtube.com/generate_204', get: false),
-  // Google's empty answer, the same the servers' ping uses: just the way there and back
-  (key: 'google', name: 'Google', letter: 'G', url: 'http://www.google.com/generate_204', get: false),
+  // Google Drive: its front page (it answers with a redirect, timed over the open connection as the rest)
+  (key: 'gdrive', name: 'Google Диск', letter: 'G', url: 'http://drive.google.com/', get: false),
 ];
 
 /// The server each site goes through when each has its own (Settings → Ping → Sites, beta): the site's key → the
 /// server's tag, read from the core's site groups ("site-<key>"); empty when that's off.
 final siteServersProvider = StreamProvider<Map<String, String>>((ref) {
-  if (!ref.watch(ConfigOptions.siteGroups) || !ref.watch(serviceRunningProvider)) return Stream.value(const {});
+  // on for either network: the core has the groups only on the one it's on, so the map is empty on the other
+  final on = ref.watch(ConfigOptions.siteGroups) || ref.watch(ConfigOptions.siteGroupsMobile);
+  if (!on || !ref.watch(serviceRunningProvider)) return Stream.value(const {});
   return ref
       .watch(proxyRepositoryProvider)
       .watchActiveProxies()

@@ -8,12 +8,17 @@ Future<String> withNetworkPingTimeout(
   NetworkKind network,
   Duration timeout, {
   int balancerTolerance = 150,
+  bool siteGroups = false,
+  int siteGroupsTolerance = 80,
 }) async {
   final seconds = timeout.inSeconds.clamp(1, 30);
   final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
   final experimental = Map<String, dynamic>.from(config['experimental'] as Map? ?? {});
   final monitoring = Map<String, dynamic>.from(experimental['monitoring'] as Map? ?? {});
   monitoring['url_test_timeout'] = '${seconds}s';
+  // this network's own Auto per site (Settings → Ping → Sites): the core builds the groups from it
+  monitoring['site_groups'] = siteGroups;
+  monitoring['site_groups_tolerance'] = siteGroupsTolerance.clamp(10, 3000);
   experimental['monitoring'] = monitoring;
   config['experimental'] = experimental;
   for (final outbound in (config['outbounds'] as List? ?? const []).whereType<Map<String, dynamic>>()) {

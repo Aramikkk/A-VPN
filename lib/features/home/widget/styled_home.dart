@@ -3105,9 +3105,8 @@ class _SiteTiles extends HookConsumerWidget {
     return path != null
         ? SvgPicture.string(
             '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#$hex" d="$path"/></svg>',
-            // Google's G fills its box edge to edge: a little smaller, so it looks the others' size
-            width: site.key == 'google' ? 12 : 15,
-            height: site.key == 'google' ? 12 : 15,
+            width: 15,
+            height: 15,
           )
         : Text(
             site.letter,

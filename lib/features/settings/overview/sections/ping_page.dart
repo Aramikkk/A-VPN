@@ -205,44 +205,59 @@ class PingPage extends HookConsumerWidget {
             onChanged: ref.read(Preferences.pingAutoSwitch.notifier).update,
           ),
           heading(t.avpn.pingSites),
-          // each service the home screen times through the server answering it soonest (the core's site groups)
-          SwitchListTile.adaptive(
-            secondary: const Icon(Icons.alt_route_rounded),
-            title: Text(t.avpn.siteGroups),
-            subtitle: Text(t.avpn.siteGroupsMsg),
-            value: ref.watch(ConfigOptions.siteGroups),
-            onChanged: (on) async {
-              await ref.read(ConfigOptions.siteGroups.notifier).update(on);
-              // the groups are in the config: the next connection has them, now when connected
-              if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
-                await ref
-                    .read(connectionNotifierProvider.notifier)
-                    .reconnect(await ref.read(activeProfileProvider.future));
-              }
-            },
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+            child: Text(
+              t.avpn.siteGroupsMsg,
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
-          // how much sooner another server must be before a site moves to it
-          ListTile(
-            leading: const Icon(Icons.compare_arrows_rounded),
-            enabled: ref.watch(ConfigOptions.siteGroups),
-            title: Text(t.avpn.siteGroupsTolerance),
-            subtitle: Text('${ref.watch(ConfigOptions.siteGroupsTolerance)} ms · ${t.avpn.siteGroupsToleranceMsg}'),
-            onTap: () async {
-              final picked = await pick(
-                t.avpn.siteGroupsTolerance,
-                [for (var ms = 10; ms <= 300; ms += 10) ms],
-                ref.read(ConfigOptions.siteGroupsTolerance),
-                (ms) => '$ms ms',
-              );
-              if (picked == null || picked == ref.read(ConfigOptions.siteGroupsTolerance)) return;
-              await ref.read(ConfigOptions.siteGroupsTolerance.notifier).update(picked);
-              if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
-                await ref
-                    .read(connectionNotifierProvider.notifier)
-                    .reconnect(await ref.read(activeProfileProvider.future));
-              }
-            },
-          ),
+          // each service the home screen times through the server answering it soonest (the core's site groups), on
+          // Wi-Fi and on mobile data each as chosen
+          for (final (network, enabled, tolerance) in [
+            ('Wi-Fi', ConfigOptions.siteGroups, ConfigOptions.siteGroupsTolerance),
+            if (!PlatformUtils.isDesktop)
+              ('LTE', ConfigOptions.siteGroupsMobile, ConfigOptions.siteGroupsToleranceMobile),
+          ]) ...[
+            SwitchListTile.adaptive(
+              secondary: Icon(network == 'LTE' ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded),
+              title: Text(PlatformUtils.isDesktop ? t.avpn.siteGroups : '${t.avpn.siteGroups} · $network'),
+              value: ref.watch(enabled),
+              onChanged: (on) async {
+                await ref.read(enabled.notifier).update(on);
+                // the groups are in the config: the next connection has them, now when connected
+                if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                  await ref
+                      .read(connectionNotifierProvider.notifier)
+                      .reconnect(await ref.read(activeProfileProvider.future));
+                }
+              },
+            ),
+            // how much sooner another server must be before a site moves to it
+            ListTile(
+              leading: const Icon(Icons.compare_arrows_rounded),
+              enabled: ref.watch(enabled),
+              title: Text(
+                PlatformUtils.isDesktop ? t.avpn.siteGroupsTolerance : '${t.avpn.siteGroupsTolerance} · $network',
+              ),
+              subtitle: Text('${ref.watch(tolerance)} ms · ${t.avpn.siteGroupsToleranceMsg}'),
+              onTap: () async {
+                final picked = await pick(
+                  '${t.avpn.siteGroupsTolerance} · $network',
+                  ConfigOptions.siteGroupsTolerances,
+                  ref.read(tolerance),
+                  (ms) => '$ms ms',
+                );
+                if (picked == null || picked == ref.read(tolerance)) return;
+                await ref.read(tolerance.notifier).update(picked);
+                if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                  await ref
+                      .read(connectionNotifierProvider.notifier)
+                      .reconnect(await ref.read(activeProfileProvider.future));
+                }
+              },
+            ),
+          ],
           heading(t.avpn.pingChecks),
           for (final entry in [
             ('Wi-Fi', ConfigOptions.urlTestTimeoutWifi),

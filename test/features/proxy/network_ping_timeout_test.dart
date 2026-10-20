@@ -12,7 +12,11 @@ void main() {
     await file.writeAsString(
       jsonEncode({
         'outbounds': [
-          {'type': 'urltest', 'tag': 'lowest', 'options': {'tolerance': 150}},
+          {
+            'type': 'urltest',
+            'tag': 'lowest',
+            'options': {'tolerance': 150},
+          },
           {'type': 'direct', 'tag': 'plain'},
         ],
         'experimental': {
@@ -20,8 +24,20 @@ void main() {
         },
       }),
     );
-    final wifi = await withNetworkPingTimeout(file.path, NetworkKind.wifi, const Duration(seconds: 1), balancerTolerance: 150);
-    final mobile = await withNetworkPingTimeout(file.path, NetworkKind.mobile, const Duration(seconds: 30), balancerTolerance: 25);
+    final wifi = await withNetworkPingTimeout(
+      file.path,
+      NetworkKind.wifi,
+      const Duration(seconds: 1),
+      balancerTolerance: 150,
+      siteGroups: true,
+      siteGroupsTolerance: 2500,
+    );
+    final mobile = await withNetworkPingTimeout(
+      file.path,
+      NetworkKind.mobile,
+      const Duration(seconds: 30),
+      balancerTolerance: 25,
+    );
     final w = jsonDecode(await File(wifi).readAsString()) as Map<String, dynamic>;
     final m = jsonDecode(await File(mobile).readAsString()) as Map<String, dynamic>;
     expect(w['experimental']['monitoring']['url_test_timeout'], '1s');
@@ -31,6 +47,10 @@ void main() {
     expect(m['outbounds'][1]['tag'], 'plain');
     expect(w['experimental']['cache_file']['enabled'], true);
     expect(jsonDecode(await file.readAsString())['experimental'].containsKey('monitoring'), false);
+    // each network's own site groups choice
+    expect(w['experimental']['monitoring']['site_groups'], true);
+    expect(w['experimental']['monitoring']['site_groups_tolerance'], 2500);
+    expect(m['experimental']['monitoring']['site_groups'], false);
     expect(wifi, isNot(mobile));
   });
 }

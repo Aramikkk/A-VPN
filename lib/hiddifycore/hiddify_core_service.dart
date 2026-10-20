@@ -115,9 +115,7 @@ class HiddifyCoreService with InfraLogger {
   TaskEither<String, Unit> changeOptions(SingboxConfigOption options) {
     return TaskEither(() async {
       loggy.debug("changing options");
-      final networkOptions = options.copyWith(
-        balancerTolerance: options.balancerToleranceWifi,
-      );
+      final networkOptions = options.copyWith(balancerTolerance: options.balancerToleranceWifi);
       // latestOptions = options;
       try {
         final res = await core.fgClient.changeHiddifySettings(
@@ -274,9 +272,13 @@ class HiddifyCoreService with InfraLogger {
         filtered,
         current,
         ref.read(current == NetworkKind.mobile ? ConfigOptions.urlTestTimeoutMobile : ConfigOptions.urlTestTimeoutWifi),
-        balancerTolerance: ref.read(current == NetworkKind.mobile
-            ? ConfigOptions.balancerToleranceMobile
-            : ConfigOptions.balancerToleranceWifi),
+        balancerTolerance: ref.read(
+          current == NetworkKind.mobile ? ConfigOptions.balancerToleranceMobile : ConfigOptions.balancerToleranceWifi,
+        ),
+        siteGroups: ref.read(current == NetworkKind.mobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups),
+        siteGroupsTolerance: ref.read(
+          current == NetworkKind.mobile ? ConfigOptions.siteGroupsToleranceMobile : ConfigOptions.siteGroupsTolerance,
+        ),
       );
     }
     return filtered;

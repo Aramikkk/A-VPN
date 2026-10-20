@@ -177,8 +177,20 @@ abstract class ConfigOptions {
   /// (the core's site groups), the rest through Auto as before. Beta: off until the user turns it on.
   static final siteGroups = PreferencesNotifier.create<bool, bool>("site-groups", false);
 
-  /// How much sooner (ms, 10 to 300) another server must answer a site before the site moves to it.
+  /// The same on mobile data (the phone): on or off of its own.
+  static final siteGroupsMobile = PreferencesNotifier.create<bool, bool>("site-groups-mobile", false);
+
+  /// How much sooner (ms, 10 to 3000) another server must answer a site before the site moves to it; on Wi-Fi
+  /// (and on a computer), and on mobile data.
   static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 80);
+  static final siteGroupsToleranceMobile = PreferencesNotifier.create<int, int>("site-groups-tolerance-mobile", 80);
+
+  /// The thresholds offered: by 10 ms to 300, by 50 to a second, by 100 to three.
+  static final siteGroupsTolerances = [
+    for (var ms = 10; ms <= 300; ms += 10) ms,
+    for (var ms = 350; ms <= 1000; ms += 50) ms,
+    for (var ms = 1100; ms <= 3000; ms += 100) ms,
+  ];
 
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
@@ -453,6 +465,8 @@ abstract class ConfigOptions {
     "balancer-tolerance-mobile": balancerToleranceMobile,
     "site-groups": siteGroups,
     "site-groups-tolerance": siteGroupsTolerance,
+    "site-groups-mobile": siteGroupsMobile,
+    "site-groups-tolerance-mobile": siteGroupsToleranceMobile,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
     "allow-connection-from-lan": allowConnectionFromLan,
@@ -555,7 +569,7 @@ abstract class ConfigOptions {
       balancerToleranceMobile: ref.watch(balancerToleranceMobile),
       balancerKeepConnections: true,
       siteGroups: ref.watch(siteGroups),
-      siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 300),
+      siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
       // blockAds: ref.watch(blockAds),
       useXrayCoreWhenPossible: ref.watch(useXrayCoreWhenPossible),
       executeConfigAsIs: false,
