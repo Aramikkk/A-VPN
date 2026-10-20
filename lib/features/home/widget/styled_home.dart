@@ -812,6 +812,9 @@ Future<void> _toggleConnection(WidgetRef ref) async {
     return;
   }
   pending.begin(ref.read(connectionNotifierProvider).valueOrNull ?? const Disconnected());
+  // the button pressed: the backdrop laid out anew, faded in over the old one (only then and when the app starts,
+  // not on a reconnect by itself)
+  ref.read(contrastBackdropLayoutProvider.notifier).next();
   try {
     await ref.read(connectionNotifierProvider.notifier).toggleConnection();
   } catch (_) {
@@ -1855,12 +1858,6 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
   @override
   Widget build(BuildContext context) {
     if (!widget.own && context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
-    // the VPN on or off: the backdrop laid out anew, faded in over the old one
-    ref.listen(connectionNotifierProvider, (previous, next) {
-      final was = previous?.valueOrNull?.isConnected;
-      final now = next.valueOrNull?.isConnected;
-      if (was != null && now != null && was != now) ref.read(contrastBackdropLayoutProvider.notifier).next();
-    });
     final layout = ref.watch(contrastBackdropLayoutProvider);
     final brightness = Theme.of(context).brightness;
     // the settings not read yet (the first frames): the defaults
@@ -3176,62 +3173,81 @@ class _SiteTiles extends HookConsumerWidget {
                       ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(11),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // the service's logo in a thin ring, both in the delay's colour
-                  Container(
-                    width: 28,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: sign, width: 1.3),
-                    ),
-                    child: _sign(site, sign),
+            // a low tile (the unfolded phone's): the logo and the name on one line, the figure smaller, so it fits
+            LayoutBuilder(
+              builder: (context, box) {
+                final low = box.maxHeight < 112;
+                // the service's logo in a thin ring, both in the delay's colour
+                final ring = Container(
+                  width: low ? 22 : 28,
+                  height: low ? 22 : 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: sign, width: 1.3),
                   ),
-                  const Spacer(),
-                  Text(
-                    site.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: _sign(site, sign),
+                );
+                final name = Text(
+                  site.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    fontSize: low ? 11 : null,
+                    letterSpacing: low ? 0 : null,
                   ),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
-                          if (measured && ms != null)
-                            TextSpan(
-                              text: ' ms',
-                              style: TextStyle(
-                                fontSize: 12,
-                                letterSpacing: 0,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
+                );
+                return Padding(
+                  padding: EdgeInsets.all(low ? 8 : 11),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (low)
+                        Row(
+                          children: [
+                            ring,
+                            const Gap(6),
+                            Expanded(child: name),
+                          ],
+                        )
+                      else
+                        ring,
+                      const Spacer(),
+                      if (!low) name,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
+                              if (measured && ms != null)
+                                TextSpan(
+                                  text: ' ms',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    letterSpacing: 0,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontSize: low ? 26 : 32,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -1.5,
+                            color: scheme.onSurface,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
                       ),
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -1.5,
-                        color: scheme.onSurface,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
