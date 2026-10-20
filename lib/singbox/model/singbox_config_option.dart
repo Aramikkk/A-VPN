@@ -28,6 +28,9 @@ class SingboxConfigOption with _$SingboxConfigOption {
     // the apps (package names) with a server of their own
     @Default(<String>[]) List<String> siteGroupApps,
     @Default(false) bool siteGroupAppsOnly,
+    // ad blocking at the VPN's level and the user's exceptions
+    @Default(false) bool adBlock,
+    @Default(<String>[]) List<String> adBlockAllow,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,
     required bool executeConfigAsIs,

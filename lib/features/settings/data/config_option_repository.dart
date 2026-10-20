@@ -180,6 +180,12 @@ abstract class ConfigOptions {
   /// The same on mobile data (the phone): on or off of its own.
   static final siteGroupsMobile = PreferencesNotifier.create<bool, bool>("site-groups-mobile", false);
 
+  /// Ad blocking at the VPN's level (Settings → Ad blocking, beta): the ad, tracker and malware domains refused.
+  static final adBlock = PreferencesNotifier.create<bool, bool>("ad-block", false);
+
+  /// The user's exceptions to it: domains (and their subdomains) that are never blocked.
+  static final adBlockAllow = PreferencesNotifier.create<List<String>, List<String>>("ad-block-allow", <String>[]);
+
   /// The apps (package names) with a server of their own, chosen in Settings → Sites: on the phone the whole choice
   /// (a service of the home screen's six only when its app is here). At first the six services' apps.
   static final siteGroupApps = PreferencesNotifier.create<List<String>, List<String>>(
@@ -484,6 +490,8 @@ abstract class ConfigOptions {
     "site-groups-tolerance": siteGroupsTolerance,
     "site-groups-mobile": siteGroupsMobile,
     "site-group-apps": siteGroupApps,
+    "ad-block": adBlock,
+    "ad-block-allow": adBlockAllow,
     "site-groups-tolerance-mobile": siteGroupsToleranceMobile,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
@@ -588,6 +596,8 @@ abstract class ConfigOptions {
       balancerKeepConnections: true,
       siteGroups: ref.watch(siteGroups),
       siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
+      adBlock: ref.watch(adBlock),
+      adBlockAllow: ref.watch(adBlockAllow),
       siteGroupApps: PlatformUtils.isAndroid ? ref.watch(siteGroupApps) : const [],
       // the phone: the list is the whole choice (a computer has no packages: the six services always)
       siteGroupAppsOnly: PlatformUtils.isAndroid,

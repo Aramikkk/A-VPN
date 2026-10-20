@@ -145,7 +145,7 @@ class SettingsPage extends HookConsumerWidget {
       // fills it exactly (on a short screen they keep their usual height and the list scrolls)
       body: LayoutBuilder(
         builder: (context, box) {
-          final rows = 10 + (PlatformUtils.isIOS ? 1 : 0);
+          final rows = 11 + (PlatformUtils.isIOS ? 1 : 0);
           final row = ((box.maxHeight - 14) / rows).clamp(44.0, 72.0);
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -208,6 +208,12 @@ class SettingsPage extends HookConsumerWidget {
                         title: t.avpn.pingSites,
                         icon: Icons.alt_route_rounded,
                         namedLocation: context.namedLocation('sitesOptions'),
+                      ),
+                      SettingsSection(
+                        height: row,
+                        title: t.avpn.adBlock,
+                        icon: Icons.block_rounded,
+                        namedLocation: context.namedLocation('adBlockOptions'),
                       ),
                       SettingsSection(
                         height: row,
