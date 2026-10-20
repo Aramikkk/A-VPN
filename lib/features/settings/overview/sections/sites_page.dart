@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -108,14 +109,7 @@ class SitesPage extends HookConsumerWidget {
               title: Text(t.avpn.siteGroupAppsChoose),
               subtitle: Text(apps.isEmpty ? t.avpn.siteGroupAppsNone : t.avpn.siteGroupAppsCount(n: apps.length)),
               trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () async {
-                final picked = await Navigator.of(
-                  context,
-                ).push<List<String>>(MaterialPageRoute(builder: (_) => _AppPicker(selected: apps)));
-                if (picked == null) return;
-                await ref.read(ConfigOptions.siteGroupApps.notifier).update(picked);
-                await apply();
-              },
+              onTap: () => context.go(context.namedLocation('siteApps')),
             ),
             for (final app in apps)
               ListTile(
@@ -164,15 +158,15 @@ class _AppIcon extends StatelessWidget {
   }
 }
 
-/// The phone's apps to pick from: a search line and a box for each, the chosen ones first.
-class _AppPicker extends HookConsumerWidget {
-  const _AppPicker({required this.selected});
-
-  final List<String> selected;
+/// The phone's apps to pick from: a search line and a box for each, the chosen ones first; Done keeps the choice
+/// (and reconnects with it), Back leaves it as it was.
+class SiteAppsPage extends HookConsumerWidget {
+  const SiteAppsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    final selected = useMemoized(() => ref.read(ConfigOptions.siteGroupApps));
     final chosen = useState<Set<String>>({...selected});
     final query = useState('');
     final installed = ref.watch(installedAppsProvider);
@@ -181,7 +175,20 @@ class _AppPicker extends HookConsumerWidget {
         title: Text(t.avpn.siteGroupAppsChoose),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(chosen.value.toList()),
+            onPressed: () async {
+              final picked = chosen.value.toList();
+              final changed = picked.length != selected.length || !picked.every(selected.contains);
+              // the container, not ref: this page is gone by the time the reconnect is under way
+              final container = ProviderScope.containerOf(context, listen: false);
+              if (context.canPop()) context.pop();
+              if (!changed) return;
+              await container.read(ConfigOptions.siteGroupApps.notifier).update(picked);
+              if (container.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                await container
+                    .read(connectionNotifierProvider.notifier)
+                    .reconnect(await container.read(activeProfileProvider.future));
+              }
+            },
             child: Text(t.avpn.siteGroupAppsDone),
           ),
         ],

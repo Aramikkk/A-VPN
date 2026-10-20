@@ -309,6 +309,18 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       path: 'sites-options',
                       pageBuilder: (_, state) =>
                           customTransition(TransitionType.slide, state.pageKey, settingsWidth(const SitesPage())),
+                      // the apps to choose from: slides in over Sites as every settings page does
+                      routes: [
+                        GoRoute(
+                          name: 'siteApps',
+                          path: 'apps',
+                          pageBuilder: (_, state) => customTransition(
+                            TransitionType.slide,
+                            state.pageKey,
+                            settingsWidth(const SiteAppsPage()),
+                          ),
+                        ),
+                      ],
                     ),
                     GoRoute(
                       name: 'themes',
@@ -386,12 +398,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       ],
                     ),
                     GoRoute(
-                      name: 'dnsOptions',
-                      path: 'dns-options',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, settingsWidth(const DnsOptionsPage())),
-                    ),
-                    GoRoute(
                       name: 'inboundOptions',
                       path: 'inbound-options',
                       pageBuilder: (_, state) => customTransition(
@@ -399,6 +405,18 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         state.pageKey,
                         settingsWidth(const InboundOptionsPage()),
                       ),
+                      // DNS opens from Inbound now: under it, so it slides in over it and Back returns there
+                      routes: [
+                        GoRoute(
+                          name: 'dnsOptions',
+                          path: 'dns-options',
+                          pageBuilder: (_, state) => customTransition(
+                            TransitionType.slide,
+                            state.pageKey,
+                            settingsWidth(const DnsOptionsPage()),
+                          ),
+                        ),
+                      ],
                     ),
                     GoRoute(
                       name: 'tlsTricks',
