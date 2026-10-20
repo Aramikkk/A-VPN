@@ -79,6 +79,7 @@
     "siteGroupAppsCount": "Выбрано: $n",
     "siteGroupAppsSearch": "Поиск приложения",
     "siteGroupAppsDone": "Готово",
+    "siteGroupAppsHideSystem": "Скрыть системные",
     "pingSwitched": "Пинг не отвечал минуту — адрес проверки: $name",
     "pingChecks": "Проверки",
     "pingEveryMinutes": "Каждые $n мин",

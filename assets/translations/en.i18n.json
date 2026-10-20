@@ -79,6 +79,7 @@
     "siteGroupAppsCount": "Chosen: $n",
     "siteGroupAppsSearch": "Search apps",
     "siteGroupAppsDone": "Done",
+    "siteGroupAppsHideSystem": "Hide system apps",
     "pingSwitched": "No ping for a minute — ping address now: $name",
     "pingChecks": "Checks",
     "pingEveryMinutes": "Every $n min",

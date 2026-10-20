@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -177,6 +178,9 @@ class SiteAppsPage extends HookConsumerWidget {
     final chosen = useState<Set<String>>({...selected});
     final query = useState('');
     final installed = ref.watch(installedAppsProvider);
+    // the system's own parts hidden (no icon on the home screen), unless chosen; on by default
+    final hideSystem = useState(true);
+    final launchable = useFuture(useMemoized(_launcherApps));
     return Scaffold(
       appBar: AppBar(
         title: Text(t.avpn.siteGroupAppsChoose),
@@ -205,8 +209,10 @@ class SiteAppsPage extends HookConsumerWidget {
         error: (_, _) => const SizedBox.shrink(),
         data: (apps) {
           final q = query.value.trim().toLowerCase();
+          final shown = launchable.data;
           final list =
               apps.entries
+                  .where((e) => !hideSystem.value || shown == null || shown.contains(e.key) || selected.contains(e.key))
                   .where((e) => q.isEmpty || e.value.name.toLowerCase().contains(q) || e.key.toLowerCase().contains(q))
                   .toList()
                 ..sort((a, b) {
@@ -228,6 +234,12 @@ class SiteAppsPage extends HookConsumerWidget {
                   ),
                   onChanged: (v) => query.value = v,
                 ),
+              ),
+              SwitchListTile.adaptive(
+                dense: true,
+                title: Text(t.avpn.siteGroupAppsHideSystem),
+                value: hideSystem.value,
+                onChanged: (v) => hideSystem.value = v,
               ),
               Expanded(
                 child: ListView.builder(
@@ -251,5 +263,18 @@ class SiteAppsPage extends HookConsumerWidget {
         },
       ),
     );
+  }
+}
+
+/// The packages with an icon on the home screen (asked once, kept): the rest are the system's own parts.
+Set<String>? _launcherAppsKept;
+
+Future<Set<String>?> _launcherApps() async {
+  if (_launcherAppsKept != null) return _launcherAppsKept;
+  try {
+    final list = await const MethodChannel('com.aravpn.app/network').invokeListMethod<String>('launcherApps');
+    return _launcherAppsKept = list?.toSet();
+  } catch (_) {
+    return null;
   }
 }

@@ -96,6 +96,18 @@ class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Event
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "underlyingNetwork" -> result.success(NetworkKinds.underlying(context))
+            // the apps with an icon on the home screen (the rest: services, overlays, the system's own parts)
+            "launcherApps" -> {
+                val pm = context?.packageManager
+                Thread {
+                    val packages = runCatching {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_MAIN)
+                            .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+                        pm?.queryIntentActivities(intent, 0)?.map { it.activityInfo.packageName }?.distinct()
+                    }.getOrNull() ?: emptyList()
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { result.success(packages) }
+                }.start()
+            }
             // a VPN up on the phone now (A-VPN's own, left running while Android unloaded the app)
             "vpnActive" -> {
                 val cm = context?.getSystemService(ConnectivityManager::class.java)
