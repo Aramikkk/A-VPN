@@ -3462,32 +3462,30 @@ class _SiteTiles extends HookConsumerWidget {
   static const _bad = Color(0xFFE5483B);
 
   // the way there and back through the VPN: the server's own ping is ~50-100 ms, a site a little more
-  /// Each service's own colour, for the disc under its sign.
+  /// Each service's own colour, for its logo and the ring round it.
   static Color _brand(String key) => switch (key) {
-    'instagram' => const Color(0xFFE1306C),
+    'instagram' => const Color(0xFFE4405F),
     'whatsapp' => const Color(0xFF25D366),
-    'telegram' => const Color(0xFF2AABEE),
+    'telegram' => const Color(0xFF26A5E4),
     'chatgpt' => const Color(0xFF10A37F),
     'youtube' => const Color(0xFFFF0000),
     'yandex' => const Color(0xFFFC3F1D),
     _ => const Color(0xFF8A8F98),
   };
 
-  /// A plain sign for each service: a camera, a phone, a paper plane, sparkles, play; Yandex its letter.
+  /// The service's logo (Simple Icons' shape) in its colour; Yandex, whose logo is its letter, the letter.
   static Widget _sign(LatencySite site) {
-    final icon = switch (site.key) {
-      'instagram' => Icons.photo_camera_rounded,
-      'whatsapp' => Icons.call_rounded,
-      'telegram' => Icons.send_rounded,
-      'chatgpt' => Icons.auto_awesome_rounded,
-      'youtube' => Icons.play_arrow_rounded,
-      _ => null,
-    };
-    return icon != null
-        ? Icon(icon, size: 16, color: Colors.white)
+    final path = siteLogoPaths[site.key];
+    final hex = _brand(site.key).toARGB32().toRadixString(16).substring(2);
+    return path != null
+        ? SvgPicture.string(
+            '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#$hex" d="$path"/></svg>',
+            width: 15,
+            height: 15,
+          )
         : Text(
             site.letter,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+            style: TextStyle(fontSize: 15, height: 1, fontWeight: FontWeight.w900, color: _brand(site.key)),
           );
   }
 
@@ -3553,12 +3551,15 @@ class _SiteTiles extends HookConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // the service's sign, white on a disc of its own colour (a plain sign, not its logo)
+                  // the service's own logo in its colour, in a thin ring of the same colour
                   Container(
                     width: 28,
                     height: 28,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: _brand(site.key)),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _brand(site.key), width: 1.3),
+                    ),
                     child: _sign(site),
                   ),
                   const Spacer(),
