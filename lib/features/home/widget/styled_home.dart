@@ -3210,7 +3210,10 @@ class _SiteTiles extends HookConsumerWidget {
                   ),
                 );
                 final server = siteServers[site.key];
-                final flag = server == null || server == mainServer ? '' : _flagOf(server);
+                // no flag when the site goes through the main server, or one of the same country (the same flag
+                // would read as the same server)
+                final own = server == null || server == mainServer ? '' : _flagOf(server);
+                final flag = own == _flagOf(mainServer ?? '') ? '' : own;
                 // the flag in a thin circle, as the server row's
                 final corner = flag.isEmpty
                     ? null

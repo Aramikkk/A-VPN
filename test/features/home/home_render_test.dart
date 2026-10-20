@@ -265,6 +265,7 @@ void main() {
                     'telegram': '🇱🇻 Латвия',
                     'chatgpt': '🇵🇱 Польша 2',
                     'youtube': '🇫🇮 Финляндия 3',
+                    'gdrive': '🇩🇪 Германия',
                   }),
                 ),
               installedAppsProvider.overrideWith(
