@@ -2699,9 +2699,10 @@ class _ContrastMosaic extends ConsumerWidget {
       out.add((area, tiles.first));
       return;
     }
-    // a tile's traffic, but none smaller than a fortieth of the whole, so the smallest can still be read
-    final whole = tiles.fold<int>(0, (s, t) => s + t.app.bytes);
-    double weight(_MosaicTile t) => math.max(t.app.bytes.toDouble(), whole / 40);
+    // sizes relative, not proportional: a tile grows with its traffic's 0.35th power, and none is smaller than a
+    // quarter of the largest, so the biggest app is a few times the smallest tile, not half the screen, and all fit
+    final largest = tiles.fold<double>(0, (m, t) => math.max(m, math.pow(t.app.bytes, .35).toDouble()));
+    double weight(_MosaicTile t) => math.max(math.pow(t.app.bytes, .35).toDouble(), largest / 4);
     final sum = tiles.fold<double>(0, (s, t) => s + weight(t));
     var half = weight(tiles.first);
     var k = 1;
@@ -2790,7 +2791,7 @@ class _MosaicCell extends StatelessWidget {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        amount.first,
+                        amount.join(' '),
                         style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -3220,8 +3221,9 @@ class _SiteTiles extends HookConsumerWidget {
                 final corner = flag.isEmpty
                     ? null
                     : Container(
-                        width: low ? 20 : 24,
-                        height: low ? 20 : 24,
+                        // the size of the logo's ring beside it, so the two sit level
+                        width: low ? 22 : 28,
+                        height: low ? 22 : 28,
                         alignment: Alignment.center,
                         // a pane of the page's colour under it, so the circle keeps its edge in the water too
                         decoration: BoxDecoration(
@@ -3231,7 +3233,7 @@ class _SiteTiles extends HookConsumerWidget {
                         ),
                         child: Text(
                           flag,
-                          style: TextStyle(fontSize: low ? 10 : 12, height: 1, fontFamilyFallback: const ['Emoji']),
+                          style: TextStyle(fontSize: low ? 11 : 14, height: 1, fontFamilyFallback: const ['Emoji']),
                         ),
                       );
                 return Padding(
