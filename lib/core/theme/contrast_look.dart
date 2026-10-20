@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Contrast's colour: a warm colour (the accent: the buttons, the arcs, the figures) and a cool one (with it on the
 /// backdrop). By day both lifted towards white for the backdrop.
@@ -92,11 +94,25 @@ enum ContrastClarity {
   // low: nearly solid; medium a little more see-through; high a little more again
   // the blur light: the thin line backdrops still show through the blocks (a strong one wiped them out and the
   // blocks looked solid next to the other pages' see-through cards)
-  weak('Слабо', 'Low', .92, .9, 3),
-  medium('Средне', 'Medium', .8, .78, 3),
-  strong('Сильно', 'High', .66, .64, 3);
+  // three levels that can be told apart (the blocks had come out nearly solid at every one): low nearly solid,
+  // medium the backdrop plainly behind, high clear glass; the blur light, so the thin line backdrops still show
+  weak('Слабо', 'Low', .9, .88, 1.5, .34),
+  medium('Средне', 'Medium', .62, .6, .5, .18),
+  strong('Сильно', 'High', .38, .36, .3, .08);
 
-  const ContrastClarity(this.ru, this.en, this.day, this.night, this.blur);
+  const ContrastClarity(this.ru, this.en, this.day, this.night, this.blur, this.tile);
+
+  /// a tile's own pane inside a block (the session line's, the sites'): it stacks on the block's, so it's light
+  final double tile;
+
+  /// The clarity chosen in Settings → Themes, for widgets with no provider reference of their own.
+  static ContrastClarity of(BuildContext context) {
+    try {
+      return ProviderScope.containerOf(context, listen: false).read(Preferences.contrastClarity);
+    } catch (_) {
+      return fallback;
+    }
+  }
 
   final String ru;
   final String en;
@@ -149,6 +165,10 @@ enum ContrastBackdrop {
   /// thin lines: frost over them blurs lightly, so they still show; over the filled kinds (stripes, discs) it blurs
   /// harder, or the bright shapes ran through the blocks' text
   bool get lines => switch (this) {
+    // the thin stripes too (the default since 5.9.36): blurred as a filled kind they vanished under the blocks, and
+    // every block looked solid at any clarity
+    pinstripes ||
+    chevronGlow ||
     relief ||
     dots ||
     grid ||

@@ -2310,7 +2310,8 @@ class _ContrastRow extends StatelessWidget {
             ],
           )
         : BoxDecoration(
-            color: dark ? scheme.surfaceContainerHigh : Colors.white,
+            // white (dark by night) as chosen, but see-through again: the backdrop shows through, as in every block
+            color: dark ? scheme.surfaceContainerHigh.withValues(alpha: .72) : Colors.white.withValues(alpha: .72),
             borderRadius: BorderRadius.circular(22),
             // see-through: the zone's light shows through
             border: Border.all(
@@ -2514,7 +2515,7 @@ class _ContrastStats extends StatelessWidget {
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow.withValues(alpha: .3),
+          color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
         ),
@@ -2714,7 +2715,7 @@ class _WaterTile extends ConsumerWidget {
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow.withValues(alpha: .3),
+          color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
         ),
@@ -3481,7 +3482,7 @@ class _SiteTiles extends HookConsumerWidget {
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow.withValues(alpha: .3),
+          color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
         ),
@@ -3598,64 +3599,61 @@ class _SiteTiles extends HookConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // the button on the left: the block's name; while the sites are asked it fills with the accent, a site
-          // at a time, and empties when they have all answered
+          // a small round button on the left, the block's name beside it; while the sites are asked a ring of the
+          // accent fills round it, a site at a time, closes when they have all answered and fades
           Padding(
             padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(
-                          end: sites.testing ? (.12 + .88 * sites.done / latencySites.length).clamp(0.0, 1.0) : 0.0,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: scheme.outlineVariant),
                         ),
-                        duration: Duration(milliseconds: sites.testing ? 450 : 700),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, fill, _) => Align(
-                          alignment: Alignment.centerLeft,
-                          child: FractionallySizedBox(
-                            widthFactor: fill,
-                            heightFactor: 1,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [accent.withValues(alpha: .25), accent.withValues(alpha: .55)],
-                                ),
-                              ),
+                      ),
+                      AnimatedOpacity(
+                        opacity: sites.testing ? 1 : 0,
+                        duration: Duration(milliseconds: sites.testing ? 150 : 900),
+                        curve: Curves.easeIn,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(
+                            end: sites.testing ? (.08 + .92 * sites.done / latencySites.length).clamp(0.0, 1.0) : 1.0,
+                          ),
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, fill, _) => SizedBox.expand(
+                            child: CircularProgressIndicator(
+                              value: fill,
+                              strokeWidth: 2.5,
+                              strokeCap: StrokeCap.round,
+                              color: accent,
+                              backgroundColor: Colors.transparent,
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurface),
-                          const Gap(6),
-                          Text(
-                            t.avpn.sitesTitle.toUpperCase(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: scheme.onSurface,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                      Icon(Icons.refresh_rounded, size: 16, color: scheme.onSurface),
+                    ],
+                  ),
                 ),
-              ),
+                const Gap(10),
+                Expanded(
+                  child: Text(
+                    t.avpn.sitesTitle.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           line(latencySites.take(3)),
