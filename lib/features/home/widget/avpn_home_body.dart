@@ -25,6 +25,7 @@ import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/foreground_screen_time.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
+import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/home/widget/network_indicator.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';

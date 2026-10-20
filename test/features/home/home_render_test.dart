@@ -397,43 +397,13 @@ void main() {
             );
           }
         }
-        if (land && style == AraStyle.contrast && connected) {
-          expect(find.byKey(const Key('contrast-traffic')), findsOneWidget);
-        }
+        // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
         if (connected && style == AraStyle.contrast) {
-          final timerText = find.byWidgetPredicate(
-            (w) => w is Text && RegExp(r'^1:1[34]:').hasMatch(w.data ?? w.textSpan?.toPlainText() ?? ''),
-          );
-          expect(timerText, findsOneWidget);
-          _statsUpdates.add(SystemInfo());
-          await tester.pump();
-          await tester.pump();
-          expect(timerText, findsOneWidget, reason: 'native session time must survive a statistics gap');
-        }
-        if (connected && style == AraStyle.contrast) {
-          final traffic = find.byKey(const Key('contrast-traffic'));
-          expect(
-            find.descendant(
-              of: traffic,
-              matching: find.byWidgetPredicate((w) => w is Text && RegExp(r'^\d+:\d{2}').hasMatch(w.data ?? '')),
-            ),
-            findsNothing,
-            reason: 'desktop traffic is measured in bytes, not application time',
-          );
-          expect(find.descendant(of: traffic, matching: find.textContaining('МБ')), findsWidgets);
-          final water = tester
-              .widgetList<FractionallySizedBox>(
-                find.descendant(of: traffic, matching: find.byType(FractionallySizedBox)),
-              )
-              .where((w) => w.heightFactor != null);
-          expect(water, isNotEmpty);
-          expect(
-            water.map((w) => w.heightFactor),
-            everyElement(1.0),
-            reason: 'each route uses the full column regardless of its overall share',
-          );
-          if (!land) {
-            expect(find.descendant(of: traffic, matching: find.text('Яндекс Диск')), findsOneWidget);
+          final sites = find.byKey(const Key('contrast-sites'));
+          expect(sites, findsOneWidget);
+          expect(find.byKey(const Key('contrast-traffic')), findsNothing);
+          for (final name in ['Instagram', 'WhatsApp', 'Telegram', 'ChatGPT', 'YouTube', 'Google']) {
+            expect(find.descendant(of: sites, matching: find.text(name)), findsOneWidget);
           }
         }
         // TAP=<text>: a tap on it first, to look at what it opens

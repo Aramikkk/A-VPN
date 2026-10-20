@@ -11,6 +11,7 @@ import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/model/proxy_failure.dart';
+import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 
 import 'package:hiddify/utils/riverpod_utils.dart';
@@ -216,6 +217,8 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
     loggy.debug("testing group: [$groupTag]");
     if (state case AsyncData()) {
       if (!quiet) await ref.read(hapticServiceProvider.notifier).lightImpact();
+      // the sites the home screen shows are asked with every ping of the servers
+      unawaited(ref.read(siteLatencyProvider.notifier).test());
       await ref.read(proxyRepositoryProvider).urlTest(groupTag).getOrElse((err) {
         loggy.error("error testing group", err);
         throw err;

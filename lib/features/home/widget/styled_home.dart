@@ -145,7 +145,8 @@ class _StyledHome extends HookConsumerWidget {
                   const Gap(30),
                 ],
               ),
-        traffic: traffic && hasList ? _HomeTraffic(visible: visible) : null,
+        // Contrast: the delay to the sites the user uses most, where the traffic was (that is in Topology)
+        traffic: traffic && hasList ? _SiteTiles(visible: visible) : null,
         toggles: _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
       );
     }
@@ -1725,14 +1726,15 @@ class _ContrastHome extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
-                if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(8)],
+                // the blocks a little apart (14, was 8)
+                if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(14)],
                 _ContrastBlock(child: status),
-                const Gap(8),
+                const Gap(14),
                 _ContrastBlock(child: servers),
-                const Gap(8),
+                const Gap(14),
                 if (traffic != null) Expanded(child: _ContrastBlock(expand: true, child: traffic!)) else const Spacer(),
                 // a short screen (the phone turned): the toggles are under the connect control at the side
-                if (!ContrastShellDock.sideways(context)) ...[const Gap(8), _ContrastBlock(child: toggles)],
+                if (!ContrastShellDock.sideways(context)) ...[const Gap(14), _ContrastBlock(child: toggles)],
               ],
             ),
           );
@@ -3439,6 +3441,209 @@ class _SessionServers extends ConsumerWidget {
                 },
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The delay to the sites the user uses most, in tiles like the session line's: the site's letter in a thin circle,
+/// its name and the delay large, over water that rises the faster it answers, green up to 150 ms, amber up to 300,
+/// red slower or with no answer. Two rows of three filling the room the traffic had; a tap asks them again.
+class _SiteTiles extends HookConsumerWidget {
+  const _SiteTiles({required this.visible});
+
+  final bool visible;
+
+  static const _good = Color(0xFF7CC43A);
+  static const _slow = Color(0xFFF0B429);
+  static const _bad = Color(0xFFE5483B);
+
+  // the way there and back through the VPN: the server's own ping is ~50-100 ms, a site a little more
+  static Color _colour(int? ms) => ms == null || ms >= 300 ? _bad : (ms < 150 ? _good : _slow);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final sites = ref.watch(siteLatencyProvider);
+    // "12 с назад" ticking while on screen
+    final now = useState(DateTime.now());
+    useEffect(() {
+      if (!visible) return null;
+      final timer = Timer.periodic(const Duration(seconds: 1), (_) => now.value = DateTime.now());
+      return timer.cancel;
+    }, [visible]);
+    final ago = sites.at == null ? null : now.value.difference(sites.at!).inSeconds.clamp(0, 99999);
+
+    Widget tile(LatencySite site) {
+      final measured = sites.ms.containsKey(site.key);
+      final ms = sites.ms[site.key];
+      final colour = !measured ? scheme.outlineVariant : _colour(ms);
+      // the faster, the fuller; no answer or 450 ms and slower: a sliver
+      final level = !measured ? 0.0 : (ms == null ? .08 : (1 - ms / 450).clamp(.08, 1.0));
+      return Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow.withValues(alpha: .3),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: level),
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOutCubic,
+                builder: (context, l, _) => l < .005
+                    ? const SizedBox.shrink()
+                    : Align(
+                        alignment: Alignment.bottomCenter,
+                        child: FractionallySizedBox(
+                          heightFactor: l,
+                          widthFactor: 1,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  colour.withValues(alpha: dark ? .25 : .19),
+                                  colour.withValues(alpha: dark ? .4 : .3),
+                                ],
+                              ),
+                              border: l > .97
+                                  ? null
+                                  : Border(top: BorderSide(color: colour.withValues(alpha: .6), width: 1.5)),
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(11),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: scheme.onSurface, width: 1.3),
+                    ),
+                    child: Text(
+                      site.letter,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: scheme.onSurface),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    site.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
+                          if (measured && ms != null)
+                            TextSpan(
+                              text: ' ms',
+                              style: TextStyle(
+                                fontSize: 12,
+                                letterSpacing: 0,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: -1.5,
+                        color: scheme.onSurface,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget line(Iterable<LatencySite> row) => Expanded(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, site) in row.indexed) ...[if (i > 0) const Gap(8), Expanded(child: tile(site))],
+        ],
+      ),
+    );
+
+    return GestureDetector(
+      key: const Key('contrast-sites'),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => ref.read(siteLatencyProvider.notifier).test(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 2, 2, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    t.avpn.sitesTitle.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.refresh_rounded, size: 13, color: scheme.onSurfaceVariant),
+                      const Gap(3),
+                      Text(
+                        sites.testing
+                            ? t.avpn.sitesTesting
+                            : (ago == null ? t.avpn.sitesTap : t.avpn.sitesAgo(n: ago)),
+                        style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          line(latencySites.take(3)),
+          const Gap(8),
+          line(latencySites.skip(3)),
         ],
       ),
     );
