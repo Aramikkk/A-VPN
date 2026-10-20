@@ -5,6 +5,7 @@ import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/connection/data/connection_data_providers.dart';
 import 'package:hiddify/features/connection/data/connection_repository.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
@@ -106,6 +107,18 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   Future<void> connectOnAppStart() async {
     if (!ref.read(Preferences.connectOnAppStart)) return;
     if (await ref.read(activeProfileProvider.future) == null) return;
+    // The first status at start is always "disconnected", until the core answers a moment later. A VPN left
+    // running while Android unloaded the app shows up then; connecting on that first status restarted it (the
+    // VPN off for ~20 s on opening the app). So: the phone's own word first, then up to 2 s for the core's.
+    if (await ServerRegionFilter.vpnActive()) {
+      loggy.info("the VPN is already up: not connecting on app start");
+      return;
+    }
+    for (var i = 0; i < 20; i++) {
+      final status = state.valueOrNull;
+      if (status is Connected || status is Connecting) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
     if (await future case Disconnected()) {
       loggy.info("connecting on app start");
       await ref.read(Preferences.startedByUser.notifier).update(true);

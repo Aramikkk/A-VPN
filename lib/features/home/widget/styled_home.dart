@@ -1713,8 +1713,9 @@ class _ContrastHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _LongSwipe(
-      // down: the settings come down from the top; up: the day's connections come up from the panel
-      onDown: () => context.goNamed('settings'),
+      // down: the session's traffic comes down from the top (Settings are on the cog); up: the day's connections
+      // come up from the panel
+      onDown: () => context.goNamed('traffic'),
       onUp: () => context.goNamed('connections'),
       child: LayoutBuilder(
         // a short screen: no room for the traffic block (it's on the Statistics tab)
@@ -3469,14 +3470,7 @@ class _SiteTiles extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final sites = ref.watch(siteLatencyProvider);
-    // "12 с назад" ticking while on screen
-    final now = useState(DateTime.now());
-    useEffect(() {
-      if (!visible) return null;
-      final timer = Timer.periodic(const Duration(seconds: 1), (_) => now.value = DateTime.now());
-      return timer.cancel;
-    }, [visible]);
-    final ago = sites.at == null ? null : now.value.difference(sites.at!).inSeconds.clamp(0, 99999);
+    final accent = theme.araAccent;
 
     Widget tile(LatencySite site) {
       final measured = sites.ms.containsKey(site.key);
@@ -3604,47 +3598,112 @@ class _SiteTiles extends HookConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // the button on the left: the block's name; while the sites are asked it fills with the accent, a site
+          // at a time, and empties when they have all answered
           Padding(
-            padding: const EdgeInsets.fromLTRB(6, 2, 2, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    t.avpn.sitesTitle.toUpperCase(),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                    ),
-                  ),
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: scheme.outlineVariant),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.refresh_rounded, size: 13, color: scheme.onSurfaceVariant),
-                      const Gap(3),
-                      Text(
-                        sites.testing
-                            ? t.avpn.sitesTesting
-                            : (ago == null ? t.avpn.sitesTap : t.avpn.sitesAgo(n: ago)),
-                        style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(
+                          end: sites.testing ? (.12 + .88 * sites.done / latencySites.length).clamp(0.0, 1.0) : 0.0,
+                        ),
+                        duration: Duration(milliseconds: sites.testing ? 450 : 700),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, fill, _) => Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: fill,
+                            heightFactor: 1,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [accent.withValues(alpha: .25), accent.withValues(alpha: .55)],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurface),
+                          const Gap(6),
+                          Text(
+                            t.avpn.sitesTitle.toUpperCase(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurface,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           line(latencySites.take(3)),
           const Gap(8),
           line(latencySites.skip(3)),
         ],
+      ),
+    );
+  }
+}
+
+/// The session's traffic by app, as the home screen showed it before the sites took its place: through the VPN and
+/// direct, each filled with its apps. Down from the top with a swipe down on the home screen; a swipe up (or Back)
+/// takes it away.
+class SessionTrafficPage extends ConsumerWidget {
+  const SessionTrafficPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    return _LongSwipe(
+      onDown: () {},
+      onUp: () => context.canPop() ? context.pop() : context.goNamed('home'),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          scrolledUnderElevation: 0,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t.avpn.trafficPageTitle),
+              Text(
+                t.avpn.trafficPageSession,
+                style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+        body: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+            child: _ContrastBlock(expand: true, child: const _HomeTraffic(visible: true)),
+          ),
+        ),
       ),
     );
   }

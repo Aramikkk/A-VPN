@@ -28,7 +28,8 @@ const latencySites = <LatencySite>[
 ];
 
 /// The last round: each site's delay in ms (null: no answer in time), when it ran, and whether one runs now.
-typedef SiteLatencyState = ({Map<String, int?> ms, DateTime? at, bool testing});
+/// [done]: the sites answered (or given up) in the round running now.
+typedef SiteLatencyState = ({Map<String, int?> ms, DateTime? at, bool testing, int done});
 
 final siteLatencyProvider = NotifierProvider<SiteLatency, SiteLatencyState>(SiteLatency.new);
 
@@ -54,7 +55,7 @@ class SiteLatency extends Notifier<SiteLatencyState> {
       _pick = pick;
       if (changed) unawaited(test());
     });
-    return stateOrNull ?? (ms: const {}, at: null, testing: false);
+    return stateOrNull ?? (ms: const {}, at: null, testing: false, done: 0);
   }
 
   /// The server Auto (or the chosen server) uses now.
@@ -71,7 +72,7 @@ class SiteLatency extends Notifier<SiteLatencyState> {
     if (state.at != null && DateTime.now().difference(state.at!) < const Duration(seconds: 3)) return;
     if (!(ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false)) return;
     if (!ref.read(ConfigOptions.enableMixedPort)) return;
-    state = (ms: state.ms, at: state.at, testing: true);
+    state = (ms: state.ms, at: state.at, testing: true, done: 0);
     final port = ref.read(ConfigOptions.mixedPort);
     final https = ref.read(ConfigOptions.pingHttps);
     // a client of its own each round, so a round starts from fresh connections
@@ -113,11 +114,12 @@ class SiteLatency extends Notifier<SiteLatencyState> {
             } catch (_) {
               results[site.key] = null;
             }
+            state = (ms: state.ms, at: state.at, testing: true, done: results.length);
           }(),
       ]);
     } finally {
       client.close(force: true);
     }
-    state = (ms: results, at: DateTime.now(), testing: false);
+    state = (ms: results, at: DateTime.now(), testing: false, done: latencySites.length);
   }
 }

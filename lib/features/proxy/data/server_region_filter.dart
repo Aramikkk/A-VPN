@@ -206,6 +206,17 @@ abstract class ServerRegionFilter {
     }
   }
 
+  /// Whether a VPN is up on the phone now (Android; false elsewhere): A-VPN's own left running while Android
+  /// unloaded the app, as a rule.
+  static Future<bool> vpnActive() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await _networkChannel.invokeMethod<bool>('vpnActive') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// The configs for Wi-Fi and for mobile data, for the phone's service to switch between when the network
   /// changes (with the app closed too); empty paths: it leaves the switching to the app.
   static Future<void> leaveVariants({String wifi = '', String mobile = ''}) async {

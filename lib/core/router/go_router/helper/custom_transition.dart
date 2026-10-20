@@ -7,7 +7,8 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/utils/utils.dart';
 
-enum TransitionType { slide, fade }
+/// [fromTop]: the page comes down from the top over the one under it (the home screen's swipe down)
+enum TransitionType { slide, fade, fromTop }
 
 Page<dynamic> customTransition(TransitionType transition, LocalKey pageKey, Widget child) {
   // On iOS, use CupertinoPage so pages get the native interactive (edge-swipe)
@@ -24,6 +25,14 @@ Page<dynamic> customTransition(TransitionType transition, LocalKey pageKey, Widg
     reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       if (transition == TransitionType.fade) return FadeTransition(opacity: animation, child: child);
+      if (transition == TransitionType.fromTop) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic),
+          ),
+          child: child,
+        );
+      }
       final incoming = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
       final covered = CurvedAnimation(
         parent: secondaryAnimation,

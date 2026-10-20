@@ -96,6 +96,15 @@ class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Event
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "underlyingNetwork" -> result.success(NetworkKinds.underlying(context))
+            // a VPN up on the phone now (A-VPN's own, left running while Android unloaded the app)
+            "vpnActive" -> {
+                val cm = context?.getSystemService(ConnectivityManager::class.java)
+                @Suppress("DEPRECATION")
+                val up = cm?.allNetworks?.any {
+                    cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+                } ?: false
+                result.success(up)
+            }
             // the router of the Wi-Fi the phone is on, to save it as a home: its address and the VPN panel's ports
             "homeWifiCapture" -> {
                 val appContext = context?.applicationContext

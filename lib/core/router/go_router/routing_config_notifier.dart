@@ -11,6 +11,7 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/custom_transition.dart';
 import 'package:hiddify/core/router/go_router/refresh_listenable.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/auto_pause/auto_pause_page.dart';
 import 'package:hiddify/features/home_wifi/home_wifi_page.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
@@ -165,6 +166,13 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   path: '/home',
                   builder: (_, _) => FocusScope(node: branchesScope['home'], child: const HomePage()),
                   routes: <GoRoute>[
+                    // the session's traffic by app, down from the top with a swipe down on the home screen
+                    GoRoute(
+                      name: 'traffic',
+                      path: 'traffic',
+                      pageBuilder: (_, state) =>
+                          customTransition(TransitionType.fromTop, state.pageKey, const SessionTrafficPage()),
+                    ),
                     GoRoute(
                       name: 'proxies',
                       path: 'proxies',
