@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -185,8 +186,42 @@ enum ContrastBackdrop {
   };
 }
 
-/// The seed of this run's layout: picked when the app starts, the same until it's closed.
+/// The seed of this run's first layout: picked when the app starts.
 final contrastBackdropSeed = math.Random().nextInt(1 << 30);
+
+/// The backdrop's layout now and the one before it: a new layout each time the VPN goes on or off, faded in over the
+/// old one ([ContrastBackdropLayout.fade]) in 0.7 s. Meanwhile only the two kept pictures are drawn, nothing is laid
+/// out again frame by frame.
+final contrastBackdropLayoutProvider = NotifierProvider<ContrastBackdropLayout, ({int seed, int previous})>(
+  ContrastBackdropLayout.new,
+);
+
+class ContrastBackdropLayout extends Notifier<({int seed, int previous})> {
+  /// how far the new layout has faded in over the old one (1: the new one alone)
+  static final fade = ValueNotifier<double>(1);
+  static Ticker? _ticker;
+
+  @override
+  ({int seed, int previous}) build() => (seed: contrastBackdropSeed, previous: contrastBackdropSeed);
+
+  /// Lays the backdrop out anew and fades it in, unless one is fading in already.
+  void next() {
+    if (fade.value < 1) return;
+    state = (seed: math.Random().nextInt(1 << 30), previous: state.seed);
+    fade.value = 0;
+    _ticker = Ticker((elapsed) {
+      final t = (elapsed.inMilliseconds / 700).clamp(0.0, 1.0);
+      fade.value = Curves.easeInOut.transform(t);
+      if (t < 1) return;
+      final done = _ticker;
+      _ticker = null;
+      done?.stop();
+      Future.microtask(() => done?.dispose());
+      // faded in: the old picture let go
+      state = (seed: state.seed, previous: state.seed);
+    })..start();
+  }
+}
 
 /// Draws a [ContrastBackdrop] in a palette's two colours on the page's base colour.
 class ContrastBackdropPainter extends CustomPainter {
@@ -296,11 +331,13 @@ class ContrastBackdropPainter extends CustomPainter {
       case ContrastBackdrop.pinstripes:
         canvas.save();
         canvas.translate(w / 2, h / 2);
-        canvas.rotate(-35 * math.pi / 180);
+        // laid out anew with each layout (the VPN on or off): the slant and where the lit lines fall
+        canvas.rotate(-(29 + r.nextDouble() * 12) * math.pi / 180);
+        final shift = r.nextDouble() * 5 * w / 12;
         for (var j = 0; j < 48; j++) {
           final on = j % 5 == 2;
           canvas.drawRect(
-            Rect.fromLTWH(-w * 2 + j * w / 12, -h, on ? 3 * w / 411 : 1.4 * w / 411, h * 2),
+            Rect.fromLTWH(-w * 2 + j * w / 12 + shift - 5 * w / 12, -h, on ? 3 * w / 411 : 1.4 * w / 411, h * 2),
             fill..color = on ? warm : faint,
           );
         }
@@ -590,13 +627,14 @@ class ContrastFrostImage {
     required double blur,
     // Blurred textures use at most one pixel per point; sharp backgrounds keep their own resolution.
     required double scale,
+    required int seed,
   }) {
     final key =
-        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur|$scale';
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur|$scale|$seed';
     final kept = _kept[key];
     if (kept != null) return kept;
     // a handful at most (day and night, a few clarities); the old ones go to the collector
-    if (_kept.length > 2) _kept.clear();
+    if (_kept.length > 3) _kept.clear();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.scale(scale);
@@ -604,14 +642,7 @@ class ContrastFrostImage {
       Offset.zero & area,
       Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur, tileMode: TileMode.clamp),
     );
-    ContrastBackdropPainter(
-      kind: kind,
-      warm: warm,
-      cool: cool,
-      dark: dark,
-      seed: contrastBackdropSeed,
-      area: area,
-    ).paint(canvas, area);
+    ContrastBackdropPainter(kind: kind, warm: warm, cool: cool, dark: dark, seed: seed, area: area).paint(canvas, area);
     canvas.restore();
     final picture = recorder.endRecording();
     final image = picture.toImageSync(
@@ -638,23 +669,17 @@ class ContrastBackdropImage {
     required bool dark,
     required Size area,
     required double scale,
+    required int seed,
   }) {
     final key =
-        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$scale';
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$scale|$seed';
     final kept = _kept[key];
     if (kept != null) return kept;
     // a few at most (day and night, folded and unfolded); the old ones go to the collector
-    if (_kept.length > 2) _kept.clear();
+    if (_kept.length > 3) _kept.clear();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)..scale(scale);
-    ContrastBackdropPainter(
-      kind: kind,
-      warm: warm,
-      cool: cool,
-      dark: dark,
-      seed: contrastBackdropSeed,
-      area: area,
-    ).paint(canvas, area);
+    ContrastBackdropPainter(kind: kind, warm: warm, cool: cool, dark: dark, seed: seed, area: area).paint(canvas, area);
     final picture = recorder.endRecording();
     final image = picture.toImageSync(
       math.max(1, (area.width * scale).ceil()),
@@ -666,10 +691,13 @@ class ContrastBackdropImage {
 }
 
 /// Paints a [ContrastBackdropImage] from its box's corner, at its points' size.
+/// [previous]: the layout before, under the new one while that fades in.
 class ContrastImagePainter extends CustomPainter {
-  ContrastImagePainter(this.image, this.scale);
+  ContrastImagePainter(this.image, this.scale, {this.previous})
+    : super(repaint: previous == null ? null : ContrastBackdropLayout.fade);
 
   final ui.Image image;
+  final ui.Image? previous;
   final double scale;
 
   @override
@@ -677,10 +705,24 @@ class ContrastImagePainter extends CustomPainter {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     canvas.scale(1 / scale);
-    canvas.drawImage(image, Offset.zero, Paint()..filterQuality = FilterQuality.low);
+    final fade = ContrastBackdropLayout.fade.value;
+    final old = previous;
+    if (old != null && fade < 1) {
+      canvas.drawImage(old, Offset.zero, Paint()..filterQuality = FilterQuality.low);
+      canvas.drawImage(
+        image,
+        Offset.zero,
+        Paint()
+          ..filterQuality = FilterQuality.low
+          ..color = Color.fromRGBO(0, 0, 0, fade),
+      );
+    } else {
+      canvas.drawImage(image, Offset.zero, Paint()..filterQuality = FilterQuality.low);
+    }
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(ContrastImagePainter old) => !identical(old.image, image) || old.scale != scale;
+  bool shouldRepaint(ContrastImagePainter old) =>
+      !identical(old.image, image) || !identical(old.previous, previous) || old.scale != scale;
 }

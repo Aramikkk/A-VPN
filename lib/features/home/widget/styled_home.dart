@@ -1452,61 +1452,24 @@ class _HomeTraffic extends ConsumerWidget {
     final theme = Theme.of(context);
     if (theme.araLook.style == AraStyle.contrast) {
       final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
-      if (PlatformUtils.isAndroid) {
-        final screenTime = visible && connected ? ref.watch(foregroundScreenTimeProvider).valueOrNull : null;
-        if (screenTime != null && !screenTime.hasUsageAccess) return const _ScreenTimeAccessCard();
-        final byRoute = foregroundConnectionsByRoute(current, screenTime?.apps ?? const {});
-        List<_AppShare> screenTimeRoute(ConnectionRoute route) {
-          final groups = groupConnections(byRoute[route] ?? const [], (c) => c.app)
-            ..sort((a, b) {
-              final aTime = screenTime?.apps[a.key] ?? Duration.zero;
-              final bTime = screenTime?.apps[b.key] ?? Duration.zero;
-              return bTime.compareTo(aTime);
-            });
-          return [
-            for (final group in groups)
-              (
-                name: connectionAppName(t, installed, group.key),
-                bytes: group.total,
-                duration: screenTime?.apps[group.key] ?? Duration.zero,
-                servers: route == ConnectionRoute.vpn
-                    ? serverFlags(group.servers.where((server) => !isHiddenServer(server)))
-                    : '',
-                icon: installed[group.key]?.icon,
-              ),
-          ];
-        }
-
-        return _ContrastTraffic(
-          vpn: screenTimeRoute(ConnectionRoute.vpn),
-          direct: screenTimeRoute(ConnectionRoute.direct),
-        );
-      }
-      final activityStart = sessionStart ?? DateTime.now();
-      final activityNow = DateTime.now();
+      // by traffic on every platform (the time on screen came out empty on most phones)
       List<_AppShare> route(ConnectionRoute r) {
         final groups = groupConnections(current.where((c) => c.route == r && c.app.isNotEmpty), (c) => c.app)
-          ..sort((a, b) {
-            if (PlatformUtils.isDesktop) return b.total.compareTo(a.total);
-            final aUsage = routeAppUsageSince(state.routeUsage, r, a.key, activityStart, activityNow);
-            final bUsage = routeAppUsageSince(state.routeUsage, r, b.key, activityStart, activityNow);
-            return bUsage.compareTo(aUsage);
-          });
+          ..sort((a, b) => b.total.compareTo(a.total));
         return [
           for (final g in groups)
-            (
-              name: connectionAppName(t, installed, g.key),
-              bytes: g.total,
-              duration: PlatformUtils.isDesktop
-                  ? Duration.zero
-                  : routeAppUsageSince(state.routeUsage, r, g.key, activityStart, activityNow),
-              servers: r == ConnectionRoute.vpn ? serverFlags(g.servers.where((s) => !isHiddenServer(s))) : '',
-              icon: installed[g.key]?.icon,
-            ),
+            if (g.total > 0)
+              (
+                name: connectionAppName(t, installed, g.key),
+                bytes: g.total,
+                duration: Duration.zero,
+                servers: r == ConnectionRoute.vpn ? serverFlags(g.servers.where((s) => !isHiddenServer(s))) : '',
+                icon: installed[g.key]?.icon,
+              ),
         ];
       }
 
-      return _ContrastTraffic(vpn: route(ConnectionRoute.vpn), direct: route(ConnectionRoute.direct));
+      return _ContrastMosaic(vpn: route(ConnectionRoute.vpn), direct: route(ConnectionRoute.direct));
     }
     // fixed in place (no scroll) and without a heading, so the strips have the room; what doesn't fit is cut
     final strips = ClipRect(
@@ -1567,46 +1530,6 @@ class _HomeTraffic extends ConsumerWidget {
               )
             // from the top, each part always in its place (the strips keep a fixed height)
             : Align(alignment: Alignment.topCenter, child: strips),
-      ),
-    );
-  }
-}
-
-class _ScreenTimeAccessCard extends ConsumerWidget {
-  const _ScreenTimeAccessCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow.withValues(alpha: .6),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .5)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.screen_search_desktop_rounded, size: 30),
-          const Gap(10),
-          Text(t.avpn.autoPauseNeedAccess, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
-          const Gap(12),
-          FilledButton.icon(
-            onPressed: () async {
-              try {
-                await openForegroundUsageAccessSettings();
-              } on PlatformException {
-                // The phone's settings app may be unavailable; leave the home screen usable.
-              }
-            },
-            icon: const Icon(Icons.open_in_new_rounded),
-            label: Text(t.avpn.autoPauseGrant),
-          ),
-        ],
       ),
     );
   }
@@ -1932,6 +1855,13 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
   @override
   Widget build(BuildContext context) {
     if (!widget.own && context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
+    // the VPN on or off: the backdrop laid out anew, faded in over the old one
+    ref.listen(connectionNotifierProvider, (previous, next) {
+      final was = previous?.valueOrNull?.isConnected;
+      final now = next.valueOrNull?.isConnected;
+      if (was != null && now != null && was != now) ref.read(contrastBackdropLayoutProvider.notifier).next();
+    });
+    final layout = ref.watch(contrastBackdropLayoutProvider);
     final brightness = Theme.of(context).brightness;
     // the settings not read yet (the first frames): the defaults
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
@@ -1940,7 +1870,7 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     final area = contrastImageArea(MediaQuery.sizeOf(context));
     // the picture at the screen's sharpness, two pixels a point at most (blurrier lines aren't seen, memory is)
     final scale = math.min(MediaQuery.devicePixelRatioOf(context), PlatformUtils.isDesktop ? 1.25 : 2.0);
-    final image = ContrastBackdropImage.of(
+    ui.Image picture(int seed) => ContrastBackdropImage.of(
       kind: ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback,
       warm: warm,
       cool: cool,
@@ -1948,13 +1878,18 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
       // laid out on the screen, so every page's lines up with the rest
       area: area,
       scale: scale,
+      seed: seed,
     );
+    final image = picture(layout.seed);
+    final previous = layout.previous == layout.seed ? null : picture(layout.previous);
     return _GlowAnchor(
       child: Stack(
         fit: StackFit.passthrough,
         children: [
           Positioned.fill(
-            child: RepaintBoundary(child: CustomPaint(painter: ContrastImagePainter(image, scale))),
+            child: RepaintBoundary(
+              child: CustomPaint(painter: ContrastImagePainter(image, scale, previous: previous)),
+            ),
           ),
           if (widget.muted) Positioned.fill(child: ColoredBox(color: ContrastGlow.veil(brightness == Brightness.dark))),
           widget.child,
@@ -2043,7 +1978,8 @@ class _FrostedBackdrop extends ConsumerWidget {
     final (warm, cool) = palette.backdrop(brightness);
     final scale = math.min(MediaQuery.devicePixelRatioOf(context), 1.0);
     final kind = ready ? ref.watch(Preferences.contrastBackdrop) : ContrastBackdrop.fallback;
-    final image = ContrastFrostImage.of(
+    final layout = ref.watch(contrastBackdropLayoutProvider);
+    ui.Image picture(int seed) => ContrastFrostImage.of(
       kind: kind,
       warm: warm,
       cool: cool,
@@ -2052,11 +1988,16 @@ class _FrostedBackdrop extends ConsumerWidget {
       // thin lines blurred lightly (they still show), filled shapes harder (their bright edges ran through the text)
       blur: kind.lines ? clarity.blur : 12,
       scale: scale,
+      seed: seed,
     );
+    final image = picture(layout.seed);
+    // the layout before, under the new one while that fades in (the VPN on or off)
+    final previous = layout.previous == layout.seed ? null : picture(layout.previous);
     // on a muted page the backdrop under the frost is toned down too
     final muted = context.findAncestorStateOfType<_ContrastGlowState>()?.widget.muted ?? false;
     final frost = _FrostPart(
       image: image,
+      previous: previous,
       scale: scale,
       radius: radius,
       scroll: Scrollable.maybeOf(context)?.position,
@@ -2065,6 +2006,7 @@ class _FrostedBackdrop extends ConsumerWidget {
     if (!muted) return frost;
     return _FrostPart(
       image: image,
+      previous: previous,
       scale: scale,
       radius: radius,
       scroll: Scrollable.maybeOf(context)?.position,
@@ -2091,9 +2033,19 @@ class _GlowAnchor extends SingleChildRenderObjectWidget {
 class _RenderGlowAnchor extends RenderProxyBox {}
 
 class _FrostPart extends SingleChildRenderObjectWidget {
-  const _FrostPart({required this.image, required this.scale, required this.radius, this.scroll, super.child});
+  const _FrostPart({
+    required this.image,
+    required this.scale,
+    required this.radius,
+    this.previous,
+    this.scroll,
+    super.child,
+  });
 
   final ui.Image image;
+
+  /// the layout before, under the new one while that fades in
+  final ui.Image? previous;
 
   /// the picture's pixels per point
   final double scale;
@@ -2103,11 +2055,14 @@ class _FrostPart extends SingleChildRenderObjectWidget {
   final Listenable? scroll;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderFrostPart(image, radius, scroll)..scale = scale;
+  RenderObject createRenderObject(BuildContext context) => _RenderFrostPart(image, radius, scroll)
+    ..scale = scale
+    ..previous = previous;
 
   @override
   void updateRenderObject(BuildContext context, _RenderFrostPart renderObject) => renderObject
     ..image = image
+    ..previous = previous
     ..scale = scale
     ..radius = radius
     ..scroll = scroll;
@@ -2135,12 +2090,26 @@ class _RenderFrostPart extends RenderProxyBox {
   void attach(PipelineOwner owner) {
     super.attach(owner);
     _scroll?.addListener(markNeedsPaint);
+    if (_previous != null) ContrastBackdropLayout.fade.addListener(markNeedsPaint);
   }
 
   @override
   void detach() {
     _scroll?.removeListener(markNeedsPaint);
+    ContrastBackdropLayout.fade.removeListener(markNeedsPaint);
     super.detach();
+  }
+
+  /// the layout before, faded out as the new one fades in: repainted with the fade only while there is one
+  ui.Image? _previous;
+  set previous(ui.Image? v) {
+    if (identical(v, _previous)) return;
+    if (attached) {
+      ContrastBackdropLayout.fade.removeListener(markNeedsPaint);
+      if (v != null) ContrastBackdropLayout.fade.addListener(markNeedsPaint);
+    }
+    _previous = v;
+    markNeedsPaint();
   }
 
   ui.Image _image;
@@ -2171,11 +2140,24 @@ class _RenderFrostPart extends RenderProxyBox {
     canvas.save();
     canvas.clipRRect(RRect.fromRectAndRadius(offset & size, Radius.circular(_radius)));
     // whole pixels of the picture: a part taken between them was resampled anew each frame and the lines shimmered
+    final part = Rect.fromLTWH(
+      (at.dx * k).roundToDouble(),
+      (at.dy * k).roundToDouble(),
+      size.width * k,
+      size.height * k,
+    );
+    final fade = ContrastBackdropLayout.fade.value;
+    final old = _previous;
+    if (old != null && fade < 1) {
+      canvas.drawImageRect(old, part, offset & size, Paint()..filterQuality = FilterQuality.low);
+    }
     canvas.drawImageRect(
       _image,
-      Rect.fromLTWH((at.dx * k).roundToDouble(), (at.dy * k).roundToDouble(), size.width * k, size.height * k),
+      part,
       offset & size,
-      Paint()..filterQuality = FilterQuality.low,
+      Paint()
+        ..filterQuality = FilterQuality.low
+        ..color = Color.fromRGBO(0, 0, 0, old != null && fade < 1 ? fade : 1),
     );
     canvas.restore();
     super.paint(context, offset);
@@ -2601,615 +2583,272 @@ class _ContrastStats extends StatelessWidget {
 /// An app's part of a route: its name, how much, the servers it went through (flags) and its icon.
 typedef _AppShare = ({String name, int bytes, Duration duration, String servers, Uint8List? icon});
 
-/// Contrast's traffic: two tiles, through the VPN (the accent) and the bypass (grey), each marked by its sign with
-/// its share and foreground time on Android, traffic on desktop. Water and app bands use that same metric,
-/// with the largest app at the bottom. A tap opens the route's apps in a card that grows
-/// out of the tile into the middle of the screen.
-class _ContrastTraffic extends StatelessWidget {
-  const _ContrastTraffic({required this.vpn, required this.direct});
+/// Contrast's traffic as a mosaic: the session's totals through the VPN and the bypass, under them a tile for each
+/// app, as big as its share of the traffic; the VPN's in the accent, the bypass's grey.
+class _ContrastMosaic extends ConsumerWidget {
+  const _ContrastMosaic({required this.vpn, required this.direct});
 
   final List<_AppShare> vpn;
   final List<_AppShare> direct;
 
+  /// the most tiles: the rest in one tile of their own
+  static const _most = 11;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final accent = theme.araAccent;
-    Duration sum(List<_AppShare> apps) => apps.fold(Duration.zero, (s, a) => s + a.duration);
-    int sumBytes(List<_AppShare> apps) => apps.fold(0, (s, a) => s + a.bytes);
-    final total = sum(vpn) + sum(direct);
-    final totalBytes = sumBytes(vpn) + sumBytes(direct);
-    return Row(
+    const grey = Color(0xFF9AA0A6);
+    final units = t.avpn.bytesUnits.split(',');
+    int sum(List<_AppShare> apps) => apps.fold(0, (s, a) => s + a.bytes);
+    final vpnBytes = sum(vpn);
+    final directBytes = sum(direct);
+    final all = [for (final a in vpn) (a, true), for (final a in direct) (a, false)]
+      ..sort((a, b) => b.$1.bytes.compareTo(a.$1.bytes));
+    final shown = all.take(all.length > _most ? _most - 1 : _most).toList();
+    final rest = all.skip(shown.length).toList();
+    final tiles = <_MosaicTile>[
+      for (final (a, onVpn) in shown) (app: a, vpn: onVpn, more: 0),
+      if (rest.isNotEmpty)
+        (
+          app: (
+            name: t.avpn.contrastMore(n: rest.length),
+            bytes: rest.fold(0, (s, r) => s + r.$1.bytes),
+            duration: Duration.zero,
+            servers: '',
+            icon: null,
+          ),
+          vpn: rest.every((r) => r.$2),
+          more: rest.length,
+        ),
+    ];
+
+    Widget total(String label, int bytes, Color colour, CrossAxisAlignment align) {
+      final amount = formatBytes(bytes, units).split(' ');
+      return Column(
+        crossAxisAlignment: align,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(color: colour, fontWeight: FontWeight.w800, letterSpacing: 1),
+          ),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: amount.first),
+                if (amount.length > 1)
+                  TextSpan(
+                    text: ' ${amount.skip(1).join(' ')}',
+                    style: theme.textTheme.labelLarge?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+              ],
+            ),
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: -1),
+          ),
+        ],
+      );
+    }
+
+    return Column(
       key: const Key('contrast-traffic'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: _WaterTile(
-            icon: Icons.shield_rounded,
-            apps: vpn,
-            totalActivity: total,
-            totalBytes: totalBytes,
-            colour: accent,
-            vpn: true,
-            compact: MediaQuery.sizeOf(context).height < 600,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(6, 2, 6, 10),
+          child: Row(
+            children: [
+              Expanded(child: total(t.avpn.statsViaVpn, vpnBytes, accent, CrossAxisAlignment.start)),
+              Expanded(child: total(t.avpn.homeBypass, directBytes, scheme.onSurfaceVariant, CrossAxisAlignment.end)),
+            ],
           ),
         ),
-        const Gap(6),
         Expanded(
-          child: _WaterTile(
-            icon: Icons.alt_route_rounded,
-            apps: direct,
-            totalActivity: total,
-            totalBytes: totalBytes,
-            colour: const Color(0xFF9AA0A6),
-            vpn: false,
-            compact: MediaQuery.sizeOf(context).height < 600,
-          ),
+          child: tiles.isEmpty
+              ? Center(child: Icon(Icons.data_usage_rounded, size: 40, color: scheme.outlineVariant))
+              : LayoutBuilder(
+                  builder: (context, box) {
+                    final places = <(Rect, _MosaicTile)>[];
+                    _lay(tiles, Offset.zero & box.biggest, places);
+                    return Stack(
+                      children: [
+                        for (final (rect, tile) in places)
+                          Positioned.fromRect(
+                            rect: rect.deflate(3),
+                            child: _MosaicCell(
+                              tile: tile,
+                              colour: tile.vpn ? accent : grey,
+                              units: units,
+                              direct: t.avpn.statsDirect.toLowerCase(),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
+
+  /// Lays [tiles] (the biggest first) out on [area]: split in two halves of the traffic across its longer side,
+  /// each half laid out the same way.
+  static void _lay(List<_MosaicTile> tiles, Rect area, List<(Rect, _MosaicTile)> out) {
+    if (tiles.isEmpty) return;
+    if (tiles.length == 1) {
+      out.add((area, tiles.first));
+      return;
+    }
+    // a tile's traffic, but none smaller than a fortieth of the whole, so the smallest can still be read
+    final whole = tiles.fold<int>(0, (s, t) => s + t.app.bytes);
+    double weight(_MosaicTile t) => math.max(t.app.bytes.toDouble(), whole / 40);
+    final sum = tiles.fold<double>(0, (s, t) => s + weight(t));
+    var half = weight(tiles.first);
+    var k = 1;
+    while (k < tiles.length - 1 && half + weight(tiles[k]) <= sum / 2) {
+      half += weight(tiles[k]);
+      k++;
+    }
+    final f = half / sum;
+    if (area.width >= area.height) {
+      final w = area.width * f;
+      _lay(tiles.sublist(0, k), Rect.fromLTWH(area.left, area.top, w, area.height), out);
+      _lay(tiles.sublist(k), Rect.fromLTWH(area.left + w, area.top, area.width - w, area.height), out);
+    } else {
+      final h = area.height * f;
+      _lay(tiles.sublist(0, k), Rect.fromLTWH(area.left, area.top, area.width, h), out);
+      _lay(tiles.sublist(k), Rect.fromLTWH(area.left, area.top + h, area.width, area.height - h), out);
+    }
+  }
 }
 
-class _WaterTile extends ConsumerWidget {
-  const _WaterTile({
-    required this.icon,
-    required this.apps,
-    required this.totalActivity,
-    required this.totalBytes,
-    required this.colour,
-    required this.vpn,
-    required this.compact,
-  });
+/// A mosaic's tile: an app (or the rest of them, [more] apps) and its route.
+typedef _MosaicTile = ({_AppShare app, bool vpn, int more});
 
-  final IconData icon;
-  final List<_AppShare> apps;
-  final Duration totalActivity;
-  final int totalBytes;
+/// An app's tile in the mosaic: its icon, name, amount and route; a small one just the icon and the amount.
+class _MosaicCell extends StatelessWidget {
+  const _MosaicCell({required this.tile, required this.colour, required this.units, required this.direct});
+
+  /// the bypass's word under its tiles
+  final String direct;
+
+  final _MosaicTile tile;
   final Color colour;
-  final bool vpn;
-  final bool compact;
-
-  static const _alphas = [.62, .46, .34, .25, .2];
+  final List<String> units;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    final units = t.avpn.bytesUnits.split(',');
-    final bytes = apps.fold<int>(0, (s, a) => s + a.bytes);
-    final activity = apps.fold(Duration.zero, (s, a) => s + a.duration);
-    final byBytes = PlatformUtils.isDesktop;
-    int weight(Duration time, int traffic) => byBytes ? traffic : time.inMilliseconds;
-    final routeWeight = weight(activity, bytes);
-    final totalWeight = weight(totalActivity, totalBytes);
-    final share = totalWeight == 0 ? 0.0 : routeWeight / totalWeight;
-    // Desktop water measures bytes; Android water measures foreground time.
-    // Apps below 12% of the route are combined into one band.
-    final big = [
-      for (final a in apps)
-        if (routeWeight > 0 && weight(a.duration, a.bytes) / routeWeight >= .12) a,
-    ].take(3).toList();
-    final rest = apps.where((a) => !big.contains(a)).toList();
-    final bands = <(String, Duration, int)>[
-      for (final a in big) (a.name, a.duration, a.bytes),
-      if (rest.isNotEmpty)
-        (
-          rest.length == 1 ? rest.first.name : t.avpn.contrastMore(n: rest.length),
-          rest.fold(Duration.zero, (s, a) => s + a.duration),
-          rest.fold<int>(0, (s, a) => s + a.bytes),
-        ),
-    ];
-    final ink = scheme.onSurface;
-    final amount = formatBytes(bytes, units).split(' ');
-    final activeTime = byBytes ? formatBytes(bytes, units) : _duration(activity);
-    final header = compact ? 40.0 : 48.0;
-    // by day the water lighter, so the light behind shows through
-    final alphas = dark ? _alphas : const [.4, .3, .22, .16, .14];
-    // always full of its own apps; the route's share is the thin bar under the header
-    final level = routeWeight > 0 ? 1.0 : 0.0;
-    return GestureDetector(
-      onTap: () => _open(context, t),
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // the sign, the amount and the share in one small row over the water
-            Container(
-              height: header,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: colour.withValues(alpha: .25))),
-              ),
-              child: compact
-                  ? Row(
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: colour, width: 1.3),
-                          ),
-                          child: Icon(icon, size: 12, color: vpn ? theme.araIcon : colour),
+    final app = tile.app;
+    final amount = formatBytes(app.bytes, units).split(' ');
+    return LayoutBuilder(
+      builder: (context, box) {
+        final small = box.maxWidth < 96 || box.maxHeight < 104;
+        final side = small ? 22.0 : 30.0;
+        final icon = ClipRRect(
+          borderRadius: BorderRadius.circular(side * .3),
+          child: app.icon != null && tile.more == 0
+              ? Image.memory(app.icon!, width: side, height: side, gaplessPlayback: true)
+              : Container(
+                  width: side,
+                  height: side,
+                  alignment: Alignment.center,
+                  color: colour.withValues(alpha: .25),
+                  child: tile.more > 0
+                      ? Icon(Icons.more_horiz_rounded, size: side * .6, color: scheme.onSurface)
+                      : Text(
+                          app.name.isEmpty ? '?' : app.name.characters.first.toUpperCase(),
+                          style: TextStyle(fontSize: side * .5, fontWeight: FontWeight.w800, color: scheme.onSurface),
                         ),
-                        const Gap(7),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                activeTime,
-                                maxLines: 1,
-                                style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, color: ink),
-                              ),
-                              Text(
-                                byBytes
-                                    ? (bands.isEmpty ? '—' : bands.first.$1)
-                                    : '${bands.isEmpty ? '—' : bands.first.$1} · ${amount.join(' ')}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(color: ink.withValues(alpha: .65)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Gap(4),
-                        Text(
-                          '${(share * 100).round()}%',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: colour, width: 1.3),
-                          ),
-                          child: Icon(icon, size: 13, color: vpn ? theme.araIcon : colour),
-                        ),
-                        const Gap(8),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  activeTime,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -.5,
-                                    color: ink,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                byBytes ? (vpn ? t.avpn.statsViaVpn : t.avpn.homeBypass) : amount.join(' '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(color: ink.withValues(alpha: .6)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Gap(4),
-                        Text(
-                          '${(share * 100).round()}%',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+                ),
+        );
+        // the number as big as the tile allows
+        final figure = (box.maxWidth / 6).clamp(16.0, 34.0);
+        return Container(
+          clipBehavior: Clip.antiAlias,
+          padding: EdgeInsets.all(small ? 6 : 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colour.withValues(alpha: dark ? .5 : .6)),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                colour.withValues(alpha: dark ? .14 : .12),
+                colour.withValues(alpha: dark ? .3 : .26),
+              ],
+            ),
+          ),
+          child: small
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    icon,
+                    const Gap(3),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        amount.first,
+                        style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                     ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(10, compact ? 2 : 6, 10, compact ? 2 : 6),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(end: _percent(share)),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, v, _) => LinearProgressIndicator(
-                    value: v,
-                    minHeight: 4,
-                    color: colour,
-                    backgroundColor: ink.withValues(alpha: .07),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(end: _percent(level)),
-                duration: const Duration(milliseconds: 900),
-                curve: Curves.easeOutCubic,
-                builder: (context, level, _) => Stack(
-                  children: [
-                    // the stream: a soft glow of the route's colour rising from the water up to the amount
-                    if (level > .005)
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              stops: [0, 1 - level, 1 - level],
-                              colors: [
-                                colour.withValues(alpha: 0),
-                                colour.withValues(alpha: dark ? .16 : .14),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (level > .005)
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: FractionallySizedBox(
-                          heightFactor: level,
-                          widthFactor: 1,
-                          child: LayoutBuilder(
-                            builder: (context, area) {
-                              final minimum = math.min(
-                                MediaQuery.textScalerOf(context).scale(48),
-                                area.maxHeight / bands.length,
-                              );
-                              final remaining = math.max(0.0, area.maxHeight - minimum * bands.length);
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  for (final (i, (name, duration, b)) in bands.indexed.toList().reversed)
-                                    SizedBox(
-                                      height:
-                                          minimum +
-                                          remaining * weight(duration, b) / (routeWeight == 0 ? 1 : routeWeight),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: colour.withValues(alpha: alphas[i.clamp(0, 4)]),
-                                          border: i < bands.length - 1
-                                              ? Border(
-                                                  top: BorderSide(
-                                                    color: Colors.white.withValues(alpha: dark ? .16 : .7),
-                                                  ),
-                                                )
-                                              : null,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(horizontal: 11),
-                                        child: LayoutBuilder(
-                                          builder: (context, box) => box.maxHeight < 27
-                                              ? const SizedBox.shrink()
-                                              : Padding(
-                                                  padding: EdgeInsets.symmetric(vertical: box.maxHeight < 42 ? 1 : 3),
-                                                  child: Column(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                                    children: [
-                                                      Text(
-                                                        name,
-                                                        maxLines: box.maxHeight < 42 ? 1 : 2,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: theme.textTheme.labelSmall?.copyWith(
-                                                          color: ink,
-                                                          fontWeight: FontWeight.w700,
-                                                          height: 1,
-                                                        ),
-                                                      ),
-                                                      if (box.maxHeight >= 31) ...[
-                                                        const Gap(2),
-                                                        Text(
-                                                          byBytes
-                                                              ? formatBytes(b, units)
-                                                              : '${_duration(duration)} · ${formatBytes(b, units)}',
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                          style: theme.textTheme.labelSmall?.copyWith(
-                                                            color: ink.withValues(alpha: .7),
-                                                            fontWeight: FontWeight.w700,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ],
-                                                  ),
-                                                ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
                   ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// The route's apps in a card that grows out of this tile into the middle of the screen.
-  void _open(BuildContext context, Translations t) {
-    final box = context.findRenderObject() as RenderBox?;
-    final screen = MediaQuery.sizeOf(context);
-    var from = Alignment.center;
-    if (box != null && box.hasSize) {
-      final centre = box.localToGlobal(box.size.center(Offset.zero));
-      from = Alignment(centre.dx / screen.width * 2 - 1, centre.dy / screen.height * 2 - 1);
-    }
-    final theme = Theme.of(context);
-    showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black45,
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (_, _, _) => Theme(
-        data: theme,
-        child: _RouteCard(apps: apps, total: totalBytes, colour: colour, icon: icon, vpn: vpn),
-      ),
-      transitionBuilder: (context, animation, _, child) =>
-          HomePopupTransition(animation: animation, alignment: from, child: child),
-    );
-  }
-}
-
-/// A route's apps, in a card in the middle of the screen: the route with its share and amount, a strip of the
-/// apps' shares, and each app with its icon, amount, a bar against the biggest, its share and (through the VPN)
-/// the servers it went through.
-class _RouteCard extends ConsumerWidget {
-  const _RouteCard({
-    required this.apps,
-    required this.total,
-    required this.colour,
-    required this.icon,
-    required this.vpn,
-  });
-
-  final List<_AppShare> apps;
-  final int total;
-  final Color colour;
-  final IconData icon;
-  final bool vpn;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final units = t.avpn.bytesUnits.split(',');
-    final bytes = apps.fold<int>(0, (s, a) => s + a.bytes);
-    final top = apps.fold<int>(1, (largest, app) => app.bytes > largest ? app.bytes : largest);
-    final servers = {for (final a in apps) ...a.servers.split(' ').where((f) => f.isNotEmpty)}.length;
-    final amount = formatBytes(bytes, units).split(' ');
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 60),
-        child: ContrastClear(
-          radius: 28,
-          builder: (tint) => Material(
-            color: tint,
-            borderRadius: BorderRadius.circular(28),
-            clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-              side: BorderSide(color: colour.withValues(alpha: .35), width: 1.5),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: colour, width: 1.6),
-                          ),
-                          child: Icon(icon, size: 20, color: colour),
-                        ),
-                        const Gap(12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(vpn ? t.avpn.statsViaVpn : t.avpn.homeBypass, style: theme.textTheme.titleLarge),
-                              Text(
-                                vpn
-                                    ? t.avpn.contrastRouteVpn(
-                                        share: total == 0 ? 0 : (bytes * 100 / total).round(),
-                                        n: servers,
-                                      )
-                                    : t.avpn.contrastRouteDirect(
-                                        share: total == 0 ? 0 : (bytes * 100 / total).round(),
-                                      ),
-                                style: theme.textTheme.bodySmall?.copyWith(
+                    icon,
+                    const Gap(6),
+                    Text(
+                      app.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: amount.first),
+                            if (amount.length > 1)
+                              TextSpan(
+                                text: ' ${amount.skip(1).join(' ')}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  letterSpacing: 0,
                                   color: scheme.onSurfaceVariant,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: amount.first),
-                              if (amount.length > 1)
-                                TextSpan(
-                                  text: ' ${amount.sublist(1).join(' ')}',
-                                  style: TextStyle(fontSize: 13, letterSpacing: 0, color: scheme.onSurfaceVariant),
-                                ),
-                            ],
-                          ),
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: -1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Gap(16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: SizedBox(
-                        height: 10,
-                        child: Row(
-                          spacing: 2,
-                          children: [
-                            for (final (i, a) in apps.indexed)
-                              Expanded(
-                                flex: (a.bytes * 1000 ~/ (bytes == 0 ? 1 : bytes)).clamp(1, 1000),
-                                child: ColoredBox(color: colour.withValues(alpha: (1 - i * .15).clamp(.2, 1))),
-                              ),
                           ],
                         ),
-                      ),
-                    ),
-                    const Gap(14),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 2, bottom: 4),
-                      child: Text(
-                        t.avpn.contrastApps.toUpperCase(),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.3,
+                        style: TextStyle(
+                          fontSize: figure,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -1,
+                          height: 1.15,
                         ),
                       ),
                     ),
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        padding: EdgeInsets.zero,
-                        itemCount: apps.length,
-                        separatorBuilder: (_, _) =>
-                            Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: .5)),
-                        itemBuilder: (context, i) {
-                          final a = apps[i];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-                            child: Row(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: a.icon == null
-                                      ? Container(
-                                          width: 36,
-                                          height: 36,
-                                          color: colour.withValues(alpha: .2),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            a.name.isEmpty ? '?' : a.name.characters.first.toUpperCase(),
-                                            style: TextStyle(color: colour, fontWeight: FontWeight.w800),
-                                          ),
-                                        )
-                                      : Image.memory(a.icon!, width: 36, height: 36, gaplessPlayback: true),
-                                ),
-                                const Gap(12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(
-                                        a.name,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
-                                      ),
-                                      const Gap(2),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            formatBytes(a.bytes, units),
-                                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                                          ),
-                                          const Spacer(),
-                                          if (!PlatformUtils.isDesktop)
-                                            Text(
-                                              _duration(a.duration),
-                                              style: theme.textTheme.labelMedium?.copyWith(
-                                                color: scheme.onSurfaceVariant,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      const Gap(5),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(3),
-                                              child: LinearProgressIndicator(
-                                                value: a.bytes / top,
-                                                minHeight: 5,
-                                                color: colour,
-                                                backgroundColor: scheme.outlineVariant.withValues(alpha: .4),
-                                              ),
-                                            ),
-                                          ),
-                                          const Gap(10),
-                                          Text(
-                                            [
-                                              if (a.servers.isNotEmpty) a.servers,
-                                              '${bytes == 0 ? 0 : (a.bytes * 100 / bytes).round()}%',
-                                            ].join(' · '),
-                                            style: theme.textTheme.labelSmall?.copyWith(
-                                              color: scheme.onSurfaceVariant,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                    if (tile.more == 0)
+                      Text(
+                        tile.vpn ? 'VPN ${app.servers}'.trim() : direct,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: tile.vpn ? (dark ? colour : scheme.onSurface) : scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -3462,21 +3101,10 @@ class _SiteTiles extends HookConsumerWidget {
   static const _bad = Color(0xFFE5483B);
 
   // the way there and back through the VPN: the server's own ping is ~50-100 ms, a site a little more
-  /// Each service's own colour, for its logo and the ring round it.
-  static Color _brand(String key) => switch (key) {
-    'instagram' => const Color(0xFFE4405F),
-    'whatsapp' => const Color(0xFF25D366),
-    'telegram' => const Color(0xFF26A5E4),
-    'chatgpt' => const Color(0xFF10A37F),
-    'youtube' => const Color(0xFFFF0000),
-    'yandex' => const Color(0xFFFC3F1D),
-    _ => const Color(0xFF8A8F98),
-  };
-
-  /// The service's logo (Simple Icons' shape) in its colour; Yandex, whose logo is its letter, the letter.
-  static Widget _sign(LatencySite site) {
+  /// The service's logo (Simple Icons' shape) in [colour], its delay's; Yandex, whose logo is its letter, the letter.
+  static Widget _sign(LatencySite site, Color colour) {
     final path = siteLogoPaths[site.key];
-    final hex = _brand(site.key).toARGB32().toRadixString(16).substring(2);
+    final hex = colour.toARGB32().toRadixString(16).substring(2);
     return path != null
         ? SvgPicture.string(
             '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#$hex" d="$path"/></svg>',
@@ -3485,7 +3113,7 @@ class _SiteTiles extends HookConsumerWidget {
           )
         : Text(
             site.letter,
-            style: TextStyle(fontSize: 15, height: 1, fontWeight: FontWeight.w900, color: _brand(site.key)),
+            style: TextStyle(fontSize: 15, height: 1, fontWeight: FontWeight.w900, color: colour),
           );
   }
 
@@ -3504,6 +3132,8 @@ class _SiteTiles extends HookConsumerWidget {
       final measured = sites.ms.containsKey(site.key);
       final ms = sites.ms[site.key];
       final colour = !measured ? scheme.outlineVariant : _colour(ms);
+      // the logo and its ring in the delay's colour too (green, amber, red); grey until the first round
+      final sign = !measured ? scheme.onSurfaceVariant : colour;
       // the faster, the fuller; no answer or 450 ms and slower: a sliver
       final level = !measured ? 0.0 : (ms == null ? .08 : (1 - ms / 450).clamp(.08, 1.0));
       return Container(
@@ -3551,16 +3181,16 @@ class _SiteTiles extends HookConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // the service's own logo in its colour, in a thin ring of the same colour
+                  // the service's logo in a thin ring, both in the delay's colour
                   Container(
                     width: 28,
                     height: 28,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: _brand(site.key), width: 1.3),
+                      border: Border.all(color: sign, width: 1.3),
                     ),
-                    child: _sign(site),
+                    child: _sign(site, sign),
                   ),
                   const Spacer(),
                   Text(

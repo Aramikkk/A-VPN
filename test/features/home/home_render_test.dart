@@ -30,6 +30,7 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
+import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
@@ -254,6 +255,7 @@ void main() {
               profilePathResolverProvider.overrideWithValue(ProfilePathResolver(Directory.systemTemp)),
               connectionsProvider.overrideWith(_Connections.new),
               connectionQualityProvider.overrideWith(_Quality.new),
+              siteLatencyProvider.overrideWith(_Sites.new),
               installedAppsProvider.overrideWith(
                 (ref) async => {
                   'com.google.android.youtube': (name: 'YouTube', icon: null),
@@ -510,4 +512,21 @@ class _ShellPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Theme(data: contrastPageTheme(Theme.of(context)), child: child);
+}
+
+/// The sites' delays as measured: SITES=<ms,...> in the order of latencySites ('-' for no answer).
+class _Sites extends SiteLatency {
+  @override
+  SiteLatencyState build() {
+    final given = (Platform.environment['SITES'] ?? '53,61,180,244,320,51').split(',');
+    return (
+      ms: {for (final (i, site) in latencySites.indexed) site.key: i < given.length ? int.tryParse(given[i]) : null},
+      at: DateTime(2026),
+      testing: false,
+      done: latencySites.length,
+    );
+  }
+
+  @override
+  Future<void> test() async {}
 }

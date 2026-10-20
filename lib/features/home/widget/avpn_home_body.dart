@@ -24,7 +24,6 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
-import 'package:hiddify/features/stats/notifier/foreground_screen_time.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';
