@@ -23,6 +23,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required bool balancerKeepConnections,
     // an Auto of its own for each service the home screen times (Settings → Ping, beta)
     @Default(false) bool siteGroups,
+    // how much sooner (ms) another server must answer a site before it moves there
+    @Default(80) int siteGroupsTolerance,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,
     required bool executeConfigAsIs,

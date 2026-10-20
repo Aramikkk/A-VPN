@@ -221,6 +221,28 @@ class PingPage extends HookConsumerWidget {
               }
             },
           ),
+          // how much sooner another server must be before a site moves to it
+          ListTile(
+            leading: const Icon(Icons.compare_arrows_rounded),
+            enabled: ref.watch(ConfigOptions.siteGroups),
+            title: Text(t.avpn.siteGroupsTolerance),
+            subtitle: Text('${ref.watch(ConfigOptions.siteGroupsTolerance)} ms · ${t.avpn.siteGroupsToleranceMsg}'),
+            onTap: () async {
+              final picked = await pick(
+                t.avpn.siteGroupsTolerance,
+                [for (var ms = 10; ms <= 300; ms += 10) ms],
+                ref.read(ConfigOptions.siteGroupsTolerance),
+                (ms) => '$ms ms',
+              );
+              if (picked == null || picked == ref.read(ConfigOptions.siteGroupsTolerance)) return;
+              await ref.read(ConfigOptions.siteGroupsTolerance.notifier).update(picked);
+              if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                await ref
+                    .read(connectionNotifierProvider.notifier)
+                    .reconnect(await ref.read(activeProfileProvider.future));
+              }
+            },
+          ),
           heading(t.avpn.pingChecks),
           for (final entry in [
             ('Wi-Fi', ConfigOptions.urlTestTimeoutWifi),

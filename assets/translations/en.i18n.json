@@ -70,6 +70,8 @@
     "pingSites": "Sites",
     "siteGroups": "A server of its own for each site (beta)",
     "siteGroupsMsg": "Instagram, WhatsApp, Telegram, ChatGPT and YouTube each take the server answering them soonest; the home tiles show its flag. Checked every 5 minutes and only while the service is used; open connections aren't cut",
+    "siteGroupsTolerance": "Switch threshold",
+    "siteGroupsToleranceMsg": "A site moves to another server only when that one answers at least this much sooner",
     "pingSwitched": "No ping for a minute — ping address now: $name",
     "pingChecks": "Checks",
     "pingEveryMinutes": "Every $n min",

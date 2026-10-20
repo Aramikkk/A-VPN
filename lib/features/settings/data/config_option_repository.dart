@@ -177,6 +177,9 @@ abstract class ConfigOptions {
   /// (the core's site groups), the rest through Auto as before. Beta: off until the user turns it on.
   static final siteGroups = PreferencesNotifier.create<bool, bool>("site-groups", false);
 
+  /// How much sooner (ms, 10 to 300) another server must answer a site before the site moves to it.
+  static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 80);
+
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
     "http://www.gstatic.com/generate_204",
@@ -449,6 +452,7 @@ abstract class ConfigOptions {
     "balancer-tolerance-wifi": balancerToleranceWifi,
     "balancer-tolerance-mobile": balancerToleranceMobile,
     "site-groups": siteGroups,
+    "site-groups-tolerance": siteGroupsTolerance,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
     "allow-connection-from-lan": allowConnectionFromLan,
@@ -551,6 +555,7 @@ abstract class ConfigOptions {
       balancerToleranceMobile: ref.watch(balancerToleranceMobile),
       balancerKeepConnections: true,
       siteGroups: ref.watch(siteGroups),
+      siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 300),
       // blockAds: ref.watch(blockAds),
       useXrayCoreWhenPossible: ref.watch(useXrayCoreWhenPossible),
       executeConfigAsIs: false,

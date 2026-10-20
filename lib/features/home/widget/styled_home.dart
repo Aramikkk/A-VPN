@@ -3219,9 +3219,11 @@ class _SiteTiles extends HookConsumerWidget {
                         width: low ? 20 : 24,
                         height: low ? 20 : 24,
                         alignment: Alignment.center,
+                        // a pane of the page's colour under it, so the circle keeps its edge in the water too
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: scheme.outlineVariant, width: 1.3),
+                          color: ContrastBackdropPainter.base(dark).withValues(alpha: .85),
+                          border: Border.all(color: scheme.outline.withValues(alpha: .6), width: 1.3),
                         ),
                         child: Text(
                           flag,
