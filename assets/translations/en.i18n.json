@@ -69,7 +69,7 @@
     "pingAutoSwitchMsg": "When no server has answered its ping for a minute, the next address on the list is taken",
     "pingSites": "Sites",
     "siteGroups": "A server of its own for sites",
-    "siteGroupsMsg": "Beta. Instagram, WhatsApp, Telegram, ChatGPT, YouTube and Google Drive each take the server answering them soonest; the home tiles show its flag when it isn't the main one. For the first minute after the VPN comes up, the network changes or an auto pause ends, the sites go through the main server (the pings aren't ready yet), then through their own. Checked every 5 minutes and only while the service is used; open connections aren't cut. Wi-Fi and LTE each have their own settings",
+    "siteGroupsMsg": "Beta. Instagram, WhatsApp, Telegram, ChatGPT, YouTube and Google Drive each take the server steadily answering them soonest: a server counts only after answering 3 tests in a row, chosen by their average; until one has, the site goes through the main server. For the first minute after the VPN comes up, the network changes or an auto pause ends, the main server too (3 tests run in that minute), then a test every 2 minutes, only while the service is used. The tiles show a site's server flag when it isn't the main one. Open connections aren't cut. Wi-Fi and LTE each have their own settings",
     "siteGroupsTolerance": "Switch threshold",
     "siteGroupsToleranceMsg": "A site moves to another server only when that one answers at least this much sooner",
     "pingSwitched": "No ping for a minute — ping address now: $name",
