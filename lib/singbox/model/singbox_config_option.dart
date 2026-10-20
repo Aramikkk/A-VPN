@@ -25,6 +25,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
     @Default(false) bool siteGroups,
     // how much sooner (ms) another server must answer a site before it moves there
     @Default(80) int siteGroupsTolerance,
+    // the apps (package names) with a server of their own
+    @Default(<String>[]) List<String> siteGroupApps,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,
     required bool executeConfigAsIs,

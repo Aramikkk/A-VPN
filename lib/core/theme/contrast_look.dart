@@ -59,9 +59,64 @@ enum ContrastPalette {
   sage('Шалфей', 'Sage', Color(0xFF708F72), Color(0xFFD2AE78)),
   sakura('Сакура', 'Sakura', Color(0xFFD95F8C), Color(0xFF72A9C1)),
   twilight('Сумерки', 'Twilight', Color(0xFF6655B2), Color(0xFFD986AC)),
-  copper('Медь', 'Copper', Color(0xFFC06442), Color(0xFF488F86));
+  copper('Медь', 'Copper', Color(0xFFC06442), Color(0xFF488F86)),
+  // tonal ones: the whole page in the palette's own shades, the darkest by night and the lightest by day
+  slate(
+    'Сланец',
+    'Slate',
+    Color(0xFF4A5C6A),
+    Color(0xFF9BA8AB),
+    night: Color(0xFF06141B),
+    nightPane: Color(0xFF11212D),
+    nightAccent: Color(0xFFCCD0CF),
+    day: Color(0xFFE4E7E6),
+  ),
+  malachite(
+    'Малахит',
+    'Malachite',
+    Color(0xFF235347),
+    Color(0xFF8EB69B),
+    night: Color(0xFF051F20),
+    nightPane: Color(0xFF0B2B26),
+    nightAccent: Color(0xFF8EB69B),
+    day: Color(0xFFE3F3E6),
+  );
 
-  const ContrastPalette(this.ru, this.en, this.warm, this.cool);
+  const ContrastPalette(
+    this.ru,
+    this.en,
+    this.warm,
+    this.cool, {
+    this.night,
+    this.nightPane,
+    this.nightAccent,
+    this.day,
+  });
+
+  /// a tonal palette's page by night and by day, its blocks' tint by night and its accent by night (null: the
+  /// usual near-black and warm grey, the usual tint, the warm colour lifted)
+  final Color? night;
+  final Color? nightPane;
+  final Color? nightAccent;
+  final Color? day;
+
+  /// The page's own colour, under the backdrop.
+  Color page(bool dark) => dark ? (night ?? const Color(0xFF1D1D20)) : (day ?? const Color(0xFFEFEDE8));
+
+  /// The tint of the blocks' glass.
+  Color pane(bool dark) => dark ? (nightPane ?? const Color(0xFF1E1E22)) : Colors.white;
+
+  /// The palette the theme was last built with (for theme builders with no context of their own).
+  static ContrastPalette active = fallback;
+
+  /// The palette chosen in Settings → Themes, for widgets with no provider reference of their own.
+  static ContrastPalette of(BuildContext context) {
+    try {
+      return ProviderScope.containerOf(context, listen: false).read(Preferences.contrastPalette);
+    } catch (_) {
+      return fallback;
+    }
+  }
 
   final String ru;
   final String en;
@@ -80,6 +135,7 @@ enum ContrastPalette {
   /// the accent: the warm colour, by night lifted a little to read on the dark (a near-black one to light grey)
   Color accent(Brightness brightness) {
     if (brightness == Brightness.light) return warm;
+    if (nightAccent != null) return nightAccent!;
     final hsl = HSLColor.fromColor(warm);
     return hsl.lightness < .3 ? hsl.withLightness(.72).toColor() : Color.lerp(warm, Colors.white, .15)!;
   }
@@ -232,7 +288,11 @@ class ContrastBackdropPainter extends CustomPainter {
     required this.dark,
     required this.seed,
     this.area,
+    this.page,
   });
+
+  /// the page's colour under the backdrop (null: the usual one); the quiet lines just off it
+  final Color? page;
 
   /// the size it's laid out on (the screen), so a page's own backdrop lines up with the one round it; its own size
   /// when not given
@@ -259,9 +319,11 @@ class ContrastBackdropPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = width
       ..color = c;
-    canvas.drawRect(Offset.zero & box, Paint()..color = base(dark));
+    canvas.drawRect(Offset.zero & box, Paint()..color = page ?? base(dark));
     // the quiet backdrops' lines: near the page's own colour, thin
-    final faint = dark ? const Color(0xFF3A3A42) : const Color(0xFFD9D4CC);
+    final faint = page != null
+        ? Color.lerp(page, dark ? Colors.white : Colors.black, dark ? .12 : .1)!
+        : (dark ? const Color(0xFF3A3A42) : const Color(0xFFD9D4CC));
     final thin = math.max(1.0, w / 411 * 1.4);
     // the line families' lit rows: every sixth, as thin as the rest, evenly down the screen
     bool lit(int row) => row % 6 == 3;
@@ -607,6 +669,7 @@ class ContrastBackdropPainter extends CustomPainter {
       old.cool != cool ||
       old.dark != dark ||
       old.seed != seed ||
+      old.page != page ||
       old.area != area;
 }
 
@@ -628,9 +691,10 @@ class ContrastFrostImage {
     // Blurred textures use at most one pixel per point; sharp backgrounds keep their own resolution.
     required double scale,
     required int seed,
+    Color? page,
   }) {
     final key =
-        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur|$scale|$seed';
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|${page?.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur|$scale|$seed';
     final kept = _kept[key];
     if (kept != null) return kept;
     // a handful at most (day and night, a few clarities); the old ones go to the collector
@@ -642,7 +706,15 @@ class ContrastFrostImage {
       Offset.zero & area,
       Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur, tileMode: TileMode.clamp),
     );
-    ContrastBackdropPainter(kind: kind, warm: warm, cool: cool, dark: dark, seed: seed, area: area).paint(canvas, area);
+    ContrastBackdropPainter(
+      kind: kind,
+      warm: warm,
+      cool: cool,
+      dark: dark,
+      seed: seed,
+      area: area,
+      page: page,
+    ).paint(canvas, area);
     canvas.restore();
     final picture = recorder.endRecording();
     final image = picture.toImageSync(
@@ -670,16 +742,25 @@ class ContrastBackdropImage {
     required Size area,
     required double scale,
     required int seed,
+    Color? page,
   }) {
     final key =
-        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$scale|$seed';
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|${page?.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$scale|$seed';
     final kept = _kept[key];
     if (kept != null) return kept;
     // a few at most (day and night, folded and unfolded); the old ones go to the collector
     if (_kept.length > 3) _kept.clear();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)..scale(scale);
-    ContrastBackdropPainter(kind: kind, warm: warm, cool: cool, dark: dark, seed: seed, area: area).paint(canvas, area);
+    ContrastBackdropPainter(
+      kind: kind,
+      warm: warm,
+      cool: cool,
+      dark: dark,
+      seed: seed,
+      area: area,
+      page: page,
+    ).paint(canvas, area);
     final picture = recorder.endRecording();
     final image = picture.toImageSync(
       math.max(1, (area.width * scale).ceil()),

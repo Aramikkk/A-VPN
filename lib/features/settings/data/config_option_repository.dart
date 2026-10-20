@@ -180,6 +180,9 @@ abstract class ConfigOptions {
   /// The same on mobile data (the phone): on or off of its own.
   static final siteGroupsMobile = PreferencesNotifier.create<bool, bool>("site-groups-mobile", false);
 
+  /// The apps (package names) with a server of their own, chosen in Settings → Sites.
+  static final siteGroupApps = PreferencesNotifier.create<List<String>, List<String>>("site-group-apps", <String>[]);
+
   /// How much sooner (ms, 10 to 3000) another server must answer a site before the site moves to it; on Wi-Fi
   /// (and on a computer), and on mobile data.
   static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 80);
@@ -466,6 +469,7 @@ abstract class ConfigOptions {
     "site-groups": siteGroups,
     "site-groups-tolerance": siteGroupsTolerance,
     "site-groups-mobile": siteGroupsMobile,
+    "site-group-apps": siteGroupApps,
     "site-groups-tolerance-mobile": siteGroupsToleranceMobile,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
@@ -570,6 +574,7 @@ abstract class ConfigOptions {
       balancerKeepConnections: true,
       siteGroups: ref.watch(siteGroups),
       siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
+      siteGroupApps: PlatformUtils.isAndroid ? ref.watch(siteGroupApps) : const [],
       // blockAds: ref.watch(blockAds),
       useXrayCoreWhenPossible: ref.watch(useXrayCoreWhenPossible),
       executeConfigAsIs: false,

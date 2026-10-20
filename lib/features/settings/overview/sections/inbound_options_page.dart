@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/widget/lan_sharing_tile.dart';
@@ -17,6 +18,13 @@ class InboundOptionsPage extends HookConsumerWidget with AppLogger {
       appBar: AppBar(title: Text(t.pages.settings.inbound.title)),
       body: ListView(
         children: [
+          // DNS lives here now (the settings' list has Sites in its place)
+          ListTile(
+            leading: const Icon(Icons.dns_rounded),
+            title: Text(t.pages.settings.dns.title),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => context.go(context.namedLocation('dnsOptions')),
+          ),
           ChoicePreferenceWidget(
             selected: ref.watch(ConfigOptions.serviceMode),
             preferences: ref.watch(ConfigOptions.serviceMode.notifier),

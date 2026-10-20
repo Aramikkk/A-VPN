@@ -32,6 +32,7 @@ import 'package:hiddify/features/settings/overview/sections/dns_options_page.dar
 import 'package:hiddify/features/settings/overview/sections/general_page.dart';
 import 'package:hiddify/features/settings/overview/sections/inbound_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/ping_page.dart';
+import 'package:hiddify/features/settings/overview/sections/sites_page.dart';
 import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/themes_page.dart';
 import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart';
@@ -271,14 +272,20 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         GoRoute(
                           name: 'autoPause',
                           path: 'auto-pause',
-                          pageBuilder: (_, state) =>
-                              customTransition(TransitionType.slide, state.pageKey, settingsWidth(const AutoPausePage())),
+                          pageBuilder: (_, state) => customTransition(
+                            TransitionType.slide,
+                            state.pageKey,
+                            settingsWidth(const AutoPausePage()),
+                          ),
                         ),
                         GoRoute(
                           name: 'homeWifi',
                           path: 'home-wifi',
-                          pageBuilder: (_, state) =>
-                              customTransition(TransitionType.slide, state.pageKey, settingsWidth(const HomeWifiPage())),
+                          pageBuilder: (_, state) => customTransition(
+                            TransitionType.slide,
+                            state.pageKey,
+                            settingsWidth(const HomeWifiPage()),
+                          ),
                         ),
                       ],
                     ),
@@ -296,6 +303,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                       path: 'ping-options',
                       pageBuilder: (_, state) =>
                           customTransition(TransitionType.slide, state.pageKey, settingsWidth(const PingPage())),
+                    ),
+                    GoRoute(
+                      name: 'sitesOptions',
+                      path: 'sites-options',
+                      pageBuilder: (_, state) =>
+                          customTransition(TransitionType.slide, state.pageKey, settingsWidth(const SitesPage())),
                     ),
                     GoRoute(
                       name: 'themes',
@@ -438,9 +451,9 @@ Widget settingsWidth(Widget page) => !PlatformUtils.isDesktop
         builder: (context) => Theme.of(context).araLook.style == AraStyle.contrast
             ? page
             : ColoredBox(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          child: Center(
-            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: page),
-          ),
-        ),
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: Center(
+                  child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: page),
+                ),
+              ),
       );

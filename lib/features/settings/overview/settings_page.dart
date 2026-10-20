@@ -202,11 +202,12 @@ class SettingsPage extends HookConsumerWidget {
                         icon: Icons.network_ping_rounded,
                         namedLocation: context.namedLocation('pingOptions'),
                       ),
+                      // each site and chosen app through its own server (beta); DNS is under Inbound now
                       SettingsSection(
                         height: row,
-                        title: t.pages.settings.dns.title,
-                        icon: Icons.dns_rounded,
-                        namedLocation: context.namedLocation('dnsOptions'),
+                        title: t.avpn.pingSites,
+                        icon: Icons.alt_route_rounded,
+                        namedLocation: context.namedLocation('sitesOptions'),
                       ),
                       SettingsSection(
                         height: row,

@@ -212,6 +212,39 @@ class AppTheme {
   }
 
   /// The palette of a style in day or night: background, cards, text, lines.
+  /// A tonal palette's colours: by night its darkest shade for the page and its pane shade, lifted step by step,
+  /// for the cards and lines; by day its lightest for the page, the cards white.
+  static AraPalette _tonal(AraPalette plain, ContrastPalette palette, bool dark) {
+    final page = palette.page(dark);
+    if (!dark) {
+      return AraPalette(
+        bg: page,
+        fg: plain.fg,
+        muted: plain.muted,
+        card: plain.card,
+        container: Color.lerp(page, Colors.white, .6)!,
+        high: Color.lerp(page, Colors.white, .4)!,
+        highest: Color.lerp(page, Colors.black, .04)!,
+        line: Color.lerp(page, Colors.black, .12)!,
+        strongLine: Color.lerp(page, Colors.black, .25)!,
+        nav: plain.nav,
+      );
+    }
+    final pane = palette.pane(true);
+    return AraPalette(
+      bg: page,
+      fg: plain.fg,
+      muted: Color.lerp(palette.cool, plain.muted, .5)!,
+      card: pane,
+      container: Color.lerp(pane, Colors.white, .04)!,
+      high: Color.lerp(pane, Colors.white, .08)!,
+      highest: Color.lerp(pane, Colors.white, .12)!,
+      line: Color.lerp(pane, Colors.white, .14)!,
+      strongLine: Color.lerp(pane, Colors.white, .24)!,
+      nav: plain.nav,
+    );
+  }
+
   static AraPalette palette(AraStyle style, Brightness brightness, {GlassScheme glass = GlassScheme.fallback}) {
     if (style == AraStyle.glass) return glassPalette(glass.look(brightness));
     final dark = brightness == Brightness.dark;
@@ -268,7 +301,11 @@ class AppTheme {
   ThemeData _styledTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     final contrast = style == AraStyle.contrast;
-    final styled = palette(style, brightness, glass: glassScheme);
+    if (contrast) ContrastPalette.active = contrastPalette;
+    final plain = palette(style, brightness, glass: glassScheme);
+    // a tonal Contrast palette: the page, the cards and the lines in its own shades
+    final tonal = contrast && (dark ? contrastPalette.night != null : contrastPalette.day != null);
+    final styled = tonal ? _tonal(plain, contrastPalette, dark) : plain;
     final glass = _glass;
     final look = glassScheme.look(brightness);
     // a dialog, a sheet or a menu lies over the page's content: a solid version of the glass

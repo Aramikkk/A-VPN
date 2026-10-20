@@ -348,7 +348,7 @@ ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = Contrast
   // a single card as see-through as the home screen's block with its tiles together (about three quarters of
   // the chosen clarity): the same look on every page
   Color pane(double level) => dark
-      ? const Color(0xFF1E1E22).withValues(alpha: (clarity.night * .72 * level).clamp(0, .97))
+      ? ContrastPalette.active.pane(true).withValues(alpha: (clarity.night * .72 * level).clamp(0, .97))
       : Colors.white.withValues(alpha: (clarity.day * .72 * level).clamp(0, .97));
   return theme.copyWith(
     scaffoldBackgroundColor: Colors.transparent,

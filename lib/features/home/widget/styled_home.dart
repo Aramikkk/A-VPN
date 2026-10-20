@@ -1251,7 +1251,7 @@ class _Orb extends HookWidget {
                             // on: by night dark with a glow of the accent (it was near white on the black panel)
                             ? Color.alphaBlend(
                                 accent.withValues(alpha: dark ? .2 : .14),
-                                dark ? const Color(0xFF1E1E22) : Colors.white,
+                                dark ? ContrastPalette.of(context).pane(true) : Colors.white,
                               )
                             : (dark ? const Color(0xFF2C2C30) : const Color(0xFFECEAE6)))
                       : dark
@@ -1876,6 +1876,7 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
       area: area,
       scale: scale,
       seed: seed,
+      page: palette.page(brightness == Brightness.dark),
     );
     final image = picture(layout.seed);
     final previous = layout.previous == layout.seed ? null : picture(layout.previous);
@@ -1948,7 +1949,7 @@ class ContrastFrost extends ConsumerWidget {
           // lighter than the chosen clarity: the tiles inside add their own pane, and the two together came out
           // nearly solid next to the other pages' single see-through cards
           color: dark
-              ? const Color(0xFF1E1E22).withValues(alpha: clarity.night * (solo ? .75 : .6))
+              ? ContrastPalette.of(context).pane(true).withValues(alpha: clarity.night * (solo ? .75 : .6))
               : Colors.white.withValues(alpha: clarity.day * (solo ? .75 : .6)),
           borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
@@ -1986,6 +1987,7 @@ class _FrostedBackdrop extends ConsumerWidget {
       blur: kind.lines ? clarity.blur : 12,
       scale: scale,
       seed: seed,
+      page: palette.page(brightness == Brightness.dark),
     );
     final image = picture(layout.seed);
     // the layout before, under the new one while that fades in (the VPN on or off)
@@ -3224,7 +3226,7 @@ class _SiteTiles extends HookConsumerWidget {
                         // a pane of the page's colour under it, so the circle keeps its edge in the water too
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: ContrastBackdropPainter.base(dark).withValues(alpha: .85),
+                          color: ContrastPalette.of(context).page(dark).withValues(alpha: .85),
                           border: Border.all(color: scheme.outline.withValues(alpha: .6), width: 1.3),
                         ),
                         child: Text(
@@ -3473,7 +3475,7 @@ class ContrastPlate extends ConsumerWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: dark
-                ? const Color(0xFF1E1E22).withValues(alpha: clarity.night)
+                ? ContrastPalette.of(context).pane(true).withValues(alpha: clarity.night)
                 : Colors.white.withValues(alpha: clarity.day),
             border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
           ),
