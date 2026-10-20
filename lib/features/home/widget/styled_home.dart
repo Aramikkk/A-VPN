@@ -3105,8 +3105,9 @@ class _SiteTiles extends HookConsumerWidget {
     return path != null
         ? SvgPicture.string(
             '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#$hex" d="$path"/></svg>',
-            width: 15,
-            height: 15,
+            // Google's G fills its box edge to edge: a little smaller, so it looks the others' size
+            width: site.key == 'google' ? 12 : 15,
+            height: site.key == 'google' ? 12 : 15,
           )
         : Text(
             site.letter,
@@ -3132,6 +3133,8 @@ class _SiteTiles extends HookConsumerWidget {
     final accent = theme.araAccent;
     // each site's own server (Settings → Ping → Sites, beta): its flag in the tile's corner
     final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const {};
+    // the server everything else goes through: a site's flag shows only when its own one is another
+    final mainServer = ref.watch(proxiesOverviewNotifierProvider.select((v) => SiteLatency.mainServer(v.valueOrNull)));
 
     Widget tile(LatencySite site) {
       final measured = sites.ms.containsKey(site.key);
@@ -3208,8 +3211,23 @@ class _SiteTiles extends HookConsumerWidget {
                   ),
                 );
                 final server = siteServers[site.key];
-                final flag = server == null ? '' : _flagOf(server);
-                final corner = flag.isEmpty ? null : Text(flag, style: TextStyle(fontSize: low ? 12 : 15, height: 1));
+                final flag = server == null || server == mainServer ? '' : _flagOf(server);
+                // the flag in a thin circle, as the server row's
+                final corner = flag.isEmpty
+                    ? null
+                    : Container(
+                        width: low ? 20 : 24,
+                        height: low ? 20 : 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: scheme.outlineVariant, width: 1.3),
+                        ),
+                        child: Text(
+                          flag,
+                          style: TextStyle(fontSize: low ? 10 : 12, height: 1, fontFamilyFallback: const ['Emoji']),
+                        ),
+                      );
                 return Padding(
                   padding: EdgeInsets.all(low ? 8 : 11),
                   child: Column(
@@ -3221,7 +3239,6 @@ class _SiteTiles extends HookConsumerWidget {
                             ring,
                             const Gap(5),
                             Expanded(child: name),
-                            if (corner != null) corner,
                           ],
                         )
                       else
@@ -3231,33 +3248,42 @@ class _SiteTiles extends HookConsumerWidget {
                         ),
                       const Spacer(),
                       if (!low) name,
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
-                              if (measured && ms != null)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text.rich(
                                 TextSpan(
-                                  text: ' ms',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    letterSpacing: 0,
-                                    fontWeight: FontWeight.w600,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
+                                  children: [
+                                    TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
+                                    if (measured && ms != null)
+                                      TextSpan(
+                                        text: ' ms',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          letterSpacing: 0,
+                                          fontWeight: FontWeight.w600,
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                            ],
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontSize: low ? 26 : 32,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: -1.5,
+                                  color: scheme.onSurface,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                            ),
                           ),
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontSize: low ? 26 : 32,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: -1.5,
-                            color: scheme.onSurface,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
+                          // on a low tile the flag by the figure, the name keeps the top line
+                          if (low && corner != null) corner,
+                        ],
                       ),
                     ],
                   ),

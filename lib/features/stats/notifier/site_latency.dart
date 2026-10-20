@@ -25,8 +25,8 @@ const latencySites = <LatencySite>[
   // YouTube's home page is built on every request (~350 ms of the server's own work): its empty answer, the same
   // the servers' ping uses, times just the way there and back
   (key: 'youtube', name: 'YouTube', letter: 'Y', url: 'http://www.youtube.com/generate_204', get: false),
-  // Yandex goes direct by the routing rules: the plain internet's delay, beside the VPN's to the others
-  (key: 'yandex', name: 'Яндекс', letter: 'Я', url: 'http://ya.ru/', get: false),
+  // Google's empty answer, the same the servers' ping uses: just the way there and back
+  (key: 'google', name: 'Google', letter: 'G', url: 'http://www.google.com/generate_204', get: false),
 ];
 
 /// The server each site goes through when each has its own (Settings → Ping → Sites, beta): the site's key → the
@@ -77,6 +77,8 @@ class SiteLatency extends Notifier<SiteLatencyState> {
   }
 
   /// The server Auto (or the chosen server) uses now.
+  static String? mainServer(OutboundGroup? group) => _autoPick(group);
+
   static String? _autoPick(OutboundGroup? group) {
     if (group == null) return null;
     final selected = group.items.where((i) => i.tag == group.selected).firstOrNull;

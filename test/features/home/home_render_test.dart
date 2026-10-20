@@ -417,7 +417,7 @@ void main() {
           final sites = find.byKey(const Key('contrast-sites'));
           expect(sites, findsOneWidget);
           expect(find.byKey(const Key('contrast-traffic')), findsNothing);
-          for (final name in ['Instagram', 'WhatsApp', 'Telegram', 'ChatGPT', 'YouTube', 'Яндекс']) {
+          for (final name in ['Instagram', 'WhatsApp', 'Telegram', 'ChatGPT', 'YouTube', 'Google']) {
             expect(find.descendant(of: sites, matching: find.text(name)), findsOneWidget);
           }
         }
