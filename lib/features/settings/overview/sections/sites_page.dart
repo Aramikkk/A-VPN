@@ -113,8 +113,15 @@ class SitesPage extends HookConsumerWidget {
             ),
             for (final app in apps)
               ListTile(
-                leading: _AppIcon(icon: installed[app]?.icon, name: installed[app]?.name ?? app),
-                title: Text(installed[app]?.name ?? app, maxLines: 1, overflow: TextOverflow.ellipsis),
+                leading: _AppIcon(
+                  icon: installed[app]?.icon,
+                  name: installed[app]?.name ?? ConfigOptions.siteGroupServiceApps[app] ?? app,
+                ),
+                title: Text(
+                  installed[app]?.name ?? ConfigOptions.siteGroupServiceApps[app] ?? app,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 subtitle: Text(app, maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: IconButton(
                   icon: const Icon(Icons.close_rounded),

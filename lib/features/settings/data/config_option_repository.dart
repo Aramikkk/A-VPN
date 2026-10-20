@@ -180,8 +180,22 @@ abstract class ConfigOptions {
   /// The same on mobile data (the phone): on or off of its own.
   static final siteGroupsMobile = PreferencesNotifier.create<bool, bool>("site-groups-mobile", false);
 
-  /// The apps (package names) with a server of their own, chosen in Settings → Sites.
-  static final siteGroupApps = PreferencesNotifier.create<List<String>, List<String>>("site-group-apps", <String>[]);
+  /// The apps (package names) with a server of their own, chosen in Settings → Sites: on the phone the whole choice
+  /// (a service of the home screen's six only when its app is here). At first the six services' apps.
+  static final siteGroupApps = PreferencesNotifier.create<List<String>, List<String>>(
+    "site-group-apps",
+    siteGroupServiceApps.keys.toList(),
+  );
+
+  /// The six services' apps (Settings → Sites shows their names when one isn't installed).
+  static const siteGroupServiceApps = {
+    'com.instagram.android': 'Instagram',
+    'com.whatsapp': 'WhatsApp',
+    'org.telegram.messenger': 'Telegram',
+    'com.openai.chatgpt': 'ChatGPT',
+    'com.google.android.youtube': 'YouTube',
+    'com.google.android.apps.docs': 'Google Диск',
+  };
 
   /// How much sooner (ms, 10 to 3000) another server must answer a site before the site moves to it; on Wi-Fi
   /// (and on a computer), and on mobile data.
@@ -575,6 +589,8 @@ abstract class ConfigOptions {
       siteGroups: ref.watch(siteGroups),
       siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
       siteGroupApps: PlatformUtils.isAndroid ? ref.watch(siteGroupApps) : const [],
+      // the phone: the list is the whole choice (a computer has no packages: the six services always)
+      siteGroupAppsOnly: PlatformUtils.isAndroid,
       // blockAds: ref.watch(blockAds),
       useXrayCoreWhenPossible: ref.watch(useXrayCoreWhenPossible),
       executeConfigAsIs: false,

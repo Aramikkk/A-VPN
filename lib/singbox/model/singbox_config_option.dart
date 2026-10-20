@@ -27,6 +27,7 @@ class SingboxConfigOption with _$SingboxConfigOption {
     @Default(80) int siteGroupsTolerance,
     // the apps (package names) with a server of their own
     @Default(<String>[]) List<String> siteGroupApps,
+    @Default(false) bool siteGroupAppsOnly,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,
     required bool executeConfigAsIs,
