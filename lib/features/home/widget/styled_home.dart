@@ -3462,6 +3462,35 @@ class _SiteTiles extends HookConsumerWidget {
   static const _bad = Color(0xFFE5483B);
 
   // the way there and back through the VPN: the server's own ping is ~50-100 ms, a site a little more
+  /// Each service's own colour, for the disc under its sign.
+  static Color _brand(String key) => switch (key) {
+    'instagram' => const Color(0xFFE1306C),
+    'whatsapp' => const Color(0xFF25D366),
+    'telegram' => const Color(0xFF2AABEE),
+    'chatgpt' => const Color(0xFF10A37F),
+    'youtube' => const Color(0xFFFF0000),
+    'yandex' => const Color(0xFFFC3F1D),
+    _ => const Color(0xFF8A8F98),
+  };
+
+  /// A plain sign for each service: a camera, a phone, a paper plane, sparkles, play; Yandex its letter.
+  static Widget _sign(LatencySite site) {
+    final icon = switch (site.key) {
+      'instagram' => Icons.photo_camera_rounded,
+      'whatsapp' => Icons.call_rounded,
+      'telegram' => Icons.send_rounded,
+      'chatgpt' => Icons.auto_awesome_rounded,
+      'youtube' => Icons.play_arrow_rounded,
+      _ => null,
+    };
+    return icon != null
+        ? Icon(icon, size: 16, color: Colors.white)
+        : Text(
+            site.letter,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+          );
+  }
+
   static Color _colour(int? ms) => ms == null || ms >= 300 ? _bad : (ms < 150 ? _good : _slow);
 
   @override
@@ -3524,18 +3553,13 @@ class _SiteTiles extends HookConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // the service's sign, white on a disc of its own colour (a plain sign, not its logo)
                   Container(
-                    width: 26,
-                    height: 26,
+                    width: 28,
+                    height: 28,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: scheme.onSurface, width: 1.3),
-                    ),
-                    child: Text(
-                      site.letter,
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: scheme.onSurface),
-                    ),
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: _brand(site.key)),
+                    child: _sign(site),
                   ),
                   const Spacer(),
                   Text(

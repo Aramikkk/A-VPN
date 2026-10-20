@@ -21,10 +21,11 @@ const latencySites = <LatencySite>[
   // chatgpt.com (Cloudflare) closes the connection on its page's redirect, so the second request opened a new one
   // (~250 ms where the others read ~80): Cloudflare's tiny trace page keeps it, asked with GET
   (key: 'chatgpt', name: 'ChatGPT', letter: 'G', url: 'http://chatgpt.com/cdn-cgi/trace', get: true),
-  // Google's and YouTube's home pages are built on every request (~350 ms of the server's own work): their empty
-  // answer, the same the servers' ping uses, times just the way there and back
+  // YouTube's home page is built on every request (~350 ms of the server's own work): its empty answer, the same
+  // the servers' ping uses, times just the way there and back
   (key: 'youtube', name: 'YouTube', letter: 'Y', url: 'http://www.youtube.com/generate_204', get: false),
-  (key: 'google', name: 'Google', letter: 'G', url: 'http://www.google.com/generate_204', get: false),
+  // Yandex goes direct by the routing rules: the plain internet's delay, beside the VPN's to the others
+  (key: 'yandex', name: 'Яндекс', letter: 'Я', url: 'http://ya.ru/', get: false),
 ];
 
 /// The last round: each site's delay in ms (null: no answer in time), when it ran, and whether one runs now.
