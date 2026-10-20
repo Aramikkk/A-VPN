@@ -3114,6 +3114,12 @@ class _SiteTiles extends HookConsumerWidget {
           );
   }
 
+  /// A server's flag: the first word of its name when that's a flag ("🇵🇱 Польша 2"), else nothing.
+  static String _flagOf(String server) {
+    final first = server.trim().split(' ').first;
+    return first.runes.any((r) => r >= 0x1F1E6 && r <= 0x1F1FF) ? first : '';
+  }
+
   static Color _colour(int? ms) => ms == null || ms >= 300 ? _bad : (ms < 150 ? _good : _slow);
 
   @override
@@ -3124,6 +3130,8 @@ class _SiteTiles extends HookConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final sites = ref.watch(siteLatencyProvider);
     final accent = theme.araAccent;
+    // each site's own server (Settings → Ping → Sites, beta): its flag in the tile's corner
+    final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const {};
 
     Widget tile(LatencySite site) {
       final measured = sites.ms.containsKey(site.key);
@@ -3199,6 +3207,9 @@ class _SiteTiles extends HookConsumerWidget {
                     letterSpacing: low ? 0 : null,
                   ),
                 );
+                final server = siteServers[site.key];
+                final flag = server == null ? '' : _flagOf(server);
+                final corner = flag.isEmpty ? null : Text(flag, style: TextStyle(fontSize: low ? 12 : 15, height: 1));
                 return Padding(
                   padding: EdgeInsets.all(low ? 8 : 11),
                   child: Column(
@@ -3208,12 +3219,16 @@ class _SiteTiles extends HookConsumerWidget {
                         Row(
                           children: [
                             ring,
-                            const Gap(6),
+                            const Gap(5),
                             Expanded(child: name),
+                            if (corner != null) corner,
                           ],
                         )
                       else
-                        ring,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [ring, const Spacer(), if (corner != null) corner],
+                        ),
                       const Spacer(),
                       if (!low) name,
                       FittedBox(

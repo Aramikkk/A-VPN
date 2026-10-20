@@ -173,6 +173,10 @@ abstract class ConfigOptions {
   /// the address stays as it is kept (http://), see pingUrl.
   static final pingHttps = PreferencesNotifier.create<bool, bool>("ping-https", false);
 
+  /// Instagram, WhatsApp, Telegram, ChatGPT and YouTube each through the server answering that service soonest
+  /// (the core's site groups), the rest through Auto as before. Beta: off until the user turns it on.
+  static final siteGroups = PreferencesNotifier.create<bool, bool>("site-groups", false);
+
   static final connectionTestUrl = PreferencesNotifier.create<String, String>(
     "connection-test-url",
     "http://www.gstatic.com/generate_204",
@@ -444,6 +448,7 @@ abstract class ConfigOptions {
     "url-test-timeout-mobile": urlTestTimeoutMobile,
     "balancer-tolerance-wifi": balancerToleranceWifi,
     "balancer-tolerance-mobile": balancerToleranceMobile,
+    "site-groups": siteGroups,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
     "allow-connection-from-lan": allowConnectionFromLan,
@@ -545,6 +550,7 @@ abstract class ConfigOptions {
       balancerToleranceWifi: ref.watch(balancerToleranceWifi),
       balancerToleranceMobile: ref.watch(balancerToleranceMobile),
       balancerKeepConnections: true,
+      siteGroups: ref.watch(siteGroups),
       // blockAds: ref.watch(blockAds),
       useXrayCoreWhenPossible: ref.watch(useXrayCoreWhenPossible),
       executeConfigAsIs: false,

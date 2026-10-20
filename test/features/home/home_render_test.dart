@@ -256,6 +256,17 @@ void main() {
               connectionsProvider.overrideWith(_Connections.new),
               connectionQualityProvider.overrideWith(_Quality.new),
               siteLatencyProvider.overrideWith(_Sites.new),
+              // SITEFLAGS=1: each site through its own server (Settings → Ping → Sites), its flag on the tile
+              if (Platform.environment['SITEFLAGS'] == '1')
+                siteServersProvider.overrideWith(
+                  (ref) => Stream.value(const {
+                    'instagram': '🇫🇮 Финляндия',
+                    'whatsapp': '🇵🇱 Польша',
+                    'telegram': '🇱🇻 Латвия',
+                    'chatgpt': '🇵🇱 Польша 2',
+                    'youtube': '🇫🇮 Финляндия 3',
+                  }),
+                ),
               installedAppsProvider.overrideWith(
                 (ref) async => {
                   'com.google.android.youtube': (name: 'YouTube', icon: null),

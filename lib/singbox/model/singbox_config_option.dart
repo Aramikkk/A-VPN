@@ -21,6 +21,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required int balancerToleranceWifi,
     required int balancerToleranceMobile,
     required bool balancerKeepConnections,
+    // an Auto of its own for each service the home screen times (Settings → Ping, beta)
+    @Default(false) bool siteGroups,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,
     required bool executeConfigAsIs,

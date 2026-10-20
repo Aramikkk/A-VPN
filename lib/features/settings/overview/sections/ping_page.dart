@@ -204,6 +204,23 @@ class PingPage extends HookConsumerWidget {
             value: ref.watch(Preferences.pingAutoSwitch),
             onChanged: ref.read(Preferences.pingAutoSwitch.notifier).update,
           ),
+          heading(t.avpn.pingSites),
+          // each service the home screen times through the server answering it soonest (the core's site groups)
+          SwitchListTile.adaptive(
+            secondary: const Icon(Icons.alt_route_rounded),
+            title: Text(t.avpn.siteGroups),
+            subtitle: Text(t.avpn.siteGroupsMsg),
+            value: ref.watch(ConfigOptions.siteGroups),
+            onChanged: (on) async {
+              await ref.read(ConfigOptions.siteGroups.notifier).update(on);
+              // the groups are in the config: the next connection has them, now when connected
+              if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+                await ref
+                    .read(connectionNotifierProvider.notifier)
+                    .reconnect(await ref.read(activeProfileProvider.future));
+              }
+            },
+          ),
           heading(t.avpn.pingChecks),
           for (final entry in [
             ('Wi-Fi', ConfigOptions.urlTestTimeoutWifi),

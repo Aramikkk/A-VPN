@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -27,6 +28,22 @@ const latencySites = <LatencySite>[
   // Yandex goes direct by the routing rules: the plain internet's delay, beside the VPN's to the others
   (key: 'yandex', name: 'Яндекс', letter: 'Я', url: 'http://ya.ru/', get: false),
 ];
+
+/// The server each site goes through when each has its own (Settings → Ping → Sites, beta): the site's key → the
+/// server's tag, read from the core's site groups ("site-<key>"); empty when that's off.
+final siteServersProvider = StreamProvider<Map<String, String>>((ref) {
+  if (!ref.watch(ConfigOptions.siteGroups) || !ref.watch(serviceRunningProvider)) return Stream.value(const {});
+  return ref
+      .watch(proxyRepositoryProvider)
+      .watchActiveProxies()
+      .map((event) => event.getOrElse((_) => const []))
+      .map(
+        (groups) => {
+          for (final group in groups)
+            if (group.tag.startsWith('site-') && group.selected.isNotEmpty) group.tag.substring(5): group.selected,
+        },
+      );
+});
 
 /// The last round: each site's delay in ms (null: no answer in time), when it ran, and whether one runs now.
 /// [done]: the sites answered (or given up) in the round running now.
