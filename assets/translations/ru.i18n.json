@@ -80,6 +80,7 @@
     "siteGroupAppsSearch": "Поиск приложения",
     "siteGroupAppsDone": "Готово",
     "siteGroupAppsHideSystem": "Скрыть системные",
+    "trafficSmallHidden": "Приложений с трафиком от 50 МБ за сессию пока нет",
     "pingSwitched": "Пинг не отвечал минуту — адрес проверки: $name",
     "pingChecks": "Проверки",
     "pingEveryMinutes": "Каждые $n мин",

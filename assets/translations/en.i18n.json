@@ -80,6 +80,7 @@
     "siteGroupAppsSearch": "Search apps",
     "siteGroupAppsDone": "Done",
     "siteGroupAppsHideSystem": "Hide system apps",
+    "trafficSmallHidden": "No app has used 50 MB this session yet",
     "pingSwitched": "No ping for a minute — ping address now: $name",
     "pingChecks": "Checks",
     "pingEveryMinutes": "Every $n min",

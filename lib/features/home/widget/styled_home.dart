@@ -2593,6 +2593,9 @@ class _ContrastMosaic extends ConsumerWidget {
   /// the most tiles: the rest in one tile of their own
   static const _most = 11;
 
+  /// the least an app has to have used to get a tile: 50 MB
+  static const _least = 50 * 1024 * 1024;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
@@ -2604,22 +2607,38 @@ class _ContrastMosaic extends ConsumerWidget {
     int sum(List<_AppShare> apps) => apps.fold(0, (s, a) => s + a.bytes);
     final vpnBytes = sum(vpn);
     final directBytes = sum(direct);
-    final all = [for (final a in vpn) (a, true), for (final a in direct) (a, false)]
-      ..sort((a, b) => b.$1.bytes.compareTo(a.$1.bytes));
+    // one card an app, through the VPN and direct together; only the apps with 50 MB or more (the totals above
+    // count everything)
+    final merged = <String, ({_AppShare app, int vpnBytes})>{};
+    for (final (a, onVpn) in [for (final a in vpn) (a, true), for (final a in direct) (a, false)]) {
+      final had = merged[a.name];
+      merged[a.name] = (
+        app: (
+          name: a.name,
+          bytes: (had?.app.bytes ?? 0) + a.bytes,
+          duration: Duration.zero,
+          servers: onVpn ? a.servers : (had?.app.servers ?? ''),
+          icon: had?.app.icon ?? a.icon,
+        ),
+        vpnBytes: (had?.vpnBytes ?? 0) + (onVpn ? a.bytes : 0),
+      );
+    }
+    final all = merged.values.where((m) => m.app.bytes >= _least).toList()
+      ..sort((a, b) => b.app.bytes.compareTo(a.app.bytes));
     final shown = all.take(all.length > _most ? _most - 1 : _most).toList();
     final rest = all.skip(shown.length).toList();
     final tiles = <_MosaicTile>[
-      for (final (a, onVpn) in shown) (app: a, vpn: onVpn, more: 0),
+      for (final m in shown) (app: m.app, vpnShare: m.app.bytes == 0 ? 0.0 : m.vpnBytes / m.app.bytes, more: 0),
       if (rest.isNotEmpty)
         (
           app: (
             name: t.avpn.contrastMore(n: rest.length),
-            bytes: rest.fold(0, (s, r) => s + r.$1.bytes),
+            bytes: rest.fold(0, (s, r) => s + r.app.bytes),
             duration: Duration.zero,
             servers: '',
             icon: null,
           ),
-          vpn: rest.every((r) => r.$2),
+          vpnShare: rest.fold(0, (s, r) => s + r.vpnBytes) / math.max(1, rest.fold(0, (s, r) => s + r.app.bytes)),
           more: rest.length,
         ),
     ];
@@ -2665,7 +2684,20 @@ class _ContrastMosaic extends ConsumerWidget {
         ),
         Expanded(
           child: tiles.isEmpty
-              ? Center(child: Icon(Icons.data_usage_rounded, size: 40, color: scheme.outlineVariant))
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.data_usage_rounded, size: 40, color: scheme.outlineVariant),
+                      const Gap(8),
+                      Text(
+                        t.avpn.trafficSmallHidden,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                )
               : LayoutBuilder(
                   builder: (context, box) {
                     final places = <(Rect, _MosaicTile)>[];
@@ -2677,7 +2709,8 @@ class _ContrastMosaic extends ConsumerWidget {
                             rect: rect.deflate(3),
                             child: _MosaicCell(
                               tile: tile,
-                              colour: tile.vpn ? accent : grey,
+                              // mostly through the VPN: the accent; mostly direct: grey
+                              colour: tile.vpnShare >= .5 ? accent : grey,
                               units: units,
                               direct: t.avpn.statsDirect.toLowerCase(),
                             ),
@@ -2724,7 +2757,7 @@ class _ContrastMosaic extends ConsumerWidget {
 }
 
 /// A mosaic's tile: an app (or the rest of them, [more] apps) and its route.
-typedef _MosaicTile = ({_AppShare app, bool vpn, int more});
+typedef _MosaicTile = ({_AppShare app, double vpnShare, int more});
 
 /// An app's tile in the mosaic: its icon, name, amount and route; a small one just the icon and the amount.
 class _MosaicCell extends StatelessWidget {
@@ -2837,11 +2870,16 @@ class _MosaicCell extends StatelessWidget {
                     ),
                     if (tile.more == 0)
                       Text(
-                        tile.vpn ? 'VPN ${app.servers}'.trim() : direct,
+                        // both ways: the VPN's share, then direct
+                        tile.vpnShare >= 1
+                            ? 'VPN ${app.servers}'.trim()
+                            : tile.vpnShare <= 0
+                            ? direct
+                            : '${'VPN ${app.servers}'.trim()} ${(tile.vpnShare * 100).round()}% · $direct',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: tile.vpn ? (dark ? colour : scheme.onSurface) : scheme.onSurfaceVariant,
+                          color: tile.vpnShare >= .5 ? (dark ? colour : scheme.onSurface) : scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
