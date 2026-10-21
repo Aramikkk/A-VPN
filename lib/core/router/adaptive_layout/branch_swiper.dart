@@ -58,7 +58,8 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     if (index != _current) {
       _direction = index > _current ? 1 : -1;
       // a computer: every page in its menu, so they all slide sideways in the menu's order
-      _vertical = !PlatformUtils.isDesktop && _contrast && {index, _current}.any((i) => i == _connections || i == _settings);
+      _vertical =
+          !PlatformUtils.isDesktop && _contrast && {index, _current}.any((i) => i == _connections || i == _settings);
       if (_vertical) {
         // Settings come down from the top and go back up; Connections come up from below and go back down
         _direction = index == _settings || _current == _connections ? -1 : 1;
@@ -84,7 +85,7 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
     super.dispose();
   }
 
-  bool get _contrast => Theme.of(context).araLook.style == AraStyle.contrast;
+  bool get _contrast => Theme.of(context).contrastLayout;
 
   int? _neighbour(double drag) {
     final next = _current + (drag < 0 ? 1 : -1);

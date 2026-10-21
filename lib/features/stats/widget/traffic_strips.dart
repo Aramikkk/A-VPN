@@ -128,7 +128,7 @@ class _StripMap extends ConsumerWidget {
     final scheme = theme.colorScheme;
     // Glass: the VPN strip in the scheme's colour, a little deeper; the direct one grey, as everywhere (in a lighter
     // shade of the colour it was taken for the VPN one)
-    final glass = theme.araLook.glass;
+    final glass = theme.glassLook;
     final calm = glass?.calm ?? false;
     Color deeper(Color c) {
       final hsl = HSLColor.fromColor(c);

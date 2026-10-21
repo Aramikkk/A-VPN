@@ -164,8 +164,7 @@ class AraHomeBody extends HookConsumerWidget {
       };
     }, [connected, visible]);
 
-    final style = Theme.of(context).araLook.style;
-    if (style != AraStyle.classic) {
+    if (Theme.of(context).contrastLayout) {
       return _StyledHome(testing: testing, onCheck: pingAll, traffic: traffic, visible: visible);
     }
     return Padding(
@@ -590,8 +589,8 @@ class _CheckRow extends HookConsumerWidget {
 
     // Glass: the toggles in one pane the width of the connect panel, each an equal part of it; Contrast: outlined
     // pills on its black panel, the ones on filled
-    final glass = Theme.of(context).araLook.glass;
-    if (Theme.of(context).araLook.style == AraStyle.contrast) {
+    final glass = Theme.of(context).glassLook;
+    if (Theme.of(context).contrastLayout) {
       final scheme = Theme.of(context).colorScheme;
       final accent = Theme.of(context).araAccent;
       Widget pill(IconData icon, String label, bool on, Future<void> Function(bool) toggle, VoidCallback? hold) =>
@@ -818,9 +817,7 @@ class _ToggleChip extends StatelessWidget {
       selectedColor: scheme.primary,
       labelStyle: TextStyle(fontSize: 13, color: selected ? scheme.onPrimary : null),
       // the styled looks shape their chips themselves
-      shape: Theme.of(context).araLook.style == AraStyle.classic
-          ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-          : null,
+      shape: !Theme.of(context).contrastLayout ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)) : null,
       onSelected: onSelected,
     );
   }

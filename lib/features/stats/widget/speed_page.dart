@@ -12,7 +12,7 @@ class SpeedPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final contrast = Theme.of(context).araLook.style == AraStyle.contrast;
+    final contrast = Theme.of(context).contrastLayout;
     return Scaffold(
       appBar: AppBar(
         // what the page counts: this session (as Topology says its day)

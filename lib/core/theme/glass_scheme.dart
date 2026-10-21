@@ -502,33 +502,39 @@ class _BackdropPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = look.base);
-    final strength = look.strength;
-    final w = size.width;
-    final h = size.height;
-    // a spot: the colour fading out to nothing, as a blurred circle would
-    void spot(Offset centre, double radius, Color colour, double alpha) {
-      final rect = Rect.fromCircle(center: centre, radius: radius);
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [
-              colour.withValues(alpha: alpha),
-              colour.withValues(alpha: alpha * .45),
-              colour.withValues(alpha: 0),
-            ],
-            stops: const [0, .45, 1],
-          ).createShader(rect),
-      );
-    }
-
-    spot(Offset(w * .05, h * .2), w * .85, look.spots[0], strength[0]);
-    spot(Offset(w * 1.0, h * .5), w * .8, look.spots[1], strength[1]);
-    spot(Offset(w * .1, h * .85), w * .75, look.spots[2], strength[2]);
+    paintGlassSpots(canvas, size, look);
   }
 
   @override
   bool shouldRepaint(_BackdropPainter old) => old.look != look;
+}
+
+/// The Glass backdrop's three soft colour spots (the base colour under them is the caller's), top left, right and
+/// bottom left of [size].
+void paintGlassSpots(Canvas canvas, Size size, GlassLook look) {
+  final strength = look.strength;
+  final w = size.width;
+  final h = size.height;
+  // a spot: the colour fading out to nothing, as a blurred circle would
+  void spot(Offset centre, double radius, Color colour, double alpha) {
+    final rect = Rect.fromCircle(center: centre, radius: radius);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            colour.withValues(alpha: alpha),
+            colour.withValues(alpha: alpha * .45),
+            colour.withValues(alpha: 0),
+          ],
+          stops: const [0, .45, 1],
+        ).createShader(rect),
+    );
+  }
+
+  spot(Offset(w * .05, h * .2), w * .85, look.spots[0], strength[0]);
+  spot(Offset(w * 1.0, h * .5), w * .8, look.spots[1], strength[1]);
+  spot(Offset(w * .1, h * .85), w * .75, look.spots[2], strength[2]);
 }
 
 /// A floating pane of glass: the scheme's fill lit along its top and a bright edge. The menu, the toggles and the

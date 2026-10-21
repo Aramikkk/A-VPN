@@ -229,8 +229,6 @@ void main() {
   final only = Platform.environment['SCREEN'];
   for (final screen in _screens.where((s) => only == null || s.name == only)) {
     for (final style in AraStyle.values) {
-      // the classic home draws in the system's own font, which tests can't load (digits come out as wide boxes)
-      if (screen.name == 'home' && style == AraStyle.classic) continue;
       testWidgets('${screen.name}: ${style.name}', (tester) async {
         final problems = <String>[];
         final previous = FlutterError.onError;

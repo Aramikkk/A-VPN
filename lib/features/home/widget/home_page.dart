@@ -22,17 +22,14 @@ class HomePage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final t = ref.watch(translationsProvider).requireValue;
 
-    // Graphite: a soft glow in the accent colour from the top, behind the app bar and both columns of an unfolded
-    // phone
-    final graphite = theme.araLook.style == AraStyle.graphite;
     // Contrast: the app bar on the upper zone's light, no band of its own; the settings by the "+"
-    final contrast = theme.araLook.style == AraStyle.contrast;
+    final contrast = theme.contrastLayout;
     // Contrast: the "+" and the cog each on a frosted plate
     Widget plate(Widget button) => contrast ? ContrastPlate(child: button) : button;
     final scaffold = Scaffold(
-      backgroundColor: graphite || contrast ? Colors.transparent : null,
+      backgroundColor: contrast ? Colors.transparent : null,
       appBar: AppBar(
-        backgroundColor: graphite || contrast ? Colors.transparent : null,
+        backgroundColor: contrast ? Colors.transparent : null,
         surfaceTintColor: contrast ? Colors.transparent : null,
         scrolledUnderElevation: contrast ? 0 : null,
         // a low bar: the home screen needs the height for the traffic card
@@ -153,29 +150,7 @@ class HomePage extends HookConsumerWidget {
         },
       ),
     );
-    if (contrast) return ContrastGlow(page: 'home', child: scaffold);
-    // no glow on a true black (or white) OLED screen
-    final pure = theme.scaffoldBackgroundColor == Colors.black || theme.scaffoldBackgroundColor == Colors.white;
-    if (!graphite || pure) {
-      return scaffold;
-    }
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        gradient: RadialGradient(
-          center: const Alignment(0, -1.25),
-          radius: 1.25,
-          colors: [
-            Color.alphaBlend(
-              theme.colorScheme.primary.withValues(alpha: theme.brightness == Brightness.dark ? .2 : .1),
-              theme.scaffoldBackgroundColor,
-            ),
-            theme.scaffoldBackgroundColor,
-          ],
-        ),
-      ),
-      child: scaffold,
-    );
+    return ContrastGlow(page: 'home', child: scaffold);
   }
 }
 

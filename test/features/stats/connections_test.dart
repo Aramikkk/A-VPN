@@ -310,7 +310,7 @@ void main() {
       AppThemeMode.dark,
       '',
       accent: accent,
-      style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
+      style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'contrast'),
     );
     await tester.pumpWidget(
       ProviderScope(
@@ -355,7 +355,7 @@ void main() {
         dark ? AppThemeMode.dark : AppThemeMode.light,
         '',
         accent: accent,
-        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
+        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'contrast'),
       );
       await tester.pumpWidget(
         ProviderScope(

@@ -1,21 +1,14 @@
-/// The app's look, picked in Settings → Themes; each one has a day and a night version, and the accent colour
-/// (the colour theme) colours it.
+/// The app's theme, picked in Settings → Themes: the layout and the logic are one (Contrast's), the themes are
+/// different colours and backdrops; each has a day and a night version.
 enum AraStyle {
-  /// Contrast: a light upper half (dark grey by night) with white tiles, and the connect controls on a black panel
-  /// under it; big tight Golos figures. In place of Editorial (5.8.89).
+  /// Contrast: a light upper half (dark grey by night) with frosted blocks over a backdrop of lines or shapes in the
+  /// palette chosen, and the connect controls on a black panel under it; big tight Golos figures.
   contrast,
 
-  /// Glass: see-through panels over a soft coloured backdrop, the menu and the connect panel
-  /// floating over it, in one of its own colour schemes (GlassScheme).
-  glass,
+  /// Glass: the same layout over soft colour spots on the scheme's base (GlassScheme), its blocks frosted glass.
+  glass;
 
-  /// Graphite: near-black (or light grey) with glass cards, a glowing ring button and big Unbounded figures.
-  graphite,
-
-  /// The look before 5.8: cards on white or black, the accent gradient on the speed block.
-  classic;
-
-  // a new install opens in Glass (its scheme: GlassScheme.fallback)
+  // a new install opens in Contrast
   static const fallback = contrast;
 }
 

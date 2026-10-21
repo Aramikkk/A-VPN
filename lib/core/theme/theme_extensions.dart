@@ -42,11 +42,7 @@ class AraLook extends ThemeExtension<AraLook> {
     this.dark = false,
     this.graphDown,
     this.graphUp,
-    this.style = AraStyle.classic,
-    this.iconGradient,
     this.pingOn,
-    this.neonFill,
-    this.glass,
     this.fill,
   });
 
@@ -54,21 +50,8 @@ class AraLook extends ThemeExtension<AraLook> {
   /// the icons and accent figures (the scheme's primary) go graphite to read on white; null: the primary for both
   final Color? fill;
 
-  /// the Glass scheme the theme was built for: panels see-through, the menu and the connect panel floating;
-  /// null: not Glass
-  final GlassLook? glass;
-
-  /// the neon the chosen server and the connect button are filled with (black text on it); null: not filled
-  final Color? neonFill;
-
-  /// a neon gradient the icons are painted in (Cyberpunk); null: plain icons
-  final Gradient? iconGradient;
-
   /// the cards the ping colours have to read on; null: white (or near-black) cards
   final Color? pingOn;
-
-  /// the look the theme was built for: the home screen and a few blocks draw themselves to match it
-  final AraStyle style;
 
   /// the speed graph's download and upload colours on the speed block; null: the text colour on it
   final Color? graphDown;
@@ -144,6 +127,9 @@ class AraLook extends ThemeExtension<AraLook> {
     return ((la > lb ? la : lb) + .05) / ((la > lb ? lb : la) + .05);
   }
 
+  /// no theme fills the chosen server and the connect button with a neon any more
+  Color? get neonFill => null;
+
   final Gradient? gradient;
 
   /// an outline for the gradient blocks, when they're the same colour as the background (the OLED theme)
@@ -161,11 +147,7 @@ class AraLook extends ThemeExtension<AraLook> {
     dark: dark,
     graphDown: graphDown,
     graphUp: graphUp,
-    style: style,
-    iconGradient: iconGradient,
     pingOn: pingOn,
-    neonFill: neonFill,
-    glass: glass,
     fill: fill,
   );
 
@@ -181,44 +163,40 @@ class AraLook extends ThemeExtension<AraLook> {
       dark: t < .5 ? dark : other.dark,
       graphDown: Color.lerp(graphDown, other.graphDown, t),
       graphUp: Color.lerp(graphUp, other.graphUp, t),
-      style: t < .5 ? style : other.style,
-      iconGradient: Gradient.lerp(iconGradient, other.iconGradient, t),
       pingOn: Color.lerp(pingOn, other.pingOn, t),
-      neonFill: Color.lerp(neonFill, other.neonFill, t),
-      glass: t < .5 ? glass : other.glass,
       fill: Color.lerp(fill, other.fill, t),
     );
   }
 }
 
 extension AraLookOf on ThemeData {
+  /// Both themes, Contrast and Glass, are drawn in Contrast's layout: the one layout's checks read this (the other
+  /// looks' branches are left behind them).
+  bool get contrastLayout => true;
+
+  /// The Glass look the theme was built for: none, Glass is drawn as the one layout's backdrop (see [ContrastColours]).
+  GlassLook? get glassLook => null;
+
   AraLook get araLook =>
       extension<AraLook>() ?? AraLook(fastPing: colorScheme.primary, dark: brightness == Brightness.dark);
 
   /// the accent things are filled and drawn in: Contrast's fill, a neon theme's fill, or the primary
-  Color get araAccent => araLook.fill ?? araLook.neonFill ?? colorScheme.primary;
+  Color get araAccent => araLook.fill ?? colorScheme.primary;
 
   /// the accent icons and figures are drawn in: graphite when Contrast fills in its palette by day, else the accent
   Color get araIcon => araLook.fill != null ? colorScheme.primary : araAccent;
 }
 
-/// Paints [child] (an icon) in the theme's neon icon gradient when it has one.
+/// Paints [child] (an icon) as it is: the themes have no icon gradients any more; kept so the places that wrap their
+/// icons in it stay as they are.
 class AraIconPaint extends StatelessWidget {
   const AraIconPaint({super.key, required this.child, this.enabled = true});
 
   final Widget child;
 
-  /// false: leave the icon as it is (an unselected tab, a muted state)
+  /// kept for the callers (an unselected tab, a muted state)
   final bool enabled;
 
   @override
-  Widget build(BuildContext context) {
-    final gradient = Theme.of(context).araLook.iconGradient;
-    if (gradient == null || !enabled) return child;
-    return ShaderMask(
-      blendMode: BlendMode.srcIn,
-      shaderCallback: (bounds) => gradient.createShader(bounds),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => child;
 }

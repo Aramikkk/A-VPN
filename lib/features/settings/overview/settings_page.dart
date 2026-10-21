@@ -287,7 +287,7 @@ class _Frame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (theme.araLook.style == AraStyle.contrast) {
+    if (theme.contrastLayout) {
       return ContrastFrost(radius: 20, padding: EdgeInsets.zero, solo: true, child: child);
     }
     return Container(

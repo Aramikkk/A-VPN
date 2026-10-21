@@ -241,7 +241,7 @@ class TrafficPanel extends ConsumerWidget {
 
 /// Glass: [child] on a see-through pane with a bright edge, as the cards round it; otherwise as it is.
 Widget _glassCard(BuildContext context, Widget child) {
-  final glass = Theme.of(context).araLook.glass;
+  final glass = Theme.of(context).glassLook;
   if (glass == null) return child;
   return DecoratedBox(
     decoration: BoxDecoration(

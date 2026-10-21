@@ -4,11 +4,120 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+/// What a theme gives the app's one layout: its colours, the page and the glass over it, the accent and, for a Glass
+/// theme, the soft colour spots the backdrop is drawn as. The layout and the logic are Contrast's whatever the
+/// theme; the themes are a [ContrastPalette] (with the backdrop chosen in Settings → Themes) or a [GlassColours].
+abstract interface class ContrastColours {
+  /// the warm colour (the accent's fill and frames) and the cool one (the backdrop's second colour)
+  Color get warm;
+  Color get cool;
+
+  /// a tonal theme's page by night and by day, its blocks' tint by night and its accent by night; null: the usual
+  /// near-black and warm grey, the usual tint, the warm colour lifted
+  Color? get night;
+  Color? get nightPane;
+  Color? get nightAccent;
+  Color? get day;
+
+  /// by day the icons and the accent figures are graphite while the colour stays on the fills
+  bool get inkByDay;
+
+  /// the page's own colour, under the backdrop
+  Color page(bool dark);
+
+  /// the tint of the blocks' glass
+  Color pane(bool dark);
+
+  /// the accent: the buttons, the arcs, the figures
+  Color accent(Brightness brightness);
+
+  /// the two colours as the backdrop draws them
+  (Color, Color) backdrop(Brightness brightness);
+
+  /// a Glass theme's look (the backdrop is its colour spots); null: the backdrop chosen in Settings → Themes
+  GlassLook? glass(Brightness brightness);
+
+  /// The theme the app was last built with (for theme builders with no context of their own).
+  static ContrastColours active = ContrastPalette.fallback;
+
+  /// The theme chosen in Settings → Themes, for widgets with no provider reference of their own.
+  static ContrastColours of(BuildContext context) {
+    try {
+      return ProviderScope.containerOf(context, listen: false).read(contrastColoursProvider);
+    } catch (_) {
+      return active;
+    }
+  }
+}
+
+/// The theme chosen: the Glass scheme when the look is Glass, else the Contrast palette.
+final contrastColoursProvider = Provider<ContrastColours>((ref) {
+  // the settings not read yet (the first frames): the defaults
+  if (!ref.watch(sharedPreferencesProvider).hasValue) return ContrastPalette.fallback;
+  return ref.watch(Preferences.araStyle) == AraStyle.glass
+      ? GlassColours(ref.watch(Preferences.glassScheme))
+      : ref.watch(Preferences.contrastPalette);
+});
+
+/// A Glass scheme as a theme of the one layout: the scheme's backdrop (colour spots on its base) and accent, its
+/// day and night looks as the page's colours.
+@immutable
+class GlassColours implements ContrastColours {
+  const GlassColours(this.scheme);
+
+  final GlassScheme scheme;
+
+  @override
+  GlassLook glass(Brightness brightness) => scheme.look(brightness);
+
+  @override
+  Color get warm => scheme.look(Brightness.light).accent;
+
+  @override
+  Color get cool => scheme.look(Brightness.light).spots[1];
+
+  @override
+  Color get night => scheme.look(Brightness.dark).base;
+
+  @override
+  Color get day => scheme.look(Brightness.light).base;
+
+  @override
+  Color get nightPane => Color.lerp(night, Colors.white, .07)!;
+
+  @override
+  Color get nightAccent => scheme.look(Brightness.dark).accent;
+
+  @override
+  bool get inkByDay => true;
+
+  @override
+  Color page(bool dark) => dark ? night : day;
+
+  @override
+  Color pane(bool dark) => dark ? nightPane : Colors.white;
+
+  @override
+  Color accent(Brightness brightness) => brightness == Brightness.dark ? nightAccent : warm;
+
+  @override
+  (Color, Color) backdrop(Brightness brightness) => (accent(brightness), cool);
+
+  @override
+  bool operator ==(Object other) => other is GlassColours && other.scheme == scheme;
+
+  @override
+  int get hashCode => scheme.hashCode;
+}
 
 /// Contrast's colour: a warm colour (the accent: the buttons, the arcs, the figures) and a cool one (with it on the
 /// backdrop). By day both lifted towards white for the backdrop.
-enum ContrastPalette {
+enum ContrastPalette implements ContrastColours {
   claude('Claude', 'Claude', Color(0xFFC96442), Color(0xFF8FA8BD)),
   peach('Персик', 'Peach', Color(0xFFF08A5D), Color(0xFF9EC1CF)),
   terracotta('Терракота', 'Terracotta', Color(0xFFB5553A), Color(0xFF7D9D9C)),
@@ -95,44 +204,44 @@ enum ContrastPalette {
 
   /// a tonal palette's page by night and by day, its blocks' tint by night and its accent by night (null: the
   /// usual near-black and warm grey, the usual tint, the warm colour lifted)
+  @override
   final Color? night;
+  @override
   final Color? nightPane;
+  @override
   final Color? nightAccent;
+  @override
   final Color? day;
 
-  /// The page's own colour, under the backdrop.
+  @override
   Color page(bool dark) => dark ? (night ?? const Color(0xFF1D1D20)) : (day ?? const Color(0xFFEFEDE8));
 
-  /// The tint of the blocks' glass.
+  @override
   Color pane(bool dark) => dark ? (nightPane ?? const Color(0xFF1E1E22)) : Colors.white;
 
-  /// The palette the theme was last built with (for theme builders with no context of their own).
-  static ContrastPalette active = fallback;
-
-  /// The palette chosen in Settings → Themes, for widgets with no provider reference of their own.
-  static ContrastPalette of(BuildContext context) {
-    try {
-      return ProviderScope.containerOf(context, listen: false).read(Preferences.contrastPalette);
-    } catch (_) {
-      return fallback;
-    }
-  }
+  /// a palette has no spots: the backdrop is the kind chosen in Settings → Themes
+  @override
+  GlassLook? glass(Brightness brightness) => null;
 
   final String ru;
   final String en;
+  @override
   final Color warm;
+  @override
   final Color cool;
 
   static const fallback = ContrastPalette.citrus;
 
   /// by day its colour stays as it is on the frames, fills and lit pills, while icons and accent figures go
   /// graphite (light ones washed out on white, darkened ones stopped being themselves): every palette
+  @override
   bool get inkByDay => true;
 
   /// the icons' and figures' colour by day for [inkByDay]
   static const ink = Color(0xFF3A3E44);
 
   /// the accent: the warm colour, by night lifted a little to read on the dark (a near-black one to light grey)
+  @override
   Color accent(Brightness brightness) {
     if (brightness == Brightness.light) return warm;
     if (nightAccent != null) return nightAccent!;
@@ -141,6 +250,7 @@ enum ContrastPalette {
   }
 
   /// the two colours as the backdrop draws them: by day lifted towards white, by night as they are
+  @override
   (Color, Color) backdrop(Brightness brightness) => brightness == Brightness.light
       ? (Color.lerp(warm, Colors.white, .35)!, Color.lerp(cool, Colors.white, .3)!)
       : (accent(brightness), cool);
@@ -289,7 +399,11 @@ class ContrastBackdropPainter extends CustomPainter {
     required this.seed,
     this.area,
     this.page,
+    this.glass,
   });
+
+  /// a Glass theme's look: the backdrop is its colour spots on the page's colour
+  final GlassLook? glass;
 
   /// the page's colour under the backdrop (null: the usual one); the quiet lines just off it
   final Color? page;
@@ -330,6 +444,11 @@ class ContrastBackdropPainter extends CustomPainter {
     Paint line(bool on) => stroke(on ? warm : faint, thin);
     canvas.save();
     canvas.clipRect(Offset.zero & box);
+    if (glass != null) {
+      paintGlassSpots(canvas, size, glass!);
+      canvas.restore();
+      return;
+    }
     switch (kind) {
       case ContrastBackdrop.circles:
         // four or five small discs, warm and cool in turn, each in its own band down the screen and on the other
@@ -670,6 +789,7 @@ class ContrastBackdropPainter extends CustomPainter {
       old.dark != dark ||
       old.seed != seed ||
       old.page != page ||
+      old.glass != glass ||
       old.area != area;
 }
 
@@ -692,9 +812,10 @@ class ContrastFrostImage {
     required double scale,
     required int seed,
     Color? page,
+    GlassLook? glass,
   }) {
     final key =
-        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|${page?.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$blur|$scale|$seed';
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|${page?.toARGB32()}|${glass?.hashCode}|$dark|${area.width.round()}x${area.height.round()}|$blur|$scale|$seed';
     final kept = _kept[key];
     if (kept != null) return kept;
     // a handful at most (day and night, a few clarities); the old ones go to the collector
@@ -714,6 +835,7 @@ class ContrastFrostImage {
       seed: seed,
       area: area,
       page: page,
+      glass: glass,
     ).paint(canvas, area);
     canvas.restore();
     final picture = recorder.endRecording();
@@ -743,9 +865,10 @@ class ContrastBackdropImage {
     required double scale,
     required int seed,
     Color? page,
+    GlassLook? glass,
   }) {
     final key =
-        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|${page?.toARGB32()}|$dark|${area.width.round()}x${area.height.round()}|$scale|$seed';
+        '${kind.name}|${warm.toARGB32()}|${cool.toARGB32()}|${page?.toARGB32()}|${glass?.hashCode}|$dark|${area.width.round()}x${area.height.round()}|$scale|$seed';
     final kept = _kept[key];
     if (kept != null) return kept;
     // a few at most (day and night, folded and unfolded); the old ones go to the collector
@@ -760,6 +883,7 @@ class ContrastBackdropImage {
       seed: seed,
       area: area,
       page: page,
+      glass: glass,
     ).paint(canvas, area);
     final picture = recorder.endRecording();
     final image = picture.toImageSync(

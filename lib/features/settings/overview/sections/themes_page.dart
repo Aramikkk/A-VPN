@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
-import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
@@ -12,32 +11,26 @@ import 'package:hiddify/features/common/general_pref_tiles.dart';
 import 'package:hiddify/features/settings/widget/settings_block.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Settings → Themes: light or dark (or with the system), and the colour theme.
+/// Settings → Themes: light or dark (or with the system), the theme (Contrast or Glass: one layout in different
+/// colours) and its colours.
 class ThemesPage extends ConsumerWidget {
   const ThemesPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    // Glass has its own colour schemes (each by day and by night), not the colour themes the others share; Contrast
-    // takes its colour from them too
-    final style = ref.watch(Preferences.araStyle);
-    final glass = style == AraStyle.glass;
+    final glass = ref.watch(Preferences.araStyle) == AraStyle.glass;
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.themes)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         children: [
-          // the colour themes are all true black now: OLED and the neon colours
+          // Glass has its own colour schemes (each by day and by night); Contrast its palettes and backdrops
           SettingsBlock(
-            children: style == AraStyle.contrast
-                ? const [StylePicker(), ThemeModePrefTile()]
-                : glass
-                ? const [StylePicker(), ThemeModePrefTile(), GlassSchemePicker()]
-                : const [StylePicker(), ThemeModePrefTile(), AccentPicker(oled: true)],
+            children: [const StylePicker(), const ThemeModePrefTile(), if (glass) const GlassSchemePicker()],
           ),
-          // Contrast: three steps, how see-through the blocks are, the backdrop, the colour
-          if (style == AraStyle.contrast) const ContrastThemePicker(),
+          // how see-through the blocks are, for both; Contrast: the backdrop and the colour too
+          ContrastThemePicker(glass: glass),
         ],
       ),
     );
@@ -226,109 +219,7 @@ class _GlassSwatch extends StatelessWidget {
   );
 }
 
-/// The colour themes as gradient swatches, the chosen one ringed: the coloured ones, or ([oled]) the true-black
-/// ones (OLED and the neon themes).
-class AccentPicker extends ConsumerWidget {
-  const AccentPicker({super.key, this.oled = false});
-
-  final bool oled;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final selected = ref.watch(Preferences.araAccent);
-    final brightness = Theme.of(context).brightness;
-    String name(AraAccent accent) => switch (accent) {
-      AraAccent.oled => t.avpn.accentOled,
-      AraAccent.neonYellow => t.avpn.accentNeonYellow,
-      AraAccent.neonRed => t.avpn.accentNeonRed,
-      AraAccent.neonBlue => t.avpn.accentNeonBlue,
-      AraAccent.neonGreen => t.avpn.accentNeonGreen,
-      AraAccent.neonOrange => t.avpn.accentNeonOrange,
-      AraAccent.neonAmber => t.avpn.accentNeonAmber,
-      AraAccent.neonCoral => t.avpn.accentNeonCoral,
-      AraAccent.neonPink => t.avpn.accentNeonPink,
-      AraAccent.neonFuchsia => t.avpn.accentNeonFuchsia,
-      AraAccent.neonViolet => t.avpn.accentNeonViolet,
-      AraAccent.neonIndigo => t.avpn.accentNeonIndigo,
-      AraAccent.neonTurquoise => t.avpn.accentNeonTurquoise,
-      AraAccent.neonMint => t.avpn.accentNeonMint,
-      AraAccent.neonLavender => t.avpn.accentNeonLavender,
-    };
-    return ListTile(
-      leading: Icon(oled ? Icons.contrast_rounded : Icons.palette_rounded),
-      title: Text(oled ? t.avpn.accentOledGroup : t.avpn.accentTheme),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (oled) Text(t.avpn.accentOledGroupMsg),
-          Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 4),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 10,
-              children: [
-                for (final accent in AraAccent.values.where((a) => a.pure == oled))
-                  Tooltip(
-                    message: name(accent),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () => ref.read(Preferences.araAccent.notifier).update(accent),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 56,
-                            height: 36,
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: accent == selected
-                                    ? Theme.of(context).colorScheme.onSurface
-                                    : Colors.transparent,
-                                width: 2,
-                              ),
-                            ),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: accent.gradient(brightness),
-                                borderRadius: BorderRadius.circular(10),
-                                // the OLED swatch is the background's own colour: outline it
-                                border: accent.pure ? Border.all(color: Theme.of(context).colorScheme.outline) : null,
-                              ),
-                              child: accent == selected
-                                  ? Icon(Icons.check_rounded, color: accent.onGradient(brightness), size: 18)
-                                  // the Mono themes' blocks are all graphite: a dot shows their colour
-                                  : accent.icon != null
-                                  ? Center(
-                                      child: CircleAvatar(
-                                        radius: 7,
-                                        backgroundColor: brightness == Brightness.dark
-                                            ? accent.darkPrimary
-                                            : accent.lightPrimary,
-                                      ),
-                                    )
-                                  : const SizedBox.expand(),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(name(accent), style: Theme.of(context).textTheme.labelSmall),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The looks as small previews in today's brightness: Contrast, Glass, Graphite and the classic one.
+/// The two themes as small previews in today's brightness: Contrast and Glass (one layout, different colours).
 class StylePicker extends ConsumerWidget {
   const StylePicker({super.key});
 
@@ -338,13 +229,10 @@ class StylePicker extends ConsumerWidget {
     final selected = ref.watch(Preferences.araStyle);
     final theme = Theme.of(context);
     final brightness = theme.brightness;
-    final accent = ref.watch(Preferences.araAccent);
-    final accentColour = brightness == Brightness.dark ? accent.darkPrimary : accent.lightPrimary;
+    final accentColour = ref.watch(Preferences.contrastPalette).accent(brightness);
     (String, String) names(AraStyle style) => switch (style) {
-      AraStyle.graphite => (t.avpn.styleGraphite, t.avpn.styleGraphiteHint),
       AraStyle.contrast => (t.avpn.styleContrast, t.avpn.styleContrastHint),
       AraStyle.glass => (t.avpn.styleGlass, t.avpn.styleGlassHint),
-      AraStyle.classic => (t.avpn.styleClassic, t.avpn.styleClassicHint),
     };
     return ListTile(
       leading: const Icon(Icons.style_rounded),
@@ -376,7 +264,7 @@ class StylePicker extends ConsumerWidget {
                         ),
                         child: style == AraStyle.glass
                             ? _GlassStylePreview(look: ref.watch(Preferences.glassScheme).look(brightness))
-                            : _StylePreview(style: style, brightness: brightness, accent: accentColour),
+                            : _StylePreview(brightness: brightness, accent: accentColour),
                       ),
                       const SizedBox(height: 6),
                       Text(names(style).$1, style: theme.textTheme.titleSmall),
@@ -396,28 +284,21 @@ class StylePicker extends ConsumerWidget {
   }
 }
 
-/// A thumbnail of a look: its background, a few server rows with the chosen one, and its connect control.
+/// Contrast's thumbnail: its background, a few server rows with the chosen one, and the black panel with its ring.
 class _StylePreview extends StatelessWidget {
-  const _StylePreview({required this.style, required this.brightness, required this.accent});
+  const _StylePreview({required this.brightness, required this.accent});
 
-  final AraStyle style;
   final Brightness brightness;
   final Color accent;
 
   @override
   Widget build(BuildContext context) {
-    final dark = brightness == Brightness.dark;
-    final p = style == AraStyle.classic ? null : AppTheme.palette(style, brightness);
-    final neon = accent;
-    final bg = p?.bg ?? (dark ? Colors.black : Colors.white);
-    final line = p?.line ?? (dark ? const Color(0xFF26262B) : const Color(0xFFDDDFDA));
-    final card = p?.card ?? (dark ? const Color(0xFF111113) : const Color(0xFFF6F7F4));
-    final contrast = style == AraStyle.contrast;
+    final p = AppTheme.palette(brightness);
     Widget row(bool selected) => Container(
       height: 9,
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: selected ? neon.withValues(alpha: .3) : card,
+        color: selected ? accent.withValues(alpha: .3) : p.card,
         borderRadius: BorderRadius.circular(4),
       ),
     );
@@ -425,19 +306,9 @@ class _StylePreview extends StatelessWidget {
       height: 86,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: bg,
+        color: p.bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: line),
-        gradient: style == AraStyle.graphite
-            ? RadialGradient(
-                center: const Alignment(0, -1.3),
-                radius: 1.2,
-                colors: [
-                  Color.alphaBlend(accent.withValues(alpha: dark ? .25 : .12), bg),
-                  bg,
-                ],
-              )
-            : null,
+        border: Border.all(color: p.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -446,58 +317,38 @@ class _StylePreview extends StatelessWidget {
           row(false),
           row(false),
           const Spacer(),
-          if (style == AraStyle.graphite)
-            Row(
-              children: [
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: neon, width: 2),
-                    boxShadow: [BoxShadow(color: neon.withValues(alpha: .5), blurRadius: 8)],
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  width: 34,
-                  height: 12,
-                  decoration: BoxDecoration(color: neon, borderRadius: BorderRadius.circular(9)),
-                ),
-              ],
-            )
-          // Contrast: the black panel with the glowing ring under the light rows
-          else if (contrast)
-            Container(
-              height: 26,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: const Color(0xFF0B0B0C), borderRadius: BorderRadius.circular(8)),
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF3F1EC),
-                  border: Border.all(color: neon, width: 2),
-                  boxShadow: [BoxShadow(color: neon.withValues(alpha: .6), blurRadius: 8)],
-                ),
-              ),
-            )
-          else
-            Container(
-              height: 16,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [accent, accent.withValues(alpha: .6)]),
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
+          _PanelPreview(accent: accent),
         ],
       ),
     );
   }
 }
 
-/// Glass's thumbnail: the chosen scheme's backdrop with see-through rows and a floating pane.
+/// The black connect panel in small: the ring, lit in [accent].
+class _PanelPreview extends StatelessWidget {
+  const _PanelPreview({required this.accent});
+
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 26,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(color: const Color(0xFF0B0B0C), borderRadius: BorderRadius.circular(8)),
+    child: Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFF3F1EC),
+        border: Border.all(color: accent, width: 2),
+        boxShadow: [BoxShadow(color: accent.withValues(alpha: .6), blurRadius: 8)],
+      ),
+    ),
+  );
+}
+
+/// Glass's thumbnail: the chosen scheme's backdrop with see-through rows and the same black panel.
 class _GlassStylePreview extends StatelessWidget {
   const _GlassStylePreview({required this.look});
 
@@ -530,21 +381,7 @@ class _GlassStylePreview extends StatelessWidget {
                   row(false),
                   row(false),
                   const Spacer(),
-                  Container(
-                    height: 20,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    alignment: Alignment.centerLeft,
-                    decoration: BoxDecoration(
-                      color: look.panel,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: look.edge),
-                    ),
-                    child: Container(
-                      width: 13,
-                      height: 13,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: look.accent),
-                    ),
-                  ),
+                  _PanelPreview(accent: look.accent),
                 ],
               ),
             ),
@@ -555,9 +392,13 @@ class _GlassStylePreview extends StatelessWidget {
   }
 }
 
-/// Contrast's look in three steps: clarity, backdrop and colour palettes.
+/// The theme's look in steps: clarity (both themes), then Contrast's backdrop and colour palettes (Glass has its own
+/// colour schemes above, and its backdrop is their colour spots).
 class ContrastThemePicker extends ConsumerWidget {
-  const ContrastThemePicker({super.key});
+  const ContrastThemePicker({super.key, this.glass = false});
+
+  /// Glass: just the clarity
+  final bool glass;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -569,7 +410,7 @@ class ContrastThemePicker extends ConsumerWidget {
     final clarity = ref.watch(Preferences.contrastClarity);
     final backdrop = ref.watch(Preferences.contrastBackdrop);
     final palette = ref.watch(Preferences.contrastPalette);
-    final (warm, cool) = palette.backdrop(theme.brightness);
+    final (warm, cool) = ref.watch(contrastColoursProvider).backdrop(theme.brightness);
     final accent = scheme.primary;
     Widget heading(String text) => Padding(
       padding: const EdgeInsets.fromLTRB(6, 18, 6, 8),
@@ -667,86 +508,91 @@ class ContrastThemePicker extends ConsumerWidget {
             ],
           ),
         ),
-        heading(t.avpn.contrastBackdropTitle),
-        card(
-          GridView.count(
-            crossAxisCount: 5,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 8,
-            childAspectRatio: .58,
-            children: [
-              for (final k in ContrastBackdrop.values)
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => ref.read(Preferences.contrastBackdrop.notifier).update(k),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: AnimatedContainer(
+        if (!glass) ...[
+          heading(t.avpn.contrastBackdropTitle),
+          card(
+            GridView.count(
+              crossAxisCount: 5,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 8,
+              childAspectRatio: .58,
+              children: [
+                for (final k in ContrastBackdrop.values)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => ref.read(Preferences.contrastBackdrop.notifier).update(k),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(2.5),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: k == backdrop ? accent : Colors.transparent, width: 2),
+                            ),
+                            child: backdropOf(k),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        label(ru ? k.ru : k.en, k == backdrop),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          heading(t.avpn.contrastPaletteTitle),
+          card(
+            GridView(
+              // a cell as tall as its swatch and name (a share of the width left the name cut on a narrow screen)
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 4,
+                mainAxisExtent: 76,
+              ),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                for (final p in ContrastPalette.values)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => ref.read(Preferences.contrastPalette.notifier).update(p),
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           padding: const EdgeInsets.all(2.5),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: k == backdrop ? accent : Colors.transparent, width: 2),
-                          ),
-                          child: backdropOf(k),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      label(ru ? k.ru : k.en, k == backdrop),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-        heading(t.avpn.contrastPaletteTitle),
-        card(
-          GridView.count(
-            crossAxisCount: 6,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 4,
-            childAspectRatio: .7,
-            children: [
-              for (final p in ContrastPalette.values)
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => ref.read(Preferences.contrastPalette.notifier).update(p),
-                  child: Column(
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.all(2.5),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: p == palette ? accent : Colors.transparent, width: 2),
-                        ),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [p.warm, p.warm, p.cool, p.cool],
-                              stops: const [0, .5, .5, 1],
+                            border: Border.all(color: p == palette ? accent : Colors.transparent, width: 2),
+                          ),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [p.warm, p.warm, p.cool, p.cool],
+                                stops: const [0, .5, .5, 1],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      label(ru ? p.ru : p.en, p == palette),
-                    ],
+                        const SizedBox(height: 4),
+                        label(ru ? p.ru : p.en, p == palette),
+                      ],
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

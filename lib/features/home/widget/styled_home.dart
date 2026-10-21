@@ -75,7 +75,7 @@ class _StyledHome extends HookConsumerWidget {
     // shares to the three gaps under them, servers to toggles, toggles to the connect panel, the panel to the menu
     final spread = !traffic && profile != null && servers.isNotEmpty;
     Widget share() => spread ? const Spacer() : const SizedBox.shrink();
-    if (theme.araLook.style == AraStyle.contrast) {
+    if (theme.contrastLayout) {
       return _ContrastHome(
         header: header,
         // Windows without the administrator's rights: the system proxy instead of the VPN mode chosen, and a way to
@@ -266,7 +266,7 @@ class _StatusBlock extends HookConsumerWidget {
       _ => null,
     };
 
-    if (theme.araLook.style == AraStyle.contrast) {
+    if (theme.contrastLayout) {
       // Keep collecting daily history for Statistics; the headline uses the VPN session.
       ref.read(trafficHistoryProvider);
       // Native session totals survive configuration reloads; a new native session resets them.
@@ -628,7 +628,7 @@ class _GraphiteRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final fill = theme.araLook.neonFill;
-    if (theme.araLook.style == AraStyle.contrast) {
+    if (theme.contrastLayout) {
       return _ContrastRow(
         flag: flag,
         group: group,
@@ -662,8 +662,6 @@ class _GraphiteRow extends StatelessWidget {
               fastPing: ink,
               pingOn: ink == Colors.white ? Colors.black : Colors.white,
               dark: ink == Colors.white,
-              style: theme.araLook.style,
-              neonFill: fill,
             ),
           ],
         ),
@@ -683,7 +681,7 @@ class _GraphiteRow extends StatelessWidget {
         ),
       );
     }
-    final glass = theme.araLook.glass;
+    final glass = theme.glassLook;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
@@ -874,9 +872,9 @@ class _GraphiteDock extends HookConsumerWidget {
       Future.microtask(() => ref.read(_pendingConnectionProvider.notifier).clear());
     }
     final busy = status.isSwitching || pendingFrom != null;
-    final glass = theme.araLook.glass;
+    final glass = theme.glassLook;
     // Contrast: tight, on its black panel
-    final padding = theme.araLook.style == AraStyle.contrast
+    final padding = theme.contrastLayout
         ? const EdgeInsets.fromLTRB(12, 4, 12, 2)
         : (large ? const EdgeInsets.fromLTRB(12, 16, 12, 16) : const EdgeInsets.fromLTRB(10, 10, 12, 10));
     // the servers answering their ping right now (a test that timed out or never ran doesn't count)
@@ -901,25 +899,22 @@ class _GraphiteDock extends HookConsumerWidget {
               : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : scheme.onSurface))
         : scheme.onSurfaceVariant;
     // Contrast: the side figures and captions a little bigger
-    final sideFigure = theme.araLook.style == AraStyle.contrast ? 25.0 : null;
-    final caption =
-        (theme.araLook.style == AraStyle.contrast ? theme.textTheme.labelLarge : theme.textTheme.labelMedium)?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: scheme.onSurfaceVariant,
-        );
-    final iconSize = (large ? 28.0 : 26.0) * (theme.araLook.style == AraStyle.contrast ? 1.05 : 1);
+    final sideFigure = theme.contrastLayout ? 25.0 : null;
+    final caption = (theme.contrastLayout ? theme.textTheme.labelLarge : theme.textTheme.labelMedium)?.copyWith(
+      fontWeight: FontWeight.w700,
+      color: scheme.onSurfaceVariant,
+    );
+    final iconSize = (large ? 28.0 : 26.0) * (theme.contrastLayout ? 1.05 : 1);
     // no plates: an icon (or a number) over a small caption, pressed as one
     // on a barely-there plate, as the toggles above
     // Contrast: the ping and the servers' figures in the ping frame's colour (their signs in the text colour), the
     // loss in its frame's grey
-    final contrastOn = theme.araLook.style == AraStyle.contrast && on;
+    final contrastOn = theme.contrastLayout && on;
     final gaugeInk = contrastOn ? accent : ink;
     final lossInk = dark ? const Color(0xFFA3A9B0) : const Color(0xFF8C939C);
     Widget side({required Widget top, required String label, VoidCallback? onTap, Color? labelColor}) => Material(
       // Contrast: no plate, right on its black panel
-      color: theme.araLook.style == AraStyle.contrast
-          ? Colors.transparent
-          : scheme.onSurface.withValues(alpha: dark ? .06 : .045),
+      color: theme.contrastLayout ? Colors.transparent : scheme.onSurface.withValues(alpha: dark ? .06 : .045),
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -951,11 +946,11 @@ class _GraphiteDock extends HookConsumerWidget {
         Expanded(
           // Contrast: the ping button a little to the left of its half's middle
           child: Align(
-            alignment: theme.araLook.style == AraStyle.contrast ? const Alignment(-.45, 0) : Alignment.center,
+            alignment: theme.contrastLayout ? const Alignment(-.45, 0) : Alignment.center,
             child: side(
               top: on && testing
                   ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: ink))
-                  : theme.araLook.style == AraStyle.contrast
+                  : theme.contrastLayout
                   // Contrast: the ping here, as the servers answering are on the right: the sign and the figure
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
@@ -984,10 +979,10 @@ class _GraphiteDock extends HookConsumerWidget {
                     )
                   : Icon(Icons.network_ping_rounded, size: iconSize, color: ink),
               // Contrast: the loss under it while measured
-              label: theme.araLook.style == AraStyle.contrast && on && measured && !busy
+              label: theme.contrastLayout && on && measured && !busy
                   ? t.avpn.dockLoss(loss: lossText)
                   : t.avpn.stPingButton,
-              labelColor: theme.araLook.style == AraStyle.contrast && on && measured && !busy ? lossInk : null,
+              labelColor: theme.contrastLayout && on && measured && !busy ? lossInk : null,
               onTap: on && !busy && !testing ? onCheck : null,
             ),
           ),
@@ -999,7 +994,7 @@ class _GraphiteDock extends HookConsumerWidget {
           // (only for a connection just started: one found up when the app opened shows its gauge straight away)
           busy: busy || (on && !measured && ref.read(connectionQualityProvider.notifier).warmUp),
           // Contrast: a fifth smaller
-          size: (large ? 88.0 : 76.0) * (theme.araLook.style == AraStyle.contrast ? .8 : 1),
+          size: (large ? 88.0 : 76.0) * (theme.contrastLayout ? .8 : 1),
           ping: measured ? _Orb.pingFill(ping) : 0,
           loss: measured ? _Orb.lossFill(loss) : 0,
           pingLabel: measured && !busy ? '$ping ms' : null,
@@ -1050,7 +1045,7 @@ class _GraphiteDock extends HookConsumerWidget {
       ],
     );
     // Contrast: right on its black panel, no card round it
-    if (theme.araLook.style == AraStyle.contrast) return Padding(padding: padding, child: content);
+    if (theme.contrastLayout) return Padding(padding: padding, child: content);
     // Glass: floating over the backdrop, what's behind it blurred
     if (glass != null) {
       return GlassPane(look: glass, radius: large ? 40 : 32, padding: padding, child: content);
@@ -1145,10 +1140,8 @@ class _Orb extends HookWidget {
     final accent = theme.araAccent;
     // the loss's inner frame a deep shade of the accent; Citrus: grey (its deep olive looked muddy)
     // Contrast: the loss in grey on every palette (a deep shade of a light accent looked muddy)
-    final lossColor = theme.araLook.style == AraStyle.contrast
-        ? (dark ? const Color(0xFF6B7178) : const Color(0xFF8C939C))
-        : deep(accent);
-    final contrastDay = !dark && theme.araLook.style == AraStyle.contrast;
+    final lossColor = theme.contrastLayout ? (dark ? const Color(0xFF6B7178) : const Color(0xFF8C939C)) : deep(accent);
+    final contrastDay = !dark && theme.contrastLayout;
     // the network's sign on the light button: graphite when the accent is too light to read on it (citrus, lemon)
     // by night on the dark button the accent itself
     final onButton = dark
@@ -1159,7 +1152,7 @@ class _Orb extends HookWidget {
     final lossInk = dark ? Color.lerp(lossColor, Colors.white, .35)! : lossColor;
     final width = size * 2.1;
     // Contrast: a rounded-square button in two square frames, the ping outside, the loss inside
-    final square = theme.araLook.style == AraStyle.contrast;
+    final square = theme.contrastLayout;
     // the square: its numbers inside the button, the frames reaching below it
     final centre = square ? size * .94 : size * .98;
     // There is no secondary mode pill under the button.
@@ -1251,7 +1244,7 @@ class _Orb extends HookWidget {
                             // on: by night dark with a glow of the accent (it was near white on the black panel)
                             ? Color.alphaBlend(
                                 accent.withValues(alpha: dark ? .2 : .14),
-                                dark ? ContrastPalette.of(context).pane(true) : Colors.white,
+                                dark ? ContrastColours.of(context).pane(true) : Colors.white,
                               )
                             : (dark ? const Color(0xFF2C2C30) : const Color(0xFFECEAE6)))
                       : dark
@@ -1266,9 +1259,7 @@ class _Orb extends HookWidget {
                 ),
                 child: Center(
                   // a computer, on: the computer's sign (it has no LTE or Wi-Fi of its own to tell)
-                  child:
-                      theme.araLook.style == AraStyle.contrast &&
-                          (networkLabel != null || (PlatformUtils.isDesktop && on && !busy))
+                  child: theme.contrastLayout && (networkLabel != null || (PlatformUtils.isDesktop && on && !busy))
                       // Contrast: the mode under the sign, inside the button
                       // Contrast: the network it runs on, large, instead of the power sign (that only while off)
                       ? Semantics(
@@ -1288,7 +1279,7 @@ class _Orb extends HookWidget {
                           // it goes black there, as the chosen server's text does
                           color: on
                               ? (theme.araLook.neonFill == null
-                                    ? (dark && theme.araLook.style != AraStyle.contrast ? Colors.white : scheme.primary)
+                                    ? (dark && !theme.contrastLayout ? Colors.white : scheme.primary)
                                     : (dark || AraLook.contrast(accent, Colors.white) >= 2.2 ? accent : Colors.black))
                               : scheme.onSurfaceVariant,
                         ),
@@ -1453,7 +1444,7 @@ class _HomeTraffic extends ConsumerWidget {
       (c) => c.outbound,
     )..sort((a, b) => b.total.compareTo(a.total));
     final theme = Theme.of(context);
-    if (theme.araLook.style == AraStyle.contrast) {
+    if (theme.contrastLayout) {
       final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
       // by traffic on every platform (the time on screen came out empty on most phones)
       List<_AppShare> route(ConnectionRoute r) {
@@ -1513,7 +1504,7 @@ class _HomeTraffic extends ConsumerWidget {
       ),
     );
     // Glass: the strips on a pane of glass, as the rows above them
-    final glass = theme.araLook.glass;
+    final glass = theme.glassLook;
     if (glass == null) return strips;
     // the card always fills its place, empty or not
     return DecoratedBox(
@@ -1841,7 +1832,7 @@ class ContrastGlow extends ConsumerStatefulWidget {
   final bool muted;
 
   /// the veil over a muted page's backdrop
-  static Color veil(bool dark) => (dark ? const Color(0xFF1D1D20) : const Color(0xFFEFEDE8)).withValues(alpha: .78);
+  static Color veil(bool dark) => ContrastColours.active.page(dark).withValues(alpha: .78);
 
   /// draws its own backdrop inside another one too: a page sliding over another carries its own, so the one under
   /// it doesn't show through
@@ -1862,7 +1853,7 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     final brightness = Theme.of(context).brightness;
     // the settings not read yet (the first frames): the defaults
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
-    final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
+    final palette = ref.watch(contrastColoursProvider);
     final (warm, cool) = palette.backdrop(brightness);
     final area = contrastImageArea(MediaQuery.sizeOf(context));
     // the picture at the screen's sharpness, two pixels a point at most (blurrier lines aren't seen, memory is)
@@ -1877,6 +1868,7 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
       scale: scale,
       seed: seed,
       page: palette.page(brightness == Brightness.dark),
+      glass: palette.glass(brightness),
     );
     final image = picture(layout.seed);
     final previous = layout.previous == layout.seed ? null : picture(layout.previous);
@@ -1949,7 +1941,7 @@ class ContrastFrost extends ConsumerWidget {
           // lighter than the chosen clarity: the tiles inside add their own pane, and the two together came out
           // nearly solid next to the other pages' single see-through cards
           color: dark
-              ? ContrastPalette.of(context).pane(true).withValues(alpha: clarity.night * (solo ? .75 : .6))
+              ? ContrastColours.of(context).pane(true).withValues(alpha: clarity.night * (solo ? .75 : .6))
               : Colors.white.withValues(alpha: clarity.day * (solo ? .75 : .6)),
           borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
@@ -1971,7 +1963,7 @@ class _FrostedBackdrop extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final brightness = Theme.of(context).brightness;
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
-    final palette = ready ? ref.watch(Preferences.contrastPalette) : ContrastPalette.fallback;
+    final palette = ref.watch(contrastColoursProvider);
     final clarity = ready ? ref.watch(Preferences.contrastClarity) : ContrastClarity.fallback;
     final (warm, cool) = palette.backdrop(brightness);
     final scale = math.min(MediaQuery.devicePixelRatioOf(context), 1.0);
@@ -1984,10 +1976,11 @@ class _FrostedBackdrop extends ConsumerWidget {
       dark: brightness == Brightness.dark,
       area: contrastImageArea(MediaQuery.sizeOf(context)),
       // thin lines blurred lightly (they still show), filled shapes harder (their bright edges ran through the text)
-      blur: kind.lines ? clarity.blur : 12,
+      blur: palette.glass(brightness) != null || kind.lines ? clarity.blur : 12,
       scale: scale,
       seed: seed,
       page: palette.page(brightness == Brightness.dark),
+      glass: palette.glass(brightness),
     );
     final image = picture(layout.seed);
     // the layout before, under the new one while that fades in (the VPN on or off)
@@ -3266,7 +3259,7 @@ class _SiteTiles extends HookConsumerWidget {
                         // a pane of the page's colour under it, so the circle keeps its edge in the water too
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: ContrastPalette.of(context).page(dark).withValues(alpha: .85),
+                          color: ContrastColours.of(context).page(dark).withValues(alpha: .85),
                           border: Border.all(color: scheme.outline.withValues(alpha: .6), width: 1.3),
                         ),
                         child: Text(
@@ -3515,7 +3508,7 @@ class ContrastPlate extends ConsumerWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: dark
-                ? ContrastPalette.of(context).pane(true).withValues(alpha: clarity.night)
+                ? ContrastColours.of(context).pane(true).withValues(alpha: clarity.night)
                 : Colors.white.withValues(alpha: clarity.day),
             border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
           ),

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/notification/toast_hover_pause.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -26,7 +29,8 @@ class InAppNotificationController with AppLogger {
       toastification.dismissAll();
       final text = Text(message, maxLines: 6, softWrap: true, overflow: TextOverflow.ellipsis);
       late final ToastificationItem item;
-      return item = toastification.show(
+      final closeAfter = action == null ? const Duration(seconds: 4) : const Duration(seconds: 8);
+      item = toastification.show(
         title: ToastHoverPause(
           item: () => item,
           child: action == null
@@ -52,7 +56,7 @@ class InAppNotificationController with AppLogger {
         alignment: AlignmentDirectional.bottomCenter,
         margin: const EdgeInsets.only(bottom: 64 + 16, right: 16, left: 16),
         // 4 s, a Material 3 snackbar's time; 8 s with a button, to read it and reach the button
-        autoCloseDuration: action == null ? const Duration(seconds: 4) : const Duration(seconds: 8),
+        autoCloseDuration: closeAfter,
         style: ToastificationStyle.flat,
         // see ToastHoverPause
         pauseOnHover: false,
@@ -64,6 +68,15 @@ class InAppNotificationController with AppLogger {
           showType: action == null ? CloseButtonShowType.onHover : CloseButtonShowType.none,
         ),
       );
+      // a phone: the toast always goes by itself. Its own timer could be held (a hover that never ended, the app in
+      // the background) and the notice stayed on the screen; this one doesn't wait for anything. A computer keeps
+      // the pause while the mouse is over the toast.
+      if (!PlatformUtils.isDesktop) {
+        Timer(closeAfter + const Duration(seconds: 1), () {
+          if (toastification.findToastificationItem(item.id) != null) toastification.dismiss(item);
+        });
+      }
+      return item;
     } catch (e, stackTrace) {
       loggy.warning("failed to show notification, overlay may not be ready", e, stackTrace);
       return null;

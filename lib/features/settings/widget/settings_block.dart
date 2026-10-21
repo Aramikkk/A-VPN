@@ -17,7 +17,7 @@ class SettingsBlock extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
     );
     // Contrast: the same frosted glass as the home screen's blocks
-    if (Theme.of(context).araLook.style == AraStyle.contrast) {
+    if (Theme.of(context).contrastLayout) {
       return ContrastFrost(radius: 20, padding: EdgeInsets.zero, solo: true, child: column);
     }
     return Container(

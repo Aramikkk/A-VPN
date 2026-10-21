@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:toastification/toastification.dart';
 
 /// Pauses a toast's auto-close timer while the pointer is over [child].
@@ -16,6 +17,8 @@ class ToastHoverPause extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // no pause on a phone: a "hover" that never ended would hold the toast on the screen
+    if (!PlatformUtils.isDesktop) return child;
     return MouseRegion(onEnter: (_) => _alive()?.pause(), onExit: (_) => _alive()?.start(), child: child);
   }
 

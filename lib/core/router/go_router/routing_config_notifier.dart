@@ -473,7 +473,7 @@ Widget settingsWidth(Widget page) => !PlatformUtils.isDesktop
     ? page
     : Builder(
         // Contrast: the phone's layout, the page over the backdrop as on the phone
-        builder: (context) => Theme.of(context).araLook.style == AraStyle.contrast
+        builder: (context) => Theme.of(context).contrastLayout
             ? page
             : ColoredBox(
                 color: Theme.of(context).scaffoldBackgroundColor,

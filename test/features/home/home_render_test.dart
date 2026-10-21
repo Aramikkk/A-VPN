@@ -169,7 +169,7 @@ void main() {
     ]);
   });
 
-  for (final style in [AraStyle.graphite, AraStyle.contrast, AraStyle.glass]) {
+  for (final style in AraStyle.values) {
     for (final (dark, connected) in [(true, true), (false, false), (false, true), (true, false)]) {
       final name = '${style.name}_${dark ? 'night' : 'day'}_${connected ? 'on' : 'off'}';
       testWidgets('home: $name', (tester) async {
@@ -192,6 +192,9 @@ void main() {
         addTearDown(() => _statsUpdates.close());
         // BG=<backdrop>, PAL=<palette>: Contrast's look
         SharedPreferences.setMockInitialValues({
+          // the theme: Contrast or Glass (GLASS=<scheme>), the same layout
+          'ara_style': style.name,
+          'glass_scheme': Platform.environment['GLASS'] ?? 'lemonade',
           if ((Platform.environment['BG'] ?? '').isNotEmpty) 'contrast_backdrop': Platform.environment['BG']!,
           if ((Platform.environment['PAL'] ?? '').isNotEmpty) 'contrast_palette': Platform.environment['PAL']!,
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
@@ -229,7 +232,8 @@ void main() {
         final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
         // GLASS=<scheme>: Glass in that scheme, by day or by night as the others
         final glassScheme = GlassScheme.values.byName(Platform.environment['GLASS'] ?? 'lemonade');
-        final glass = style == AraStyle.glass;
+        // both themes are drawn in the one (Contrast's) layout
+        const contrast = true;
         final theme = AppTheme(
           AppThemeMode.system,
           '',
@@ -281,30 +285,19 @@ void main() {
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
               theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
-              builder: (context, child) => style == AraStyle.contrast
-                  ? ContrastGlow(child: child!)
-                  : glass
-                  ? Stack(
-                      children: [
-                        Positioned.fill(
-                          child: GlassBackdrop(look: glassScheme.look(dark ? Brightness.dark : Brightness.light)),
-                        ),
-                        child!,
-                      ],
-                    )
-                  : child!,
+              builder: (context, child) => ContrastGlow(child: child!),
               home: Consumer(
                 builder: (context, ref, _) =>
                     !ref.watch(translationsProvider).hasValue || !ref.watch(sharedPreferencesProvider).hasValue
                     ? const SizedBox()
                     : Scaffold(
                         // Contrast: the page on its light, as the home page draws it
-                        backgroundColor: style == AraStyle.contrast ? Colors.transparent : null,
+                        backgroundColor: contrast ? Colors.transparent : null,
                         appBar: AppBar(
                           title: const Text('A-VPN'),
-                          backgroundColor: style == AraStyle.contrast ? Colors.transparent : null,
+                          backgroundColor: contrast ? Colors.transparent : null,
                         ),
-                        body: unfolded && style == AraStyle.contrast
+                        body: unfolded && contrast
                             // Contrast unfolded: the folded column on the left, the connections on the right, the
                             // panel under both
                             ? const Column(
@@ -341,7 +334,7 @@ void main() {
                                   ),
                                 ],
                               )
-                            : style == AraStyle.contrast
+                            : contrast
                             // Contrast: the panel under the page, as the shell draws it
                             ? Flex(
                                 direction: land ? Axis.horizontal : Axis.vertical,
@@ -353,7 +346,7 @@ void main() {
                             : const AraHomeBody(),
                         bottomNavigationBar: pc
                             ? null
-                            : style == AraStyle.contrast
+                            : contrast
                             ? NavigationBar(
                                 height: 62,
                                 elevation: 0,
@@ -404,7 +397,7 @@ void main() {
         expect(find.byType(AraHomeBody), findsOneWidget);
         expect(find.textContaining('Обычные'), findsNothing);
         expect(t.avpn.autoBestHint, 'Сервер с наименьшим пингом');
-        if (connected && style == AraStyle.contrast) {
+        if (connected && contrast) {
           for (final amount in ['8 МБ', '2 МБ']) {
             expect(
               find.byWidgetPredicate((w) => w is Text && w.textSpan?.toPlainText() == amount),
@@ -414,7 +407,7 @@ void main() {
           }
         }
         // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
-        if (connected && style == AraStyle.contrast) {
+        if (connected && contrast) {
           final sites = find.byKey(const Key('contrast-sites'));
           expect(sites, findsOneWidget);
           expect(find.byKey(const Key('contrast-traffic')), findsNothing);

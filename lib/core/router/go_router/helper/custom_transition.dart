@@ -27,9 +27,10 @@ Page<dynamic> customTransition(TransitionType transition, LocalKey pageKey, Widg
       if (transition == TransitionType.fade) return FadeTransition(opacity: animation, child: child);
       if (transition == TransitionType.fromTop) {
         return SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic),
-          ),
+          position: Tween<Offset>(
+            begin: const Offset(0, -1),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic)),
           child: child,
         );
       }
@@ -61,10 +62,10 @@ class _Opaque extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final glass = theme.araLook.glass;
+    final glass = theme.glassLook;
     // Contrast: its backdrop (the page colour is see-through there), laid out as the one round it
     // (muted: these pages have their text right on it)
-    if (theme.araLook.style == AraStyle.contrast) return ContrastGlow(own: true, muted: true, child: child);
+    if (theme.contrastLayout) return ContrastGlow(own: true, muted: true, child: child);
     if (glass == null) return ColoredBox(color: theme.scaffoldBackgroundColor, child: child);
     return Stack(
       fit: StackFit.expand,

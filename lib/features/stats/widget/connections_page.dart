@@ -452,7 +452,7 @@ class _Count extends StatelessWidget {
     );
     return Expanded(
       // Contrast: the same frosted glass as the home screen's blocks
-      child: theme.araLook.style == AraStyle.contrast
+      child: theme.contrastLayout
           ? ContrastFrost(radius: 14, padding: padding, solo: true, child: content)
           : Container(
               padding: padding,
@@ -629,7 +629,7 @@ class _GroupCard extends HookConsumerWidget {
       ],
     );
     // Contrast: the same frosted glass as the home screen's blocks
-    if (theme.araLook.style == AraStyle.contrast) {
+    if (theme.contrastLayout) {
       return ContrastFrost(radius: 14, padding: EdgeInsets.zero, solo: true, child: content);
     }
     return Container(

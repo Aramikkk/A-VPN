@@ -14,207 +14,37 @@ class AppTheme {
     this.mode,
     this.fontFamily, {
     AraAccent? accent,
-    this.style = AraStyle.classic,
+    this.style = AraStyle.contrast,
     this.glassScheme = GlassScheme.fallback,
     this.contrastPalette = ContrastPalette.fallback,
   }) : accent = accent ?? AraAccent.platformDefault;
 
-  /// Glass's own colour scheme (the accent above doesn't colour Glass)
+  /// Glass's own colour scheme, when the theme is Glass
   final GlassScheme glassScheme;
 
-  /// Contrast's colour
+  /// Contrast's colour, when the theme is Contrast
   final ContrastPalette contrastPalette;
 
-  bool get _glass => style == AraStyle.glass;
+  /// What the one layout is drawn in: the Glass scheme's colours or the Contrast palette's
+  ContrastColours get colours => style == AraStyle.glass ? GlassColours(glassScheme) : contrastPalette;
   final AppThemeMode mode;
   final String fontFamily;
 
   /// the accent colour and gradient (Settings → General → Colour theme)
   final AraAccent accent;
 
-  /// Contrast, Glass, Graphite or the classic look (Settings → Themes)
+  /// The theme: Contrast or Glass, the same layout in different colours (Settings → Themes)
   final AraStyle style;
 
-  AraLook _look(Brightness brightness) {
-    final graph = graphColours(accent, brightness);
-    return AraLook(
-      gradient: accent.gradient(brightness),
-      onGradient: accent.onGradient(brightness),
-      // the ping's colour scale starts at the accent (red, orange… in the red theme)
-      fastPing: brightness == Brightness.dark ? accent.darkPrimary : accent.lightPrimary,
-      dark: brightness == Brightness.dark,
-      border: accent.pure ? (brightness == Brightness.dark ? Colors.white54 : Colors.black45) : null,
-      graphDown: graph.down,
-      graphUp: graph.up,
-    );
-  }
+  /// The theme by day.
+  ThemeData lightTheme(ColorScheme? lightColorScheme) => _styledTheme(Brightness.light);
 
-  /// The speed graph's colours on the speed block: download in the accent colour and upload in a colour across
-  /// the colour wheel from it, both readable on the block. A colourless accent (Monochrome, OLED) gets blue and
-  /// orange; on a coloured gradient the download stays in the text colour and the upload gets the opposite hue.
-  static ({Color down, Color up}) graphColours(AraAccent accent, Brightness brightness) {
-    final colours = brightness == Brightness.dark ? accent.darkGradient : accent.lightGradient;
-    final block = colours[colours.length ~/ 2];
-    final blockDark = block.computeLuminance() < .4;
-    final seed = HSLColor.fromColor(accent.seed);
-    final colourless = seed.saturation < .12;
-    final neutralBlock = accent.pure || colourless || accent.icon != null;
-    final Color down;
-    final Color up;
-    if (colourless) {
-      down = blockDark ? const Color(0xFF3B9BFF) : const Color(0xFF1F66E5);
-      up = blockDark ? const Color(0xFFFF9F2E) : const Color(0xFFD9590B);
-    } else if (neutralBlock) {
-      final base = HSLColor.fromColor(blockDark ? accent.darkPrimary : accent.lightPrimary);
-      down = base.toColor();
-      up = base.withHue((base.hue + 150) % 360).toColor();
-    } else {
-      final hue = HSLColor.fromColor(block).hue;
-      down = accent.onGradient(brightness);
-      up = HSLColor.fromAHSL(1, (hue + 180) % 360, .95, blockDark ? .75 : .32).toColor();
-    }
-    return (down: AraLook.readableOn(down, block), up: AraLook.readableOn(up, block));
-  }
+  /// The theme by night.
+  ThemeData darkTheme(ColorScheme? darkColorScheme) => _styledTheme(Brightness.dark);
 
-  /// Light: white backgrounds and the accent's deeper shade, whatever the wallpaper colours.
-  ThemeData lightTheme(ColorScheme? lightColorScheme) {
-    if (style != AraStyle.classic) return _styledTheme(Brightness.light);
-    if (PlatformUtils.isDesktop) return _windowsTheme(Brightness.light);
-    const white = Colors.white;
-    final scheme = ColorScheme.fromSeed(seedColor: accent.seed).copyWith(
-      primary: accent.lightPrimary,
-      onPrimary: white,
-      surface: white,
-      surfaceDim: const Color(0xFFEDEEEB),
-      surfaceBright: white,
-      surfaceContainerLowest: white,
-      surfaceContainerLow: const Color(0xFFF6F7F4),
-      surfaceContainer: const Color(0xFFF0F1EE),
-      surfaceContainerHigh: const Color(0xFFEAEBE8),
-      surfaceContainerHighest: const Color(0xFFE4E5E2),
-      outlineVariant: const Color(0xFFDDDFDA),
-    );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: white,
-      appBarTheme: const AppBarTheme(backgroundColor: white, surfaceTintColor: Colors.transparent),
-      navigationBarTheme: const NavigationBarThemeData(backgroundColor: white, surfaceTintColor: Colors.transparent),
-      fontFamily: fontFamily,
-      extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _look(Brightness.light)},
-    );
-  }
-
-  ThemeData darkTheme(ColorScheme? darkColorScheme) {
-    if (style != AraStyle.classic) return _styledTheme(Brightness.dark);
-    // the app's dark look is OLED black, also when the phone's dark mode picks it
-    if (PlatformUtils.isDesktop) return _windowsTheme(Brightness.dark);
-    if (mode != AppThemeMode.dark) return _oledTheme();
-    final ColorScheme scheme =
-        darkColorScheme ?? ColorScheme.fromSeed(seedColor: const Color(0xFF293CA0), brightness: Brightness.dark);
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.surface,
-      fontFamily: fontFamily,
-      extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
-    );
-  }
-
-  /// OLED black: true black backgrounds, near-black cards and the accent, whatever the wallpaper colours.
-  ThemeData _oledTheme() {
-    const black = Colors.black;
-    final scheme = ColorScheme.fromSeed(seedColor: accent.seed, brightness: Brightness.dark).copyWith(
-      primary: accent.darkPrimary,
-      onPrimary: black,
-      surface: black,
-      surfaceDim: black,
-      surfaceBright: const Color(0xFF1C1C1E),
-      surfaceContainerLowest: black,
-      surfaceContainerLow: const Color(0xFF0B0B0C),
-      surfaceContainer: const Color(0xFF111113),
-      surfaceContainerHigh: const Color(0xFF17171A),
-      surfaceContainerHighest: const Color(0xFF1E1E22),
-      outlineVariant: const Color(0xFF26262B),
-    );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: black,
-      canvasColor: black,
-      appBarTheme: const AppBarTheme(backgroundColor: black, surfaceTintColor: Colors.transparent),
-      navigationBarTheme: const NavigationBarThemeData(backgroundColor: black, surfaceTintColor: Colors.transparent),
-      navigationRailTheme: const NavigationRailThemeData(backgroundColor: black),
-      bottomSheetTheme: BottomSheetThemeData(backgroundColor: scheme.surfaceContainer),
-      dialogTheme: DialogThemeData(backgroundColor: scheme.surfaceContainer),
-      fontFamily: fontFamily,
-      extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _look(Brightness.dark)},
-    );
-  }
-
-  /// Windows 11 look for the desktop: the Mica-grey window, white (or dark grey) cards, the Windows accent blue
-  /// and a blue gradient for the highlights.
-  ThemeData _windowsTheme(Brightness brightness) {
-    final dark = brightness == Brightness.dark;
-    final pure = accent.pure;
-    final background = pure
-        ? (dark ? Colors.black : Colors.white)
-        : (dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3));
-    final seeded = ColorScheme.fromSeed(seedColor: accent.seed, brightness: brightness);
-    final windows = seeded.copyWith(
-      primary: dark ? accent.darkPrimary : accent.lightPrimary,
-      onPrimary: dark ? const Color(0xFF101014) : Colors.white,
-      surface: background,
-      surfaceDim: dark ? const Color(0xFF1A1A1A) : const Color(0xFFEBEBEB),
-      surfaceBright: dark ? const Color(0xFF383838) : Colors.white,
-      surfaceContainerLowest: dark ? const Color(0xFF1C1C1C) : Colors.white,
-      surfaceContainerLow: dark ? const Color(0xFF2B2B2B) : const Color(0xFFFBFBFB),
-      surfaceContainer: dark ? const Color(0xFF2D2D2D) : const Color(0xFFF9F9F9),
-      surfaceContainerHigh: dark ? const Color(0xFF323232) : Colors.white,
-      surfaceContainerHighest: dark ? const Color(0xFF3A3A3A) : const Color(0xFFEFEFEF),
-      outlineVariant: dark ? const Color(0xFF3D3D3D) : const Color(0xFFE5E5E5),
-    );
-    // OLED: black cards on black (white on white), told apart by their outlines
-    final scheme = !pure
-        ? windows
-        : windows.copyWith(
-            surface: background,
-            surfaceDim: background,
-            surfaceBright: dark ? const Color(0xFF1C1C1C) : Colors.white,
-            surfaceContainerLowest: background,
-            surfaceContainerLow: dark ? const Color(0xFF0A0A0A) : Colors.white,
-            surfaceContainer: dark ? const Color(0xFF0E0E0E) : const Color(0xFFFAFAFA),
-            surfaceContainerHigh: dark ? const Color(0xFF141414) : const Color(0xFFF5F5F5),
-            surfaceContainerHighest: dark ? const Color(0xFF1C1C1C) : const Color(0xFFEDEDED),
-            outlineVariant: dark ? const Color(0xFF333333) : const Color(0xFFD6D6D6),
-          );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: background,
-      canvasColor: background,
-      appBarTheme: AppBarTheme(backgroundColor: background, surfaceTintColor: Colors.transparent),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: background,
-        indicatorColor: scheme.primary.withValues(alpha: .18),
-      ),
-      navigationBarTheme: NavigationBarThemeData(backgroundColor: background, surfaceTintColor: Colors.transparent),
-      dialogTheme: DialogThemeData(backgroundColor: scheme.surfaceContainerLow),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.onPrimary : null),
-        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.primary : null),
-      ),
-      // Windows' own UI font renders crisp at small sizes; the bundled emoji font stays as the fallback for flags
-      fontFamily: 'Segoe UI Variable Text',
-      fontFamilyFallback: ['Segoe UI', if (fontFamily.isNotEmpty) fontFamily],
-      extensions: <ThemeExtension<dynamic>>{ConnectionButtonTheme.light, _look(brightness)},
-    );
-  }
-
-  /// The palette of a style in day or night: background, cards, text, lines.
   /// A tonal palette's colours: by night its darkest shade for the page and its pane shade, lifted step by step,
   /// for the cards and lines; by day its lightest for the page, the cards white.
-  static AraPalette _tonal(AraPalette plain, ContrastPalette palette, bool dark) {
+  static AraPalette _tonal(AraPalette plain, ContrastColours palette, bool dark) {
     final page = palette.page(dark);
     if (!dark) {
       return AraPalette(
@@ -245,131 +75,78 @@ class AppTheme {
     );
   }
 
-  static AraPalette palette(AraStyle style, Brightness brightness, {GlassScheme glass = GlassScheme.fallback}) {
-    if (style == AraStyle.glass) return glassPalette(glass.look(brightness));
+  /// The usual colours by day or by night: background, cards, text, lines (a theme with its own page colours
+  /// goes over them, see [_tonal]).
+  static AraPalette palette(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    // Contrast: warm light grey with white tiles by day, dark graphite with lighter tiles by night (its black
-    // panel is drawn by the home screen itself)
-    return style == AraStyle.contrast
-        ? AraPalette(
-            bg: dark ? const Color(0xFF242428) : const Color(0xFFECEBE7),
-            fg: dark ? const Color(0xFFF3F1EC) : const Color(0xFF111111),
-            muted: dark ? const Color(0xFF8F8C86) : const Color(0xFF6E6A64),
-            card: dark ? const Color(0xFF303035) : Colors.white,
-            container: dark ? const Color(0xFF34343A) : const Color(0xFFF7F6F3),
-            high: dark ? const Color(0xFF3A3A40) : const Color(0xFFF1F0EC),
-            highest: dark ? const Color(0xFF424248) : const Color(0xFFE6E4DF),
-            line: dark ? const Color(0xFF45454B) : const Color(0xFFD4D1CB),
-            strongLine: dark ? const Color(0xFF55555B) : const Color(0xFFB4B0A8),
-            // the menu as black as the connect panel over it
-            nav: const Color(0xFF0B0B0C),
-          )
-        : AraPalette(
-            bg: dark ? const Color(0xFF0B0B0D) : const Color(0xFFF4F4F6),
-            fg: dark ? const Color(0xFFF2F2F4) : const Color(0xFF16161A),
-            muted: dark ? const Color(0xFF8D8D95) : const Color(0xFF6F6F78),
-            card: dark ? const Color(0xFF151517) : Colors.white,
-            container: dark ? const Color(0xFF1A1A1D) : const Color(0xFFF8F8FA),
-            high: dark ? const Color(0xFF202024) : const Color(0xFFEFEFF2),
-            highest: dark ? const Color(0xFF26262B) : const Color(0xFFE8E8EC),
-            line: dark ? const Color(0xFF34343B) : const Color(0xFFD3D3DA),
-            strongLine: dark ? const Color(0xFF4A4A52) : const Color(0xFFB9B9C2),
-            nav: dark ? const Color(0xFF0F0F12) : Colors.white,
-          );
-  }
-
-  /// Glass's colours: see-through panels and lines over the backdrop ([AraPalette.bg] is the backdrop's own colour,
-  /// for working out readable colours; the pages themselves are clear so the backdrop shows).
-  static AraPalette glassPalette(GlassLook s) {
-    final dark = s.dark;
-    Color more(double alpha) => Colors.white.withValues(alpha: (s.panel.a + alpha).clamp(0.0, 1.0));
+    // warm light grey with white tiles by day, dark graphite with lighter tiles by night (the black panel is drawn by
+    // the home screen itself)
     return AraPalette(
-      bg: s.base,
-      fg: dark ? const Color(0xFFF4F4F7) : const Color(0xFF15151A),
-      muted: dark ? const Color(0xFFA4A4AE) : const Color(0xFF55555F),
-      card: s.panel,
-      container: more(dark ? .02 : .05),
-      high: more(dark ? .05 : .12),
-      highest: more(dark ? .09 : .2),
-      line: s.edge,
-      strongLine: dark ? Colors.white.withValues(alpha: .3) : Colors.white,
-      nav: Colors.transparent,
+      bg: dark ? const Color(0xFF242428) : const Color(0xFFECEBE7),
+      fg: dark ? const Color(0xFFF3F1EC) : const Color(0xFF111111),
+      muted: dark ? const Color(0xFF8F8C86) : const Color(0xFF6E6A64),
+      card: dark ? const Color(0xFF303035) : Colors.white,
+      container: dark ? const Color(0xFF34343A) : const Color(0xFFF7F6F3),
+      high: dark ? const Color(0xFF3A3A40) : const Color(0xFFF1F0EC),
+      highest: dark ? const Color(0xFF424248) : const Color(0xFFE6E4DF),
+      line: dark ? const Color(0xFF45454B) : const Color(0xFFD4D1CB),
+      strongLine: dark ? const Color(0xFF55555B) : const Color(0xFFB4B0A8),
+      // the menu as black as the connect panel over it
+      nav: const Color(0xFF0B0B0C),
     );
   }
 
-  /// Contrast, Glass and Graphite, by day or night, in the accent colour (Glass: its scheme's).
+  /// The one layout in its theme's colours, by day or night.
   ThemeData _styledTheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final contrast = style == AraStyle.contrast;
-    if (contrast) ContrastPalette.active = contrastPalette;
-    final plain = palette(style, brightness, glass: glassScheme);
-    // a tonal Contrast palette: the page, the cards and the lines in its own shades
-    final tonal = contrast && (dark ? contrastPalette.night != null : contrastPalette.day != null);
-    final styled = tonal ? _tonal(plain, contrastPalette, dark) : plain;
-    final glass = _glass;
-    final look = glassScheme.look(brightness);
-    // a dialog, a sheet or a menu lies over the page's content: a solid version of the glass
-    final solid = glass
-        ? Color.alphaBlend(look.dark ? const Color(0x24FFFFFF) : const Color(0xE6FFFFFF), look.base)
-        : styled.card;
-    // the OLED theme in Graphite: true black by night (pixels off) and pure white by day, cards just off it
-    final p = accent.pure && style == AraStyle.graphite
-        ? AraPalette(
-            bg: dark ? Colors.black : Colors.white,
-            fg: styled.fg,
-            muted: styled.muted,
-            card: dark ? const Color(0xFF0A0A0B) : Colors.white,
-            container: dark ? const Color(0xFF0E0E10) : const Color(0xFFF7F7F8),
-            high: dark ? const Color(0xFF151517) : const Color(0xFFF0F0F2),
-            highest: dark ? const Color(0xFF1C1C1F) : const Color(0xFFE8E8EB),
-            line: dark ? const Color(0xFF2E2E33) : const Color(0xFFD6D6DC),
-            strongLine: styled.strongLine,
-            nav: dark ? Colors.black : Colors.white,
-          )
-        : styled;
-    // Glass takes its colour from its scheme, Contrast from its palette
-    final fromScheme = glass || contrast;
-    final schemeAccent = contrast ? contrastPalette.accent(brightness) : look.accent;
-    final accentColour = fromScheme ? schemeAccent : (dark ? accent.darkPrimary : accent.lightPrimary);
-    // Contrast by day, a light or grey palette: graphite icons and figures (its colour stays on the fills)
-    final inkDay = contrast && !dark && contrastPalette.inkByDay;
-    final primary = inkDay ? ContrastPalette.ink : AraLook.readableOn(accentColour, glass ? look.panelOnBase : p.bg);
+    final theme = colours;
+    ContrastColours.active = theme;
+    final plain = palette(brightness);
+    // a theme with its own page colours (a tonal palette, a Glass scheme): the page, the cards and the lines in its
+    // own shades
+    final tonal = dark ? theme.night != null : theme.day != null;
+    final p = tonal ? _tonal(plain, theme, dark) : plain;
+    // a dialog, a sheet or a menu lies over the page's content: solid
+    final solid = p.card;
+    final accentColour = theme.accent(brightness);
+    // by day, a light or grey palette: graphite icons and figures (its colour stays on the fills)
+    final inkDay = !dark && theme.inkByDay;
+    // readable on the page, and on the lighter blocks of a tonal theme by night
+    final primary = inkDay ? ContrastPalette.ink : AraLook.readableOn(accentColour, tonal && dark ? p.card : p.bg);
     final onPrimary = primary.computeLuminance() > .45 ? const Color(0xFF111111) : Colors.white;
-    final scheme = ColorScheme.fromSeed(seedColor: fromScheme ? schemeAccent : accent.seed, brightness: brightness)
-        .copyWith(
-          primary: primary,
-          onPrimary: onPrimary,
-          primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
-          onPrimaryContainer: p.fg,
-          secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
-          onSecondaryContainer: p.fg,
-          surface: p.bg,
-          onSurface: p.fg,
-          onSurfaceVariant: p.muted,
-          surfaceDim: p.bg,
-          surfaceBright: p.card,
-          surfaceContainerLowest: p.bg,
-          surfaceContainerLow: p.card,
-          surfaceContainer: p.container,
-          surfaceContainerHigh: p.high,
-          surfaceContainerHighest: p.highest,
-          outline: p.strongLine,
-          outlineVariant: p.line,
-        );
+    final scheme = ColorScheme.fromSeed(seedColor: accentColour, brightness: brightness).copyWith(
+      primary: primary,
+      onPrimary: onPrimary,
+      primaryContainer: Color.alphaBlend(primary.withValues(alpha: .16), p.card),
+      onPrimaryContainer: p.fg,
+      secondaryContainer: Color.alphaBlend(primary.withValues(alpha: .12), p.card),
+      onSecondaryContainer: p.fg,
+      surface: p.bg,
+      onSurface: p.fg,
+      onSurfaceVariant: p.muted,
+      surfaceDim: p.bg,
+      surfaceBright: p.card,
+      surfaceContainerLowest: p.bg,
+      surfaceContainerLow: p.card,
+      surfaceContainer: p.container,
+      surfaceContainerHigh: p.high,
+      surfaceContainerHighest: p.highest,
+      outline: p.strongLine,
+      outlineVariant: p.line,
+    );
 
-    // body text: Manrope (Graphite, Glass) or Golos Text (Contrast); headings in Unbounded (Contrast: Golos)
-    final body = contrast ? 'Golos Text' : 'Manrope';
-    // Contrast's menu is black by day too: its idle tabs in a grey that reads on it
-    final navMuted = contrast ? const Color(0xFF8F8C86) : p.muted;
+    // body text and headings in Golos Text
+    const body = 'Golos Text';
+    // the menu is black by day too: its idle tabs in a grey that reads on it
+    const navMuted = Color(0xFF8F8C86);
     final base = (dark ? Typography.material2021().white : Typography.material2021().black).apply(
       fontFamily: body,
       bodyColor: p.fg,
       displayColor: p.fg,
     );
-    // Contrast's headings in Golos too, medium and tight, as its big figures
-    TextStyle? heading(TextStyle? s, double spacing) => contrast
-        ? s?.copyWith(fontFamily: 'Golos Text', fontWeight: FontWeight.w600, letterSpacing: spacing * .8)
-        : s?.copyWith(fontFamily: 'Unbounded', fontWeight: FontWeight.w800, letterSpacing: spacing);
+    // headings medium and tight, as the big figures
+    TextStyle? heading(TextStyle? s, double spacing) =>
+        s?.copyWith(fontFamily: 'Golos Text', fontWeight: FontWeight.w600, letterSpacing: spacing * .8);
     final text = base.copyWith(
       displayLarge: heading(base.displayLarge, -2),
       displayMedium: heading(base.displayMedium, -1.5),
@@ -387,7 +164,7 @@ class AppTheme {
       labelSmall: base.labelSmall?.copyWith(fontWeight: FontWeight.w600),
     );
 
-    final radius = (glass ? 24.0 : 20.0);
+    const radius = 20.0;
     final ShapeBorder shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
       side: BorderSide(color: p.line),
@@ -401,12 +178,11 @@ class AppTheme {
       fontFamily: body,
       // the bundled emoji font draws the servers' flags (Windows has none of its own)
       fontFamilyFallback: [if (fontFamily.isNotEmpty) fontFamily, 'Emoji'],
-      // Glass: every page clear, the backdrop behind the whole app showing through
-      scaffoldBackgroundColor: glass ? Colors.transparent : p.bg,
-      canvasColor: glass ? Colors.transparent : p.bg,
+      scaffoldBackgroundColor: p.bg,
+      canvasColor: p.bg,
       dividerTheme: DividerThemeData(color: p.line, space: 1, thickness: 1),
       appBarTheme: AppBarTheme(
-        backgroundColor: glass ? Colors.transparent : p.bg,
+        backgroundColor: p.bg,
         foregroundColor: p.fg,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
@@ -447,12 +223,6 @@ class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(backgroundColor: solid, surfaceTintColor: Colors.transparent),
       popupMenuTheme: PopupMenuThemeData(color: solid, surfaceTintColor: Colors.transparent),
       menuTheme: MenuThemeData(style: MenuStyle(backgroundColor: WidgetStatePropertyAll(solid))),
-      snackBarTheme: glass
-          ? SnackBarThemeData(
-              backgroundColor: solid,
-              contentTextStyle: TextStyle(color: p.fg),
-            )
-          : null,
       chipTheme: ChipThemeData(
         shape: small.copyWith(side: BorderSide(color: p.line)),
         // a selected chip keeps its text colour, so its fill is a tint
@@ -490,34 +260,20 @@ class AppTheme {
     );
   }
 
-  /// The speed block and the graph's colours for a style: Graphite's block is a dark (or white) glass card with the
-  /// download in the accent and the upload across the colour wheel.
+  /// The graph's colours and the fills: Contrast's block is a light (or dark) glass card, the download in the accent
+  /// and the upload across the colour wheel.
   AraLook _styledLook(Brightness brightness, AraPalette p, Color primary) {
     final dark = brightness == Brightness.dark;
-    final glass = _glass;
-    // Contrast takes its colour from the Glass scheme, as Glass does (no neon fill of the colour themes)
-    final fromScheme = glass || style == AraStyle.contrast;
-    final look = glassScheme.look(brightness);
-    final blockColours = glass
-        ? [p.high, p.card]
-        : accent.filled
-        ? [accent.darkPrimary, accent.darkPrimary]
-        : accent.pure
-        ? [p.card, p.card]
-        : dark
+    final theme = colours;
+    final blockColours = dark
         ? const [Color(0xFF1D1D21), Color(0xFF141417), Color(0xFF0F0F11)]
         : const [Colors.white, Color(0xFFFAFAFB), Color(0xFFF2F2F5)];
-    final block = glass ? look.panelOnBase : blockColours[blockColours.length ~/ 2];
-    final schemeAccent = style == AraStyle.contrast ? contrastPalette.accent(brightness) : look.accent;
-    final colourless = HSLColor.fromColor(fromScheme ? schemeAccent : accent.seed).saturation < .12;
+    final block = blockColours[blockColours.length ~/ 2];
+    final schemeAccent = theme.accent(brightness);
+    final colourless = HSLColor.fromColor(schemeAccent).saturation < .12;
     final Color down;
     final Color up;
-    final filled = accent.filled && !fromScheme;
-    if (filled) {
-      // on the neon block: black lines, upload a lighter shade of it
-      down = Colors.black;
-      up = Color.alphaBlend(Colors.black.withValues(alpha: .55), block);
-    } else if (colourless) {
+    if (colourless) {
       down = dark ? const Color(0xFF3B9BFF) : const Color(0xFF1F66E5);
       up = dark ? const Color(0xFFFF9F2E) : const Color(0xFFD9590B);
     } else {
@@ -527,17 +283,14 @@ class AppTheme {
     }
     return AraLook(
       gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: blockColours),
-      onGradient: filled ? Colors.black : p.fg,
+      onGradient: p.fg,
       fastPing: primary,
-      neonFill: filled ? accent.darkPrimary : null,
-      fill: style == AraStyle.contrast && !dark && contrastPalette.inkByDay ? contrastPalette.warm : null,
+      fill: !dark && theme.inkByDay ? theme.warm : null,
       dark: dark,
       border: p.line,
-      graphDown: filled ? down : AraLook.readableOn(down, block),
-      graphUp: filled ? up : AraLook.readableOn(up, block),
-      style: style,
-      pingOn: glass ? look.panelOnBase : p.card,
-      glass: glass ? look : null,
+      graphDown: AraLook.readableOn(down, block),
+      graphUp: AraLook.readableOn(up, block),
+      pingOn: p.card,
     );
   }
 

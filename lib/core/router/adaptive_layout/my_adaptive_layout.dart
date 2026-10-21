@@ -99,8 +99,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     // no callback of ours ever runs. A press that a branch can handle is popped
     // by go router before it reaches here, so this only sees presses at the
     // root of a branch.
-    final glass = Theme.of(context).araLook.glass;
-    final contrastPhone = isMobileBreakpoint && Theme.of(context).araLook.style == AraStyle.contrast;
+    final glass = Theme.of(context).glassLook;
+    final contrastPhone = isMobileBreakpoint && Theme.of(context).contrastLayout;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final rail = FocusScope(
       node: navScopeNode,
@@ -242,18 +242,10 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                 ? FocusScope(
                     node: navScopeNode,
                     child: DecoratedBox(
-                      // Graphite rules the menu off with a hairline
-                      decoration: BoxDecoration(
-                        border: switch (Theme.of(context).araLook.style) {
-                          AraStyle.graphite => Border(
-                            top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-                          ),
-                          AraStyle.contrast || AraStyle.glass || AraStyle.classic => null,
-                        },
-                      ),
+                      decoration: const BoxDecoration(),
                       // Contrast: three tabs, Statistics, Home and Topology (the branches 1 to 3); Connections come up
                       // with a long swipe up on the home screen, Settings down with one down (or the cog by the "+")
-                      child: Theme.of(context).araLook.style == AraStyle.contrast
+                      child: Theme.of(context).contrastLayout
                           ? NavigationBar(
                               // a lower menu, of a piece with the panel over it (white by day, black by night); flat
                               height: 62,
@@ -348,7 +340,7 @@ ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = Contrast
   // a single card as see-through as the home screen's block with its tiles together (about three quarters of
   // the chosen clarity): the same look on every page
   Color pane(double level) => dark
-      ? ContrastPalette.active.pane(true).withValues(alpha: (clarity.night * .72 * level).clamp(0, .97))
+      ? ContrastColours.active.pane(true).withValues(alpha: (clarity.night * .72 * level).clamp(0, .97))
       : Colors.white.withValues(alpha: (clarity.day * .72 * level).clamp(0, .97));
   return theme.copyWith(
     scaffoldBackgroundColor: Colors.transparent,

@@ -250,7 +250,7 @@ class _Section extends StatelessWidget {
       ],
     );
     // Contrast: the same frosted glass as the home screen's blocks
-    if (theme.araLook.style == AraStyle.contrast) {
+    if (theme.contrastLayout) {
       return ContrastFrost(radius: 18, padding: const EdgeInsets.fromLTRB(14, 12, 14, 14), solo: true, child: content);
     }
     return Container(

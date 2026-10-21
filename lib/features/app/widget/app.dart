@@ -74,7 +74,6 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
       glassScheme: glassScheme,
       contrastPalette: ref.watch(Preferences.contrastPalette),
     );
-    final glass = style == AraStyle.glass;
     final upgrader = ref.watch(upgraderProvider);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
@@ -89,7 +88,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 
     // Contrast on a computer: no system title bar (Windows' blue frame), the app's own strip in the panel's colour
-    final ownFrame = PlatformUtils.isDesktop && style == AraStyle.contrast;
+    final ownFrame = PlatformUtils.isDesktop;
     useEffect(() {
       if (PlatformUtils.isDesktop) {
         windowManager.setTitleBarStyle(ownFrame ? TitleBarStyle.hidden : TitleBarStyle.normal);
@@ -127,15 +126,6 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                       navigatorKey: router.routerDelegate.navigatorKey,
                       child: child ?? const SizedBox(),
                     );
-                    // Glass: the backdrop behind every page, the clear pages over it
-                    if (glass) {
-                      child = Stack(
-                        children: [
-                          Positioned.fill(child: GlassBackdrop(look: glassScheme.look(theme.brightness))),
-                          child,
-                        ],
-                      );
-                    }
                     // the window's own strip over the pages: dragged to move the window, a double click maximizes it,
                     // the minimize, maximize and close buttons at the right; white by day, black by night, as the panel
                     if (ownFrame) {
@@ -158,18 +148,14 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                     }
                     return AnnotatedRegion<SystemUiOverlayStyle>(
                       value: SystemUiOverlayStyle(
-                        statusBarColor: glass ? Colors.transparent : theme.scaffoldBackgroundColor,
+                        statusBarColor: theme.scaffoldBackgroundColor,
                         // dark icons on a light page, light ones on a dark page
                         statusBarIconBrightness: theme.brightness == Brightness.dark
                             ? Brightness.light
                             : Brightness.dark,
                         statusBarBrightness: theme.brightness,
                         // Contrast: the gesture strip under the menu in the panel's colour (it showed a grey band)
-                        systemNavigationBarColor: glass
-                            ? glassScheme.look(theme.brightness).base
-                            : style == AraStyle.contrast
-                            ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white)
-                            : theme.scaffoldBackgroundColor,
+                        systemNavigationBarColor: theme.brightness == Brightness.dark ? Colors.black : Colors.white,
                         systemNavigationBarDividerColor: Colors.transparent,
                         systemNavigationBarIconBrightness: theme.brightness == Brightness.dark
                             ? Brightness.light

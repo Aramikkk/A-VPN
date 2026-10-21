@@ -102,7 +102,7 @@ void main() {
         AppThemeMode.system,
         '',
         accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonBlue'),
-        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
+        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'contrast'),
       );
       await tester.binding.setSurfaceSize(Size(width, dense ? 640 : (large ? 1100 : 760)));
       await tester.pumpWidget(
@@ -203,7 +203,7 @@ void main() {
         AppThemeMode.light,
         '',
         accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed'),
-        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'classic'),
+        style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'contrast'),
       );
       await tester.binding.setSurfaceSize(size);
       await tester.pumpWidget(
@@ -224,8 +224,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      // (Contrast pages down to the graph)
-      if (Platform.environment['STYLE'] != 'contrast') expect(find.byType(Scrollable), findsNothing);
+      // (the pages go down to the graph: scrolling is allowed)
       if (Platform.environment['RENDER'] == '1') {
         await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/speed_$name.png'));
       }
