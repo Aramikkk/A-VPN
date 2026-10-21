@@ -24,7 +24,7 @@ const _geoUrl = 'https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set'
 /// Rules the app ships with, in the order a new list starts with. They are always in the list: the user can
 /// only switch and move them, and their content comes from here, so an update can change it.
 ///
-/// The order is the routing in brief: the local network direct, QUIC and ads blocked, then the groups that
+/// The order is the routing in brief: the local network direct, QUIC blocked, then the groups that
 /// always take the VPN (even on Russian domains, so they come first), then Russian apps and sites direct.
 /// Whatever is left goes by the mode: through the VPN, or direct with "only blocked through the VPN".
 enum BuiltinRule {
@@ -32,7 +32,6 @@ enum BuiltinRule {
   // QUIC (HTTP/3 over UDP) crawls through a TCP tunnel and is often throttled in Russia; blocking it makes apps
   // fall back to TCP at once instead of after a timeout
   blockQuic(enabledByDefault: true),
-  blockAds(enabledByDefault: true),
   // what is blocked in Russia first: no app reaches it direct
   socialProxy(enabledByDefault: true),
   adultProxy(enabledByDefault: true),
@@ -63,7 +62,6 @@ enum BuiltinRule {
 
   String present(Translations t, Region region) => switch (this) {
     bypassLan => t.pages.settings.routing.builtinRules.bypassLan,
-    blockAds => t.pages.settings.routing.builtinRules.blockAds,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuic,
     aiProxy => t.pages.settings.routing.builtinRules.aiProxy,
     banksDirect => t.pages.settings.routing.builtinRules.banksDirect,
@@ -84,7 +82,6 @@ enum BuiltinRule {
   /// What the group holds, in a few names.
   String examples(Translations t) => switch (this) {
     bypassLan => t.pages.settings.routing.builtinRules.bypassLanHint,
-    blockAds => t.pages.settings.routing.builtinRules.blockAdsHint,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuicHint,
     aiProxy => t.pages.settings.routing.builtinRules.aiProxyHint,
     banksDirect => t.pages.settings.routing.builtinRules.banksDirectHint,
@@ -119,17 +116,6 @@ enum BuiltinRule {
         '::1/128',
         'ff00::/8',
         '::/128',
-      ],
-    ),
-    blockAds => Rule(
-      outbound: Outbound.block,
-      ruleSets: [
-        '$_geoUrl/block/geosite-category-ads-all.srs',
-        '$_geoUrl/block/geosite-malware.srs',
-        '$_geoUrl/block/geosite-phishing.srs',
-        '$_geoUrl/block/geosite-cryptominers.srs',
-        '$_geoUrl/block/geoip-malware.srs',
-        '$_geoUrl/block/geoip-phishing.srs',
       ],
     ),
     blockQuic => Rule(outbound: Outbound.block, protocols: [Protocol.quic]),
@@ -168,18 +154,6 @@ List<Rule> splitGroups(Iterable<Rule> rules) {
   final list = rules.toList();
   return [
     for (final rule in list) ...[
-      // Keep required bank/AI domains reachable when ad lists include telemetry
-      // under those domains. Do not exempt all traffic from these applications.
-      if (BuiltinRule.of(rule) == BuiltinRule.blockAds && rule.enabled)
-        for (final group in list)
-          if (group.enabled && const {BuiltinRule.banksDirect, BuiltinRule.aiProxy}.contains(BuiltinRule.of(group)))
-            Rule(
-              name: '${group.name}:adblock-compatibility',
-              listOrder: rule.listOrder,
-              enabled: true,
-              outbound: group.outbound,
-              domainSuffixes: group.domainSuffixes,
-            ),
       if (BuiltinRule.of(rule) == null)
         rule
       else ...[
@@ -437,3 +411,7 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
     return rules;
   }
 }
+
+/// Domains the ad block (Settings → Ads) never touches: the banks' and the AI services', whose own telemetry hosts
+/// sit in the ad lists and breaking them breaks the apps.
+List<String> adBlockExceptions() => [...bankDomains, ...aiDomains];

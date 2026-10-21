@@ -1470,7 +1470,16 @@ class _HomeTraffic extends ConsumerWidget {
         ];
       }
 
-      return _ContrastMosaic(vpn: route(ConnectionRoute.vpn), direct: route(ConnectionRoute.direct));
+      // the headline totals are the session's, as in the stats block: from the VPN's switch-on, zero when it is off
+      final totals = ref.watch(sessionTotalsProvider);
+      final total = connected ? totals.up + totals.down : 0;
+      final viaVpn = connected ? ((totals.vpnUp ?? 0) + (totals.vpnDown ?? 0)).clamp(0, total) : 0;
+      return _ContrastMosaic(
+        vpn: route(ConnectionRoute.vpn),
+        direct: route(ConnectionRoute.direct),
+        vpnTotal: viaVpn,
+        directTotal: total - viaVpn,
+      );
     }
     // fixed in place (no scroll) and without a heading, so the strips have the room; what doesn't fit is cut
     final strips = ClipRect(
@@ -2609,16 +2618,20 @@ typedef _AppShare = ({String name, int bytes, Duration duration, String servers,
 /// Contrast's traffic as a mosaic: the session's totals through the VPN and the bypass, under them a tile for each
 /// app, as big as its share of the traffic; the VPN's in the accent, the bypass's grey.
 class _ContrastMosaic extends ConsumerWidget {
-  const _ContrastMosaic({required this.vpn, required this.direct});
+  const _ContrastMosaic({required this.vpn, required this.direct, required this.vpnTotal, required this.directTotal});
 
   final List<_AppShare> vpn;
   final List<_AppShare> direct;
 
+  /// the session's totals through the VPN and direct (the tiles are only the apps over the limit)
+  final int vpnTotal;
+  final int directTotal;
+
   /// the most tiles: the rest in one tile of their own
   static const _most = 11;
 
-  /// the least an app has to have used to get a tile: 50 MB
-  static const _least = 50 * 1024 * 1024;
+  /// the least an app has to have used to get a tile: 30 MB
+  static const _least = 30 * 1024 * 1024;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2628,10 +2641,9 @@ class _ContrastMosaic extends ConsumerWidget {
     final accent = theme.araAccent;
     const grey = Color(0xFF9AA0A6);
     final units = t.avpn.bytesUnits.split(',');
-    int sum(List<_AppShare> apps) => apps.fold(0, (s, a) => s + a.bytes);
-    final vpnBytes = sum(vpn);
-    final directBytes = sum(direct);
-    // one card an app, through the VPN and direct together; only the apps with 50 MB or more (the totals above
+    final vpnBytes = vpnTotal;
+    final directBytes = directTotal;
+    // one card an app, through the VPN and direct together; only the apps with 30 MB or more (the totals above
     // count everything)
     final merged = <String, ({_AppShare app, int vpnBytes})>{};
     for (final (a, onVpn) in [for (final a in vpn) (a, true), for (final a in direct) (a, false)]) {

@@ -42,19 +42,6 @@ void main() {
       'action': 'route',
       'outbound': 'direct §hide§',
     });
-    // ads are rule-sets, named by the core's tags (it sets up their download)
-    expect(rules.firstWhere((rule) => (rule['rule_set'] as List?)?.contains('geosite-category-ads-all') ?? false), {
-      'rule_set': [
-        'geosite-category-ads-all',
-        'geosite-malware',
-        'geosite-phishing',
-        'geosite-cryptominers',
-        'geoip-malware',
-        'geoip-phishing',
-      ],
-      'action': 'reject',
-      'no_drop': true,
-    });
   });
 
   test('AI, Google, social networks and blocked sites through the VPN; Russian ones direct', () {

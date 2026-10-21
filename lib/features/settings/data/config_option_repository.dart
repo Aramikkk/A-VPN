@@ -597,7 +597,7 @@ abstract class ConfigOptions {
       siteGroups: ref.watch(siteGroups),
       siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
       adBlock: ref.watch(adBlock),
-      adBlockAllow: ref.watch(adBlockAllow),
+      adBlockAllow: {...ref.watch(adBlockAllow), ...adBlockExceptions()}.toList(),
       siteGroupApps: PlatformUtils.isAndroid ? ref.watch(siteGroupApps) : const [],
       // the phone: the list is the whole choice (a computer has no packages: the six services always)
       siteGroupAppsOnly: PlatformUtils.isAndroid,
