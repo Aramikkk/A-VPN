@@ -3337,27 +3337,21 @@ class _SiteTiles extends HookConsumerWidget {
                 // would read as the same server)
                 final own = server == null || server == mainServer ? '' : _flagOf(server);
                 final flag = own == _flagOf(mainServer ?? '') ? '' : own;
-                // the flag in a circle the size of the logo's disc, beside it; the flag is fitted into the circle, it
-                // can't stick out of it
+                // the flag as in the server row: a thin circle the size of the logo's disc, the flag in it at half
+                // the circle's width, with room round it (it can't stick out of the circle)
                 final corner = flag.isEmpty
                     ? null
                     : Container(
                         width: disc,
                         height: disc,
                         alignment: Alignment.center,
-                        // a pane of the page's colour under it, so the circle keeps its edge in the water too
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: ContrastColours.of(context).page(dark).withValues(alpha: .85),
-                          border: Border.all(color: scheme.outline.withValues(alpha: .6), width: 1.3),
+                          border: Border.all(color: scheme.outline.withValues(alpha: .7), width: 1.3),
                         ),
-                        child: SizedBox(
-                          width: disc * .8,
-                          height: disc * .8,
-                          child: FittedBox(
-                            fit: BoxFit.contain,
-                            child: Text(flag, style: const TextStyle(height: 1, fontFamilyFallback: ['Emoji'])),
-                          ),
+                        child: Text(
+                          flag,
+                          style: TextStyle(fontSize: disc * .5, height: 1, fontFamilyFallback: const ['Emoji']),
                         ),
                       );
                 final unitStyle = TextStyle(
