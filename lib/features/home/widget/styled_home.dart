@@ -3220,18 +3220,18 @@ class _SiteTiles extends HookConsumerWidget {
 
   // the way there and back through the VPN: the server's own ping is ~50-100 ms, a site a little more
   /// The service's logo (Simple Icons' shape) in [colour], its delay's; Yandex, whose logo is its letter, the letter.
-  static Widget _sign(LatencySite site, Color colour) {
+  static Widget _sign(LatencySite site, Color colour, {double size = 15}) {
     final path = siteLogoPaths[site.key];
     final hex = colour.toARGB32().toRadixString(16).substring(2);
     return path != null
         ? SvgPicture.string(
             '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#$hex" d="$path"/></svg>',
-            width: 15,
-            height: 15,
+            width: size,
+            height: size,
           )
         : Text(
             site.letter,
-            style: TextStyle(fontSize: 15, height: 1, fontWeight: FontWeight.w900, color: colour),
+            style: TextStyle(fontSize: size, height: 1, fontWeight: FontWeight.w900, color: colour),
           );
   }
 
@@ -3308,17 +3308,19 @@ class _SiteTiles extends HookConsumerWidget {
                       ),
               ),
             ),
-            // a low tile (the unfolded phone's): the logo and the name on one line, the figure smaller, so it fits
+            // the same on the folded and the unfolded phone: the logo and the flag on top, the delay in the middle, the
+            // name at the bottom; every size by the tile's height (the unfolded phone's tiles are lower)
             LayoutBuilder(
               builder: (context, box) {
-                final low = box.maxHeight < 112;
+                final k = (box.maxHeight / 118).clamp(.7, 1.0);
+                final disc = 28 * k;
                 // the service's logo as ink on a solid disc of the delay's colour (every one filled alike)
                 final ring = Container(
-                  width: low ? 22 : 28,
-                  height: low ? 22 : 28,
+                  width: disc,
+                  height: disc,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(shape: BoxShape.circle, color: sign),
-                  child: _sign(site, _ink(sign)),
+                  child: _sign(site, _ink(sign), size: 15 * k),
                 );
                 final name = Text(
                   site.name,
@@ -3327,8 +3329,7 @@ class _SiteTiles extends HookConsumerWidget {
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
-                    fontSize: low ? 11 : null,
-                    letterSpacing: low ? 0 : null,
+                    fontSize: 12 * k,
                   ),
                 );
                 final server = siteServers[site.key];
@@ -3336,102 +3337,83 @@ class _SiteTiles extends HookConsumerWidget {
                 // would read as the same server)
                 final own = server == null || server == mainServer ? '' : _flagOf(server);
                 final flag = own == _flagOf(mainServer ?? '') ? '' : own;
-                // the flag in a thin circle, as the server row's
+                // the flag in a circle the size of the logo's disc, beside it; the flag is fitted into the circle, it
+                // can't stick out of it
                 final corner = flag.isEmpty
                     ? null
                     : Container(
-                        // the size of the logo's ring beside it, so the two sit level
-                        width: low ? 22 : 28,
-                        height: low ? 22 : 28,
+                        width: disc,
+                        height: disc,
                         alignment: Alignment.center,
-                        // the flag fills the circle, as the logo does its ring
-                        clipBehavior: Clip.antiAlias,
                         // a pane of the page's colour under it, so the circle keeps its edge in the water too
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: ContrastColours.of(context).page(dark).withValues(alpha: .85),
                           border: Border.all(color: scheme.outline.withValues(alpha: .6), width: 1.3),
                         ),
-                        child: Text(
-                          flag,
-                          style: TextStyle(fontSize: low ? 16 : 22, height: 1, fontFamilyFallback: const ['Emoji']),
+                        child: SizedBox(
+                          width: disc * .8,
+                          height: disc * .8,
+                          child: FittedBox(
+                            fit: BoxFit.contain,
+                            child: Text(flag, style: const TextStyle(height: 1, fontFamilyFallback: ['Emoji'])),
+                          ),
                         ),
                       );
+                final unitStyle = TextStyle(
+                  fontSize: 12 * k,
+                  letterSpacing: 0,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurfaceVariant,
+                );
                 return Padding(
-                  padding: EdgeInsets.all(low ? 8 : 11),
+                  padding: EdgeInsets.all(11 * k),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (low)
-                        Row(
-                          children: [
-                            ring,
-                            const Gap(5),
-                            Expanded(child: name),
-                          ],
-                        )
-                      else
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [ring, const Spacer(), if (corner != null) corner],
-                        ),
-                      // the delay in the middle of the tile, the name at the bottom (a low tile: the name is
-                      // on the top line beside the logo)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [ring, const Spacer(), if (corner != null) corner],
+                      ),
+                      // the delay in the middle of the tile, the name at the bottom
                       Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Center(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Padding(
-                                    // the room of " ms" on the left: the figure is in the middle, " ms" is written after it
-                                    padding: EdgeInsets.only(
-                                      left: measured && ms != null
-                                          ? _textWidth(
-                                              ' ms',
-                                              (theme.textTheme.headlineMedium ?? const TextStyle()).copyWith(
-                                                fontSize: 12,
-                                                letterSpacing: 0,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            )
-                                          : 0,
-                                    ),
-                                    child: Text.rich(
-                                      TextSpan(
-                                        children: [
-                                          TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
-                                          if (measured && ms != null)
-                                            TextSpan(
-                                              text: ' ms',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                letterSpacing: 0,
-                                                fontWeight: FontWeight.w600,
-                                                color: scheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      style: theme.textTheme.headlineMedium?.copyWith(
-                                        fontSize: low ? 26 : 32,
-                                        fontWeight: FontWeight.w500,
-                                        letterSpacing: -1.5,
-                                        color: scheme.onSurface,
-                                        fontFeatures: const [FontFeature.tabularFigures()],
-                                      ),
-                                    ),
-                                  ),
+                        child: Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Padding(
+                              // the room of " ms" on the left: the figure is in the middle, " ms" is written after it
+                              padding: EdgeInsets.only(
+                                left: measured && ms != null
+                                    ? _textWidth(
+                                        ' ms',
+                                        (theme.textTheme.headlineMedium ?? const TextStyle()).copyWith(
+                                          fontSize: 12 * k,
+                                          letterSpacing: 0,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    : 0,
+                              ),
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
+                                    if (measured && ms != null) TextSpan(text: ' ms', style: unitStyle),
+                                  ],
+                                ),
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontSize: 32 * k,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: -1.5 * k,
+                                  color: scheme.onSurface,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
                                 ),
                               ),
                             ),
-                            // on a low tile the flag by the figure
-                            if (low && corner != null) corner,
-                          ],
+                          ),
                         ),
                       ),
-                      if (!low) Center(child: name),
+                      Center(child: name),
                     ],
                   ),
                 );
