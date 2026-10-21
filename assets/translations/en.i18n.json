@@ -87,6 +87,7 @@
     "adBlockAllowMsg": "A domain on this list (and its subdomains) is never blocked, in case a site or app broke. Type a site's address and press the plus",
     "adBlockAllowHint": "example.com",
     "adBlockBadDomain": "Enter a domain, e.g. example.com",
+    "ruleOwnServer": "$name: own server",
     "lightLook": "Light look",
     "lightLookMsg": "No see-through blocks or blur, no gliding animations or sliding pages, a flat background, less memory for pictures. The theme's colours stay. For a weak phone or to save battery",
     "lightBackground": "Light background work",

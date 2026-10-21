@@ -42,7 +42,11 @@ class TopologyPage extends HookConsumerWidget {
     final total = items.fold<double>(0, (s, c) => s + weight(c));
     double sum(Iterable<SeenConnection> cs) => cs.fold<double>(0, (s, c) => s + weight(c));
     // a rule and the way it sent its traffic: the same list can send some of it through the VPN and some direct
-    final rules = groupConnections(items, (c) => '${c.route.index}${ruleLabel(c.rule, t) ?? t.avpn.connRuleDefault}');
+    final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+    final rules = groupConnections(
+      items,
+      (c) => '${c.route.index}${ruleLabel(c.rule, t, apps: apps) ?? t.avpn.connRuleDefault}',
+    );
 
     // what moved since the list started (03:00, or the last clearing) against what the list holds: connections
     // shorter than one poll and the ones while the app was closed aren't in the list
@@ -183,9 +187,10 @@ class SessionRules extends ConsumerWidget {
     ];
     double sum(Iterable<SeenConnection> cs) => cs.fold<double>(0, (s, c) => s + c.total);
     final total = sum(session);
+    final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     final rules = groupConnections(
       session,
-      (c) => '${c.route.index}${ruleLabel(c.rule, t) ?? t.avpn.connRuleDefault}',
+      (c) => '${c.route.index}${ruleLabel(c.rule, t, apps: apps) ?? t.avpn.connRuleDefault}',
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

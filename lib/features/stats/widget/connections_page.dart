@@ -18,6 +18,7 @@ import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/connection/notifier/shown_connection.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:installed_apps/installed_apps.dart';
@@ -641,13 +642,14 @@ class _InnerRow extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     final ports = {
       for (final c in group.items)
         if (c.port > 0) '${c.network}:${c.port}',
     }.take(3).join(', ');
     final rules = {
       for (final c in group.items)
-        if (ruleLabel(c.rule, t) case final r?) r,
+        if (ruleLabel(c.rule, t, apps: apps) case final r?) r,
     }.take(2).join(', ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
@@ -694,7 +696,16 @@ class _InnerRow extends ConsumerWidget {
 ///
 /// Worked out once per rule: there are a few dozen of them and thousands of connections, and each label took a
 /// dozen regular expressions (the Topology tab lost frames redoing them on every update).
-String? ruleLabel(String rule, Translations t) {
+String? ruleLabel(String rule, Translations t, {Map<String, InstalledApp> apps = const {}}) {
+  // a service's or a chosen app's own server (Settings → Sites): "Instagram: own server", by the group the rule sends to
+  final own = RegExp(r'route\((site|app)-([^)]+)\)').firstMatch(rule);
+  if (own != null) {
+    final key = own.group(2)!;
+    final name = own.group(1) == 'site'
+        ? (latencySites.where((s) => s.key == key).firstOrNull?.name ?? key)
+        : (apps[key]?.name ?? key);
+    return t.avpn.ruleOwnServer(name: name);
+  }
   if (!identical(_ruleLabelsIn, t)) {
     _ruleLabels.clear();
     _ruleLabelsIn = t;

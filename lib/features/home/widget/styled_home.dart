@@ -287,7 +287,7 @@ class _StatusBlock extends HookConsumerWidget {
         items: [
           // the time by the day, the two routes by each other
           (
-            Icons.schedule_rounded,
+            Icons.access_time_filled_rounded,
             t.avpn.contrastTime,
             connected ? time : (waiting ?? '—'),
             '',
@@ -296,7 +296,7 @@ class _StatusBlock extends HookConsumerWidget {
             const Color(0xFF8FA8BD),
           ),
           (
-            Icons.shield_outlined,
+            Icons.shield_rounded,
             t.avpn.statsViaVpn,
             vpn.$1,
             vpn.$2,
@@ -2562,11 +2562,8 @@ class _ContrastStats extends StatelessWidget {
                     Container(
                       width: 26,
                       height: 26,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: scheme.outlineVariant, width: 1.3),
-                      ),
-                      child: Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: colour),
+                      child: Icon(icon, size: 15, color: _SiteTiles._ink(colour)),
                     ),
                     const Gap(8),
                     Expanded(
@@ -2600,11 +2597,8 @@ class _ContrastStats extends StatelessWidget {
                       Container(
                         width: 26,
                         height: 26,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: scheme.outlineVariant, width: 1.3),
-                        ),
-                        child: Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: colour),
+                        child: Icon(icon, size: 15, color: _SiteTiles._ink(colour)),
                       ),
                       const Gap(5),
                       Text(label, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
@@ -2937,7 +2931,8 @@ class _MosaicCell extends StatelessWidget {
                             : tile.vpnShare <= 0
                             ? direct
                             : '${'VPN ${app.servers}'.trim()} ${(tile.vpnShare * 100).round()}% · $direct',
-                        maxLines: 1,
+                        // every country the app's traffic went through, on as many lines as it takes
+                        maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: tile.vpnShare >= .5 ? (dark ? colour : scheme.onSurface) : scheme.onSurfaceVariant,
@@ -3222,6 +3217,10 @@ class _SiteTiles extends HookConsumerWidget {
     return first.runes.any((r) => r >= 0x1F1E6 && r <= 0x1F1FF) ? first : '';
   }
 
+  /// the sign on a solid disc: dark on a light colour, white on a dark one
+  static Color _ink(Color disc) =>
+      ThemeData.estimateBrightnessForColor(disc) == Brightness.dark ? Colors.white : const Color(0xFF11151A);
+
   static Color _colour(int? ms) => ms == null || ms >= 300 ? _bad : (ms < 150 ? _good : _slow);
 
   @override
@@ -3289,16 +3288,13 @@ class _SiteTiles extends HookConsumerWidget {
             LayoutBuilder(
               builder: (context, box) {
                 final low = box.maxHeight < 112;
-                // the service's logo in a thin ring, both in the delay's colour
+                // the service's logo as ink on a solid disc of the delay's colour (every one filled alike)
                 final ring = Container(
                   width: low ? 22 : 28,
                   height: low ? 22 : 28,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: sign, width: 1.3),
-                  ),
-                  child: _sign(site, sign),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: sign),
+                  child: _sign(site, _ink(sign)),
                 );
                 final name = Text(
                   site.name,
