@@ -157,7 +157,7 @@ class AutoPausePage extends HookConsumerWidget {
                   onChanged: (_) => toggle(app.packageName),
                   secondary: icon == null || icon.isEmpty
                       ? const Icon(Icons.android_rounded)
-                      : Image.memory(icon, width: 36, height: 36, gaplessPlayback: true),
+                      : Image.memory(icon, width: 36, height: 36, cacheWidth: 108, gaplessPlayback: true),
                   title: Text(app.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(app.packageName, maxLines: 1, overflow: TextOverflow.ellipsis),
                 );

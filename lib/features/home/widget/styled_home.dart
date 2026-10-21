@@ -1126,6 +1126,10 @@ class _Orb extends HookWidget {
     final spin = useAnimationController(duration: const Duration(milliseconds: 1600));
     // the arcs as last drawn, so switching flows on from the gauge and the gauge from the wave, with no jump to empty
     final drawn = useRef(Offset.zero);
+    // where the arcs head: the ping and the loss change every few seconds by a hair, and each change set the arcs
+    // gliding again for 0.7 s, so the screen redrew all the time at rest (40 frames a second); they head for a new
+    // value only when it's at least 8% of the arc away
+    final heading = useRef(Offset.zero);
     useEffect(() {
       if (busy) {
         // the pulse starts bright
@@ -1189,7 +1193,10 @@ class _Orb extends HookWidget {
               // both arcs glide to new values; started over when switching ends, from where the wave was
               key: ValueKey(busy),
               // in steps of 2%: each second's ping doesn't start the arcs gliding again for a hair's change
-              tween: Tween(begin: drawn.value, end: on && !busy ? Offset(_step(ping), _step(loss)) : Offset.zero),
+              tween: Tween(
+                begin: drawn.value,
+                end: _headingFor(heading, on && !busy ? Offset(_step(ping), _step(loss)) : Offset.zero),
+              ),
               duration: const Duration(milliseconds: 700),
               curve: Curves.easeOutCubic,
               builder: (context, filled, _) {
@@ -1935,18 +1942,22 @@ class ContrastFrost extends ConsumerWidget {
         : ContrastClarity.fallback;
     return _FrostedBackdrop(
       radius: radius,
-      child: Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          // lighter than the chosen clarity: the tiles inside add their own pane, and the two together came out
-          // nearly solid next to the other pages' single see-through cards
-          color: dark
-              ? ContrastColours.of(context).pane(true).withValues(alpha: clarity.night * (solo ? .75 : .6))
-              : Colors.white.withValues(alpha: clarity.day * (solo ? .75 : .6)),
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
+      // the block's content in a layer of its own: what moves in it (a clock, a figure) is drawn again alone, not
+      // with the frosted backdrop and the blocks beside it
+      child: RepaintBoundary(
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            // lighter than the chosen clarity: the tiles inside add their own pane, and the two together came out
+            // nearly solid next to the other pages' single see-through cards
+            color: dark
+                ? ContrastColours.of(context).pane(true).withValues(alpha: clarity.night * (solo ? .75 : .6))
+                : Colors.white.withValues(alpha: clarity.day * (solo ? .75 : .6)),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
+          ),
+          child: child,
         ),
-        child: child,
       ),
     );
   }
@@ -2417,23 +2428,24 @@ class _ContrastRow extends StatelessWidget {
   }
 }
 
-/// Contrast's session tiles: the time, through the VPN and the bypass today, each a see-through tile with its sign
-/// in a thin circle, its label and a big tight figure, all centred, over water: the time's level by the day, the
-/// two routes' by each other.
-class _ContrastStats extends StatelessWidget {
-  const _ContrastStats({required this.items});
+/// A tile's water. Its level glides, but only to a level 8% or more from where it is heading: the traffic shifting a
+/// few percent between the VPN and direct every second kept the water gliding (900 ms each time) and the screen
+/// redrew nonstop at rest.
+class _Water extends HookWidget {
+  const _Water({required this.level, required this.colour, required this.dark});
 
-  /// (sign, label, figure, unit, in the accent, water level 0 to 1, water colour)
-  final List<(IconData, String, String, String, bool, double, Color)> items;
+  final double level;
+  final Color colour;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
-    Widget water(double level, Color colour) => TweenAnimationBuilder<double>(
-      // in whole percents: the traffic moving every second doesn't restart it each time (the screen redrew nonstop)
-      tween: Tween(end: _percent(level.clamp(0.0, 1.0))),
+    final heading = useRef<double?>(null);
+    final next = level.clamp(0.0, 1.0);
+    final now = heading.value;
+    if (now == null || (next - now).abs() >= .08 || (next == 0) != (now == 0)) heading.value = next;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: heading.value),
       duration: const Duration(milliseconds: 900),
       curve: Curves.easeOutCubic,
       builder: (context, l, _) => l < .005
@@ -2459,6 +2471,24 @@ class _ContrastStats extends StatelessWidget {
               ),
             ),
     );
+  }
+}
+
+/// Contrast's session tiles: the time, through the VPN and the bypass today, each a see-through tile with its sign
+/// in a thin circle, its label and a big tight figure, all centred, over water: the time's level by the day, the
+/// two routes' by each other.
+class _ContrastStats extends StatelessWidget {
+  const _ContrastStats({required this.items});
+
+  /// (sign, label, figure, unit, in the accent, water level 0 to 1, water colour)
+  final List<(IconData, String, String, String, bool, double, Color)> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    Widget water(double level, Color colour) => _Water(level: level, colour: colour, dark: dark);
     // the unfolded phone (or a tablet): half as high, the sign beside the label and the figure
     final compact = MediaQuery.sizeOf(context).width >= 700 || MediaQuery.sizeOf(context).height < 600;
     Widget tile(IconData icon, String label, String figure, String unit, bool lit, double level, Color colour) {
@@ -2565,7 +2595,8 @@ class _ContrastStats extends StatelessWidget {
       children: [
         for (final (i, (icon, label, figure, unit, lit, level, colour)) in items.indexed) ...[
           if (i > 0) const Gap(6),
-          Expanded(child: tile(icon, label, figure, unit, lit, level, colour)),
+          // each tile in a layer of its own: the clock's tick doesn't draw the other two again
+          Expanded(child: RepaintBoundary(child: tile(icon, label, figure, unit, lit, level, colour))),
         ],
       ],
     );
@@ -2777,7 +2808,13 @@ class _MosaicCell extends StatelessWidget {
         final icon = ClipRRect(
           borderRadius: BorderRadius.circular(side * .3),
           child: app.icon != null && tile.more == 0
-              ? Image.memory(app.icon!, width: side, height: side, gaplessPlayback: true)
+              ? Image.memory(
+                  app.icon!,
+                  width: side,
+                  height: side,
+                  cacheWidth: (side * 3).round(),
+                  gaplessPlayback: true,
+                )
               : Container(
                   width: side,
                   height: side,
@@ -3521,6 +3558,15 @@ class ContrastPlate extends ConsumerWidget {
 
 /// [v] in whole percents (0 to 1): an animation to it starts again only when it moves by one.
 double _percent(double v) => v.isFinite ? (v * 100).round() / 100 : 0;
+
+/// The arcs' target: [next] when the arcs are to move to it (off, or switching, or a change of at least 8% of the arc
+/// in either), else where they already head.
+Offset _headingFor(ObjectRef<Offset> heading, Offset next) {
+  final now = heading.value;
+  final far = (next.dx - now.dx).abs() >= .08 || (next.dy - now.dy).abs() >= .08;
+  if (next == Offset.zero || now == Offset.zero || far) heading.value = next;
+  return heading.value;
+}
 
 /// [v] in steps of 2% (0 to 1).
 double _step(double v) => v.isFinite ? (v * 50).round() / 50 : 0;

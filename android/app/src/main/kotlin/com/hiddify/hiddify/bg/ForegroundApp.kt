@@ -14,9 +14,6 @@ import android.os.Process
 object ForegroundApp {
     private var current: String? = null
     private var lastQuery = 0L
-    private var lastSampleApp: String? = null
-    private var lastSampleAt = 0L
-    private val screenTime = linkedMapOf<String, Long>()
 
     fun hasPermission(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
@@ -54,23 +51,5 @@ object ForegroundApp {
     fun reset() {
         current = null
         lastQuery = 0L
-        lastSampleApp = null
-        lastSampleAt = 0L
-        screenTime.clear()
     }
-
-    /** Adds the last foreground interval to the app that actually occupied it. */
-    @Synchronized
-    fun observeScreen(context: Context, app: String?, elapsedRealtime: Long) {
-        if (lastSampleAt != 0L && lastSampleApp != null && lastSampleApp != context.packageName) {
-            val elapsed = (elapsedRealtime - lastSampleAt).coerceIn(0, 6_000)
-            screenTime[lastSampleApp!!] = (screenTime[lastSampleApp!!] ?: 0L) + elapsed
-        }
-        lastSampleApp = app?.takeIf { it.isNotBlank() && it != context.packageName }
-        lastSampleAt = elapsedRealtime
-    }
-
-    @Synchronized
-    fun screenTimeSnapshot(): Map<String, Long> = screenTime.toMap()
-
 }

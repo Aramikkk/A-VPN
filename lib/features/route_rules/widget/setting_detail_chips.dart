@@ -188,7 +188,10 @@ class AndroidAppInfo extends HookConsumerWidget {
           children: [
             AspectRatio(
               aspectRatio: 1.0,
-              child: CircleAvatar(backgroundColor: Colors.transparent, child: Image.memory(app.data!.icon!)),
+              child: CircleAvatar(
+                backgroundColor: Colors.transparent,
+                child: Image.memory(app.data!.icon!, cacheWidth: 120),
+              ),
             ),
             const Gap(4),
             Text(app.data!.name, style: Theme.of(context).textTheme.labelMedium),

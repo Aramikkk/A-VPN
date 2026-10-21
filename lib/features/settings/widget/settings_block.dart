@@ -11,26 +11,11 @@ class SettingsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final column = Material(
       type: MaterialType.transparency,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
     );
-    // Contrast: the same frosted glass as the home screen's blocks
-    if (Theme.of(context).contrastLayout) {
-      return ContrastFrost(radius: 20, padding: EdgeInsets.zero, solo: true, child: column);
-    }
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-      ),
-    );
+    // the same frosted glass as the home screen's blocks
+    return ContrastFrost(radius: 20, padding: EdgeInsets.zero, solo: true, child: column);
   }
 }

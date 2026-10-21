@@ -154,7 +154,7 @@ class _AppIcon extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: icon != null
-          ? Image.memory(icon!, width: 36, height: 36, gaplessPlayback: true)
+          ? Image.memory(icon!, width: 36, height: 36, cacheWidth: 108, gaplessPlayback: true)
           : Container(
               width: 36,
               height: 36,

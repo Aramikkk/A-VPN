@@ -249,19 +249,8 @@ class _Section extends StatelessWidget {
         child,
       ],
     );
-    // Contrast: the same frosted glass as the home screen's blocks
-    if (theme.contrastLayout) {
-      return ContrastFrost(radius: 18, padding: const EdgeInsets.fromLTRB(14, 12, 14, 14), solo: true, child: content);
-    }
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: content,
-    );
+    // the same frosted glass as the home screen's blocks
+    return ContrastFrost(radius: 18, padding: const EdgeInsets.fromLTRB(14, 12, 14, 14), solo: true, child: content);
   }
 }
 

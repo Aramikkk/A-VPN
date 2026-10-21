@@ -33,12 +33,6 @@ class AutoPauseHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
         val context = context ?: return result.error("no_context", null, null)
         when (call.method) {
             "hasUsageAccess" -> result.success(ForegroundApp.hasPermission(context))
-            "screenTimeSnapshot" -> result.success(
-                mapOf(
-                    "hasUsageAccess" to ForegroundApp.hasPermission(context),
-                    "apps" to ForegroundApp.screenTimeSnapshot(),
-                ),
-            )
             "openUsageAccessSettings" -> {
                 // straight to A-VPN's own switch where the phone allows it, else the list of apps
                 val direct = Intent(AndroidSettings.ACTION_USAGE_ACCESS_SETTINGS)

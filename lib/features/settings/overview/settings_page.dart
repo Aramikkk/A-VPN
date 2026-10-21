@@ -286,18 +286,6 @@ class _Frame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (theme.contrastLayout) {
-      return ContrastFrost(radius: 20, padding: EdgeInsets.zero, solo: true, child: child);
-    }
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: child,
-    );
+    return ContrastFrost(radius: 20, padding: EdgeInsets.zero, solo: true, child: child);
   }
 }

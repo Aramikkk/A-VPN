@@ -170,8 +170,8 @@ class BoxService(
     private fun startAutoPause() {
         autoPauseJob?.cancel()
         ForegroundApp.reset()
-        // Runs for the whole session so auto-pause settings can change without reconnecting. UsageStats is
-        // sampled less often when auto-pause is off, and much less often when screen time cannot be observed.
+        // Runs for the whole session so auto-pause settings can change without reconnecting. UsageStats is looked at
+        // only while auto-pause has apps to watch (the screen time it once also kept for the home screen is gone).
         autoPauseJob = GlobalScope.launch(Dispatchers.IO) {
             while (isActive) {
                 val screenInteractive = Application.powerManager.isInteractive
@@ -181,6 +181,7 @@ class BoxService(
                     autoPauseActive,
                     screenInteractive && ForegroundApp.hasPermission(service),
                     screenInteractive,
+                    Settings.homeWifiEnabled || pausedForHome,
                 )
                 if (screenInteractive) delay(interval) else withTimeoutOrNull(interval) { screenWake.receive() }
                 // a home Wi-Fi looked at every 15 seconds at most (besides every network change)
@@ -191,16 +192,17 @@ class BoxService(
                 }
                 // at home the apps on screen change nothing
                 if (pausedForHome) continue
-                val canObserve = Application.powerManager.isInteractive && ForegroundApp.hasPermission(service)
-                if (!canObserve) {
-                    ForegroundApp.observeScreen(service, null, android.os.SystemClock.elapsedRealtime())
+                // no apps to watch: nothing to look at (and a pause for apps that were on the list ends)
+                if (!autoPauseActive) {
                     if (paused && !pausedForHome) resume()
                     continue
                 }
-                val app = runCatching { ForegroundApp.current(service) }.getOrNull()
-                ForegroundApp.observeScreen(service, app, android.os.SystemClock.elapsedRealtime())
-                if (app == null) continue
-                if (!autoPauseActive) { if (paused && !pausedForHome) resume(); continue }
+                val canObserve = Application.powerManager.isInteractive && ForegroundApp.hasPermission(service)
+                if (!canObserve) {
+                    if (paused && !pausedForHome) resume()
+                    continue
+                }
+                val app = runCatching { ForegroundApp.current(service) }.getOrNull() ?: continue
                 if (!paused && app in apps && status.value == Status.Started) {
                     pause(app)
                 } else if (paused && app !in apps) {

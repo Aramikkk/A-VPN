@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:hiddify/core/directories/stale_files.dart';
+import 'package:hiddify/core/diagnostics/frame_stats.dart';
 import 'package:hiddify/core/analytics/analytics_controller.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/app_info/launch_args.dart';
@@ -53,6 +55,12 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   // the mouse wheel scrolls smoothly on the computer
   SmoothWheel.install();
 
+  // the pictures kept decoded: 48 MB and 150 of them at most (the default is 100 MB and 1000: the app icons of a long
+  // list stayed in the graphics memory)
+  PaintingBinding.instance.imageCache
+    ..maximumSize = 150
+    ..maximumSizeBytes = 48 << 20;
+
   final stopWatch = Stopwatch()..start();
 
   final container = ProviderContainer(
@@ -60,7 +68,7 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
     // debug builds only: it wrote every provider's old and new value as text on every change (the groups, the
     // stats, the connection list…), many times a second, and the release build paid for those strings in garbage:
     // a cold start stalled a second on it and swipes lost frames
-    observers: [if (kDebugMode) RiverpodObserver()],
+    observers: [if (kDebugMode) RiverpodObserver(), FrameStats.observer],
   );
 
   await _init("directories", () => container.read(appDirectoriesProvider.future));
@@ -189,6 +197,22 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
     FlutterNativeSplash.remove();
   }
   _watchStartFrames();
+  // how the app draws, one line in the log every 30 seconds
+  FrameStats.start();
+  // what the app leaves behind and never reads again (the configs of deleted profiles, old logs, the exports), once
+  // the first frame is out
+  unawaited(
+    WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) async {
+      try {
+        final cleaned = await cleanStaleFiles(await container.read(appDirectoriesProvider.future));
+        if (cleaned.files > 0) {
+          Logger.bootstrap.info('cleaned ${cleaned.files} stale files, ${(cleaned.bytes / 1024).round()} KB');
+        }
+      } catch (e) {
+        Logger.bootstrap.warning('clean-up failed: $e');
+      }
+    }),
+  );
   // SentryFlutter.s(DateTime.now().toUtc());
 }
 

@@ -12,7 +12,6 @@ class SpeedPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final contrast = Theme.of(context).contrastLayout;
     return Scaffold(
       appBar: AppBar(
         // what the page counts: this session (as Topology says its day)
@@ -30,33 +29,8 @@ class SpeedPage extends ConsumerWidget {
           ],
         ),
       ),
-      // it all at once, no scroll: two columns on a wide screen (the unfolded phone), otherwise one column whose
-      // graph takes the height the rest leaves; a short window (landscape) still scrolls
-      body: LayoutBuilder(
-        builder: (context, constraints) => contrast
-            // Contrast on the phone, folded or unfolded: fitted over the panel, the graph taking what the rest leaves
-            ? const SideBarStatsOverview(large: true, contrast: true)
-            : constraints.maxWidth >= 640 && constraints.maxHeight >= 480
-            ? const SideBarStatsOverview(large: true, split: true)
-            : constraints.maxHeight >= 600
-            ? Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: SideBarStatsOverview(large: true, fill: true),
-                  ),
-                ),
-              )
-            : SingleChildScrollView(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 720),
-                    child: const SideBarStatsOverview(large: true),
-                  ),
-                ),
-              ),
-      ),
+      // fitted over the panel (the phone, folded or unfolded), the graph taking what the rest leaves
+      body: const SideBarStatsOverview(large: true, contrast: true),
     );
   }
 }

@@ -451,18 +451,8 @@ class _Count extends StatelessWidget {
       ],
     );
     return Expanded(
-      // Contrast: the same frosted glass as the home screen's blocks
-      child: theme.contrastLayout
-          ? ContrastFrost(radius: 14, padding: padding, solo: true, child: content)
-          : Container(
-              padding: padding,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: scheme.outlineVariant),
-              ),
-              child: content,
-            ),
+      // the same frosted glass as the home screen's blocks
+      child: ContrastFrost(radius: 14, padding: padding, solo: true, child: content),
     );
   }
 }
@@ -628,19 +618,8 @@ class _GroupCard extends HookConsumerWidget {
         ],
       ],
     );
-    // Contrast: the same frosted glass as the home screen's blocks
-    if (theme.contrastLayout) {
-      return ContrastFrost(radius: 14, padding: EdgeInsets.zero, solo: true, child: content);
-    }
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: content,
-    );
+    // the same frosted glass as the home screen's blocks
+    return ContrastFrost(radius: 14, padding: EdgeInsets.zero, solo: true, child: content);
   }
 }
 
@@ -891,7 +870,7 @@ class ConnectionAppIcon extends StatelessWidget {
     if (icon != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(size * .3),
-        child: Image.memory(icon!, width: size, height: size, gaplessPlayback: true),
+        child: Image.memory(icon!, width: size, height: size, cacheWidth: (size * 3).round(), gaplessPlayback: true),
       );
     }
     return Container(
