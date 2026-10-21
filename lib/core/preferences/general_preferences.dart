@@ -81,7 +81,8 @@ abstract class Preferences {
     mapTo: (value) => "${value.width},${value.height}",
   );
 
-  static final silentStart = PreferencesNotifier.create<bool, bool>("silent_start", false);
+  /// The computer's: starts in the tray with no window (on by default; the phone has no such thing).
+  static final silentStart = PreferencesNotifier.create<bool, bool>("silent_start", true);
 
   static final disableMemoryLimit = PreferencesNotifier.create<bool, bool>(
     "disable_memory_limit",
@@ -112,8 +113,11 @@ abstract class Preferences {
 
   static final startedByUser = PreferencesNotifier.create<bool, bool>("started_by_user", false);
 
-  /// A-VPN: connect as soon as the app opens (Android; the desktop restores the last session instead).
-  static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", false);
+  /// A-VPN: connect as soon as the app opens. On from the start on a computer, off on a phone.
+  static final connectOnAppStart = PreferencesNotifier.create<bool, bool>(
+    "connect_on_app_start",
+    PlatformUtils.isDesktop,
+  );
 
   /// A-VPN (Android): turn the VPN on in the background when the phone starts, even if it was off before
   static final connectOnBoot = PreferencesNotifier.create<bool, bool>("connect_on_boot", false);

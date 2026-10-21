@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/utils/platform_utils.dart';
 
 @JsonEnum(valueField: 'key')
 enum ServiceMode {
@@ -18,7 +17,9 @@ enum ServiceMode {
 
   final String key;
 
-  static ServiceMode get defaultMode => PlatformUtils.isDesktop ? systemProxy : tun;
+  /// the whole device's traffic through the VPN (TUN) on the computer too; with no right to make it (no administrator)
+  /// the app falls back to the system proxy by itself (`tunDeniedProvider`)
+  static ServiceMode get defaultMode => tun;
 
   /// supported service mode based on platform, use this instead of [values] in UI
   static List<ServiceMode> get choices {

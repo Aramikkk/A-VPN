@@ -174,11 +174,11 @@ abstract class ConfigOptions {
   static final pingHttps = PreferencesNotifier.create<bool, bool>("ping-https", false);
 
   /// Instagram, WhatsApp, Telegram, ChatGPT and YouTube each through the server answering that service soonest
-  /// (the core's site groups), the rest through Auto as before. Beta: off until the user turns it on.
-  static final siteGroups = PreferencesNotifier.create<bool, bool>("site-groups", false);
+  /// (the core's site groups), the rest through Auto as before. Beta: on from the start, the user can turn it off.
+  static final siteGroups = PreferencesNotifier.create<bool, bool>("site-groups", true);
 
   /// The same on mobile data (the phone): on or off of its own.
-  static final siteGroupsMobile = PreferencesNotifier.create<bool, bool>("site-groups-mobile", false);
+  static final siteGroupsMobile = PreferencesNotifier.create<bool, bool>("site-groups-mobile", true);
 
   /// Ad blocking at the VPN's level (Settings → Ad blocking, beta): the ad, tracker and malware domains refused.
   static final adBlock = PreferencesNotifier.create<bool, bool>("ad-block", false);

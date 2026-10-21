@@ -118,6 +118,13 @@ class GeneralPage extends HookConsumerWidget {
                 // themselves — and next to the filters that decide what is shown. The ping's settings are on a page
                 // of their own (Settings → Ping).
               ] else ...[
+                SwitchListTile.adaptive(
+                  title: Text(t.avpn.connectOnAppStart),
+                  subtitle: Text(t.avpn.connectOnAppStartMsg),
+                  secondary: const Icon(Icons.bolt_rounded),
+                  value: ref.watch(Preferences.connectOnAppStart),
+                  onChanged: ref.read(Preferences.connectOnAppStart.notifier).update,
+                ),
                 if (PlatformUtils.isAndroid) ...[
                   ListTile(
                     leading: const Icon(Icons.pause_circle_outline_rounded),
@@ -140,13 +147,6 @@ class GeneralPage extends HookConsumerWidget {
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => context.goNamed('homeWifi'),
-                  ),
-                  SwitchListTile.adaptive(
-                    title: Text(t.avpn.connectOnAppStart),
-                    subtitle: Text(t.avpn.connectOnAppStartMsg),
-                    secondary: const Icon(Icons.bolt_rounded),
-                    value: ref.watch(Preferences.connectOnAppStart),
-                    onChanged: ref.read(Preferences.connectOnAppStart.notifier).update,
                   ),
                   if (PlatformUtils.isAndroid)
                     SwitchListTile.adaptive(

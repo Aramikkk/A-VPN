@@ -2590,9 +2590,10 @@ class _ContrastStats extends StatelessWidget {
             else
               Padding(
                 padding: const EdgeInsets.fromLTRB(6, 8, 6, 9),
-                child: Center(
+                // the height it had by its content: the figure sits in the middle of it, the label at the bottom
+                child: SizedBox(
+                  height: 78,
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
                         width: 26,
@@ -2600,10 +2601,13 @@ class _ContrastStats extends StatelessWidget {
                         decoration: BoxDecoration(shape: BoxShape.circle, color: colour),
                         child: Icon(icon, size: 15, color: _SiteTiles._ink(colour)),
                       ),
-                      const Gap(5),
+                      // the figure in the middle of what is left, the label at the bottom
+                      Expanded(
+                        child: Center(
+                          child: FittedBox(fit: BoxFit.scaleDown, child: value(22)),
+                        ),
+                      ),
                       Text(label, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-                      const Gap(2),
-                      FittedBox(fit: BoxFit.scaleDown, child: value(22)),
                     ],
                   ),
                 ),
@@ -3349,45 +3353,48 @@ class _SiteTiles extends HookConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [ring, const Spacer(), if (corner != null) corner],
                         ),
-                      const Spacer(),
-                      if (!low) name,
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
-                                    if (measured && ms != null)
-                                      TextSpan(
-                                        text: ' ms',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          letterSpacing: 0,
-                                          fontWeight: FontWeight.w600,
-                                          color: scheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  fontSize: low ? 26 : 32,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: -1.5,
-                                  color: scheme.onSurface,
-                                  fontFeatures: const [FontFeature.tabularFigures()],
+                      // the delay in the middle of the tile, the name at the bottom (a low tile: the name is
+                      // on the top line beside the logo)
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Center(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
+                                        if (measured && ms != null)
+                                          TextSpan(
+                                            text: ' ms',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              letterSpacing: 0,
+                                              fontWeight: FontWeight.w600,
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                      fontSize: low ? 26 : 32,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: -1.5,
+                                      color: scheme.onSurface,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          // on a low tile the flag by the figure, the name keeps the top line
-                          if (low && corner != null) corner,
-                        ],
+                            // on a low tile the flag by the figure
+                            if (low && corner != null) corner,
+                          ],
+                        ),
                       ),
+                      if (!low) Center(child: name),
                     ],
                   ),
                 );
