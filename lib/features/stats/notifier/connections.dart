@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
@@ -553,6 +554,7 @@ class Connections extends Notifier<ConnectionsState> {
       }
     }
     if (list != null) _track(open.map((id) => _seen[id]!), DateTime.now());
+    _logCounts(list?.length);
     _fold();
     state = ConnectionsState(
       items: _sorted(),
@@ -636,6 +638,19 @@ class Connections extends Notifier<ConnectionsState> {
   );
 
   List<SeenConnection> _sessionItems() => _seen.values.toList();
+
+  DateTime _counted = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// One line a minute in the log: how many connections the core listed and how many are kept, for the session and
+  /// by the session's stamp (the Traffic page lists by it).
+  void _logCounts(int? listed) {
+    final now = DateTime.now();
+    if (now.difference(_counted) < const Duration(minutes: 1)) return;
+    _counted = now;
+    final start = ref.read(sessionStartProvider)?.millisecondsSinceEpoch;
+    final stamped = _seen.values.where((c) => c.session == start).length;
+    appLogger('connections').info('listed=${listed ?? -1} kept=${_seen.length} stamped=$stamped session=$start');
+  }
 
   List<SeenConnection> _sorted() => [
     for (final c in _seen.values)
