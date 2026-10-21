@@ -16,7 +16,9 @@ import 'package:hiddify/features/route_rules/notifier/app_groups.dart';
 import 'package:hiddify/features/route_rules/notifier/ru_services.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
+import 'package:hiddify/features/connection/notifier/shown_connection.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:installed_apps/installed_apps.dart';
 
@@ -111,6 +113,10 @@ class ConnectionsPage extends HookConsumerWidget {
     // seconds for nothing; it catches up when it's back on screen
     final visible = TickerMode.of(context);
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
+    // this session's connections, from the VPN's switch-on, none while it is off: as the totals and the traffic page
+    final sessionStart = ref.watch(sessionStartProvider);
+    final connected = ref.watch(shownConnectionProvider).isConnected;
+    final session = sessionConnections(state, connected: connected, sessionStart: sessionStart);
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     final view = useState(_View.apps);
     final filter = useState(_Filter.all);
@@ -120,7 +126,7 @@ class ConnectionsPage extends HookConsumerWidget {
 
     String appName(String app) => connectionAppName(t, apps, app);
 
-    final items = state.items.where((c) {
+    final items = session.where((c) {
       if (filter.value == _Filter.vpn && c.route != ConnectionRoute.vpn) return false;
       if (filter.value == _Filter.direct && c.route == ConnectionRoute.vpn) return false;
       return true;
@@ -150,7 +156,7 @@ class ConnectionsPage extends HookConsumerWidget {
       appName: appName,
       iconOf: (app) => apps[app]?.icon,
     );
-    final all = state.items;
+    final all = session;
     final open = all.where((c) => c.active).length;
     int count(ConnectionRoute route) => all.where((c) => c.route == route).fold(0, (n, c) => n + c.count);
     final viaVpn = count(ConnectionRoute.vpn);

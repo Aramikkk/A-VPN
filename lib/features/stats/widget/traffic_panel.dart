@@ -35,12 +35,7 @@ class TrafficPanel extends ConsumerWidget {
     final sessionStart = ref.watch(sessionStartProvider);
     // the VPN off: no session, the picture (the last session's list isn't shown)
     final connected = ref.watch(shownConnectionProvider).isConnected;
-    final current = [
-      // the session's start not known yet: nothing rather than the whole day's list
-      if (connected && sessionStart != null)
-        for (final c in state.sessionItems)
-          if (c.session == sessionStart.millisecondsSinceEpoch || !c.start.isBefore(sessionStart)) c,
-    ];
+    final current = sessionConnections(state, connected: connected, sessionStart: sessionStart);
     final groups = groupConnections(current, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
     final items = [for (final g in groups) ...g.items];

@@ -8,9 +8,12 @@ import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/features/connection/model/connection_status.dart';
+import 'package:hiddify/features/connection/notifier/shown_connection.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/topology_page.dart';
@@ -61,13 +64,23 @@ final _sample = [
 
 class _Fake extends Connections {
   @override
-  ConnectionsState build() => ConnectionsState(items: _sample);
+  ConnectionsState build() => ConnectionsState(items: _sample, sessionItems: _sample);
+}
+
+class _On extends ShownConnection {
+  @override
+  ConnectionStatus build() => const Connected();
+}
+
+class _Began extends SessionStart {
+  @override
+  DateTime? build() => DateTime(2026, 10, 12);
 }
 
 /// one big connection: the case that drew full-height walls
 class _FakeOne extends Connections {
   @override
-  ConnectionsState build() => ConnectionsState(items: [_sample[2]]);
+  ConnectionsState build() => ConnectionsState(items: [_sample[2]], sessionItems: [_sample[2]]);
 }
 
 Future<void> _loadFont(String family, List<String> files) async {
@@ -318,6 +331,8 @@ void main() {
           translationsProvider.overrideWith((ref) async => t),
           connectionsProvider.overrideWith(_Fake.new),
           installedAppsProvider.overrideWith((ref) async => const {}),
+          shownConnectionProvider.overrideWith(_On.new),
+          sessionStartProvider.overrideWith(_Began.new),
         ],
         child: MaterialApp(
           theme: theme.darkTheme(null),
@@ -363,6 +378,10 @@ void main() {
             translationsProvider.overrideWith((ref) async => t),
             connectionsProvider.overrideWith(one ? _FakeOne.new : _Fake.new),
             installedAppsProvider.overrideWith((ref) async => const {}),
+            shownConnectionProvider.overrideWith(_On.new),
+            sessionStartProvider.overrideWith(_Began.new),
+            shownConnectionProvider.overrideWith(_On.new),
+            sessionStartProvider.overrideWith(_Began.new),
           ],
           child: MaterialApp(
             theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),

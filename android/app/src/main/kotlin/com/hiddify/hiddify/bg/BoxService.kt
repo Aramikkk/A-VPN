@@ -182,6 +182,7 @@ class BoxService(
                     screenInteractive && ForegroundApp.hasPermission(service),
                     screenInteractive,
                     Settings.homeWifiEnabled || pausedForHome,
+                    Settings.lightBackground,
                 )
                 if (screenInteractive) delay(interval) else withTimeoutOrNull(interval) { screenWake.receive() }
                 // a home Wi-Fi looked at every 15 seconds at most (besides every network change)

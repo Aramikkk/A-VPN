@@ -1,3 +1,4 @@
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
@@ -65,6 +66,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
     final style = ref.watch(Preferences.araStyle);
+    // the light look's switch, worked out here so the places with no `ref` read it too
+    ref.watch(lightLookProvider);
     final glassScheme = ref.watch(Preferences.glassScheme);
     final theme = AppTheme(
       themeMode,

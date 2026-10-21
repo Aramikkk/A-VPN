@@ -199,6 +199,7 @@ void main() {
           if ((Platform.environment['PAL'] ?? '').isNotEmpty) 'contrast_palette': Platform.environment['PAL']!,
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
+          if (Platform.environment['LIGHT'] == '1') 'light_look': true,
         });
         // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
         final pcw = Platform.environment['PCW'] == '1';

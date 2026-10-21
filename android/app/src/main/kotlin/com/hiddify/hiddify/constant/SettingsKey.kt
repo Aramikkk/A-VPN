@@ -34,6 +34,9 @@ object SettingsKey {
     const val AUTO_PAUSE_ENABLED = "${KEY_PREFIX}auto_pause_enabled"
     const val AUTO_PAUSE_APPS = "${KEY_PREFIX}auto_pause_apps"
 
+    // A-VPN light background work (Settings → General): the watcher wakes half as often
+    const val LIGHT_BACKGROUND = "${KEY_PREFIX}light_background"
+
     // A-VPN home Wi-Fi: the VPN pauses on a Wi-Fi whose router runs a VPN of its own
     const val HOME_WIFI_ENABLED = "${KEY_PREFIX}aravpn-home-wifi-enabled"
     const val HOME_WIFI_LIST = "${KEY_PREFIX}aravpn-home-wifi-list"

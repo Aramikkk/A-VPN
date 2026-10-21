@@ -1,3 +1,4 @@
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
@@ -22,7 +23,9 @@ Page<dynamic> customTransition(TransitionType transition, LocalKey pageKey, Widg
   return CustomTransitionPage<dynamic>(
     key: pageKey,
     child: _Opaque(child: child),
-    reverseTransitionDuration: const Duration(milliseconds: 250),
+    // the light look: the page is just there, with no sliding
+    transitionDuration: lightLookNow ? Duration.zero : const Duration(milliseconds: 300),
+    reverseTransitionDuration: lightLookNow ? Duration.zero : const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       if (transition == TransitionType.fade) return FadeTransition(opacity: animation, child: child);
       if (transition == TransitionType.fromTop) {

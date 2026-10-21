@@ -200,6 +200,12 @@ abstract class Preferences {
     mapTo: (value) => value.name,
   );
 
+  /// A-VPN's light version, the look: flat colours, no see-through blocks, no gliding and sliding.
+  static final lightLook = PreferencesNotifier.create<bool, bool>("light_look", false);
+
+  /// A-VPN's light version, the background: slower polls, fewer wake-ups while the app is out of sight.
+  static final lightBackground = PreferencesNotifier.create<bool, bool>("light_background", false);
+
   /// A-VPN: how the server list shows each server's ping.
   static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
     "ping_style",

@@ -1,3 +1,4 @@
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -343,6 +344,8 @@ class Connections extends Notifier<ConnectionsState> {
   @override
   ConnectionsState build() {
     ref.watch(sessionStartProvider);
+    // the light background work: the polls twice as far apart, and a long way apart out of sight
+    final saving = ref.watch(lightBackgroundProvider);
     _rollDay();
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
     final enabled = ref.watch(ConfigOptions.enableClashApi);
@@ -372,7 +375,7 @@ class Connections extends Notifier<ConnectionsState> {
     Timer? timer;
     void schedule() {
       timer?.cancel();
-      timer = Timer(foreground ? interval : backgroundInterval, () {
+      timer = Timer(foreground ? interval * (saving ? 2 : 1) : backgroundInterval * (saving ? 4 : 1), () {
         if (disposed) return;
         unawaited(_poll(client, url, secret));
         schedule();
@@ -661,6 +664,20 @@ class Connections extends Notifier<ConnectionsState> {
         c,
   ]..sort((a, b) => b.start.compareTo(a.start));
 }
+
+/// The connections of the VPN session on screen: from its switch-on (the core's session start) to its switch-off,
+/// as the totals and the time are. The VPN off: none (the last session's list isn't shown). The session's start
+/// not known yet: none rather than the whole day's list. A connection counts if it carries the session's stamp or
+/// began after the session did.
+List<SeenConnection> sessionConnections(
+  ConnectionsState state, {
+  required bool connected,
+  required DateTime? sessionStart,
+}) => [
+  if (connected && sessionStart != null)
+    for (final c in state.sessionItems)
+      if (c.session == sessionStart.millisecondsSinceEpoch || !c.start.isBefore(sessionStart)) c,
+];
 
 /// Apps and sites that moved less than this are hidden by default (1 MB).
 const smallTraffic = 1024 * 1024;

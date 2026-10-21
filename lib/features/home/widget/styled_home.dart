@@ -1197,7 +1197,7 @@ class _Orb extends HookWidget {
                 begin: drawn.value,
                 end: _headingFor(heading, on && !busy ? Offset(_step(ping), _step(loss)) : Offset.zero),
               ),
-              duration: const Duration(milliseconds: 700),
+              duration: lightDuration(const Duration(milliseconds: 700)),
               curve: Curves.easeOutCubic,
               builder: (context, filled, _) {
                 // switching: drawn whole (the gauge glides down from the full when it ends)
@@ -1433,12 +1433,7 @@ class _HomeTraffic extends ConsumerWidget {
     final sessionStart = ref.watch(sessionStartProvider);
     // the VPN off: no session, the picture (the last session's list isn't shown)
     final connected = ref.watch(shownConnectionProvider).isConnected;
-    final current = [
-      // the session's start not known yet: nothing rather than the whole day's list
-      if (connected && sessionStart != null)
-        for (final c in state.sessionItems)
-          if (c.session == sessionStart.millisecondsSinceEpoch || !c.start.isBefore(sessionStart)) c,
-    ];
+    final current = sessionConnections(state, connected: connected, sessionStart: sessionStart);
     final big = {
       for (final g in groupConnections(current, (c) => c.app))
         if (g.total >= smallTraffic) g.key,
@@ -1863,11 +1858,23 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
   @override
   Widget build(BuildContext context) {
     if (!widget.own && context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
-    final layout = ref.watch(contrastBackdropLayoutProvider);
     final brightness = Theme.of(context).brightness;
+    final palette = ref.watch(contrastColoursProvider);
+    // the light look: no picture behind, the page's colour (nothing to draw, nothing kept in memory)
+    if (ref.watch(lightLookProvider)) {
+      return _GlowAnchor(
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Positioned.fill(child: ColoredBox(color: palette.page(brightness == Brightness.dark))),
+            widget.child,
+          ],
+        ),
+      );
+    }
+    final layout = ref.watch(contrastBackdropLayoutProvider);
     // the settings not read yet (the first frames): the defaults
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
-    final palette = ref.watch(contrastColoursProvider);
     final (warm, cool) = palette.backdrop(brightness);
     final area = contrastImageArea(MediaQuery.sizeOf(context));
     // the picture at the screen's sharpness, two pixels a point at most (blurrier lines aren't seen, memory is)
@@ -1947,6 +1954,20 @@ class ContrastFrost extends ConsumerWidget {
     final clarity = ref.watch(sharedPreferencesProvider).hasValue
         ? ref.watch(Preferences.contrastClarity)
         : ContrastClarity.fallback;
+    // the light look: a plain pane, nothing frosted behind it
+    if (ref.watch(lightLookProvider)) {
+      return RepaintBoundary(
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: ContrastColours.of(context).pane(dark),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
+          ),
+          child: child,
+        ),
+      );
+    }
     return _FrostedBackdrop(
       radius: radius,
       // the block's content in a layer of its own: what moves in it (a clock, a figure) is drawn again alone, not
@@ -2453,7 +2474,7 @@ class _Water extends HookWidget {
     if (now == null || (next - now).abs() >= .08 || (next == 0) != (now == 0)) heading.value = next;
     return TweenAnimationBuilder<double>(
       tween: Tween(end: heading.value),
-      duration: const Duration(milliseconds: 900),
+      duration: lightDuration(const Duration(milliseconds: 900)),
       curve: Curves.easeOutCubic,
       builder: (context, l, _) => l < .005
           ? const SizedBox.shrink()
@@ -2939,7 +2960,7 @@ void showGlassPopup(BuildContext context, Widget child) {
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black26,
-    transitionDuration: const Duration(milliseconds: 300),
+    transitionDuration: lightDuration(const Duration(milliseconds: 300)),
     pageBuilder: (_, _, _) => _GlassPopup(child: child),
     transitionBuilder: (context, animation, _, child) =>
         HomePopupTransition(animation: animation, alignment: const Alignment(0, .9), child: child),
@@ -3236,7 +3257,7 @@ class _SiteTiles extends HookConsumerWidget {
             Positioned.fill(
               child: TweenAnimationBuilder<double>(
                 tween: Tween(end: level),
-                duration: const Duration(milliseconds: 900),
+                duration: lightDuration(const Duration(milliseconds: 900)),
                 curve: Curves.easeOutCubic,
                 builder: (context, l, _) => l < .005
                     ? const SizedBox.shrink()
@@ -3423,7 +3444,7 @@ class _SiteTiles extends HookConsumerWidget {
                           tween: Tween(
                             end: sites.testing ? (.08 + .92 * sites.done / latencySites.length).clamp(0.0, 1.0) : 1.0,
                           ),
-                          duration: const Duration(milliseconds: 500),
+                          duration: lightDuration(const Duration(milliseconds: 500)),
                           curve: Curves.easeOutCubic,
                           builder: (context, fill, _) => SizedBox.expand(
                             child: CircularProgressIndicator(

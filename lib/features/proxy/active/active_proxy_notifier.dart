@@ -1,3 +1,4 @@
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -161,7 +162,11 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
         ..add(Timer(const Duration(seconds: 3), refilterIfNetworkChanged))
         ..add(Timer(const Duration(seconds: 10), refilterIfNetworkChanged));
     });
-    final safetyNet = Timer.periodic(const Duration(seconds: 15), (_) => refilterIfNetworkChanged());
+    // the light background work: the safety net looks three times less often
+    final safetyNet = Timer.periodic(
+      Duration(seconds: ref.read(lightBackgroundProvider) ? 45 : 15),
+      (_) => refilterIfNetworkChanged(),
+    );
     ref.onDispose(() {
       for (final timer in checks) {
         timer.cancel();

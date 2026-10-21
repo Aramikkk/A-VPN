@@ -115,6 +115,10 @@ object Settings {
     val autoPauseEnabled: Boolean
         get() = preferences.getBoolean(SettingsKey.AUTO_PAUSE_ENABLED, false)
 
+    /** The light background work: the watcher in the service wakes half as often. */
+    val lightBackground: Boolean
+        get() = preferences.getBoolean(SettingsKey.LIGHT_BACKGROUND, false)
+
     /** Pause the VPN on a home Wi-Fi (its router runs a VPN of its own). */
     val homeWifiEnabled: Boolean
         get() = preferences.getBoolean(SettingsKey.HOME_WIFI_ENABLED, false)

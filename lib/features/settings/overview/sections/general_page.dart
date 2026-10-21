@@ -86,6 +86,20 @@ class GeneralPage extends HookConsumerWidget {
                   value: !ref.watch(Preferences.disableMemoryLimit),
                   onChanged: (value) async => await ref.read(Preferences.disableMemoryLimit.notifier).update(!value),
                 ),
+                SwitchListTile.adaptive(
+                  title: Text(t.avpn.lightLook),
+                  subtitle: Text(t.avpn.lightLookMsg),
+                  secondary: const Icon(Icons.blur_off_rounded),
+                  value: ref.watch(Preferences.lightLook),
+                  onChanged: ref.read(Preferences.lightLook.notifier).update,
+                ),
+                SwitchListTile.adaptive(
+                  title: Text(t.avpn.lightBackground),
+                  subtitle: Text(t.avpn.lightBackgroundMsg),
+                  secondary: const Icon(Icons.battery_saver_rounded),
+                  value: ref.watch(Preferences.lightBackground),
+                  onChanged: ref.read(Preferences.lightBackground.notifier).update,
+                ),
                 // the logs and About, moved here from the settings list
                 ListTile(
                   leading: const Icon(Icons.description_rounded),
