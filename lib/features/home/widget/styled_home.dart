@@ -3344,6 +3344,8 @@ class _SiteTiles extends HookConsumerWidget {
                         width: low ? 22 : 28,
                         height: low ? 22 : 28,
                         alignment: Alignment.center,
+                        // the flag fills the circle, as the logo does its ring
+                        clipBehavior: Clip.antiAlias,
                         // a pane of the page's colour under it, so the circle keeps its edge in the water too
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
@@ -3352,7 +3354,7 @@ class _SiteTiles extends HookConsumerWidget {
                         ),
                         child: Text(
                           flag,
-                          style: TextStyle(fontSize: low ? 11 : 14, height: 1, fontFamilyFallback: const ['Emoji']),
+                          style: TextStyle(fontSize: low ? 16 : 22, height: 1, fontFamilyFallback: const ['Emoji']),
                         ),
                       );
                 return Padding(
@@ -3640,8 +3642,12 @@ Offset _headingFor(ObjectRef<Offset> heading, Offset next) {
 /// [v] in steps of 2% (0 to 1).
 double _step(double v) => v.isFinite ? (v * 50).round() / 50 : 0;
 
-/// How wide [text] is in [style]: the room a unit takes beside a figure that is centred without it.
-double _textWidth(String text, TextStyle style) => (TextPainter(
-  text: TextSpan(text: text, style: style),
-  textDirection: TextDirection.ltr,
-)..layout()).width;
+/// 70% of how wide [text] is in [style]: the room given on the left to a figure with a unit written after it. Fully
+/// centred without the unit the figure looked pushed to the right (the unit's weight is on that side); with the
+/// unit counted too it sat plainly to the left; a little left of the middle looks centred.
+double _textWidth(String text, TextStyle style) =>
+    (TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout()).width *
+    .7;
