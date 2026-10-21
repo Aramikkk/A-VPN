@@ -2520,30 +2520,50 @@ class _ContrastStats extends StatelessWidget {
     // the unfolded phone (or a tablet): half as high, the sign beside the label and the figure
     final compact = MediaQuery.sizeOf(context).width >= 700 || MediaQuery.sizeOf(context).height < 600;
     Widget tile(IconData icon, String label, String figure, String unit, bool lit, double level, Color colour) {
-      Widget value(double size) => Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(text: figure),
-            if (unit.isNotEmpty)
-              TextSpan(
-                text: ' $unit',
-                style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 0,
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
+      Widget value(double size, {bool centred = false}) {
+        final text = Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: figure),
+              if (unit.isNotEmpty)
+                TextSpan(
+                  text: ' $unit',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0,
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-          ],
-        ),
-        style: theme.textTheme.titleLarge?.copyWith(
-          fontSize: size,
-          fontWeight: FontWeight.w500,
-          letterSpacing: -1,
-          color: lit ? scheme.primary : scheme.onSurface,
-          fontFeatures: const [FontFeature.tabularFigures()],
-        ),
-      );
+            ],
+          ),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontSize: size,
+            fontWeight: FontWeight.w500,
+            letterSpacing: -1,
+            color: lit ? scheme.primary : scheme.onSurface,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        );
+        // centred: as much room on the left as the unit takes on the right, so the figure itself is in the middle
+        // and the unit is just written after it
+        return centred && unit.isNotEmpty
+            ? Padding(
+                padding: EdgeInsets.only(
+                  left: _textWidth(
+                    ' $unit',
+                    (theme.textTheme.titleLarge ?? const TextStyle()).copyWith(
+                      fontSize: 11,
+                      letterSpacing: 0,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                child: text,
+              )
+            : text;
+      }
+
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -2604,7 +2624,7 @@ class _ContrastStats extends StatelessWidget {
                       // the figure in the middle of what is left, the label at the bottom
                       Expanded(
                         child: Center(
-                          child: FittedBox(fit: BoxFit.scaleDown, child: value(22)),
+                          child: FittedBox(fit: BoxFit.scaleDown, child: value(22, centred: true)),
                         ),
                       ),
                       Text(label, style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
@@ -3362,28 +3382,43 @@ class _SiteTiles extends HookConsumerWidget {
                               child: Center(
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
-                                  child: Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
-                                        if (measured && ms != null)
-                                          TextSpan(
-                                            text: ' ms',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              letterSpacing: 0,
-                                              fontWeight: FontWeight.w600,
-                                              color: scheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                      ],
+                                  child: Padding(
+                                    // the room of " ms" on the left: the figure is in the middle, " ms" is written after it
+                                    padding: EdgeInsets.only(
+                                      left: measured && ms != null
+                                          ? _textWidth(
+                                              ' ms',
+                                              (theme.textTheme.headlineMedium ?? const TextStyle()).copyWith(
+                                                fontSize: 12,
+                                                letterSpacing: 0,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            )
+                                          : 0,
                                     ),
-                                    style: theme.textTheme.headlineMedium?.copyWith(
-                                      fontSize: low ? 26 : 32,
-                                      fontWeight: FontWeight.w500,
-                                      letterSpacing: -1.5,
-                                      color: scheme.onSurface,
-                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    child: Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(text: !measured ? '…' : (ms == null ? '—' : '$ms')),
+                                          if (measured && ms != null)
+                                            TextSpan(
+                                              text: ' ms',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                letterSpacing: 0,
+                                                fontWeight: FontWeight.w600,
+                                                color: scheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      style: theme.textTheme.headlineMedium?.copyWith(
+                                        fontSize: low ? 26 : 32,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: -1.5,
+                                        color: scheme.onSurface,
+                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -3604,3 +3639,9 @@ Offset _headingFor(ObjectRef<Offset> heading, Offset next) {
 
 /// [v] in steps of 2% (0 to 1).
 double _step(double v) => v.isFinite ? (v * 50).round() / 50 : 0;
+
+/// How wide [text] is in [style]: the room a unit takes beside a figure that is centred without it.
+double _textWidth(String text, TextStyle style) => (TextPainter(
+  text: TextSpan(text: text, style: style),
+  textDirection: TextDirection.ltr,
+)..layout()).width;
