@@ -8,6 +8,7 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/country_scan.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart' show sigmaName;
 import 'package:hiddify/features/profile/data/country_ping.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_merge.dart';
@@ -217,7 +218,7 @@ class _ProfileCountries extends HookConsumerWidget {
                           text: known ? (ping == null ? '—' : '$ping ms') : '…',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: !known
+                            color: !known || (ping == null && ProfileMerge.isWhitelist(code))
                                 ? scheme.onSurfaceVariant
                                 : ping == null
                                 ? _bad
@@ -295,7 +296,9 @@ class _ProfileCountries extends HookConsumerWidget {
           if (open) unawaited(load());
         },
         title: Text(
-          profile.active ? '${profile.name}  ·  ${t.avpn.profileManagementActive}' : profile.name,
+          profile.active
+              ? '${sigmaName(profile.name)}  ·  ${t.avpn.profileManagementActive}'
+              : sigmaName(profile.name),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium,

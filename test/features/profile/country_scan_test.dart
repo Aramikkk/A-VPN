@@ -26,6 +26,14 @@ void main() {
     }
   });
 
+  test('list keys: the country, a mark for whitelist servers, nothing for the auto-select entries', () {
+    expect(ServerRegionFilter.serverKey('🇸🇪 Доступ - Швеция § 1'), 'SE');
+    expect(ServerRegionFilter.serverKey('🇸🇪 LTE Only - Швеция § 2'), 'SE:bs');
+    expect(ServerRegionFilter.serverKey('🇦🇶 Автовыбор § 0'), isNull);
+    expect(ServerRegionFilter.serverKey('🇦🇶 Автовыбор игровой § 6'), isNull);
+    expect(ServerRegionFilter.serverKey('hop'), isNull);
+  });
+
   test('the region filter lets a country in: Europe only, World and CIS, or none', () {
     expect(CountryScan.allowedByFilter('SE', europeOnly: true, cisOnly: false), isTrue);
     expect(CountryScan.allowedByFilter('US', europeOnly: true, cisOnly: false), isFalse);

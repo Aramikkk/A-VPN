@@ -152,7 +152,8 @@ abstract class ServerRegionFilter {
   /// country can't be told.
   static String? serverKey(String tag) {
     final code = countryCode(tag);
-    if (code == null) return null;
+    // Antarctica is the provider's flag for its "Автовыбор" entries: not a country with servers
+    if (code == null || code == 'AQ') return null;
     return isMobileOnly(tag) ? '$code:bs' : code;
   }
 
