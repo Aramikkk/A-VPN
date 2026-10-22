@@ -302,6 +302,8 @@ abstract class ServerRegionFilter {
     NetworkKind network = NetworkKind.unknown,
     // a variant made ahead for the other network (the phone switches to it by itself): not the one running
     bool remember = true,
+    // the countries (list keys, see serverKey) the user chose by hand: they pass the region filter
+    Set<String> allowOutside = const {},
   }) async {
     if (remember) lastApplied = network;
     try {
@@ -326,9 +328,9 @@ abstract class ServerRegionFilter {
       }
 
       if (cisOnly) {
-        shown = narrow(shown, keepCis, 'World and CIS');
+        shown = narrow(shown, (tag) => keepCis(tag) || allowOutside.contains(serverKey(tag)), 'World and CIS');
       } else if (europeOnly) {
-        shown = narrow(shown, keep, 'European');
+        shown = narrow(shown, (tag) => keep(tag) || allowOutside.contains(serverKey(tag)), 'European');
       }
       if (network == NetworkKind.mobile) shown = narrow(shown, isMobileOnly, 'mobile-only');
       if (network == NetworkKind.wifi) shown = narrow(shown, (tag) => !isMobileOnly(tag), 'Wi-Fi');

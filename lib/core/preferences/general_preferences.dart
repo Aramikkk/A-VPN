@@ -164,6 +164,27 @@ abstract class Preferences {
     mapTo: (value) => jsonEncode(value),
   );
 
+  /// Settings → Profile management: the countries outside the region filter (Europe only, World and CIS) that the user
+  /// switched on by hand, by profile and network, the same form as [profileCountriesOff]. A choice made by hand wins
+  /// over the filter.
+  static final profileCountriesOn = PreferencesNotifier.create<Map<String, Map<String, List<String>>>, String>(
+    "profile_countries_on",
+    const {},
+    mapFrom: (value) {
+      try {
+        return {
+          for (final e in (jsonDecode(value) as Map<String, dynamic>).entries)
+            e.key: {
+              for (final n in (e.value as Map<String, dynamic>).entries) n.key: [...(n.value as List).cast<String>()],
+            },
+        };
+      } catch (_) {
+        return const {};
+      }
+    },
+    mapTo: (value) => jsonEncode(value),
+  );
+
   /// The countries each profile had at the last look (at its last update), by profile id: a country not in it is new.
   static final profileCountriesSeen = PreferencesNotifier.create<Map<String, List<String>>, String>(
     "profile_countries_seen_v2",

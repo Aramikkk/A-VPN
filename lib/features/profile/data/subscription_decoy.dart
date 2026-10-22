@@ -6,7 +6,7 @@ abstract class SubscriptionDecoy {
   /// The names a decoy server carries.
   static final _marks = RegExp(
     r'не\s+поддерживается|не\s+поддерживается|скачайте|установите\s+приложение|not\s+supported|unsupported|'
-    r'download\s+(the\s+)?(happ|app)|use\s+happ|please\s+use|обновите\s+приложение',
+    r'download\s+(the\s+)?(happ|app)|use\s+happ|please\s+use|обновите\s+приложение|missing[-\s]?hwid|идентификатор\s+устройства',
     caseSensitive: false,
     unicode: true,
   );

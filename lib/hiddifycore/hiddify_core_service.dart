@@ -254,6 +254,7 @@ class HiddifyCoreService with InfraLogger {
         cisOnly: cisOnly,
         network: network,
         remember: !variant,
+        allowOutside: _chosenByHand(profilePath, current),
       );
     }
     if (ref.read(ConfigOptions.homeNetwork)) {
@@ -287,6 +288,21 @@ class HiddifyCoreService with InfraLogger {
       );
     }
     return filtered;
+  }
+
+  /// The countries outside the region filter that the user switched on by hand (for the active profile and the added
+  /// ones), on the network the config is for.
+  Set<String> _chosenByHand(String profilePath, NetworkKind current) {
+    final on = ref.read(Preferences.profileCountriesOn);
+    if (on.isEmpty) return const {};
+    final kind = current == NetworkKind.mobile ? 'mobile' : 'wifi';
+    final resolver = ref.read(profilePathResolverProvider);
+    final ids = {
+      ProfileMerge.idOf(profilePath),
+      for (final id in ref.read(Preferences.extraProfiles))
+        if (resolver.file(id).path != profilePath) id,
+    };
+    return {for (final id in ids) ...?on[id]?[kind]};
   }
 
   /// [profilePath] (the active profile) with the other profiles' servers added, and each profile's countries that are

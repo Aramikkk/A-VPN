@@ -11,6 +11,7 @@ import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/features/profile/data/clash_to_links.dart';
 import 'package:hiddify/features/profile/data/profile_data_mapper.dart';
 import 'package:hiddify/features/profile/data/subscription_decoy.dart';
+import 'package:hiddify/features/profile/data/xray_json_to_links.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/model/profile_failure.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -210,7 +211,9 @@ class ProfileParser {
         });
     // the core can't read the provider's Clash file; hand it the same servers as share links. This has to
     // happen first: expanding remote lines trims every line, which strips the YAML's indentation.
-    final links = ClashToLinks.convert(await File(tempFilePath).readAsString());
+    // Xray's JSON (what Happ-style panels answer) too: its servers as links
+    final raw = await File(tempFilePath).readAsString();
+    final links = ClashToLinks.convert(raw) ?? XrayJsonToLinks.convert(raw);
     if (links != null) await File(tempFilePath).writeAsString(links);
     await expandRemoteLinesInParallel(
       tempFilePath: tempFilePath,

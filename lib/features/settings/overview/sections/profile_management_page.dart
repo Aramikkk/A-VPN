@@ -105,6 +105,8 @@ class _ProfileCountries extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final off = ref.watch(Preferences.profileCountriesOff)[profile.id] ?? const {};
+    // the countries outside the region filter that were switched on by hand
+    final handOn = ref.watch(Preferences.profileCountriesOn)[profile.id] ?? const {};
     // the countries of the profile (with the number of servers) and what the ping says so far
     final servers = useState<List<({String code, String host, int port})>?>(null);
     final pings = useState<Map<String, int?>>(const {});
@@ -146,6 +148,32 @@ class _ProfileCountries extends HookConsumerWidget {
     bool inFilter(String key) =>
         CountryScan.allowedByFilter(ProfileMerge.codeOf(key), europeOnly: europeOnly, cisOnly: cisOnly);
 
+    // a country outside the filter: switched on by hand (the choice wins over the filter) or off again
+    Future<void> toggleOutside(String network, String code, bool on) async {
+      final all = {...ref.read(Preferences.profileCountriesOn)};
+      final mine = {
+        for (final e in (all[profile.id] ?? const <String, List<String>>{}).entries) e.key: [...e.value],
+      };
+      final list = {...?mine[network]};
+      if (on) {
+        list.add(code);
+      } else {
+        list.remove(code);
+      }
+      if (list.isEmpty) {
+        mine.remove(network);
+      } else {
+        mine[network] = list.toList();
+      }
+      if (mine.isEmpty) {
+        all.remove(profile.id);
+      } else {
+        all[profile.id] = mine;
+      }
+      await ref.read(Preferences.profileCountriesOn.notifier).update(all);
+      onChanged();
+    }
+
     Future<void> toggle(String network, String code, bool on) async {
       final all = {...ref.read(Preferences.profileCountriesOff)};
       final mine = {
@@ -173,28 +201,31 @@ class _ProfileCountries extends HookConsumerWidget {
 
     String summary(String network) {
       if (servers.value == null) return off[network]?.isEmpty ?? true ? t.avpn.profileCountriesAll : '…';
-      final usable = codes
-          .where((key) => inFilter(key) && (network == 'mobile' || !ProfileMerge.isWhitelist(key)))
-          .toList();
-      final left = usable.where((code) => off[network]?.contains(code) ?? false).length;
-      return left == 0 ? t.avpn.profileCountriesAll : '${usable.length - left}/${usable.length}';
+      final shown = codes.where((key) => network == 'mobile' || !ProfileMerge.isWhitelist(key)).toList();
+      bool open(String key) =>
+          inFilter(key) ? !(off[network]?.contains(key) ?? false) : (handOn[network]?.contains(key) ?? false);
+      final count = shown.where(open).length;
+      return count == shown.length ? t.avpn.profileCountriesAll : '$count/${shown.length}';
     }
 
     // a cell of a column: the whole width of the cell, the label centred in it (a chip would be as wide as its text and
     // the edges of the cells would not line up)
     Widget chip(String network, String code) {
-      final selected = inFilter(code) && !(off[network]?.contains(code) ?? false);
+      // in the filter: on unless switched off; outside it: off unless switched on by hand
+      final selected = inFilter(code)
+          ? !(off[network]?.contains(code) ?? false)
+          : (handOn[network]?.contains(code) ?? false);
       final ping = pings.value[code];
       final known = pings.value.containsKey(code);
       return Opacity(
-        // outside the region filter: shown, not to be chosen
-        opacity: inFilter(code) ? 1 : .5,
+        // outside the region filter: dim until it is switched on by hand
+        opacity: selected || inFilter(code) ? 1 : .5,
         child: Material(
           color: selected ? scheme.secondaryContainer : Colors.transparent,
           shape: StadiumBorder(side: BorderSide(color: selected ? Colors.transparent : scheme.outlineVariant)),
           child: InkWell(
             customBorder: const StadiumBorder(),
-            onTap: inFilter(code) ? () => toggle(network, code, !selected) : null,
+            onTap: () => inFilter(code) ? toggle(network, code, !selected) : toggleOutside(network, code, !selected),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Center(
