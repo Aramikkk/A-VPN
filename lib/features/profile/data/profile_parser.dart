@@ -17,6 +17,7 @@ import 'package:hiddify/features/profile/model/profile_failure.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/singbox/model/singbox_proxy_type.dart';
+import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:meta/meta.dart';
@@ -214,6 +215,13 @@ class ProfileParser {
     // Xray's JSON (what Happ-style panels answer) too: its servers as links
     final raw = await File(tempFilePath).readAsString();
     final links = ClashToLinks.convert(raw) ?? XrayJsonToLinks.convert(raw);
+    if (links != null && raw.trimLeft().startsWith('[')) {
+      final report = XrayJsonToLinks.lastReport;
+      appLogger('profile').info(
+        'Xray JSON subscription: ${report.configs} configs, ${report.links} links'
+        '${report.skipped.isEmpty ? '' : ', left out: ${report.skipped}'}',
+      );
+    }
     if (links != null) await File(tempFilePath).writeAsString(links);
     await expandRemoteLinesInParallel(
       tempFilePath: tempFilePath,

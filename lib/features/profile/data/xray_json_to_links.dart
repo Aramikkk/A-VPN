@@ -3,6 +3,9 @@ import 'dart:convert';
 /// A subscription in Xray's JSON form (what Happ-style panels answer): a list of configs, one server each, with a
 /// `remarks` name and an `outbounds` list. The core reads share links, so the servers are handed to it as links.
 abstract class XrayJsonToLinks {
+  /// What the last conversion did: configs in the answer, links made, and what was left out (by the protocol).
+  static ({int configs, int links, Map<String, int> skipped}) lastReport = (configs: 0, links: 0, skipped: const {});
+
   /// The links, one per config, or null when [content] isn't such a subscription.
   static String? convert(String content) {
     final text = content.trim();
@@ -15,19 +18,32 @@ abstract class XrayJsonToLinks {
     }
     final configs = doc is List ? doc : [doc];
     final links = <String>[];
+    final skipped = <String, int>{};
+    var count = 0;
     for (final config in configs) {
       if (config is! Map) continue;
       final outbounds = config['outbounds'];
       if (outbounds is! List) continue;
+      count++;
+      String? first;
+      var found = false;
       for (final outbound in outbounds) {
         if (outbound is! Map) continue;
         final link = _link(Map<String, dynamic>.from(outbound), '${config['remarks'] ?? outbound['tag'] ?? ''}');
         if (link != null) {
           links.add(link);
+          found = true;
           break;
         }
+        // the first outbound that was a server but couldn't be made a link: what it was
+        final protocol = '${outbound['protocol']}';
+        if (first == null && !const ['freedom', 'blackhole', 'dns', 'direct', 'block'].contains(protocol)) {
+          first = protocol;
+        }
       }
+      if (!found) skipped[first ?? 'no server'] = (skipped[first ?? 'no server'] ?? 0) + 1;
     }
+    lastReport = (configs: count, links: links.length, skipped: skipped);
     return links.isEmpty ? null : links.join('\n');
   }
 

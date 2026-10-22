@@ -1139,6 +1139,9 @@ class _Orb extends HookWidget {
     // gliding again for 0.7 s, so the screen redrew all the time at rest (40 frames a second); they head for a new
     // value only when it's at least 8% of the arc away
     final heading = useRef(Offset.zero);
+    // and when they last moved: the ping jumps by 30 ms and more every few seconds, and each jump was 0.7 s of full frame
+    // rate (the screen redrew 10 times a second at rest); now a jump moves them once in ten seconds at the most
+    final moved = useRef(DateTime.fromMillisecondsSinceEpoch(0));
     useEffect(() {
       if (busy) {
         // the pulse starts bright
@@ -1204,9 +1207,9 @@ class _Orb extends HookWidget {
               // in steps of 2%: each second's ping doesn't start the arcs gliding again for a hair's change
               tween: Tween(
                 begin: drawn.value,
-                end: _headingFor(heading, on && !busy ? Offset(_step(ping), _step(loss)) : Offset.zero),
+                end: _headingFor(heading, moved, on && !busy ? Offset(_step(ping), _step(loss)) : Offset.zero),
               ),
-              duration: lightDuration(const Duration(milliseconds: 700)),
+              duration: lightDuration(const Duration(milliseconds: 500)),
               curve: Curves.easeOutCubic,
               builder: (context, filled, _) {
                 // switching: drawn whole (the gauge glides down from the full when it ends)
@@ -3636,12 +3639,16 @@ class ContrastPlate extends ConsumerWidget {
 /// [v] in whole percents (0 to 1): an animation to it starts again only when it moves by one.
 double _percent(double v) => v.isFinite ? (v * 100).round() / 100 : 0;
 
-/// The arcs' target: [next] when the arcs are to move to it (off, or switching, or a change of at least 8% of the arc
-/// in either), else where they already head.
-Offset _headingFor(ObjectRef<Offset> heading, Offset next) {
+/// The arcs' target: [next] when the arcs are to move to it (off, or switching, or a change of at least 10% of the arc
+/// in either and ten seconds since they last moved), else where they already head.
+Offset _headingFor(ObjectRef<Offset> heading, ObjectRef<DateTime> moved, Offset next) {
   final now = heading.value;
-  final far = (next.dx - now.dx).abs() >= .08 || (next.dy - now.dy).abs() >= .08;
-  if (next == Offset.zero || now == Offset.zero || far) heading.value = next;
+  final far = (next.dx - now.dx).abs() >= .1 || (next.dy - now.dy).abs() >= .1;
+  final due = DateTime.now().difference(moved.value) >= const Duration(seconds: 10);
+  if (next == Offset.zero || now == Offset.zero || (far && due)) {
+    heading.value = next;
+    moved.value = DateTime.now();
+  }
   return heading.value;
 }
 
