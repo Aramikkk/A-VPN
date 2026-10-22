@@ -2,9 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 
 void main() {
-  test('the ad block never touches bank and AI domains', () {
+  test('the ad block never touches bank, AI and big Russian service domains', () {
     final exceptions = adBlockExceptions();
-    for (final host in ['sberbank.ru', 'alfabank.ru', 'openai.com']) {
+    for (final host in ['sberbank.ru', 'alfabank.ru', 'openai.com', 'mc.yandex.ru', 'avito.st', 'ozon.ru', 'm.vk.com']) {
       expect(exceptions.any((d) => host == d || host.endsWith('.$d')), isTrue, reason: host);
     }
   });

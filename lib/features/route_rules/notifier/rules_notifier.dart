@@ -412,6 +412,22 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
   }
 }
 
-/// Domains the ad block (Settings → Ads) never touches: the banks' and the AI services', whose own telemetry hosts
-/// sit in the ad lists and breaking them breaks the apps.
-List<String> adBlockExceptions() => [...bankDomains, ...aiDomains];
+/// Domains the ad block (Settings → Ads) never touches: the banks', the AI services', and the big Russian services'
+/// (Yandex, the marketplaces, VK and the like), whose own telemetry and statics hosts sit in the ad lists and breaking
+/// them breaks the apps and sites (pictures missing, a home page that never loads).
+List<String> adBlockExceptions() => [...bankDomains, ...aiDomains, ...yandexDomains, ...marketDomains, ...adBlockRuDomains];
+
+const adBlockRuDomains = [
+  'vk.com',
+  'vk.ru',
+  'vkuser.net',
+  'userapi.com',
+  'mail.ru',
+  'gosuslugi.ru',
+  '2gis.ru',
+  '2gis.com',
+  'hh.ru',
+  'rzd.ru',
+  'rutube.ru',
+  'ok.ru',
+];

@@ -104,7 +104,6 @@ class SitesPage extends HookConsumerWidget {
           // the apps with a server of their own (a phone's apps are known by package)
           if (PlatformUtils.isAndroid) ...[
             heading(t.avpn.siteGroupApps),
-            note(t.avpn.siteGroupAppsMsg),
             ListTile(
               leading: const Icon(Icons.apps_rounded),
               title: Text(t.avpn.siteGroupAppsChoose),
