@@ -158,6 +158,40 @@ void main() {
     expect(link, contains('@s.example.com:8388#s'));
   });
 
+  test('hysteria 2', () {
+    final config = {
+      'remarks': 'h',
+      'outbounds': [
+        {
+          'protocol': 'hysteria',
+          'settings': {'address': 'h.example.com', 'port': 8443, 'version': 2},
+          'streamSettings': {
+            'network': 'hysteria',
+            'security': 'tls',
+            'tlsSettings': {
+              'serverName': 'h.example.com',
+              'alpn': ['h3'],
+            },
+            'hysteriaSettings': {'version': 2, 'auth': 'secret'},
+          },
+        },
+      ],
+    };
+    final uri = Uri.parse(XrayJsonToLinks.convert(jsonEncode([config]))!);
+    expect((uri.scheme, uri.userInfo, uri.host, uri.port), ('hysteria2', 'secret', 'h.example.com', 8443));
+    expect(uri.queryParameters, {'sni': 'h.example.com', 'alpn': 'h3'});
+    expect(XrayJsonToLinks.lastReport.skipped, isEmpty);
+    // version 1: left out, and told
+    config['outbounds'] = [
+      {
+        'protocol': 'hysteria',
+        'settings': {'address': 'h.example.com', 'port': 8443, 'version': 1},
+      },
+    ];
+    expect(XrayJsonToLinks.convert(jsonEncode([config])), isNull);
+    expect(XrayJsonToLinks.lastReport.skipped, {'hysteria': 1});
+  });
+
   test('not an Xray subscription: nothing', () {
     expect(XrayJsonToLinks.convert('vless://a@b:443#x'), isNull);
     expect(XrayJsonToLinks.convert('{"outbounds":[{"type":"vless","tag":"a"}]}'), isNull);

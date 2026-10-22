@@ -72,6 +72,23 @@ abstract class XrayJsonToLinks {
         final port = _int(server['port']);
         if (password.isEmpty || host.isEmpty || port == null) return null;
         return 'trojan://${Uri.encodeComponent(password)}@${_host(host)}:$port?${_encode(_streamQuery(stream))}#$fragment';
+      case 'hysteria':
+        // Hysteria 2 (Xray's `hysteria` outbound, version 2): the link the core reads
+        final server = _server(settings, 'servers');
+        final hysteria = _map(stream['hysteriaSettings']);
+        final version = _int(hysteria['version'] ?? settings['version'] ?? server['version']) ?? 2;
+        final host = '${server['address'] ?? ''}';
+        final port = _int(server['port']);
+        final auth = '${hysteria['auth'] ?? settings['auth'] ?? server['auth'] ?? ''}';
+        if (version != 2 || host.isEmpty || port == null) return null;
+        final tls = _map(stream['tlsSettings']);
+        final query = <String, String>{};
+        _put(query, 'sni', tls['serverName']);
+        if (tls['allowInsecure'] == true) query['insecure'] = '1';
+        final alpn = tls['alpn'];
+        if (alpn is List && alpn.isNotEmpty) query['alpn'] = alpn.join(',');
+        final userinfo = auth.isEmpty ? '' : '${Uri.encodeComponent(auth)}@';
+        return 'hysteria2://$userinfo${_host(host)}:$port${query.isEmpty ? '' : '?${_encode(query)}'}#$fragment';
       case 'shadowsocks':
         final server = _server(settings, 'servers');
         final method = '${server['method'] ?? ''}';
