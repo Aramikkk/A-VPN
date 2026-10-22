@@ -1122,13 +1122,17 @@ String sigmaName(String name) =>
 /// subscription it is from (0: the active profile; see profileOfTag).
 typedef ServerName = ({String? flag, String title, int profile});
 
+// the core's display name has the number cut off, so the subscription is told from the full tag
 ServerName serverName(OutboundInfo server) =>
-    serverNameOf(server.tagDisplay.isNotEmpty ? server.tagDisplay : server.tag);
+    serverNameOf(server.tagDisplay.isNotEmpty ? server.tagDisplay : server.tag, tag: server.tag);
 
 /// The same from a bare name (a connection's outbound).
-ServerName serverNameOf(String raw) {
-  final profile = profileOfTag(raw);
-  var name = raw;
+ServerName serverNameOf(String raw, {String? tag}) {
+  // a connection's name carries its subscription as an invisible mark at the end: that tells the subscription for the
+  // flag's badge
+  final marked = splitMark(raw);
+  final profile = tag != null ? profileOfTag(tag) : (marked.profile ?? profileOfTag(raw));
+  var name = marked.text;
   name = name.replaceAll('§hide§', '').replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '').trim();
   name = sigmaName(name);
   final runes = name.runes.toList();

@@ -11,24 +11,35 @@ void main() {
     expect(profileOfTag('select'), 0);
   });
 
-  test('a mark: the first letter of the name, a circled one as text', () {
+  test('a mark: the first letter of the name, its own colour for each subscription', () {
     final sigma = badgeOf(0, 'Доступ');
-    expect((sigma.letter, sigma.glyph), ('S', 'Ⓢ'));
+    expect(sigma.letter, 'S');
     final chill = badgeOf(1, 'ChillGuy VPN 🚀');
-    expect((chill.letter, chill.glyph), ('C', 'Ⓒ'));
-    // another alphabet: a circled number
-    final other = badgeOf(2, 'Второй провайдер');
-    expect((other.letter, other.glyph), ('В', '③'));
+    expect(chill.letter, 'C');
+    // another alphabet: its own first letter
+    expect(badgeOf(2, 'Второй провайдер').letter, 'В');
     expect(sigma.colour, isNot(chill.colour));
+    expect(badgeOf(2, 'x').colour, isNot(chill.colour));
+  });
+
+  test('a name carries its subscription as an invisible mark, taken off again', () {
+    profileBadgesNow = [badgeOf(0, 'Доступ'), badgeOf(1, 'ChillGuy')];
+    final sigmaName = '🇸🇪 Швеция${profileMark(0)}';
+    final chillName = '🇩🇪 LTE-Антиглушилка №8${profileMark(1)}';
+    expect(splitMark(chillName), (profile: 1, text: '🇩🇪 LTE-Антиглушилка №8'));
+    expect(splitMark(sigmaName), (profile: 0, text: '🇸🇪 Швеция'));
+    expect(splitMark('🇸🇪 Швеция').profile, isNull);
+    // the mark is invisible: nothing a reader sees is added
+    expect(profileMark(1).runes.every((r) => r == 0x200B), isTrue);
+    profileBadgesNow = const [];
   });
 
   test('no marks with one subscription', () {
     profileBadgesNow = const [];
-    expect(profileGlyph(0), '');
-    expect(profileGlyph(3), '');
+    expect(profileMark(0), '');
+    expect(profileMark(3), '');
     profileBadgesNow = [badgeOf(0, 'Доступ'), badgeOf(1, 'ChillGuy')];
-    expect(profileGlyph(1), 'Ⓒ');
-    expect(profileGlyph(5), '');
+    expect(profileMark(5), '');
     profileBadgesNow = const [];
   });
 }

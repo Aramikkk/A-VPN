@@ -7,8 +7,8 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// A mark of a subscription: a coloured circle with the first letter of its name.
-typedef ProfileBadge = ({String letter, String glyph, Color colour});
+/// A mark of a subscription: a coloured circle with the first letter of its name, on the flag of its servers.
+typedef ProfileBadge = ({String letter, Color colour});
 
 /// The marks of the subscriptions in the work, the active profile first, then the added ones in the order they were
 /// added; the same order the servers are numbered in (see ProfileMerge). Empty with one subscription: nothing to tell
@@ -39,12 +39,7 @@ const _colours = [Color(0xFF4F8CFF), Color(0xFFF0A030), Color(0xFF45B97C), Color
 ProfileBadge badgeOf(int index, String name) {
   final text = sigmaName(name).trim();
   final letter = text.isEmpty ? '?' : String.fromCharCode(text.runes.first).toUpperCase();
-  final code = letter.codeUnitAt(0);
-  // as text (where no widget fits): a circled Latin letter, or a circled digit for any other alphabet
-  final glyph = code >= 0x41 && code <= 0x5A
-      ? String.fromCharCode(0x24B6 + code - 0x41)
-      : String.fromCharCode(0x2460 + (index % 20));
-  return (letter: letter, glyph: glyph, colour: _colours[index % _colours.length]);
+  return (letter: letter, colour: _colours[index % _colours.length]);
 }
 
 /// Which subscription a server of the running config is from: the provider's own `§ N` ending of its name is shifted by
@@ -55,9 +50,21 @@ int profileOfTag(String tag) {
   return number ~/ 1000;
 }
 
-/// A server's mark as text (a circled letter) for the lists that are text only; empty with one subscription.
-String profileGlyph(int profile) =>
-    profile >= 0 && profile < profileBadgesNow.length ? profileBadgesNow[profile].glyph : '';
+/// The invisible mark a connection's server name carries to tell its subscription: a zero-width space for each step of
+/// the subscription's index plus one. The flag shows it as a mark, the text shows nothing. Empty with one subscription.
+String profileMark(int profile) => profile >= 0 && profile < profileBadgesNow.length ? '​' * (profile + 1) : '';
+
+/// A name that ends with [profileMark]: which subscription, and the name without the mark.
+({int? profile, String text}) splitMark(String text) {
+  var count = 0;
+  var end = text.length;
+  while (end > 0 && text.codeUnitAt(end - 1) == 0x200B) {
+    count++;
+    end--;
+  }
+  if (count == 0) return (profile: null, text: text);
+  return (profile: count - 1, text: text.substring(0, end).trimRight());
+}
 
 /// The coloured circle with the subscription's letter; nothing with one subscription.
 class ProfileBadgeDot extends ConsumerWidget {
