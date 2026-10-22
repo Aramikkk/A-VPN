@@ -79,6 +79,9 @@ class RoutingOptionsPage extends HookConsumerWidget {
         header: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // where everything the rules leave goes: through the VPN, or direct (it was on the Settings list)
+            const EverythingElseTile(),
+            const Divider(height: 1),
             // native, so it applies before every rule
             if (PlatformUtils.isAndroid) const _AppBasedRoutingSection(),
             const _PinnedOptions(),
@@ -559,21 +562,11 @@ class _ListFooter extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final routing = t.pages.settings.routing;
-    final direct = ref.watch(ConfigOptions.blockedOnlyViaVpn);
     const divider = Divider(height: 1, indent: 16, endIndent: 16);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Divider(height: 1),
-        // the switch itself is in Settings, next to Routing
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Text(
-            '${routing.everythingElse}: ${direct ? routing.outcomeDirect : routing.outcomeVpn}. ${routing.everythingElseWhere}',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
         const Divider(height: 3, thickness: 3),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
@@ -719,8 +712,8 @@ class ServersOptionsPage extends ConsumerWidget {
   }
 }
 
-/// Where everything the rules leave goes: through the VPN, or direct ("only blocked through the VPN"). A
-/// setting of its own on the Settings list.
+/// Where everything the rules leave goes: through the VPN, or direct ("only blocked through the VPN"): the first row
+/// of Settings → Routing.
 class EverythingElseTile extends ConsumerWidget {
   const EverythingElseTile({super.key});
 

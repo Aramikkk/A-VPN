@@ -32,6 +32,7 @@ import 'package:hiddify/features/settings/overview/sections/dns_options_page.dar
 import 'package:hiddify/features/settings/overview/sections/general_page.dart';
 import 'package:hiddify/features/settings/overview/sections/inbound_options_page.dart';
 import 'package:hiddify/features/settings/overview/sections/ad_block_page.dart';
+import 'package:hiddify/features/settings/overview/sections/profile_management_page.dart';
 import 'package:hiddify/features/settings/overview/sections/ping_page.dart';
 import 'package:hiddify/features/settings/overview/sections/sites_page.dart';
 import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
@@ -322,6 +323,15 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                           ),
                         ),
                       ],
+                    ),
+                    GoRoute(
+                      name: 'profileManagement',
+                      path: 'profile-management',
+                      pageBuilder: (_, state) => customTransition(
+                        TransitionType.slide,
+                        state.pageKey,
+                        settingsWidth(const ProfileManagementPage()),
+                      ),
                     ),
                     GoRoute(
                       name: 'adBlockOptions',

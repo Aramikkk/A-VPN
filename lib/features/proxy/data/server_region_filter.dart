@@ -135,6 +135,9 @@ abstract class ServerRegionFilter {
     'iceland': 'IS',
   };
 
+  /// The country names the filter knows (lower case, Russian and English) and their ISO codes.
+  static Map<String, String> get countryNames => _names;
+
   static final _logger = infraLogger('ServerRegionFilter');
 
   /// Whether a server stays. A server whose country can't be told stays too, so the filter never

@@ -6,6 +6,7 @@ import 'package:hiddify/core/haptic/haptic_service.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_repository.dart';
@@ -54,11 +55,33 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
 
   Future<Unit> selectActiveProfile(String id) async {
     loggy.debug('changing active profile to: [$id]');
+    // the active profile is the base; it isn't one of the added ones
+    await _dropExtra(id);
     await ref.read(hapticServiceProvider.notifier).lightImpact();
     return _profilesRepo.setAsActive(id).getOrElse((err) {
       loggy.warning('failed to set [$id] as active profile', err);
       throw err;
     }).run();
+  }
+
+  Future<void> _dropExtra(String id) async {
+    final extras = ref.read(Preferences.extraProfiles);
+    if (extras.contains(id)) await ref.read(Preferences.extraProfiles.notifier).update([...extras]..remove(id));
+  }
+
+  /// Adds the profile's servers to the active profile's (or takes them out again): several subscriptions at once.
+  /// The config is made at the start, so a running VPN is restarted to take it.
+  Future<void> toggleExtra(ProfileEntity profile) async {
+    final extras = ref.read(Preferences.extraProfiles);
+    final on = extras.contains(profile.id);
+    loggy.debug('profile [${profile.id}] as an extra one: ${!on}');
+    await ref
+        .read(Preferences.extraProfiles.notifier)
+        .update(on ? ([...extras]..remove(profile.id)) : [...extras, profile.id]);
+    final active = await ref.read(activeProfileProvider.future);
+    if (active != null && ref.read(connectionNotifierProvider).valueOrNull is Connected) {
+      await ref.read(connectionNotifierProvider.notifier).reconnect(active);
+    }
   }
 
   Future<void> togglePin(ProfileEntity profile) async {
@@ -73,6 +96,7 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
     loggy.debug('deleting profile: ${profile.name}');
 
     if (profile.active) await ref.read(connectionNotifierProvider.notifier).abortConnection();
+    await _dropExtra(profile.id);
     await _profilesRepo
         .deleteById(profile.id, profile.active)
         .match(

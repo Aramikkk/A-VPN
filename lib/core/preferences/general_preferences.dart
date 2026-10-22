@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/model/region.dart';
@@ -132,6 +134,35 @@ abstract class Preferences {
   /// A-VPN: how often the subscription (the server list) updates, in hours; 0: as the subscription says,
   /// -1: never
   static final subUpdateHours = PreferencesNotifier.create<int, int>("sub_update_hours", 0);
+
+  /// More than one subscription at once: the ids of the profiles whose servers are added to the active profile's
+  /// (see ProfileMerge). Kept as one ";"-separated string.
+  static final extraProfiles = PreferencesNotifier.create<List<String>, String>(
+    "extra_profiles",
+    const [],
+    mapFrom: (value) => value.split(';').where((e) => e.isNotEmpty).toList(),
+    mapTo: (value) => value.join(';'),
+  );
+
+  /// Settings → Profile management: the countries of each profile switched off, by network:
+  /// {profile id: {"wifi": [codes], "mobile": [codes]}}. Nothing here: every country is on.
+  static final profileCountriesOff = PreferencesNotifier.create<Map<String, Map<String, List<String>>>, String>(
+    "profile_countries_off",
+    const {},
+    mapFrom: (value) {
+      try {
+        return {
+          for (final e in (jsonDecode(value) as Map<String, dynamic>).entries)
+            e.key: {
+              for (final n in (e.value as Map<String, dynamic>).entries) n.key: [...(n.value as List).cast<String>()],
+            },
+        };
+      } catch (_) {
+        return const {};
+      }
+    },
+    mapTo: (value) => jsonEncode(value),
+  );
 
   /// A-VPN auto-pause (Android): the VPN steps aside while one of [autoPauseApps] is on screen. Read by the
   /// VPN service itself (SettingsKey.AUTO_PAUSE_*), so the list is one ";"-separated string.

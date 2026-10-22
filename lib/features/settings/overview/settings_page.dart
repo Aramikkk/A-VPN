@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
-import 'package:hiddify/features/settings/overview/sections/routing_options_page.dart';
 import 'package:hiddify/features/settings/notifier/reset_tunnel/reset_tunnel_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -164,6 +163,12 @@ class SettingsPage extends HookConsumerWidget {
                       ),
                       SettingsSection(
                         height: row,
+                        title: t.avpn.profileManagement,
+                        icon: Icons.tune_rounded,
+                        namedLocation: context.namedLocation('profileManagement'),
+                      ),
+                      SettingsSection(
+                        height: row,
                         title: t.pages.settings.general.title,
                         icon: Icons.layers_rounded,
                         namedLocation: context.namedLocation('general'),
@@ -185,10 +190,6 @@ class SettingsPage extends HookConsumerWidget {
                         title: t.pages.settings.routing.title,
                         icon: Icons.route_rounded,
                         namedLocation: context.namedLocation('routingOptions'),
-                      ),
-                      SizedBox(
-                        height: row,
-                        child: const Center(child: EverythingElseTile()),
                       ),
                       SettingsSection(
                         height: row,

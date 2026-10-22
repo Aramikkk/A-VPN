@@ -10,6 +10,9 @@ import 'package:hiddify/core/logger/core_logger.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/features/profile/data/profile_data_providers.dart';
+import 'package:hiddify/features/profile/data/profile_merge.dart';
 import 'package:hiddify/features/proxy/data/blocked_only_routing.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
 import 'package:hiddify/features/proxy/data/network_ping_timeout.dart';
@@ -237,7 +240,9 @@ class HiddifyCoreService with InfraLogger {
 
   /// The config for the phone on [current] (unknown: whatever the network). [variant]: one made ahead for another
   /// network than the one running, in files of its own.
-  Future<String> _configFor(String path, NetworkKind current, {bool variant = false}) async {
+  Future<String> _configFor(String profilePath, NetworkKind current, {bool variant = false}) async {
+    // the profiles put together: the extra ones' servers added, the countries switched off for this network left out
+    final path = await _withProfiles(profilePath, current);
     final cisOnly = ref.read(ConfigOptions.cisOnlyServers);
     final europeOnly = !cisOnly && ref.read(ConfigOptions.europeOnlyServers);
     final network = ref.read(ConfigOptions.serversByNetwork) ? current : NetworkKind.unknown;
@@ -282,6 +287,23 @@ class HiddifyCoreService with InfraLogger {
       );
     }
     return filtered;
+  }
+
+  /// [profilePath] (the active profile) with the other profiles' servers added, and each profile's countries that are
+  /// switched off for the network ([current]: Wi-Fi, or the computer's, and mobile data) left out.
+  Future<String> _withProfiles(String profilePath, NetworkKind current) async {
+    final resolver = ref.read(profilePathResolverProvider);
+    final off = ref.read(Preferences.profileCountriesOff);
+    final kind = current == NetworkKind.mobile ? 'mobile' : 'wifi';
+    return ProfileMerge.apply(
+      profilePath,
+      [
+        for (final id in ref.read(Preferences.extraProfiles))
+          if (resolver.file(id).path != profilePath) resolver.file(id).path,
+      ],
+      name: kind,
+      hidden: (id) => {...?off[id]?[kind]},
+    );
   }
 
   TaskEither<String, Unit> stop() {
