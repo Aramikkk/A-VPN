@@ -13,8 +13,12 @@ const pingTargets = <({String name, String url})>[
 bool pingTargetHasHttps(String url) => !url.contains('msftconnecttest.com');
 
 /// The targets offered for the method: all for HTTP, those with HTTPS for HTTPS.
-List<({String name, String url})> pingTargetsFor(bool https) =>
-    https ? [for (final p in pingTargets) if (pingTargetHasHttps(p.url)) p] : pingTargets;
+List<({String name, String url})> pingTargetsFor(bool https) => https
+    ? [
+        for (final p in pingTargets)
+          if (pingTargetHasHttps(p.url)) p,
+      ]
+    : pingTargets;
 
 /// The address a ping goes to: [url] (kept as http://) over HTTPS when [https] (the TLS handshake counted too, as
 /// sites open), over HTTP otherwise. An address of the user's own keeps any other scheme.
@@ -33,3 +37,10 @@ String? pingTargetName(String url) => pingTargets.where((p) => p.url == url).fir
   final i = targets.indexWhere((p) => p.url == url);
   return targets[(i + 1) % targets.length];
 }
+
+/// What the site tiles call a good delay: green under [good] ms, amber under [slow], red from there; [scale] is the
+/// delay at which a tile's water is lowest. Over HTTPS a delay is higher by nature (the TLS handshake takes round trips
+/// of its own before the answer), so its marks are wider than for plain HTTP.
+typedef SiteGrade = ({int good, int slow, int scale});
+
+SiteGrade siteGrade(bool https) => https ? (good: 250, slow: 500, scale: 750) : (good: 150, slow: 300, scale: 450);

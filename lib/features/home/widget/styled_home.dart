@@ -3270,7 +3270,9 @@ class _SiteTiles extends HookConsumerWidget {
   static Color _ink(Color disc) =>
       ThemeData.estimateBrightnessForColor(disc) == Brightness.dark ? Colors.white : const Color(0xFF11151A);
 
-  static Color _colour(int? ms) => ms == null || ms >= 300 ? _bad : (ms < 150 ? _good : _slow);
+  /// the delay's colour by the method's own marks (HTTPS reads higher than HTTP)
+  static Color _colour(int? ms, SiteGrade grade) =>
+      ms == null || ms >= grade.slow ? _bad : (ms < grade.good ? _good : _slow);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -3279,6 +3281,8 @@ class _SiteTiles extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final sites = ref.watch(siteLatencyProvider);
+    // the marks of a good delay, by the method (HTTPS is higher by nature)
+    final grade = siteGrade(ref.watch(ConfigOptions.pingHttps));
     final accent = theme.araAccent;
     // each site's own server (Settings → Ping → Sites, beta): its flag in the tile's corner
     final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const {};
@@ -3288,11 +3292,11 @@ class _SiteTiles extends HookConsumerWidget {
     Widget tile(LatencySite site) {
       final measured = sites.ms.containsKey(site.key);
       final ms = sites.ms[site.key];
-      final colour = !measured ? scheme.outlineVariant : _colour(ms);
+      final colour = !measured ? scheme.outlineVariant : _colour(ms, grade);
       // the logo and its ring in the delay's colour too (green, amber, red); grey until the first round
       final sign = !measured ? scheme.onSurfaceVariant : colour;
       // the faster, the fuller; no answer or 450 ms and slower: a sliver
-      final level = !measured ? 0.0 : (ms == null ? .08 : (1 - ms / 450).clamp(.08, 1.0));
+      final level = !measured ? 0.0 : (ms == null ? .08 : (1 - ms / grade.scale).clamp(.08, 1.0));
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
