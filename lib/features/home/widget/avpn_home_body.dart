@@ -1,3 +1,4 @@
+import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/home/widget/popup_transition.dart';
 import 'dart:ui' as ui;
@@ -408,17 +409,21 @@ class _ServerTile extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
             child: Row(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
+                FlagBadge(
+                  profile: server.isGroup ? -1 : name.profile,
+                  size: 13,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: server.isGroup
+                        ? Icon(Icons.bolt_rounded, size: 18, color: scheme.primary)
+                        : Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 16)),
                   ),
-                  child: server.isGroup
-                      ? Icon(Icons.bolt_rounded, size: 18, color: scheme.primary)
-                      : Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 16)),
                 ),
                 const Gap(10),
                 Expanded(
@@ -1095,7 +1100,7 @@ int displayedHomePingDelay(OutboundInfo server, {OutboundInfo? autoNow, Outbound
 }
 
 /// "🇱🇹 Литва" from "Sigma - Литва": the flag and the country, without the provider's prefix.
-String _withFlag(({String? flag, String title}) name) {
+String _withFlag(ServerName name) {
   final dash = name.title.indexOf(' - ');
   final country = dash < 0 ? name.title : name.title.substring(dash + 3).trim();
   return [name.flag, country].whereType<String>().join(' ');
@@ -1113,12 +1118,16 @@ const whitelistMark = 'БС';
 String sigmaName(String name) =>
     name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
 
-/// A server's flag emoji (if its name has one) and its name without the flag and the core's " § N" suffix.
-({String? flag, String title}) serverName(OutboundInfo server) =>
+/// A server's flag emoji (if its name has one), its name without the flag and the core's " § N" suffix, and which
+/// subscription it is from (0: the active profile; see profileOfTag).
+typedef ServerName = ({String? flag, String title, int profile});
+
+ServerName serverName(OutboundInfo server) =>
     serverNameOf(server.tagDisplay.isNotEmpty ? server.tagDisplay : server.tag);
 
 /// The same from a bare name (a connection's outbound).
-({String? flag, String title}) serverNameOf(String raw) {
+ServerName serverNameOf(String raw) {
+  final profile = profileOfTag(raw);
   var name = raw;
   name = name.replaceAll('§hide§', '').replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '').trim();
   name = sigmaName(name);
@@ -1128,10 +1137,10 @@ String sigmaName(String name) =>
     final b = runes[i + 1] - 0x1F1E6;
     if (a >= 0 && a < 26 && b >= 0 && b < 26) {
       final flag = String.fromCharCodes([runes[i], runes[i + 1]]);
-      return (flag: flag, title: name.replaceFirst(flag, '').trim());
+      return (flag: flag, title: name.replaceFirst(flag, '').trim(), profile: profile);
     }
   }
-  return (flag: null, title: name);
+  return (flag: null, title: name, profile: profile);
 }
 
 String _gb(int bytes) => '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';

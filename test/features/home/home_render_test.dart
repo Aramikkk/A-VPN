@@ -28,6 +28,7 @@ import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_path_resolver.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';
@@ -69,6 +70,27 @@ final _servers = [
   ('lte', '🇵🇱 Доступ - Польша LTE Only', 95, false),
 ];
 
+/// BADGES=1: the servers of the second and third subscription carry the shifted numbers the merge gives them
+String _badged(String tag, String display) {
+  if (Platform.environment['BADGES'] != '1') return display;
+  return switch (tag) {
+    'nl' => '$display § 1002',
+    'ee' => '$display § 1003',
+    'gb' => '$display § 2004',
+    'fi' => '$display § 5',
+    _ => display,
+  };
+}
+
+class _ProfilesList extends ProfilesNotifier {
+  @override
+  Stream<List<ProfileEntity>> build() => Stream.value([
+    ProfileEntity.local(id: 'sigma', active: true, name: 'Доступ', lastUpdate: DateTime(2026, 10, 12)),
+    ProfileEntity.local(id: 'chill', active: false, name: 'ChillGuy', lastUpdate: DateTime(2026, 10, 12)),
+    ProfileEntity.local(id: 'third', active: false, name: 'Vless Hub', lastUpdate: DateTime(2026, 10, 12)),
+  ]);
+}
+
 class _Proxies extends ProxiesOverviewNotifier {
   @override
   Stream<OutboundGroup?> build() => Stream.value(
@@ -80,7 +102,7 @@ class _Proxies extends ProxiesOverviewNotifier {
               for (final (tag, display, delay, group) in _servers)
                 OutboundInfo(
                   tag: tag,
-                  tagDisplay: display,
+                  tagDisplay: _badged(tag, display),
                   type: group ? 'urltest' : 'vless',
                   urlTestDelay: group ? 108 : delay,
                   isGroup: group,
@@ -200,6 +222,7 @@ void main() {
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
           if (Platform.environment['LIGHT'] == '1') 'light_look': true,
+          if (Platform.environment['BADGES'] == '1') 'extra_profiles': 'chill;third',
         });
         // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
         final pcw = Platform.environment['PCW'] == '1';
@@ -249,6 +272,7 @@ void main() {
           ProviderScope(
             overrides: [
               translationsProvider.overrideWith((ref) async => t),
+              profilesNotifierProvider.overrideWith(_ProfilesList.new),
               sharedPreferencesProvider.overrideWith((ref) async => prefs!),
               connectionNotifierProvider.overrideWith(_Conn.new),
               shownConnectionProvider.overrideWith(_ShownConnection.new),

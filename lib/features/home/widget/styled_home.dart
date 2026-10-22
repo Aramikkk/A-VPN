@@ -570,6 +570,7 @@ class _StyledServerList extends ConsumerWidget {
 
             return _GraphiteRow(
               flag: server.isGroup && currentServer == null ? null : name.flag,
+              profile: server.isGroup && currentServer == null ? -1 : name.profile,
               group: server.isGroup && currentServer == null,
               title: title,
               subtitle: subtitle,
@@ -593,6 +594,7 @@ class _StyledServerList extends ConsumerWidget {
 class _GraphiteRow extends StatelessWidget {
   const _GraphiteRow({
     required this.flag,
+    this.profile = 0,
     required this.group,
     required this.title,
     required this.subtitle,
@@ -607,6 +609,9 @@ class _GraphiteRow extends StatelessWidget {
   });
 
   final String? flag;
+
+  /// which subscription the server is from (0: the active profile)
+  final int profile;
   final bool group;
   final String title;
   final String subtitle;
@@ -631,6 +636,7 @@ class _GraphiteRow extends StatelessWidget {
     if (theme.contrastLayout) {
       return _ContrastRow(
         flag: flag,
+        profile: profile,
         group: group,
         title: title,
         subtitle: subtitle,
@@ -720,13 +726,16 @@ class _GraphiteRow extends StatelessWidget {
             child: Row(
               children: [
                 // the flag on its own, larger (a grey tile under it looked dull)
-                SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: Center(
-                    child: group
-                        ? AraIconPaint(child: Icon(Icons.auto_awesome_rounded, size: 24, color: scheme.primary))
-                        : Text(flag ?? '🌐', style: const TextStyle(fontSize: 28, fontFamilyFallback: ['Emoji'])),
+                FlagBadge(
+                  profile: group ? -1 : profile,
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Center(
+                      child: group
+                          ? AraIconPaint(child: Icon(Icons.auto_awesome_rounded, size: 24, color: scheme.primary))
+                          : Text(flag ?? '🌐', style: const TextStyle(fontSize: 28, fontFamilyFallback: ['Emoji'])),
+                    ),
                   ),
                 ),
                 const Gap(12),
@@ -1588,7 +1597,10 @@ class _AnsweringSheet extends ConsumerWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   selected: chosen,
                   selectedTileColor: scheme.primary.withValues(alpha: .12),
-                  leading: Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 22, fontFamilyFallback: ['Emoji'])),
+                  leading: FlagBadge(
+                    profile: name.profile,
+                    child: Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 22, fontFamilyFallback: ['Emoji'])),
+                  ),
                   title: Text(
                     _marked(name.title.contains(' - ') ? name.title.split(' - ').last.trim() : name.title, name.title),
                     maxLines: 1,
@@ -2270,6 +2282,7 @@ ThemeData contrastPanelTheme(ThemeData theme) {
 class _ContrastRow extends StatelessWidget {
   const _ContrastRow({
     required this.flag,
+    this.profile = 0,
     required this.group,
     required this.title,
     required this.subtitle,
@@ -2282,6 +2295,9 @@ class _ContrastRow extends StatelessWidget {
   });
 
   final String? flag;
+
+  /// which subscription the server is from (0: the active profile)
+  final int profile;
   final bool group;
   final String title;
   final String subtitle;
@@ -2352,17 +2368,20 @@ class _ContrastRow extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
               child: Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: selected ? accent : scheme.outlineVariant, width: 1.3),
+                  FlagBadge(
+                    profile: group ? -1 : profile,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: selected ? accent : scheme.outlineVariant, width: 1.3),
+                      ),
+                      child: group
+                          ? Icon(Icons.auto_awesome_rounded, size: 18, color: selected ? theme.araIcon : ink)
+                          : Text(flag ?? '🌐', style: const TextStyle(fontSize: 18, fontFamilyFallback: ['Emoji'])),
                     ),
-                    child: group
-                        ? Icon(Icons.auto_awesome_rounded, size: 18, color: selected ? theme.araIcon : ink)
-                        : Text(flag ?? '🌐', style: const TextStyle(fontSize: 18, fontFamilyFallback: ['Emoji'])),
                   ),
                   const Gap(11),
                   Expanded(
@@ -3124,9 +3143,12 @@ class _SessionServers extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              name.flag ?? '🌐',
-                              style: const TextStyle(fontSize: 20, fontFamilyFallback: ['Emoji']),
+                            FlagBadge(
+                              profile: name.profile,
+                              child: Text(
+                                name.flag ?? '🌐',
+                                style: const TextStyle(fontSize: 20, fontFamilyFallback: ['Emoji']),
+                              ),
                             ),
                             const Gap(9),
                             Expanded(
@@ -3339,7 +3361,7 @@ class _SiteTiles extends HookConsumerWidget {
                 final flag = own == _flagOf(mainServer ?? '') ? '' : own;
                 // the flag as in the server row: a thin circle the size of the logo's disc, the flag in it at half
                 // the circle's width, with room round it (it can't stick out of the circle)
-                final corner = flag.isEmpty
+                final cornerFlag = flag.isEmpty
                     ? null
                     : Container(
                         width: disc,
@@ -3353,6 +3375,14 @@ class _SiteTiles extends HookConsumerWidget {
                           flag,
                           style: TextStyle(fontSize: disc * .5, height: 1, fontFamilyFallback: const ['Emoji']),
                         ),
+                      );
+                // with several subscriptions: which one the site's server is from
+                final corner = cornerFlag == null
+                    ? null
+                    : FlagBadge(
+                        profile: server == null ? -1 : serverNameOf(server).profile,
+                        size: 11 * k,
+                        child: cornerFlag,
                       );
                 final unitStyle = TextStyle(
                   fontSize: 12 * k,

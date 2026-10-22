@@ -1,3 +1,4 @@
+import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -68,6 +69,8 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final style = ref.watch(Preferences.araStyle);
     // the light look's switch, worked out here so the places with no `ref` read it too
     ref.watch(lightLookProvider);
+    // the marks of the subscriptions (with several in the work), worked out here so static name helpers read them
+    ref.watch(profileBadgesProvider);
     final glassScheme = ref.watch(Preferences.glassScheme);
     final theme = AppTheme(
       themeMode,

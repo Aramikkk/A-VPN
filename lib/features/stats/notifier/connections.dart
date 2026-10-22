@@ -1,3 +1,4 @@
+import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -199,12 +200,18 @@ class SeenConnection {
         .replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma')
         .trim();
     final dash = name.indexOf(' - ');
-    if (dash < 0) return name;
+    if (dash < 0) {
+      final mark = profileGlyph(profileOfTag(tag));
+      return mark.isEmpty ? name : '$name $mark';
+    }
     final flag = RegExp(r'^(\S+)\s').firstMatch(name)?.group(1);
     final isFlag = flag != null && flag.runes.any((r) => r >= 0x1F1E6 && r <= 0x1F1FF);
     var country = name.substring(dash + 3).trim();
     // a whitelist server ("LTE Only", "БС") keeps a mark, or it reads like the regular one of that country
     if (ServerRegionFilter.isMobileOnly(name) && !country.contains('БС')) country = '$country · БС';
+    // with several subscriptions: which one it is from, as a circled letter
+    final mark = profileGlyph(profileOfTag(tag));
+    if (mark.isNotEmpty) country = '$country $mark';
     return isFlag ? '$flag $country' : country;
   }
 }
