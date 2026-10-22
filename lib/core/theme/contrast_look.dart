@@ -189,6 +189,39 @@ enum ContrastPalette implements ContrastColours {
     nightPane: Color(0xFF0B2B26),
     nightAccent: Color(0xFF8EB69B),
     day: Color(0xFFE3F3E6),
+  ),
+  // strict black and white: pure black by night, near-white by day, the accent black by day and white by night
+  blackWhite(
+    'Чёрно-белая',
+    'Black & white',
+    Color(0xFF000000),
+    Color(0xFF8E8E8E),
+    night: Color(0xFF000000),
+    nightPane: Color(0xFF141414),
+    nightAccent: Color(0xFFFFFFFF),
+    day: Color(0xFFF4F4F4),
+  ),
+  // futurism: a black night with blue and grey lines, neon cyan by day
+  futurism(
+    'Футуризм',
+    'Futurism',
+    Color(0xFF00C8E6),
+    Color(0xFF8A9099),
+    night: Color(0xFF000000),
+    nightPane: Color(0xFF0A0E18),
+    nightAccent: Color(0xFF00C8E6),
+    day: Color(0xFFE6ECFF),
+  ),
+  // for OLED screens: true black by night (the blocks too, so the pixels stay off), white by day, white accent
+  oled(
+    'OLED',
+    'OLED',
+    Color(0xFF000000),
+    Color(0xFF7A7A7A),
+    night: Color(0xFF000000),
+    nightPane: Color(0xFF050505),
+    nightAccent: Color(0xFFFFFFFF),
+    day: Color(0xFFFFFFFF),
   );
 
   const ContrastPalette(
