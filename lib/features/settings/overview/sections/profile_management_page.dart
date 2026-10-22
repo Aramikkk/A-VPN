@@ -142,7 +142,8 @@ class _ProfileCountries extends HookConsumerWidget {
     // the region filter (Servers → Europe only, World and CIS) works on top: a country outside it is never used
     final cisOnly = ref.watch(ConfigOptions.cisOnlyServers);
     final europeOnly = !cisOnly && ref.watch(ConfigOptions.europeOnlyServers);
-    bool inFilter(String code) => CountryScan.allowedByFilter(code, europeOnly: europeOnly, cisOnly: cisOnly);
+    bool inFilter(String key) =>
+        CountryScan.allowedByFilter(ProfileMerge.codeOf(key), europeOnly: europeOnly, cisOnly: cisOnly);
 
     Future<void> toggle(String network, String code, bool on) async {
       final all = {...ref.read(Preferences.profileCountriesOff)};
@@ -171,12 +172,75 @@ class _ProfileCountries extends HookConsumerWidget {
 
     String summary(String network) {
       if (servers.value == null) return off[network]?.isEmpty ?? true ? t.avpn.profileCountriesAll : '…';
-      final usable = codes.where(inFilter).toList();
+      final usable = codes
+          .where((key) => inFilter(key) && (network == 'mobile' || !ProfileMerge.isWhitelist(key)))
+          .toList();
       final left = usable.where((code) => off[network]?.contains(code) ?? false).length;
       return left == 0 ? t.avpn.profileCountriesAll : '${usable.length - left}/${usable.length}';
     }
 
-    Widget section(String title, String network) => Column(
+    // a cell of a column: the whole width of the cell, the label centred in it (a chip would be as wide as its text and
+    // the edges of the cells would not line up)
+    Widget chip(String network, String code) {
+      final selected = inFilter(code) && !(off[network]?.contains(code) ?? false);
+      final ping = pings.value[code];
+      final known = pings.value.containsKey(code);
+      return Opacity(
+        // outside the region filter: shown, not to be chosen
+        opacity: inFilter(code) ? 1 : .5,
+        child: Material(
+          color: selected ? scheme.secondaryContainer : Colors.transparent,
+          shape: StadiumBorder(side: BorderSide(color: selected ? Colors.transparent : scheme.outlineVariant)),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: inFilter(code) ? () => toggle(network, code, !selected) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text.rich(
+                    TextSpan(
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: selected ? scheme.onSecondaryContainer : scheme.onSurface,
+                      ),
+                      children: [
+                        // the flag in its own run: the emoji font is its fallback only, the name keeps the theme's fonts
+                        TextSpan(
+                          text: ProfileMerge.flag(code),
+                          style: const TextStyle(fontFamilyFallback: ['Emoji']),
+                        ),
+                        TextSpan(
+                          text: ' ${ProfileMerge.countryName(code)}${ProfileMerge.isWhitelist(code) ? ' БС' : ''} ',
+                        ),
+                        TextSpan(
+                          text: known ? (ping == null ? '—' : '$ping ms') : '…',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: !known
+                                ? scheme.onSurfaceVariant
+                                : ping == null
+                                ? _bad
+                                : ping < 150
+                                ? _good
+                                : ping < 300
+                                ? _slow
+                                : _bad,
+                          ),
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget group(String title, String network, List<String> keys) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -190,51 +254,36 @@ class _ProfileCountries extends HookConsumerWidget {
             ),
           ),
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            for (final code in codes)
-              FilterChip(
-                selected: inFilter(code) && !(off[network]?.contains(code) ?? false),
-                showCheckmark: false,
-                // outside the region filter: shown, not to be chosen
-                onSelected: inFilter(code) ? (on) => toggle(network, code, on) : null,
-                label: Text.rich(
-                  TextSpan(
-                    children: [
-                      // the flag in its own run: the emoji font is its fallback only, the name keeps the theme's fonts
-                      TextSpan(
-                        text: ProfileMerge.flag(code),
-                        style: const TextStyle(fontFamilyFallback: ['Emoji']),
-                      ),
-                      TextSpan(text: ' ${ProfileMerge.countryName(code)} '),
-                      if (!inFilter(code)) TextSpan(text: '(${t.avpn.profileManagementOutside}) '),
-                      TextSpan(
-                        text: pings.value.containsKey(code)
-                            ? (pings.value[code] == null ? '—' : '${pings.value[code]} ms')
-                            : '…',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: !pings.value.containsKey(code)
-                              ? scheme.onSurfaceVariant
-                              : pings.value[code] == null
-                              ? _bad
-                              : pings.value[code]! < 150
-                              ? _good
-                              : pings.value[code]! < 300
-                              ? _slow
-                              : _bad,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+        // two even columns: every cell is half the width
+        LayoutBuilder(
+          builder: (context, box) {
+            final cell = (box.maxWidth - 8) / 2;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [for (final key in keys) SizedBox(width: cell, child: chip(network, key))],
+            );
+          },
         ),
       ],
     );
+
+    // the whitelist servers (LTE Only, БС) and the ordinary ones are two lists of countries: on Wi-Fi only the ordinary
+    // ones work; on mobile data the whitelist ones do, the ordinary ones are what is left when none of them is open
+    final whitelist = [
+      for (final key in codes)
+        if (ProfileMerge.isWhitelist(key)) key,
+    ];
+    final ordinary = [
+      for (final key in codes)
+        if (!ProfileMerge.isWhitelist(key)) key,
+    ];
+    List<Widget> lists(String network) => network == 'wifi'
+        ? [if (ordinary.isNotEmpty) group(t.avpn.profileManagementOrdinary, network, ordinary)]
+        : [
+            if (whitelist.isNotEmpty) group(t.avpn.profileManagementWhitelist, network, whitelist),
+            if (ordinary.isNotEmpty) group(t.avpn.profileManagementOrdinaryReserve, network, ordinary),
+          ];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -266,7 +315,7 @@ class _ProfileCountries extends HookConsumerWidget {
           else if (codes.isEmpty)
             Padding(padding: const EdgeInsets.all(8), child: Text(t.avpn.profileManagementNoCountries))
           else ...[
-            section(network == 'wifi' ? 'Wi‑Fi' : 'LTE', network),
+            ...lists(network),
           ],
         ],
       ),

@@ -18,7 +18,7 @@ abstract class CountryPing {
         final port = item['server_port'];
         if (tag is! String || tag.contains('§hide§') || host is! String || port is! int) continue;
         if (host == '0.0.0.0' || host == 'siski.com' || port < 2) continue;
-        final code = ServerRegionFilter.countryCode(tag);
+        final code = ServerRegionFilter.serverKey(tag);
         if (code != null) servers.add((code: code, host: host, port: port));
       }
     }

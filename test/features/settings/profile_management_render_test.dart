@@ -72,6 +72,7 @@ void main() {
               _server('🇸🇪 Доступ - Швеция 2 § 2', 'se2.example'),
               _server('🇩🇪 Доступ - Германия § 3', 'de1.example'),
               _server('🇫🇮 Доступ - Финляндия § 4', 'fi1.example'),
+              _server('🇸🇪 LTE Only - Швеция § 9', 'se9.example'),
               _server('🇪🇪 LTE Only - Эстония § 5', 'ee1.example'),
               _server('🇵🇱 LTE Only - Польша § 6', 'pl1.example'),
               _server('🇳🇱 Доступ - Нидерланды § 7', 'nl1.example'),
@@ -101,7 +102,7 @@ void main() {
       'europe-only-servers': true,
       'profile_countries_off': jsonEncode({
         'p1': {
-          'mobile': ['DE', 'NL'],
+          'mobile': ['DE', 'NL', 'PL:bs'],
           'wifi': ['EE', 'PL'],
         },
       }),
@@ -142,7 +143,6 @@ void main() {
     expect(find.textContaining('Wi‑Fi'), findsWidgets);
     expect(find.textContaining('LTE'), findsWidgets);
     expect(find.textContaining('Япония'), findsOneWidget);
-    expect(find.textContaining('вне фильтра'), findsOneWidget);
     if (Platform.environment['RENDER'] == '1') {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/profile_management.png'));
     }
@@ -150,6 +150,9 @@ void main() {
     await tester.tap(find.text('LTE').first);
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.textContaining('Германия'), findsWidgets);
+    // the whitelist servers are a list of their own, with the country's mark
+    expect(find.textContaining('Эстония БС'), findsOneWidget);
+    expect(find.textContaining('БЕЛЫЕ СПИСКИ'), findsWidgets);
     if (Platform.environment['RENDER'] == '1') {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/profile_management_lte.png'));
     }

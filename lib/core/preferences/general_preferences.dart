@@ -166,7 +166,7 @@ abstract class Preferences {
 
   /// The countries each profile had at the last look (at its last update), by profile id: a country not in it is new.
   static final profileCountriesSeen = PreferencesNotifier.create<Map<String, List<String>>, String>(
-    "profile_countries_seen",
+    "profile_countries_seen_v2",
     const {},
     mapFrom: (value) {
       try {

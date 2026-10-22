@@ -147,6 +147,15 @@ abstract class ServerRegionFilter {
     return code == null || europe.contains(code);
   }
 
+  /// What a server is chosen by in a profile's country lists: its country ("SE"), and for a whitelist server (LTE
+  /// Only, БС, ...) the same with ":bs" ("SE:bs"), so the two kinds of a country are two choices. Null when the
+  /// country can't be told.
+  static String? serverKey(String tag) {
+    final code = countryCode(tag);
+    if (code == null) return null;
+    return isMobileOnly(tag) ? '$code:bs' : code;
+  }
+
   /// The country of a server from its flag emoji, else from a country name in it.
   static String? countryCode(String tag) {
     final runes = tag.runes.toList();

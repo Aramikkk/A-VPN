@@ -105,7 +105,7 @@ abstract class ProfileMerge {
         for (final item in _items(extra, key)) {
           final tag = item['tag'];
           if (tag is! String || tag.contains('§hide§') || _isGroup(item) || _isPlaceholder(item)) continue;
-          if (off.contains(ServerRegionFilter.countryCode(tag))) continue;
+          if (off.contains(ServerRegionFilter.serverKey(tag))) continue;
           // the same server in both subscriptions: once
           if (!known.add(_identity(item))) continue;
           final match = _ending.firstMatch(tag);
@@ -145,7 +145,7 @@ abstract class ProfileMerge {
       for (final item in _items(config, key)) {
         final tag = item['tag'];
         if (tag is! String || tag.contains('§hide§') || _isGroup(item) || _isPlaceholder(item)) continue;
-        final code = ServerRegionFilter.countryCode(tag);
+        final code = ServerRegionFilter.serverKey(tag);
         if (code != null) counts[code] = (counts[code] ?? 0) + 1;
       }
     }
@@ -161,8 +161,16 @@ abstract class ProfileMerge {
     }
   }
 
-  /// Russian name of a country by its code, for the lists ("SE" → "Швеция"); the code itself when it is not known.
-  static String countryName(String code) {
+  /// Whether a list key is for a country's whitelist servers ("SE:bs").
+  static bool isWhitelist(String key) => key.endsWith(':bs');
+
+  /// The country code of a list key ("SE:bs" → "SE").
+  static String codeOf(String key) => key.split(':').first;
+
+  /// Russian name of a country by its code or list key, for the lists ("SE" → "Швеция"); the code itself when it is
+  /// not known.
+  static String countryName(String key) {
+    final code = codeOf(key);
     for (final entry in ServerRegionFilter.countryNames.entries) {
       if (entry.value == code && RegExp('[а-я]').hasMatch(entry.key)) {
         return entry.key[0].toUpperCase() + entry.key.substring(1);
@@ -171,8 +179,8 @@ abstract class ProfileMerge {
     return code;
   }
 
-  /// The flag emoji of a country code.
-  static String flag(String code) => String.fromCharCodes([for (final c in code.codeUnits) 0x1F1E6 + c - 0x41]);
+  /// The flag emoji of a country code (or of a list key).
+  static String flag(String key) => String.fromCharCodes([for (final c in codeOf(key).codeUnits) 0x1F1E6 + c - 0x41]);
 
   /// Which of [off] to really leave out of [config]: all of them, unless that would be every server (then none).
   static Set<String> _usable(Map<String, dynamic> config, Set<String> off) {
@@ -190,7 +198,7 @@ abstract class ProfileMerge {
       for (final item in _items(config, key)) {
         final tag = item['tag'];
         if (tag is! String || tag.contains('§hide§') || _isGroup(item) || _isPlaceholder(item)) continue;
-        if (use.contains(ServerRegionFilter.countryCode(tag))) renamed[tag] = '$tag$_hideMark';
+        if (use.contains(ServerRegionFilter.serverKey(tag))) renamed[tag] = '$tag$_hideMark';
       }
     }
     return renamed;

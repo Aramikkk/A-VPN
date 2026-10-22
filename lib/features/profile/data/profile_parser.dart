@@ -10,6 +10,7 @@ import 'package:hiddify/core/http_client/dio_http_client.dart';
 import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/features/profile/data/clash_to_links.dart';
 import 'package:hiddify/features/profile/data/profile_data_mapper.dart';
+import 'package:hiddify/features/profile/data/subscription_decoy.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/model/profile_failure.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -162,14 +163,43 @@ class ProfileParser {
     // if (url.startsWith("http://"))
     //   throw const ProfileFailure.invalidUrl('HTTP is not supported. Please use HTTPS for secure connection.');
 
+    // the client name the provider accepts: ours first; when the answer is only decoys ("App not supported", "Download
+    // Happ"), the other well-known ones, and the one that works is kept for this provider
+    final first = _ref.read(ConfigOptions.useXrayCoreWhenPossible)
+        ? _httpClient.userAgent.replaceAll("HiddifyNext", "HiddifyNextX")
+        : DeviceHeaders.subscriptionUserAgent;
+    final host = Uri.tryParse(url.trim())?.host ?? '';
+    Map<String, dynamic>? firstAnswer;
+    String? firstContent;
+    for (final agent in await DeviceHeaders.agentsFor(host, first)) {
+      final answer = await _fetchProfile(url, tempFilePath, cancelToken, agent);
+      final content = await File(tempFilePath).readAsString();
+      if (!SubscriptionDecoy.isDecoy(content)) {
+        if (agent != first) await DeviceHeaders.remember(host, agent);
+        return answer;
+      }
+      firstAnswer ??= answer;
+      firstContent ??= content;
+    }
+    // every client got decoys: the first answer as it was (the profile shows what the provider said)
+    await File(tempFilePath).writeAsString(firstContent ?? '');
+    return firstAnswer ?? <String, dynamic>{};
+  }, (err, st) => err is ProfileFailure ? err : ProfileFailure.unexpected(err, st));
+
+  /// One answer of the provider to [agent]: the subscription in [tempFilePath] (Clash files turned into share links,
+  /// remote lines expanded) and the headers.
+  Future<Map<String, dynamic>> _fetchProfile(
+    String url,
+    String tempFilePath,
+    CancelToken? cancelToken,
+    String agent,
+  ) async {
     final rs = await _httpClient
         .download(
           url.trim(),
           tempFilePath,
           cancelToken: cancelToken,
-          userAgent: _ref.read(ConfigOptions.useXrayCoreWhenPossible)
-              ? _httpClient.userAgent.replaceAll("HiddifyNext", "HiddifyNextX")
-              : DeviceHeaders.subscriptionUserAgent,
+          userAgent: agent,
           headers: await DeviceHeaders.get(),
         )
         .catchError((err) {
@@ -193,7 +223,8 @@ class ProfileParser {
       if (value.length == 1) return MapEntry(key, value.first);
       return MapEntry(key, value);
     });
-  }, (err, st) => err is ProfileFailure ? err : ProfileFailure.unexpected(err, st));
+  }
+
   Future<void> expandRemoteLinesInParallel({
     required String tempFilePath,
     required DioHttpClient httpClient,

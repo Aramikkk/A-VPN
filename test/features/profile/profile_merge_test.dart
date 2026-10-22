@@ -109,8 +109,31 @@ void _countryTests() {
     expect(_tags(merged), ['🇸🇪 Швеция § 1', '🇫🇮 Финляндия § 1001']);
   });
 
+  test('whitelist servers of a country are a choice of their own', () {
+    final config = profile(['🇸🇪 Доступ - Швеция § 1', '🇸🇪 LTE Only - Швеция § 2', '🇸🇪 Швеция БС § 3']);
+    expect(ProfileMerge.countries(config), [('SE:bs', 2), ('SE', 1)]);
+    // the whitelist ones off, the ordinary one stays
+    final merged = ProfileMerge.merge(config, const [], primaryHidden: {'SE:bs'})!;
+    expect(_tags(merged), [
+      '🇸🇪 Доступ - Швеция § 1',
+      '🇸🇪 LTE Only - Швеция § 2 §hide§',
+      '🇸🇪 Швеция БС § 3 §hide§',
+    ]);
+    // the ordinary one off, the whitelist ones stay
+    final other = ProfileMerge.merge(
+      profile(['🇸🇪 Доступ - Швеция § 1', '🇸🇪 LTE Only - Швеция § 2']),
+      const [],
+      primaryHidden: {'SE'},
+    )!;
+    expect(_tags(other), ['🇸🇪 Доступ - Швеция § 1 §hide§', '🇸🇪 LTE Only - Швеция § 2']);
+  });
+
   test('country names and flags', () {
     expect(ProfileMerge.countryName('SE'), 'Швеция');
     expect(ProfileMerge.flag('SE'), '🇸🇪');
+    expect(ProfileMerge.countryName('SE:bs'), 'Швеция');
+    expect(ProfileMerge.flag('SE:bs'), '🇸🇪');
+    expect(ProfileMerge.isWhitelist('SE:bs'), isTrue);
+    expect(ProfileMerge.isWhitelist('SE'), isFalse);
   });
 }

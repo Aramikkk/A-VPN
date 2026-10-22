@@ -32,8 +32,8 @@ abstract class CountryScan {
     final cis = ref.read(ConfigOptions.cisOnlyServers);
     final europe = !cis && ref.read(ConfigOptions.europeOnlyServers);
     final fresh = [
-      for (final code in codes)
-        if (!seen.contains(code) && allowedByFilter(code, europeOnly: europe, cisOnly: cis)) code,
+      for (final key in codes)
+        if (!seen.contains(key) && allowedByFilter(ProfileMerge.codeOf(key), europeOnly: europe, cisOnly: cis)) key,
     ];
     if (fresh.isEmpty) return const [];
 
@@ -55,6 +55,10 @@ abstract class CountryScan {
   }
 
   /// "🇯🇵 Япония, 🇨🇦 Канада" for the message to the user.
-  static String describe(List<String> codes) =>
-      codes.map((code) => '${ProfileMerge.flag(code)} ${ProfileMerge.countryName(code)}').join(', ');
+  static String describe(List<String> keys) => keys
+      .map(
+        (key) =>
+            '${ProfileMerge.flag(key)} ${ProfileMerge.countryName(key)}${ProfileMerge.isWhitelist(key) ? ' БС' : ''}',
+      )
+      .join(', ');
 }
