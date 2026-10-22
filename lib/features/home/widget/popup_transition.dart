@@ -51,6 +51,8 @@ class _HomePopupTransitionState extends State<HomePopupTransition> {
   @override
   Widget build(BuildContext context) => FadeTransition(
     opacity: _curve,
-    child: ScaleTransition(scale: _scale, alignment: widget.alignment, child: widget.child),
+    // the card is drawn once and the fade and scale move that picture: otherwise every frame of the opening redraws
+    // the whole list into a temporary layer
+    child: ScaleTransition(scale: _scale, alignment: widget.alignment, child: RepaintBoundary(child: widget.child)),
   );
 }
