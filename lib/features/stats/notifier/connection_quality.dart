@@ -8,6 +8,7 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
+import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
@@ -262,6 +263,34 @@ class ConnectionQuality extends Notifier<List<int?>> {
     if (now.difference(_saved) > const Duration(minutes: 1)) _save();
     state = List.of(_samples);
     if (PlatformUtils.isDesktop && ms == null) unawaited(_watchdog());
+    if (isDegraded(_samples)) unawaited(_retestServers());
+  }
+
+  /// The last probes say the connection got bad now (lost, or several times slower than it was): three losses in
+  /// the last six, or all six answered at three times the earlier median and over 300 ms.
+  @visibleForTesting
+  static bool isDegraded(List<int?> samples) {
+    const recent = 6;
+    if (samples.length < recent) return false;
+    final last = samples.sublist(samples.length - recent);
+    if (last.where((s) => s == null).length >= 3) return true;
+    final before = samples.sublist(0, samples.length - recent).whereType<int>().toList()..sort();
+    if (before.length < 10 || last.any((s) => s == null)) return false;
+    final median = before[before.length ~/ 2];
+    final now = last.whereType<int>().reduce((a, b) => a + b) / recent;
+    return now >= 300 && now >= median * 3;
+  }
+
+  DateTime? _retested;
+
+  /// A bad stretch makes the servers be pinged at once, so the auto choice sees it now rather than at its next
+  /// round (the core's own pings come every few minutes); once in two minutes at most.
+  Future<void> _retestServers() async {
+    final now = DateTime.now();
+    if (_retested != null && now.difference(_retested!) < const Duration(minutes: 2)) return;
+    _retested = now;
+    _logger.info('the last probes got bad: pinging the servers now so the auto choice can move');
+    await ref.read(proxyRepositoryProvider).urlTest('select').run();
   }
 
   /// A computer's VPN that stopped carrying anything (after sleep, a Wi-Fi change, a server gone quiet) is
