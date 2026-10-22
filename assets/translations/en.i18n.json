@@ -87,6 +87,8 @@
     "adBlockAllowMsg": "A domain on this list (and its subdomains) is never blocked, in case a site or app broke. Type a site's address and press the plus",
     "adBlockAllowHint": "example.com",
     "adBlockBadDomain": "Enter a domain, e.g. example.com",
+    "profileNewCountries": "New countries in the profile \"$profile\": $countries. They are already open",
+    "profileManagementOutside": "outside the filter",
     "profileManagement": "Profile management",
     "profileManagementHint": "Each profile's countries, with the ping to them (measured as soon as the profile is open). Ticked countries are open to the pings and to use, unticked ones are left out. Separately for Wi-Fi and LTE",
     "profileManagementNone": "No profiles yet",

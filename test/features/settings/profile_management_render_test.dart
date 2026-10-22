@@ -75,6 +75,7 @@ void main() {
               _server('🇪🇪 LTE Only - Эстония § 5', 'ee1.example'),
               _server('🇵🇱 LTE Only - Польша § 6', 'pl1.example'),
               _server('🇳🇱 Доступ - Нидерланды § 7', 'nl1.example'),
+              _server('🇯🇵 Доступ - Япония § 8', 'jp1.example'),
             ],
           }),
         );
@@ -93,9 +94,11 @@ void main() {
       'ee' => 130,
       'pl' => 95,
       'nl' => 220,
+      'jp' => 260,
       _ => null,
     };
     SharedPreferences.setMockInitialValues({
+      'europe-only-servers': true,
       'profile_countries_off': jsonEncode({
         'p1': {
           'mobile': ['DE', 'NL'],
@@ -138,8 +141,17 @@ void main() {
     expect(find.textContaining('Германия'), findsWidgets);
     expect(find.textContaining('Wi‑Fi'), findsWidgets);
     expect(find.textContaining('LTE'), findsWidgets);
+    expect(find.textContaining('Япония'), findsOneWidget);
+    expect(find.textContaining('вне фильтра'), findsOneWidget);
     if (Platform.environment['RENDER'] == '1') {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/profile_management.png'));
+    }
+    // the LTE list: its own, with its own countries switched off
+    await tester.tap(find.text('LTE').first);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.textContaining('Германия'), findsWidgets);
+    if (Platform.environment['RENDER'] == '1') {
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/profile_management_lte.png'));
     }
   });
 }

@@ -164,6 +164,23 @@ abstract class Preferences {
     mapTo: (value) => jsonEncode(value),
   );
 
+  /// The countries each profile had at the last look (at its last update), by profile id: a country not in it is new.
+  static final profileCountriesSeen = PreferencesNotifier.create<Map<String, List<String>>, String>(
+    "profile_countries_seen",
+    const {},
+    mapFrom: (value) {
+      try {
+        return {
+          for (final e in (jsonDecode(value) as Map<String, dynamic>).entries)
+            e.key: [...(e.value as List).cast<String>()],
+        };
+      } catch (_) {
+        return const {};
+      }
+    },
+    mapTo: (value) => jsonEncode(value),
+  );
+
   /// A-VPN auto-pause (Android): the VPN steps aside while one of [autoPauseApps] is on screen. Read by the
   /// VPN service itself (SettingsKey.AUTO_PAUSE_*), so the list is one ";"-separated string.
   static final autoPauseEnabled = PreferencesNotifier.create<bool, bool>("auto_pause_enabled", false);

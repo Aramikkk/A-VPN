@@ -10,7 +10,9 @@ import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart' show sigmaName;
 import 'package:hiddify/features/profile/add/model/free_profiles_model.dart';
+import 'package:hiddify/features/profile/data/country_scan.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_repository.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
@@ -142,6 +144,19 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
             },
             (_) async {
               loggy.info('successfully updated profile');
+              // a country that has come in and fits the region filter is open at once
+              final fresh = await CountryScan.afterUpdate(ref, profile.id);
+              if (fresh.isNotEmpty) {
+                final t = ref.read(translationsProvider).requireValue;
+                ref
+                    .read(inAppNotificationControllerProvider)
+                    .showSuccessToast(
+                      t.avpn.profileNewCountries(
+                        profile: sigmaName(profile.name),
+                        countries: CountryScan.describe(fresh),
+                      ),
+                    );
+              }
 
               await ref.read(activeProfileProvider.future).then((active) async {
                 if (active != null && active.id == profile.id) {

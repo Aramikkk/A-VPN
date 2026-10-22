@@ -166,7 +166,14 @@ abstract class ServerRegionFilter {
 
   /// Servers the provider runs for mobile networks with whitelists ("LTE Only", "БС"). They answer only
   /// through a mobile operator, while the other servers pass a ping there yet drop real traffic.
-  static bool isMobileOnly(String tag) => tag.toLowerCase().contains('lte only') || tag.contains('БС');
+  static bool isMobileOnly(String tag) => tag.contains('БС') || _mobileOnly.hasMatch(tag);
+
+  /// What providers call such servers: "LTE", "LTE Only", "БС", "Белые списки", "Антиглушилка", "whitelist".
+  static final _mobileOnly = RegExp(
+    r'(^|[^\p{L}\d])(lte|бс)($|[^\p{L}\d])|белые\s+списки|белый\s+список|антиглушилк|white\s?list',
+    caseSensitive: false,
+    unicode: true,
+  );
 
   static const _networkChannel = MethodChannel('com.aravpn.app/network');
   static const _networkEvents = EventChannel('com.aravpn.app/network/events');

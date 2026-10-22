@@ -7,12 +7,14 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/profile/data/country_scan.dart';
 import 'package:hiddify/features/profile/data/country_ping.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_merge.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Settings / Profile management: for each profile the countries its servers are in, each with its ping, and which of
@@ -27,6 +29,8 @@ class ProfileManagementPage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final profiles = ref.watch(profilesNotifierProvider).valueOrNull ?? const <ProfileEntity>[];
     final changed = useState(false);
+    // Wi-Fi and LTE are two lists: one is shown, the other is a tap away
+    final network = useState('wifi');
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
 
     Future<void> apply() async {
@@ -47,12 +51,26 @@ class ProfileManagementPage extends HookConsumerWidget {
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: 'wifi', icon: Icon(Icons.wifi_rounded), label: Text('Wi‑Fi')),
+                ButtonSegment(value: 'mobile', icon: Icon(Icons.signal_cellular_alt_rounded), label: Text('LTE')),
+              ],
+              selected: {network.value},
+              onSelectionChanged: (value) => network.value = value.first,
+            ),
+          ),
+          const Gap(12),
           if (profiles.isEmpty)
             Padding(
               padding: const EdgeInsets.all(24),
               child: Center(child: Text(t.avpn.profileManagementNone)),
             ),
-          for (final profile in profiles) _ProfileCountries(profile: profile, onChanged: () => changed.value = true),
+          for (final profile in profiles)
+            _ProfileCountries(profile: profile, network: network.value, onChanged: () => changed.value = true),
           if (changed.value && connected) ...[
             const Gap(8),
             FilledButton.icon(
@@ -68,9 +86,12 @@ class ProfileManagementPage extends HookConsumerWidget {
 }
 
 class _ProfileCountries extends HookConsumerWidget {
-  const _ProfileCountries({required this.profile, required this.onChanged});
+  const _ProfileCountries({required this.profile, required this.network, required this.onChanged});
 
   final ProfileEntity profile;
+
+  /// the list shown: 'wifi' or 'mobile'
+  final String network;
   final VoidCallback onChanged;
 
   static const _good = Color(0xFF7CC43A);
@@ -94,6 +115,14 @@ class _ProfileCountries extends HookConsumerWidget {
       final found = await CountryPing.serversOfFile(ref.read(profilePathResolverProvider).file(profile.id).path);
       if (!context.mounted) return;
       servers.value = found;
+      // what is there now: the next update is compared with it
+      final seen = ref.read(Preferences.profileCountriesSeen);
+      if (!seen.containsKey(profile.id) && found.isNotEmpty) {
+        await ref.read(Preferences.profileCountriesSeen.notifier).update({
+          ...seen,
+          profile.id: {for (final server in found) server.code}.toList(),
+        });
+      }
       CountryPing.measure(found).listen((result) {
         if (context.mounted) pings.value = {...pings.value, result.$1: result.$2};
       });
@@ -110,6 +139,10 @@ class _ProfileCountries extends HookConsumerWidget {
       counts[server.code] = (counts[server.code] ?? 0) + 1;
     }
     final codes = counts.keys.toList()..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+    // the region filter (Servers → Europe only, World and CIS) works on top: a country outside it is never used
+    final cisOnly = ref.watch(ConfigOptions.cisOnlyServers);
+    final europeOnly = !cisOnly && ref.watch(ConfigOptions.europeOnlyServers);
+    bool inFilter(String code) => CountryScan.allowedByFilter(code, europeOnly: europeOnly, cisOnly: cisOnly);
 
     Future<void> toggle(String network, String code, bool on) async {
       final all = {...ref.read(Preferences.profileCountriesOff)};
@@ -137,9 +170,10 @@ class _ProfileCountries extends HookConsumerWidget {
     }
 
     String summary(String network) {
-      final left = off[network]?.where(counts.containsKey).length ?? 0;
       if (servers.value == null) return off[network]?.isEmpty ?? true ? t.avpn.profileCountriesAll : '…';
-      return left == 0 ? t.avpn.profileCountriesAll : '${codes.length - left}/${codes.length}';
+      final usable = codes.where(inFilter).toList();
+      final left = usable.where((code) => off[network]?.contains(code) ?? false).length;
+      return left == 0 ? t.avpn.profileCountriesAll : '${usable.length - left}/${usable.length}';
     }
 
     Widget section(String title, String network) => Column(
@@ -162,9 +196,10 @@ class _ProfileCountries extends HookConsumerWidget {
           children: [
             for (final code in codes)
               FilterChip(
-                selected: !(off[network]?.contains(code) ?? false),
+                selected: inFilter(code) && !(off[network]?.contains(code) ?? false),
                 showCheckmark: false,
-                onSelected: (on) => toggle(network, code, on),
+                // outside the region filter: shown, not to be chosen
+                onSelected: inFilter(code) ? (on) => toggle(network, code, on) : null,
                 label: Text.rich(
                   TextSpan(
                     children: [
@@ -174,6 +209,7 @@ class _ProfileCountries extends HookConsumerWidget {
                         style: const TextStyle(fontFamilyFallback: ['Emoji']),
                       ),
                       TextSpan(text: ' ${ProfileMerge.countryName(code)} '),
+                      if (!inFilter(code)) TextSpan(text: '(${t.avpn.profileManagementOutside}) '),
                       TextSpan(
                         text: pings.value.containsKey(code)
                             ? (pings.value[code] == null ? '—' : '${pings.value[code]} ms')
@@ -230,8 +266,7 @@ class _ProfileCountries extends HookConsumerWidget {
           else if (codes.isEmpty)
             Padding(padding: const EdgeInsets.all(8), child: Text(t.avpn.profileManagementNoCountries))
           else ...[
-            section('Wi‑Fi', 'wifi'),
-            section('LTE', 'mobile'),
+            section(network == 'wifi' ? 'Wi‑Fi' : 'LTE', network),
           ],
         ],
       ),
