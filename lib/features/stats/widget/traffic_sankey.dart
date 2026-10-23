@@ -268,7 +268,10 @@ class SankeySelection {
 /// server, direct, blocked) on the right; each ribbon as thick as its traffic, in the way's colour. A tap on a
 /// route shows its details.
 class TrafficSankey extends ConsumerWidget {
-  const TrafficSankey({super.key, required this.items, required this.weight, required this.value});
+  const TrafficSankey({super.key, required this.items, required this.weight, required this.value, this.height});
+
+  /// null: by how many names the widest column holds
+  final double? height;
 
   final List<SeenConnection> items;
   final double Function(SeenConnection c) weight;
@@ -297,6 +300,7 @@ class TrafficSankey extends ConsumerWidget {
     return SankeyDiagram(
       flows: flows,
       value: value,
+      height: height,
       otherApp: t.avpn.connOther,
       otherRule: t.avpn.connOther,
       otherOut: t.avpn.connOther,

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -29,6 +30,17 @@ class TopologyPage extends HookConsumerWidget {
     final visible = TickerMode.of(context);
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     final byTraffic = useState(true);
+    final controller = useScrollController();
+    final onSecondPage = useState(false);
+    useEffect(() {
+      void follow() {
+        final second = controller.hasClients && controller.offset > 200;
+        if (second != onSecondPage.value) onSecondPage.value = second;
+      }
+
+      controller.addListener(follow);
+      return () => controller.removeListener(follow);
+    }, [controller]);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final units = t.avpn.bytesUnits.split(',');
@@ -89,7 +101,9 @@ class TopologyPage extends HookConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(t.avpn.topologyTab),
-            Text(t.avpn.topoPeriod, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+            // the first page is what is open now; the day is the second page's
+            if (onSecondPage.value)
+              Text(t.avpn.topoPeriod, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
           ],
         ),
         actions: [
@@ -105,91 +119,131 @@ class TopologyPage extends HookConsumerWidget {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-            children: [
-              // the count or the traffic, in the middle
-              Center(
-                child: SegmentedButton<bool>(
-                  showSelectedIcon: false,
-                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                  segments: [
-                    ButtonSegment(
-                      value: false,
-                      icon: const Icon(Icons.link_rounded, size: 18),
-                      label: Text(t.avpn.connFlowCount),
-                    ),
-                    ButtonSegment(
-                      value: true,
-                      icon: const Icon(Icons.data_usage_rounded, size: 18),
-                      label: Text(t.avpn.connFlowTraffic),
-                    ),
-                  ],
-                  selected: {byTraffic.value},
-                  onSelectionChanged: (s) => byTraffic.value = s.first,
-                ),
-              ),
-              const Gap(12),
-              // the connections open now, as a flow: apps, the rules that took them, where they went
-              _Section(
-                title: t.avpn.topoSankey,
-                child: openNow.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        child: Center(
-                          child: Text(
-                            t.avpn.topoSankeyEmpty,
-                            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          // two pages in one scroll: the flows over the whole screen down to the panel, then the rest under them
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final pageHeight = box.maxHeight;
+              // the toggle and the gaps over the card; the card's own title and padding inside it
+              final chartHeight = (pageHeight - 44 - 12 - 8 - 62).clamp(240.0, 900.0);
+              return ListView(
+                controller: controller,
+                physics: _PageSnap(pageHeight),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                children: [
+                  SizedBox(
+                    height: pageHeight,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // the count or the traffic, in the middle
+                        Center(
+                          child: SegmentedButton<bool>(
+                            showSelectedIcon: false,
+                            style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                            segments: [
+                              ButtonSegment(
+                                value: false,
+                                icon: const Icon(Icons.link_rounded, size: 18),
+                                label: Text(t.avpn.connFlowCount),
+                              ),
+                              ButtonSegment(
+                                value: true,
+                                icon: const Icon(Icons.data_usage_rounded, size: 18),
+                                label: Text(t.avpn.connFlowTraffic),
+                              ),
+                            ],
+                            selected: {byTraffic.value},
+                            onSelectionChanged: (s) => byTraffic.value = s.first,
                           ),
                         ),
-                      )
-                    : TrafficSankey(
-                        items: openNow,
-                        // a connection that has moved nothing yet is still a thread of its own
-                        weight: (c) => byTraffic.value ? math.max(1, c.total.toDouble()) : c.count.toDouble(),
+                        const Gap(8),
+                        // the connections open now, as a flow: apps, the rules that took them, where they went
+                        _Section(
+                          title: t.avpn.topoSankey,
+                          child: openNow.isEmpty
+                              ? SizedBox(
+                                  height: chartHeight,
+                                  child: Center(
+                                    child: Text(
+                                      t.avpn.topoSankeyEmpty,
+                                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                                    ),
+                                  ),
+                                )
+                              : TrafficSankey(
+                                  items: openNow,
+                                  height: chartHeight,
+                                  // a connection that has moved nothing yet is still a thread of its own
+                                  weight: (c) => byTraffic.value ? math.max(1, c.total.toDouble()) : c.count.toDouble(),
+                                  value: value,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Gap(12),
+                  // what moved by the core's counters (all of it); the lists below hold only the connections the app saw
+                  if (byTraffic.value && sessionAll > 0) ...[
+                    TopologyDayTotal(
+                      total: formatBytes(sessionAll, units),
+                      vpn: formatBytes(sessionVpn, units),
+                      direct: formatBytes(math.max(0, sessionAll - sessionVpn), units),
+                      listed: showUncounted ? formatBytes(listed, units) : null,
+                    ),
+                    const Gap(12),
+                  ],
+                  _Section(
+                    title: t.avpn.topoFlow,
+                    child: TrafficStrips(items: items, weight: weight, value: value),
+                  ),
+                  if (rules.isNotEmpty) ...[
+                    const Gap(12),
+                    _Section(
+                      title: t.avpn.topoRulesTitle,
+                      hint: t.avpn.topoRulesHint,
+                      child: _RuleRows(
+                        rows: [
+                          for (final g in rules.take(8))
+                            (
+                              name: g.key.substring(1),
+                              route: g.items.first.route,
+                              servers: serverFlags(g.servers),
+                              weight: sum(g.items),
+                            ),
+                        ]..sort((a, b) => b.weight.compareTo(a.weight)),
+                        total: total,
                         value: value,
                       ),
-              ),
-              const Gap(12),
-              // what moved by the core's counters (all of it); the lists below hold only the connections the app saw
-              if (byTraffic.value && sessionAll > 0) ...[
-                TopologyDayTotal(
-                  total: formatBytes(sessionAll, units),
-                  vpn: formatBytes(sessionVpn, units),
-                  direct: formatBytes(math.max(0, sessionAll - sessionVpn), units),
-                  listed: showUncounted ? formatBytes(listed, units) : null,
-                ),
-                const Gap(12),
-              ],
-              _Section(
-                title: t.avpn.topoFlow,
-                child: TrafficStrips(items: items, weight: weight, value: value),
-              ),
-              if (rules.isNotEmpty) ...[
-                const Gap(12),
-                _Section(
-                  title: t.avpn.topoRulesTitle,
-                  hint: t.avpn.topoRulesHint,
-                  child: _RuleRows(
-                    rows: [
-                      for (final g in rules.take(8))
-                        (
-                          name: g.key.substring(1),
-                          route: g.items.first.route,
-                          servers: serverFlags(g.servers),
-                          weight: sum(g.items),
-                        ),
-                    ]..sort((a, b) => b.weight.compareTo(a.weight)),
-                    total: total,
-                    value: value,
-                  ),
-                ),
-              ],
-            ],
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ),
     );
+  }
+}
+
+/// The first page rests whole on the screen, the second under it: a scroll that lets go between them goes to the
+/// nearer one (a quick flick goes the way it was thrown).
+class _PageSnap extends ScrollPhysics {
+  const _PageSnap(this.page, {super.parent});
+
+  final double page;
+
+  @override
+  _PageSnap applyTo(ScrollPhysics? ancestor) => _PageSnap(page, parent: buildParent(ancestor));
+
+  @override
+  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
+    final far = math.min(page, position.maxScrollExtent);
+    if (position.pixels >= far || position.pixels <= 0 && velocity <= 0) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+    final target = velocity.abs() > 250 ? (velocity > 0 ? far : 0.0) : (position.pixels > far / 2 ? far : 0.0);
+    return ScrollSpringSimulation(spring, position.pixels, target, velocity, tolerance: toleranceFor(position));
   }
 }
 
