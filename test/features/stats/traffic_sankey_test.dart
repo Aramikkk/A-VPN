@@ -19,8 +19,10 @@ void main() {
 
   test('every column holds all the traffic', () {
     final model = build(flows);
+    final shown = flows.fold<double>(0, (s, f) => s + f.shown);
     for (final column in model.columns) {
-      expect(column.fold<double>(0, (s, n) => s + n.weight), closeTo(1000, 1e-6));
+      expect(column.fold<double>(0, (s, n) => s + n.weight), closeTo(shown, 1e-6));
+      expect(column.fold<double>(0, (s, n) => s + n.real), closeTo(1000, 1e-6));
     }
     expect(model.columns.map((c) => c.length), [3, 3, 3]);
   });
@@ -46,7 +48,7 @@ void main() {
     final outs = model.columns[2].map((n) => n.label).toList();
     expect(outs, containsAll(['direct', 'blocked']));
     for (final column in model.columns) {
-      expect(column.fold<double>(0, (s, n) => s + n.weight), closeTo(many.fold<double>(0, (s, f) => s + f.weight), 1e-6));
+      expect(column.fold<double>(0, (s, n) => s + n.real), closeTo(many.fold<double>(0, (s, f) => s + f.weight), 1e-6));
     }
   });
 
@@ -88,6 +90,19 @@ void main() {
     final path = g.ribbon(model, link);
     final x = (g.xs[0] + SankeyGeometry.nodeW + g.xs[1]) / 2;
     expect(path.contains(Offset(x, (link.fromY + link.toY) / 2 + model.thickness(link) / 2)), isTrue);
+  });
+
+  test('one huge flow does not swallow the rest', () {
+    final model = build([
+      flow('big', 'r1', 'o1', ConnectionRoute.vpn, 400000),
+      flow('a', 'r2', 'o2', ConnectionRoute.vpn, 40000),
+      flow('b', 'r3', 'o3', ConnectionRoute.vpn, 30000),
+    ]);
+    final big = model.columns[0].firstWhere((n) => n.label == 'big');
+    final a = model.columns[0].firstWhere((n) => n.label == 'a');
+    // 10 times the traffic, about 3 times the width
+    expect(big.weight / a.weight, lessThan(4));
+    expect(big.real / a.real, closeTo(10, 1e-9));
   });
 
   test('no traffic, no diagram', () {

@@ -10,6 +10,9 @@ import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+/// A connection that moved less than this is background chatter, and the flow diagram leaves it out.
+const flowMinBytes = 20 * 1024;
+
 /// One stretch of traffic: which app, under which rule, where it went (a server, direct or blocked), and how much.
 /// [host] and [count] are for the details of a route.
 class SankeyFlow {
@@ -30,6 +33,10 @@ class SankeyFlow {
   final double weight;
   final String host;
   final int count;
+
+  /// the thickness it is given on the picture: the square root of its weight, so one huge flow doesn't swallow the
+  /// others (the amounts written stay the real ones)
+  double get shown => math.sqrt(weight);
 }
 
 class SankeyNode {
@@ -41,7 +48,12 @@ class SankeyNode {
 
   /// the way the traffic of a rule or a destination went (null for an app: it can send in several ways)
   final ConnectionRoute? route;
+
+  /// on the picture (the flows' square roots added up)
   double weight = 0;
+
+  /// the real amount (what is written)
+  double get real => flows.fold<double>(0, (s, f) => s + f.weight);
   double y = 0;
   double h = 0;
   final outLinks = <SankeyLink>[];
@@ -57,6 +69,8 @@ class SankeyLink {
   final SankeyNode from;
   final SankeyNode to;
   final ConnectionRoute route;
+
+  /// on the picture
   double weight = 0;
   double fromY = 0;
   double toY = 0;
@@ -85,14 +99,14 @@ class SankeyModel {
     double minShare = .02,
   }) {
     final list = flows.where((f) => f.weight > 0).toList();
-    final total = list.fold<double>(0, (s, f) => s + f.weight);
+    final total = list.fold<double>(0, (s, f) => s + f.shown);
     if (total <= 0) return SankeyModel._(const [[], [], []], const [], 0);
 
     // a column keeps the biggest keys that are worth a node, everything else goes to its "other"
     Set<String> keep(String Function(SankeyFlow) keyOf) {
       final by = <String, double>{};
       for (final f in list) {
-        by[keyOf(f)] = (by[keyOf(f)] ?? 0) + f.weight;
+        by[keyOf(f)] = (by[keyOf(f)] ?? 0) + f.shown;
       }
       final ranked = by.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       return {
@@ -127,7 +141,7 @@ class SankeyModel {
         n.flows.add(f);
       }
       for (final l in [link(a, r, f.route), link(r, o, f.route)]) {
-        l.weight += f.weight;
+        l.weight += f.shown;
         l.flows.add(f);
       }
     }
@@ -559,7 +573,7 @@ class _SankeyPainter extends CustomPainter {
         final labelTop = n.y + n.h / 2 - (tall ? 13 : 7);
         if (labelTop < lastBottom[ci] + 1) continue;
         lastBottom[ci] = labelTop + (tall ? 27 : 14);
-        final amount = value(n.weight);
+        final amount = value(n.real);
         switch (ci) {
           case 0:
             _label(canvas, n.label, Offset(xs[0] - 7, labelTop), g.labelL - 9, right: true, alpha: alpha);
