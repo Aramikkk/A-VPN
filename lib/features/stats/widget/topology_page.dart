@@ -12,6 +12,7 @@ import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/features/stats/widget/traffic_sankey.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -39,6 +40,7 @@ class TopologyPage extends HookConsumerWidget {
         if (g.total >= smallTraffic) g.key,
     };
     final items = open.where((c) => bigApps.contains(c.app)).toList();
+    final openNow = open.where((c) => c.active && c.route != ConnectionRoute.block).toList();
     double weight(SeenConnection c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble();
     String value(double w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}';
     final total = items.fold<double>(0, (s, c) => s + weight(c));
@@ -123,6 +125,28 @@ class TopologyPage extends HookConsumerWidget {
                   selected: {byTraffic.value},
                   onSelectionChanged: (s) => byTraffic.value = s.first,
                 ),
+              ),
+              const Gap(12),
+              // the connections open now, as a flow: apps, the rules that took them, where they went
+              _Section(
+                title: t.avpn.topoSankey,
+                child: openNow.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        child: Center(
+                          child: Text(
+                            t.avpn.topoSankeyEmpty,
+                            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ),
+                      )
+                    : TrafficSankey(
+                        items: openNow,
+                        // a connection that has moved nothing yet is still a thread of its own
+                        weight: (c) => byTraffic.value ? math.max(1, c.total.toDouble()) : c.count.toDouble(),
+                        value: value,
+                        height: 330,
+                      ),
               ),
               const Gap(12),
               // what moved by the core's counters (all of it); the lists below hold only the connections the app saw

@@ -359,6 +359,8 @@
     "topoToVpn": "через VPN",
     "topoToDirect": "напрямую",
     "topoToBlock": "заблокировано",
+    "topoSankey": "Потоки сейчас",
+    "topoSankeyEmpty": "Сейчас нет открытых соединений",
     "topoDayTitle": "Всего с 03:00",
     "topoDayDetail": "VPN $vpn · напрямую $direct",
     "topoDayGap": "В разбивке ниже учтено $listed: соединения короче 2 секунд и то, что было, пока приложение было закрыто, в неё не попали",
