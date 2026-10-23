@@ -2995,8 +2995,8 @@ class _MosaicCell extends StatelessWidget {
 
 /// Contrast's popups: a see-through frosted card in the middle of the screen, a fifth smaller than the screen's
 /// free room, growing from just above the panel.
-void showGlassPopup(BuildContext context, Widget child) {
-  showGeneralDialog<void>(
+Future<void> showGlassPopup(BuildContext context, Widget child) {
+  return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,

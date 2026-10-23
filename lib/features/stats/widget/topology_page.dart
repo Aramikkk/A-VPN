@@ -145,7 +145,6 @@ class TopologyPage extends HookConsumerWidget {
                         // a connection that has moved nothing yet is still a thread of its own
                         weight: (c) => byTraffic.value ? math.max(1, c.total.toDouble()) : c.count.toDouble(),
                         value: value,
-                        height: 330,
                       ),
               ),
               const Gap(12),

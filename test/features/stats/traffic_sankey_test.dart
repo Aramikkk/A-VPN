@@ -1,9 +1,10 @@
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/traffic_sankey.dart';
 
 SankeyFlow flow(String app, String rule, String out, ConnectionRoute route, double w) =>
-    (app: app, rule: rule, out: out, route: route, weight: w);
+    SankeyFlow(app: app, rule: rule, out: out, route: route, weight: w);
 
 SankeyModel build(List<SankeyFlow> flows) =>
     SankeyModel.build(flows, otherApp: 'other', otherRule: 'other', otherOut: 'other');
@@ -66,6 +67,27 @@ void main() {
       expect(l.toY, greaterThanOrEqualTo(l.to.y - 1e-6));
       expect(l.toY + model.thickness(l), lessThanOrEqualTo(l.to.y + l.to.h + 1e-6));
     }
+  });
+
+  test('a node knows its flows, a ribbon too', () {
+    final model = build(flows);
+    final chrome = model.columns[0].firstWhere((n) => n.label == 'Chrome');
+    expect(chrome.flows.length, 2);
+    for (final l in chrome.outLinks) {
+      expect(l.flows.every(chrome.flows.contains), isTrue);
+    }
+    expect(model.columns[2].firstWhere((n) => n.label == 'direct').flows.length, 2);
+  });
+
+  test('a tap finds a node and then a ribbon', () {
+    final model = build(flows)..layout(300);
+    final g = SankeyGeometry(360);
+    final tg = model.columns[0].firstWhere((n) => n.label == 'Telegram');
+    expect(g.hit(tg, 360).contains(Offset(20, tg.y + tg.h / 2)), isTrue);
+    final link = model.links.firstWhere((l) => l.from.label == 'Telegram');
+    final path = g.ribbon(model, link);
+    final x = (g.xs[0] + SankeyGeometry.nodeW + g.xs[1]) / 2;
+    expect(path.contains(Offset(x, (link.fromY + link.toY) / 2 + model.thickness(link) / 2)), isTrue);
   });
 
   test('no traffic, no diagram', () {
