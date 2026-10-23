@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -123,6 +125,16 @@ class TopologyPage extends HookConsumerWidget {
                 ),
               ),
               const Gap(12),
+              // what moved by the core's counters (all of it); the lists below hold only the connections the app saw
+              if (byTraffic.value && sessionAll > 0) ...[
+                TopologyDayTotal(
+                  total: formatBytes(sessionAll, units),
+                  vpn: formatBytes(sessionVpn, units),
+                  direct: formatBytes(math.max(0, sessionAll - sessionVpn), units),
+                  listed: showUncounted ? formatBytes(listed, units) : null,
+                ),
+                const Gap(12),
+              ],
               _Section(
                 title: t.avpn.topoFlow,
                 child: TrafficStrips(items: items, weight: weight, value: value),
@@ -144,20 +156,6 @@ class TopologyPage extends HookConsumerWidget {
                     ]..sort((a, b) => b.weight.compareTo(a.weight)),
                     total: total,
                     value: value,
-                  ),
-                ),
-              ],
-              if (byTraffic.value && showUncounted) ...[
-                const Gap(12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    t.avpn.topoUncounted(
-                      amount: formatBytes(uncounted, units),
-                      vpn: formatBytes(sessionVpn, units),
-                      direct: formatBytes(sessionAll - sessionVpn, units),
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -220,6 +218,45 @@ class SessionRules extends ConsumerWidget {
             value: (w) => formatBytes(w.round(), units),
           ),
       ],
+    );
+  }
+}
+
+/// All the traffic since the day's start by the core's counters: the figure, how it split between the VPN and
+/// direct, and (when the lists hold much less) what the breakdown under it covers.
+class TopologyDayTotal extends ConsumerWidget {
+  const TopologyDayTotal({super.key, required this.total, required this.vpn, required this.direct, this.listed});
+
+  final String total;
+  final String vpn;
+  final String direct;
+  final String? listed;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return _Section(
+      title: t.avpn.topoDayTitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(total, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+          const Gap(2),
+          Text(
+            t.avpn.topoDayDetail(vpn: vpn, direct: direct),
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          if (listed != null) ...[
+            const Gap(8),
+            Text(
+              t.avpn.topoDayGap(listed: listed!),
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
