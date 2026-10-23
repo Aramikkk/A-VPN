@@ -183,6 +183,15 @@ abstract class ConfigOptions {
   /// Ad blocking at the VPN's level (Settings → Ad blocking, beta): the ad, tracker and malware domains refused.
   static final adBlock = PreferencesNotifier.create<bool, bool>("ad-block", false);
 
+  /// How strict the ad lists are: 1 mild, 2 normal, 3 strict (every list; the one that breaks most sites).
+  static final adBlockLevel = PreferencesNotifier.create<int, int>("ad-block-level", 2);
+
+  /// Protection from phishing and malware sites: its own lists, on its own (without the ad block).
+  static final blockPhishing = PreferencesNotifier.create<bool, bool>("block-phishing", true);
+
+  /// Cryptominers' domains refused.
+  static final blockMiners = PreferencesNotifier.create<bool, bool>("block-miners", false);
+
   /// The user's exceptions to it: domains (and their subdomains) that are never blocked.
   static final adBlockAllow = PreferencesNotifier.create<List<String>, List<String>>("ad-block-allow", <String>[]);
 
@@ -492,6 +501,9 @@ abstract class ConfigOptions {
     "site-group-apps": siteGroupApps,
     "ad-block": adBlock,
     "ad-block-allow": adBlockAllow,
+    "ad-block-level": adBlockLevel,
+    "block-phishing": blockPhishing,
+    "block-miners": blockMiners,
     "site-groups-tolerance-mobile": siteGroupsToleranceMobile,
     "clash-api-port": clashApiPort,
     // "bypass-lan": bypassLan,
@@ -597,6 +609,9 @@ abstract class ConfigOptions {
       siteGroups: ref.watch(siteGroups),
       siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
       adBlock: ref.watch(adBlock),
+      adBlockLevel: ref.watch(adBlockLevel),
+      blockPhishing: ref.watch(blockPhishing),
+      blockMiners: ref.watch(blockMiners),
       adBlockAllow: {...ref.watch(adBlockAllow), ...adBlockExceptions()}.toList(),
       siteGroupApps: PlatformUtils.isAndroid ? ref.watch(siteGroupApps) : const [],
       // the phone: the list is the whole choice (a computer has no packages: the six services always)

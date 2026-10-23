@@ -17,7 +17,12 @@ class AdBlockPage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final on = ref.watch(ConfigOptions.adBlock);
+    final adsOn = ref.watch(ConfigOptions.adBlock);
+    final level = ref.watch(ConfigOptions.adBlockLevel);
+    final phishing = ref.watch(ConfigOptions.blockPhishing);
+    final miners = ref.watch(ConfigOptions.blockMiners);
+    // the exceptions are for every section
+    final on = adsOn || phishing || miners;
     final allow = ref.watch(ConfigOptions.adBlockAllow);
     final field = useTextEditingController();
 
@@ -78,9 +83,53 @@ class AdBlockPage extends HookConsumerWidget {
           SwitchListTile.adaptive(
             secondary: const Icon(Icons.block_rounded),
             title: Text(t.avpn.adBlockSwitch),
-            value: on,
+            subtitle: Text(t.avpn.adBlockAdsMsg),
+            value: adsOn,
             onChanged: (value) async {
               await ref.read(ConfigOptions.adBlock.notifier).update(value);
+              await apply();
+            },
+          ),
+          if (adsOn) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+              child: SegmentedButton<int>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(value: 1, label: Text(t.avpn.adBlockMild)),
+                  ButtonSegment(value: 2, label: Text(t.avpn.adBlockNormal)),
+                  ButtonSegment(value: 3, label: Text(t.avpn.adBlockStrict)),
+                ],
+                selected: {level.clamp(1, 3)},
+                onSelectionChanged: (s) async {
+                  await ref.read(ConfigOptions.adBlockLevel.notifier).update(s.first);
+                  await apply();
+                },
+              ),
+            ),
+            note(switch (level) {
+              1 => t.avpn.adBlockMildMsg,
+              3 => t.avpn.adBlockStrictMsg,
+              _ => t.avpn.adBlockNormalMsg,
+            }),
+          ],
+          SwitchListTile.adaptive(
+            secondary: const Icon(Icons.gpp_maybe_rounded),
+            title: Text(t.avpn.adBlockPhishing),
+            subtitle: Text(t.avpn.adBlockPhishingMsg),
+            value: phishing,
+            onChanged: (value) async {
+              await ref.read(ConfigOptions.blockPhishing.notifier).update(value);
+              await apply();
+            },
+          ),
+          SwitchListTile.adaptive(
+            secondary: const Icon(Icons.memory_rounded),
+            title: Text(t.avpn.adBlockMiners),
+            subtitle: Text(t.avpn.adBlockMinersMsg),
+            value: miners,
+            onChanged: (value) async {
+              await ref.read(ConfigOptions.blockMiners.notifier).update(value);
               await apply();
             },
           ),

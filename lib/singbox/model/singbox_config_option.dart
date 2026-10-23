@@ -31,6 +31,10 @@ class SingboxConfigOption with _$SingboxConfigOption {
     // ad blocking at the VPN's level and the user's exceptions
     @Default(false) bool adBlock,
     @Default(<String>[]) List<String> adBlockAllow,
+    // the ad lists' strictness (1 mild, 2 normal, 3 strict) and the other sections: phishing and malware, miners
+    @Default(2) int adBlockLevel,
+    @Default(false) bool blockPhishing,
+    @Default(false) bool blockMiners,
     // required bool blockAds,
     required bool useXrayCoreWhenPossible,
     required bool executeConfigAsIs,
