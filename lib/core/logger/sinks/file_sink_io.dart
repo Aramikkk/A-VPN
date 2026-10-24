@@ -58,7 +58,7 @@ void flushLog() {
   }
 }
 
-final _dayFile = RegExp(r'^a-vpn-(\d{4}-\d{2}-\d{2})\.log$');
+final _dayFile = RegExp(r'^(?:a-vpn|service)-(\d{4}-\d{2}-\d{2})\.log$');
 
 /// Deletes the days older than [logDays].
 void _prune() {

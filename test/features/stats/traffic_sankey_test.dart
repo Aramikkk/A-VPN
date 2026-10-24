@@ -157,6 +157,51 @@ void main() {
     });
   });
 
+  group('calm: nothing slides when a route comes or goes', () {
+    SankeyModel calm(List<SankeyFlow> f, [Map<String, int>? order]) {
+      final m = SankeyModel.build(f, otherApp: 'other', otherRule: 'other', otherOut: 'other', even: true, calm: true);
+      m.keepOrder(order ?? {});
+      return m;
+    }
+
+    test('nodes sit from the top at a fixed distance, whatever the height', () {
+      final flows = [
+        flow('A', 'a.com', 'x', ConnectionRoute.vpn, 10),
+        flow('B', 'b.com', 'x', ConnectionRoute.vpn, 10),
+      ];
+      final tall = calm(flows)..layout(600);
+      final short = calm(flows)..layout(300);
+      for (final column in [0, 1, 2]) {
+        expect([for (final n in tall.columns[column]) n.y], [for (final n in short.columns[column]) n.y]);
+      }
+      expect(tall.columns[0].first.y, 0);
+      expect(tall.columns[0][1].y - tall.columns[0][0].h, 14);
+    });
+
+    test('a new node comes last and the old ones stay where they were', () {
+      final order = <String, int>{};
+      final first = calm([
+        flow('Zed', 'z.com', 'x', ConnectionRoute.vpn, 10),
+        flow('Mid', 'm.com', 'x', ConnectionRoute.vpn, 10),
+      ], order);
+      expect(first.columns[0].map((n) => n.label), ['Mid', 'Zed']);
+      final second = calm([
+        flow('Zed', 'z.com', 'x', ConnectionRoute.vpn, 10),
+        flow('Mid', 'm.com', 'x', ConnectionRoute.vpn, 10),
+        flow('Alpha', 'a.com', 'x', ConnectionRoute.vpn, 10),
+      ], order);
+      expect(second.columns[0].map((n) => n.label), ['Mid', 'Zed', 'Alpha']);
+    });
+
+    test('a held flow keeps its amount and has no speed', () {
+      final f = SankeyFlow(app: 'A', rule: 'r', out: 'x', route: ConnectionRoute.vpn, weight: 500, speed: 99, id: 'c1');
+      final held = f.held();
+      expect(held.weight, 500);
+      expect(held.speed, 0);
+      expect(held.id, 'c1');
+    });
+  });
+
   test('a host as its site', () {
     expect(siteOf('rr4---sn.googlevideo.com'), 'googlevideo.com');
     expect(siteOf('api.telegram.org'), 'telegram.org');

@@ -26,7 +26,25 @@ class SankeyFlow {
     this.count = 1,
     this.site = '',
     this.speed = 0,
+    this.id = '',
   });
+
+  /// the connection it is (empty when the flows aren't connections)
+  final String id;
+
+  /// the same flow, still on the picture after its connection closed: no speed any more
+  SankeyFlow held() => SankeyFlow(
+    app: app,
+    rule: rule,
+    out: out,
+    route: route,
+    weight: weight,
+    host: host,
+    count: count,
+    site: site,
+    speed: 0,
+    id: id,
+  );
 
   /// the middle column's name (the site, as a domain); empty: the rule's
   final String site;
@@ -94,7 +112,22 @@ class SankeyLink {
 /// The flow diagram's data: three columns (apps, rules, destinations) and the ribbons between them, each as thick
 /// as the traffic it carries. Only the biggest of each column are kept, the rest added up in one "other" node.
 class SankeyModel {
-  SankeyModel._(this.columns, this.links, this.total, this.maxUnit);
+  SankeyModel._(this.columns, this.links, this.total, this.maxUnit, {this.calm = false});
+
+  /// calm: the nodes keep one size and sit from the top at a fixed distance, so that nothing slides about when a
+  /// route comes or goes (the usual layout spreads each column over the whole height)
+  final bool calm;
+
+  /// Puts each column in the order the nodes were first seen (new ones last) instead of by name: [order] holds the
+  /// places so far and gets the new nodes' places.
+  void keepOrder(Map<String, int> order) {
+    for (final column in columns) {
+      for (final n in column) {
+        order.putIfAbsent(n.key, () => order.length);
+      }
+      column.sort((a, b) => order[a.key]!.compareTo(order[b.key]!));
+    }
+  }
 
   /// the thickest a unit of weight may be drawn (no limit when null): with few links they stay slim, not huge
   final double? maxUnit;
@@ -121,6 +154,7 @@ class SankeyModel {
     /// every route (an app to a site to a destination) as thick as any other, and the nodes in a fixed order
     /// (by name): nothing changes size or place as the traffic moves, only what is written
     bool even = false,
+    bool calm = false,
   }) {
     final list = flows.where((f) => f.weight > 0).toList();
     // what a flow weighs on the picture: one route, one unit (even), or the logarithm of its traffic
@@ -206,7 +240,7 @@ class SankeyModel {
           if (even) return a.label.toLowerCase().compareTo(b.label.toLowerCase());
           return b.weight.compareTo(a.weight);
         });
-    return SankeyModel._([column(0), column(1), column(2)], links.values.toList(), total, even ? 44 : null);
+    return SankeyModel._([column(0), column(1), column(2)], links.values.toList(), total, even ? (calm ? 38 : 44) : null, calm: calm);
   }
 
   /// Places the nodes in [height] (each column fills it, the room not taken by nodes shared between them as gaps)
@@ -214,13 +248,15 @@ class SankeyModel {
   /// Edges sit on whole pixels, so they stay crisp.
   void layout(double height, {double minGap = 6}) {
     if (isEmpty) return;
-    var k = (height - minGap * (widest - 1)) / total;
+    final gapBetween = calm ? 14.0 : minGap;
+    var k = (height - gapBetween * (widest - 1)) / total;
     if (maxUnit != null && k > maxUnit!) k = maxUnit!;
     for (final column in columns) {
       if (column.isEmpty) continue;
       final used = column.fold<double>(0, (s, n) => s + n.weight * k);
-      final gap = column.length > 1 ? (height - used) / (column.length - 1) : 0.0;
-      var y = column.length > 1 ? 0.0 : (height - used) / 2;
+      // calm: from the top at a fixed distance; otherwise each column spread over the whole height
+      final gap = calm ? gapBetween : (column.length > 1 ? (height - used) / (column.length - 1) : 0.0);
+      var y = calm || column.length > 1 ? 0.0 : (height - used) / 2;
       for (final n in column) {
         n.y = y;
         n.h = n.weight * k;
@@ -356,6 +392,7 @@ class TrafficSankey extends ConsumerWidget {
           count: c.count,
           site: siteOf(c.host),
           speed: speed?.call(c) ?? 0,
+          id: c.id,
         ),
     ];
     return SankeyDiagram(
@@ -364,6 +401,7 @@ class TrafficSankey extends ConsumerWidget {
       height: height,
       unit: unit,
       even: true,
+      calm: true,
       speedValue: speedValue,
       headers: [t.avpn.sankeyApps, t.avpn.sankeySites, t.avpn.sankeyTo],
       otherApp: t.avpn.connOther,
@@ -389,6 +427,7 @@ class SankeyDiagram extends StatefulWidget {
     this.height,
     this.unit = 20480,
     this.even = false,
+    this.calm = false,
     this.speedValue,
     this.headers = const [],
     this.onSelect,
@@ -399,6 +438,10 @@ class SankeyDiagram extends StatefulWidget {
 
   /// every route as thick as any other, in a fixed order: only the written amounts change
   final bool even;
+
+  /// calm: fixed sizes from the top, the nodes in the order they came, a route kept a few seconds after its
+  /// connection closed (see [SankeyModel.calm])
+  final bool calm;
 
   /// a speed (bytes a second) as written, or null when there are no speeds to show
   final String Function(double bytesPerSecond)? speedValue;
@@ -429,14 +472,40 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
   late SankeyModel _model;
   Set<SankeyFlow> _lit = const {};
 
-  SankeyModel _build() => SankeyModel.build(
-    widget.flows,
-    otherApp: widget.otherApp,
-    otherRule: widget.otherRule,
-    otherOut: widget.otherOut,
-    unit: widget.unit,
-    even: widget.even,
-  );
+  /// the places the nodes took in the order they came (calm)
+  final _order = <String, int>{};
+
+  /// the flows seen lately, by connection, and when each was last open (calm)
+  final _held = <String, ({SankeyFlow flow, DateTime seen})>{};
+
+  /// how long a route stays after its connection closed (calm)
+  static const _hold = Duration(seconds: 8);
+
+  SankeyModel _build() {
+    var flows = widget.flows;
+    if (widget.calm) {
+      final now = DateTime.now();
+      final present = <String>{};
+      for (final (i, f) in widget.flows.indexed) {
+        final key = f.id.isEmpty ? '#$i' : f.id;
+        present.add(key);
+        _held[key] = (flow: f, seen: now);
+      }
+      _held.removeWhere((key, v) => !present.contains(key) && now.difference(v.seen) > _hold);
+      flows = [for (final e in _held.entries) present.contains(e.key) ? e.value.flow : e.value.flow.held()];
+    }
+    final model = SankeyModel.build(
+      flows,
+      otherApp: widget.otherApp,
+      otherRule: widget.otherRule,
+      otherOut: widget.otherOut,
+      unit: widget.unit,
+      even: widget.even,
+      calm: widget.calm,
+    );
+    if (widget.calm) model.keepOrder(_order);
+    return model;
+  }
 
   @override
   void initState() {

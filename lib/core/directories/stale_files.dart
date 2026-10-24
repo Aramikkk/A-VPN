@@ -73,7 +73,7 @@ Future<CleanedFiles> cleanStaleFiles(Directories dirs, {DateTime? now}) async {
     }
     for (final f in await filesIn(Directory(p.join(root, 'logs')))) {
       final name = p.basename(f.path);
-      if (name.startsWith('a-vpn-') && name.endsWith('.log') && await older(f, const Duration(days: 7))) {
+      if ((name.startsWith('a-vpn-') || name.startsWith('service-')) && name.endsWith('.log') && await older(f, const Duration(days: 7))) {
         await remove(f);
       }
     }

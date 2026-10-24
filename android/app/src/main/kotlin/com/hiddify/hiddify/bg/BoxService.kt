@@ -25,6 +25,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.MutableLiveData
 import com.hiddify.hiddify.Application
 import com.hiddify.hiddify.R
+import com.hiddify.hiddify.ServiceLog
 import com.hiddify.hiddify.Settings
 import com.hiddify.hiddify.constant.Action
 import com.hiddify.hiddify.constant.Alert
@@ -315,6 +316,7 @@ class BoxService(
     /** [app]: paused while it is on screen; null: paused for a home Wi-Fi. */
     private suspend fun pause(app: String?) = lifecycle.withLock {
         if (stopping || status.value != Status.Started) return@withLock
+        ServiceLog.write("paused (the tunnel closed): " + (app ?: "home Wi-Fi"))
         paused = true
         pausedForHome = app == null
         val label = if (app == null) "" else runCatching {
@@ -342,6 +344,7 @@ class BoxService(
     /** Resume the retained daemon; only manual stop ends its logical session. */
     private suspend fun resume() = lifecycle.withLock {
         if (stopping || !paused) return@withLock
+        ServiceLog.write("resumed (the tunnel opened again)")
         val operation = generation.get()
         try {
             DefaultNetworkMonitor.start()
@@ -361,6 +364,7 @@ class BoxService(
     }
 
     private suspend fun terminateFailedSession(message: String?) = withContext(NonCancellable) {
+        ServiceLog.write("the session failed and is stopped: " + (message ?: ""))
         generation.incrementAndGet()
         stopping = true
         autoPauseJob?.cancel()
@@ -520,12 +524,15 @@ class BoxService(
     private fun syncNightMode() {
         val sleeping = !Application.powerManager.isInteractive ||
             (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Application.powerManager.isDeviceIdleMode)
-        runCatching { if (sleeping && Settings.nightMode) Mobile.pause() else Mobile.wake() }
+        val night = sleeping && Settings.nightMode
+        ServiceLog.write("night mode: " + (if (night) "the core's checks sleep" else "the core's checks awake") + " interactive=" + Application.powerManager.isInteractive)
+        runCatching { if (night) Mobile.pause() else Mobile.wake() }
     }
 
     private fun stopService() {
         // a paused VPN is stopped too: the service is still up and has to go
         if (status.value == Status.Stopped && !paused) return
+        ServiceLog.write("stopService status=" + status.value + " paused=" + paused + " from " + ServiceLog.caller())
         generation.incrementAndGet()
         stopping = true
         autoPauseJob?.cancel()
@@ -593,12 +600,18 @@ class BoxService(
 
     @OptIn(DelicateCoroutinesApi::class)
     @Suppress("SameReturnValue")
-    internal fun onStartCommand(): Int {
-        if (status.value != Status.Stopped) return Service.START_NOT_STICKY
+    internal fun onStartCommand(intent: Intent?): Int {
+        // the system started the service again after killing it (no intent): only if the user had the VPN on
+        if (intent == null && !Settings.startedByUser) {
+            ServiceLog.write("the system restarted the service after killing it, but the user had the VPN off: left off")
+            return Service.START_NOT_STICKY
+        }
+        ServiceLog.write("start command" + (if (intent == null) " (a restart by the system)" else "") + " status=" + status.value)
+        if (status.value != Status.Stopped) return Service.START_STICKY
         if (paused) {
             // the user turned it on by hand while paused: reconnect now, the watch goes on
             GlobalScope.launch(Dispatchers.IO) { resume() }
-            return Service.START_NOT_STICKY
+            return Service.START_STICKY
         }
         stopping = false
         status.value = Status.Starting
@@ -626,7 +639,8 @@ class BoxService(
 //            }
             startService()
         }
-        return Service.START_NOT_STICKY
+        // sticky: if the system kills the service (memory, the battery's clean-up) it brings it back, and with it the VPN
+        return Service.START_STICKY
     }
 
     fun onBind(intent: Intent): IBinder {
@@ -634,11 +648,17 @@ class BoxService(
     }
 
     fun onDestroy() {
+        ServiceLog.write("service onDestroy status=" + status.value + " paused=" + paused)
         binder.close()
     }
 
     fun onRevoke() {
+        ServiceLog.write("onRevoke: another VPN or the system took the VPN over; stopping")
         stopService()
+    }
+
+    internal fun logMemory(level: String) {
+        ServiceLog.write("memory: $level status=" + status.value)
     }
 
     internal fun sendNotification(notification: Notification) {

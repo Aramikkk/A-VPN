@@ -27,7 +27,17 @@ class VPNService : VpnService(), PlatformInterfaceWrapper {
     private val service = BoxService(this, this)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) =
-        service.onStartCommand()
+        service.onStartCommand(intent)
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        service.logMemory("trim level=$level")
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        service.logMemory("low memory")
+    }
 
     override fun onBind(intent: Intent): IBinder {
         val binder = super.onBind(intent)
