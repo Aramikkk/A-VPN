@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
@@ -27,7 +28,73 @@ const latencySites = <LatencySite>[
   (key: 'youtube', name: 'YouTube', letter: 'Y', url: 'http://www.youtube.com/generate_204', get: false),
   // Google Drive: its front page (it answers with a redirect, timed over the open connection as the rest)
   (key: 'gdrive', name: 'Google Диск', letter: 'G', url: 'http://drive.google.com/', get: false),
+  // more to choose from in Settings → Sites (the home screen shows the ones marked there)
+  (key: 'gemini', name: 'Gemini', letter: 'G', url: 'http://gemini.google.com/', get: false),
+  (key: 'claude', name: 'Claude', letter: 'C', url: 'http://claude.ai/', get: false),
+  (key: 'perplexity', name: 'Perplexity', letter: 'P', url: 'http://www.perplexity.ai/', get: false),
+  (key: 'discord', name: 'Discord', letter: 'D', url: 'http://discord.com/', get: false),
+  (key: 'twitter', name: 'X', letter: 'X', url: 'http://x.com/', get: false),
+  (key: 'facebook', name: 'Facebook', letter: 'F', url: 'http://www.facebook.com/', get: false),
+  (key: 'tiktok', name: 'TikTok', letter: 'T', url: 'http://www.tiktok.com/', get: false),
+  (key: 'spotify', name: 'Spotify', letter: 'S', url: 'http://open.spotify.com/', get: false),
+  (key: 'netflix', name: 'Netflix', letter: 'N', url: 'http://www.netflix.com/', get: false),
 ];
+
+/// How many sites the home screen shows (three rows of three).
+const maxHomeSites = 9;
+
+/// A site of the user's own, as saved: "name<SOH>address".
+LatencySite? customLatencySite(String saved) {
+  final parts = saved.split('\u0001');
+  if (parts.length != 2 || parts[0].trim().isEmpty || parts[1].trim().isEmpty) return null;
+  final name = parts[0].trim();
+  return (key: 'c:$name', name: name, letter: name.substring(0, 1).toUpperCase(), url: parts[1].trim(), get: false);
+}
+
+/// What was typed as an address ("example.com", "https://example.com/page") as the page asked: http:// first, as the
+/// others are kept (Settings → Ping decides HTTP or HTTPS); null when it isn't an address.
+String? latencyAddress(String typed) {
+  var s = typed.trim();
+  if (s.isEmpty || s.contains(RegExp(r'\s'))) return null;
+  s = s.replaceFirst(RegExp(r'^https?://', caseSensitive: false), '');
+  final host = s.split(RegExp(r'[/?#]')).first;
+  if (!host.contains('.') || host.startsWith('.') || host.endsWith('.')) return null;
+  return 'http://${s.endsWith('/') || s.contains('/') ? s : '$s/'}';
+}
+
+/// Every site Settings → Sites lists: the catalog, then the user's own.
+final latencyCatalogProvider = Provider<List<LatencySite>>((ref) {
+  final custom = ref.watch(Preferences.latencyCustom);
+  final all = [...latencySites, ...custom.map(customLatencySite).nonNulls];
+  return orderedSites(all, ref.watch(Preferences.latencyOrder));
+});
+
+/// [sites] in the user's [order] (keys): the named ones first as named, the others after them as they were.
+List<LatencySite> orderedSites(List<LatencySite> sites, List<String> order) {
+  final byKey = {for (final s in sites) s.key: s};
+  final named = <LatencySite>[];
+  for (final key in order) {
+    final site = byKey.remove(key);
+    if (site != null) named.add(site);
+  }
+  return [...named, ...byKey.values];
+}
+
+/// [keys] with the one at [from] moved to [to], as a ReorderableListView reports it (the target counts the moved one
+/// still in place, so a move down is one less).
+List<String> movedKey(List<String> keys, int from, int to) {
+  final list = [...keys];
+  if (from < 0 || from >= list.length) return list;
+  final key = list.removeAt(from);
+  list.insert((to > from ? to - 1 : to).clamp(0, list.length), key);
+  return list;
+}
+
+/// The sites marked for the home screen, in the list's order: the delay is asked to these, and they are the tiles.
+final homeSitesProvider = Provider<List<LatencySite>>((ref) {
+  final marked = ref.watch(Preferences.latencyHome).toSet();
+  return ref.watch(latencyCatalogProvider).where((s) => marked.contains(s.key)).take(maxHomeSites).toList();
+});
 
 /// The server each site goes through when each has its own (Settings → Ping → Sites, beta): the site's key → the
 /// server's tag, read from the core's site groups ("site-<key>"); empty when that's off.
@@ -102,9 +169,10 @@ class SiteLatency extends Notifier<SiteLatencyState> {
       ..connectionTimeout = timeout
       ..findProxy = ((_) => 'PROXY 127.0.0.1:$port');
     final results = <String, int?>{};
+    final shown = ref.read(homeSitesProvider);
     try {
       await Future.wait([
-        for (final site in latencySites)
+        for (final site in shown)
           () async {
             final url = Uri.parse(pingUrl(site.url, https));
             // a request that came back from the site (not the proxy's own error), timed
@@ -142,6 +210,6 @@ class SiteLatency extends Notifier<SiteLatencyState> {
     } finally {
       client.close(force: true);
     }
-    state = (ms: results, at: DateTime.now(), testing: false, done: latencySites.length);
+    state = (ms: results, at: DateTime.now(), testing: false, done: shown.length);
   }
 }

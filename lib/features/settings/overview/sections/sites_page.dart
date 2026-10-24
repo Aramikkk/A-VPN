@@ -7,7 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -64,6 +66,63 @@ class SitesPage extends HookConsumerWidget {
 
     final apps = ref.watch(ConfigOptions.siteGroupApps);
     final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+    // the sites of the home screen's delay block: all there are, each marked or not for the home screen
+    final catalog = ref.watch(latencyCatalogProvider);
+    final marked = ref.watch(Preferences.latencyHome);
+
+    Future<void> mark(String key, bool on) async {
+      if (on && marked.length >= maxHomeSites && !marked.contains(key)) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.avpn.sitesHomeLimit(n: maxHomeSites))));
+        return;
+      }
+      await ref.read(Preferences.latencyHome.notifier).update([
+        for (final k in marked)
+          if (k != key) k,
+        if (on) key,
+      ]);
+    }
+
+    Future<void> addCustom() async {
+      final name = TextEditingController();
+      final address = TextEditingController();
+      final saved = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.avpn.sitesAdd),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: name, decoration: InputDecoration(labelText: t.avpn.sitesAddName)),
+              TextField(
+                controller: address,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: InputDecoration(labelText: t.avpn.sitesAddUrl, hintText: 'example.com'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.avpn.siteGroupAppsDone)),
+            FilledButton(
+              onPressed: () {
+                final url = latencyAddress(address.text)?.replaceAll(';', '');
+                final title = name.text.trim().replaceAll('\u0001', '').replaceAll(';', ''); // a list is kept as one string joined by ';'
+                if (url == null || title.isEmpty) return;
+                Navigator.of(context).pop('$title\u0001$url');
+              },
+              child: Text(t.avpn.sitesAddDo),
+            ),
+          ],
+        ),
+      );
+      if (saved == null) return;
+      final site = customLatencySite(saved);
+      if (site == null) return;
+      final custom = ref.read(Preferences.latencyCustom);
+      if (custom.map(customLatencySite).any((s) => s?.key == site.key)) return;
+      await ref.read(Preferences.latencyCustom.notifier).update([...custom, saved]);
+      await mark(site.key, true);
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(t.avpn.pingSites)),
@@ -101,6 +160,68 @@ class SitesPage extends HookConsumerWidget {
               },
             ),
           ],
+          // the sites of the home screen's delay block: all of them, and which to show there
+          heading(t.avpn.sitesHomeTitle),
+          note(t.avpn.sitesHomeMsg(n: maxHomeSites)),
+          // dragged up and down (the handle, or a long press on a row): the tiles of the home screen follow this order
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: catalog.length,
+            onReorder: (from, to) async => ref
+                .read(Preferences.latencyOrder.notifier)
+                .update(movedKey([for (final s in catalog) s.key], from, to)),
+            itemBuilder: (context, i) {
+              final site = catalog[i];
+              return ReorderableDelayedDragStartListener(
+                key: ValueKey(site.key),
+                index: i,
+                child: ListTile(
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: scheme.surfaceContainerHighest,
+                    child: Text(site.letter, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                  title: Text(site.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: site.key.startsWith('c:')
+                      ? Text(site.url.replaceFirst('http://', ''), maxLines: 1, overflow: TextOverflow.ellipsis)
+                      : null,
+                  onTap: () => mark(site.key, !marked.contains(site.key)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (site.key.startsWith('c:'))
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () async {
+                            final custom = ref.read(Preferences.latencyCustom);
+                            await ref.read(Preferences.latencyCustom.notifier).update([
+                              for (final c in custom)
+                                if (customLatencySite(c)?.key != site.key) c,
+                            ]);
+                            await mark(site.key, false);
+                          },
+                        ),
+                      Switch.adaptive(value: marked.contains(site.key), onChanged: (on) => mark(site.key, on)),
+                      ReorderableDragStartListener(
+                        index: i,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Icon(Icons.drag_handle_rounded, color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.add_circle_outline_rounded),
+            title: Text(t.avpn.sitesAdd),
+            onTap: addCustom,
+          ),
           // the apps with a server of their own (a phone's apps are known by package)
           if (PlatformUtils.isAndroid) ...[
             heading(t.avpn.siteGroupApps),

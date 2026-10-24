@@ -30,6 +30,7 @@ import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/overview/sections/general_page.dart';
 import 'package:hiddify/features/settings/overview/sections/themes_page.dart';
+import 'package:hiddify/features/settings/overview/sections/sites_page.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
@@ -201,6 +202,7 @@ final _screens = <_Screen>[
   (name: 'launch', page: () => const GeneralPage(connection: true), taps: []),
   (name: 'servers', page: ServersOptionsPage.new, taps: [() => find.byType(Switch)]),
   (name: 'themes', page: ThemesPage.new, taps: []),
+  (name: 'sites', page: SitesPage.new, taps: [() => find.byType(Switch)]),
   (name: 'routing', page: () => const RoutingOptionsPage(routeRule: null), taps: []),
 ];
 

@@ -3281,6 +3281,8 @@ class _SiteTiles extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final sites = ref.watch(siteLatencyProvider);
+    // the sites the user marked in Settings → Sites
+    final shown = ref.watch(homeSitesProvider);
     // the marks of a good delay, by the method (HTTPS is higher by nature)
     final grade = siteGrade(ref.watch(ConfigOptions.pingHttps));
     final accent = theme.araAccent;
@@ -3495,7 +3497,7 @@ class _SiteTiles extends HookConsumerWidget {
                         curve: Curves.easeIn,
                         child: TweenAnimationBuilder<double>(
                           tween: Tween(
-                            end: sites.testing ? (.08 + .92 * sites.done / latencySites.length).clamp(0.0, 1.0) : 1.0,
+                            end: sites.testing ? (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0) : 1.0,
                           ),
                           duration: lightDuration(const Duration(milliseconds: 500)),
                           curve: Curves.easeOutCubic,
@@ -3528,9 +3530,22 @@ class _SiteTiles extends HookConsumerWidget {
               ],
             ),
           ),
-          line(latencySites.take(3)),
-          const Gap(8),
-          line(latencySites.skip(3)),
+          // rows of three; none marked: where to mark them
+          if (shown.isEmpty)
+            Expanded(
+              child: Center(
+                child: Text(
+                  t.avpn.sitesHomeEmpty,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
+            )
+          else
+            for (var start = 0; start < shown.length; start += 3) ...[
+              if (start > 0) const Gap(8),
+              line(shown.skip(start).take(3)),
+            ],
         ],
       ),
     );

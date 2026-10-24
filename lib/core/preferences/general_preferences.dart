@@ -283,6 +283,23 @@ abstract class Preferences {
   /// service's watchers) and the polls out of sight go far apart; they wake with the screen.
   static final nightMode = PreferencesNotifier.create<bool, bool>("night_mode", true);
 
+  /// The sites the home screen shows the delay to (Settings → Sites): their keys; at first the six the screen had.
+  static final latencyHome = PreferencesNotifier.create<List<String>, List<String>>("latency_home", <String>[
+    'instagram',
+    'whatsapp',
+    'telegram',
+    'chatgpt',
+    'youtube',
+    'gdrive',
+  ]);
+
+  /// The user's own sites in that list: "name<SOH>address" each.
+  static final latencyCustom = PreferencesNotifier.create<List<String>, List<String>>("latency_custom", <String>[]);
+
+  /// The order of the sites in that list (all their keys, dragged up and down in Settings → Sites); the home
+  /// screen's tiles follow it. Empty: the catalog's order, a site not named in it after the named ones.
+  static final latencyOrder = PreferencesNotifier.create<List<String>, List<String>>("latency_order", <String>[]);
+
   /// A-VPN: how the server list shows each server's ping.
   static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
     "ping_style",
