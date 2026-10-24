@@ -8,6 +8,7 @@ import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// A site the home screen shows the delay to: its name, the letter in its circle and the page asked.
@@ -28,56 +29,70 @@ const latencySites = <LatencySite>[
   (key: 'youtube', name: 'YouTube', letter: 'Y', url: 'http://www.youtube.com/generate_204', get: false),
   // Google Drive: its front page (it answers with a redirect, timed over the open connection as the rest)
   (key: 'gdrive', name: 'Google Диск', letter: 'G', url: 'http://drive.google.com/', get: false),
-  // more to choose from in Settings → Sites (the home screen shows the ones marked there)
+  // the AI chats: their apps are timed when marked for the home screen
   (key: 'gemini', name: 'Gemini', letter: 'G', url: 'http://gemini.google.com/', get: false),
   (key: 'claude', name: 'Claude', letter: 'C', url: 'http://claude.ai/', get: false),
   (key: 'perplexity', name: 'Perplexity', letter: 'P', url: 'http://www.perplexity.ai/', get: false),
-  (key: 'discord', name: 'Discord', letter: 'D', url: 'http://discord.com/', get: false),
-  (key: 'twitter', name: 'X', letter: 'X', url: 'http://x.com/', get: false),
-  (key: 'facebook', name: 'Facebook', letter: 'F', url: 'http://www.facebook.com/', get: false),
-  (key: 'tiktok', name: 'TikTok', letter: 'T', url: 'http://www.tiktok.com/', get: false),
-  (key: 'spotify', name: 'Spotify', letter: 'S', url: 'http://open.spotify.com/', get: false),
-  (key: 'netflix', name: 'Netflix', letter: 'N', url: 'http://www.netflix.com/', get: false),
 ];
 
-/// How many sites the home screen shows (three rows of three).
+/// The services the home screen shows until the user marks other apps (Settings → Sites).
+const defaultHomeServices = ['instagram', 'whatsapp', 'telegram', 'chatgpt', 'youtube', 'gdrive'];
+
+/// How many tiles the home screen has (three rows of three).
 const maxHomeSites = 9;
 
-/// A site of the user's own, as saved: "name<SOH>address".
-LatencySite? customLatencySite(String saved) {
-  final parts = saved.split('\u0001');
-  if (parts.length != 2 || parts[0].trim().isEmpty || parts[1].trim().isEmpty) return null;
-  final name = parts[0].trim();
-  return (key: 'c:$name', name: name, letter: name.substring(0, 1).toUpperCase(), url: parts[1].trim(), get: false);
+/// A service's key by the package of its phone app (the apps of Settings → Sites that are known services).
+const appServices = {
+  'com.instagram.android': 'instagram',
+  'com.instagram.lite': 'instagram',
+  'com.whatsapp': 'whatsapp',
+  'com.whatsapp.w4b': 'whatsapp',
+  'org.telegram.messenger': 'telegram',
+  'org.telegram.messenger.web': 'telegram',
+  'org.telegram.plus': 'telegram',
+  'org.thunderdog.challegram': 'telegram',
+  'com.openai.chatgpt': 'chatgpt',
+  'com.google.android.youtube': 'youtube',
+  'app.revanced.android.youtube': 'youtube',
+  'com.google.android.apps.docs': 'gdrive',
+  'com.google.android.apps.bard': 'gemini',
+  'com.anthropic.claude': 'claude',
+  'ai.perplexity.app.android': 'perplexity',
+};
+
+/// Whether the app [package] is marked for the home screen: in the saved list, or (until the list was ever saved,
+/// "*") one of the six services' apps.
+bool homeMarked(List<String> saved, String package) {
+  if (saved.length == 1 && saved.first == '*') return defaultHomeServices.contains(appServices[package]);
+  return saved.contains(package);
 }
 
-/// What was typed as an address ("example.com", "https://example.com/page") as the page asked: http:// first, as the
-/// others are kept (Settings → Ping decides HTTP or HTTPS); null when it isn't an address.
-String? latencyAddress(String typed) {
-  var s = typed.trim();
-  if (s.isEmpty || s.contains(RegExp(r'\s'))) return null;
-  s = s.replaceFirst(RegExp(r'^https?://', caseSensitive: false), '');
-  final host = s.split(RegExp(r'[/?#]')).first;
-  if (!host.contains('.') || host.startsWith('.') || host.endsWith('.')) return null;
-  return 'http://${s.endsWith('/') || s.contains('/') ? s : '$s/'}';
-}
-
-/// Every site Settings → Sites lists: the catalog, then the user's own.
-final latencyCatalogProvider = Provider<List<LatencySite>>((ref) {
-  final custom = ref.watch(Preferences.latencyCustom);
-  final all = [...latencySites, ...custom.map(customLatencySite).nonNulls];
-  return orderedSites(all, ref.watch(Preferences.latencyOrder));
-});
-
-/// [sites] in the user's [order] (keys): the named ones first as named, the others after them as they were.
-List<LatencySite> orderedSites(List<LatencySite> sites, List<String> order) {
-  final byKey = {for (final s in sites) s.key: s};
-  final named = <LatencySite>[];
-  for (final key in order) {
-    final site = byKey.remove(key);
-    if (site != null) named.add(site);
+/// The tiles: on the phone the apps of Settings → Sites marked for the home screen, in the list's order (a service's
+/// app is timed against its service, any other app against the test address); on a computer the six services.
+List<LatencySite> homeSitesFor({
+  required bool android,
+  required List<String> apps,
+  required List<String> saved,
+  required String testUrl,
+}) {
+  if (!android) return [for (final key in defaultHomeServices) latencySites.firstWhere((s) => s.key == key)];
+  final sites = <LatencySite>[];
+  final seen = <String>{};
+  for (final package in apps) {
+    if (package.isEmpty || !homeMarked(saved, package)) continue;
+    final service = appServices[package];
+    final site = service != null
+        ? latencySites.firstWhere((s) => s.key == service)
+        : (key: 'app:$package', name: _appName(package), letter: _appName(package).substring(0, 1).toUpperCase(), url: testUrl, get: false);
+    if (seen.add(site.key)) sites.add(site);
   }
-  return [...named, ...byKey.values];
+  return sites.take(maxHomeSites).toList();
+}
+
+/// A package's last part as a name ("ru.sberbankmobile" -> "sberbankmobile"), until the app's own name is read.
+String _appName(String package) {
+  final last = package.split('.').last;
+  return last.isEmpty ? package : last;
 }
 
 /// [keys] with the one at [from] moved to [to], as a ReorderableListView reports it (the target counts the moved one
@@ -90,11 +105,15 @@ List<String> movedKey(List<String> keys, int from, int to) {
   return list;
 }
 
-/// The sites marked for the home screen, in the list's order: the delay is asked to these, and they are the tiles.
-final homeSitesProvider = Provider<List<LatencySite>>((ref) {
-  final marked = ref.watch(Preferences.latencyHome).toSet();
-  return ref.watch(latencyCatalogProvider).where((s) => marked.contains(s.key)).take(maxHomeSites).toList();
-});
+/// The tiles of the home screen's delay block: the delay is asked to these.
+final homeSitesProvider = Provider<List<LatencySite>>(
+  (ref) => homeSitesFor(
+    android: PlatformUtils.isAndroid,
+    apps: ref.watch(ConfigOptions.siteGroupApps),
+    saved: ref.watch(Preferences.homeApps),
+    testUrl: ref.watch(ConfigOptions.connectionTestUrl),
+  ),
+);
 
 /// The server each site goes through when each has its own (Settings → Ping → Sites, beta): the site's key → the
 /// server's tag, read from the core's site groups ("site-<key>"); empty when that's off.

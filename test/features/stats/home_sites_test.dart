@@ -1,46 +1,65 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';
 
+const _six = [
+  'com.instagram.android',
+  'com.whatsapp',
+  'org.telegram.messenger',
+  'com.openai.chatgpt',
+  'com.google.android.youtube',
+  'com.google.android.apps.docs',
+];
+
+List<String> keys(List<String> apps, List<String> saved, {bool android = true}) => homeSitesFor(
+  android: android,
+  apps: apps,
+  saved: saved,
+  testUrl: 'http://www.gstatic.com/generate_204',
+).map((s) => s.key).toList();
+
 void main() {
-  test('the catalog: the first six are the screen\'s old ones, keys are unique', () {
-    expect(latencySites.take(6).map((s) => s.key), ['instagram', 'whatsapp', 'telegram', 'chatgpt', 'youtube', 'gdrive']);
-    expect(latencySites.map((s) => s.key).toSet().length, latencySites.length);
-    expect(latencySites.length, greaterThanOrEqualTo(15));
+  test('until a switch is touched the six services\' apps are the tiles, in the list order', () {
+    expect(keys(_six, ['*']), ['instagram', 'whatsapp', 'telegram', 'chatgpt', 'youtube', 'gdrive']);
+    expect(keys([..._six.reversed], ['*']).first, 'gdrive');
   });
 
-  test('an address typed by the user', () {
-    expect(latencyAddress('example.com'), 'http://example.com/');
-    expect(latencyAddress('https://Example.com/page'), 'http://Example.com/page');
-    expect(latencyAddress(' ya.ru '), 'http://ya.ru/');
-    expect(latencyAddress('localhost'), isNull);
-    expect(latencyAddress('two words.com'), isNull);
-    expect(latencyAddress(''), isNull);
+  test('another app is not a tile until it is marked', () {
+    final apps = [..._six, 'ru.sberbankmobile'];
+    expect(keys(apps, ['*']).length, 6);
+    final saved = [...apps];
+    final marked = keys(apps, saved);
+    expect(marked.last, 'app:ru.sberbankmobile');
+    expect(homeSitesFor(android: true, apps: apps, saved: saved, testUrl: 'http://x/').last.name, 'sberbankmobile');
   });
 
-  test('a site of one\'s own, as saved', () {
-    final site = customLatencySite('Мой сайт\u0001http://example.com/');
-    expect(site?.name, 'Мой сайт');
-    expect(site?.letter, 'М');
-    expect(site?.key, 'c:Мой сайт');
-    expect(site?.url, 'http://example.com/');
-    expect(customLatencySite('no separator'), isNull);
-    expect(customLatencySite('\u0001http://x.com/'), isNull);
+  test('the saved list decides, and an unmarked app is out', () {
+    expect(keys(_six, ['com.whatsapp']), ['whatsapp']);
+    expect(keys(_six, ['']), isEmpty);
   });
 
-  test('the order of the user: named first as named, the rest after', () {
-    final keys = (List<String> order) => orderedSites(latencySites, order).map((s) => s.key).toList();
-    expect(keys([]), latencySites.map((s) => s.key).toList());
-    expect(keys(['claude', 'instagram']).take(3), ['claude', 'instagram', 'whatsapp']);
-    expect(keys(['unknown', 'netflix']).first, 'netflix');
-    expect(keys(['claude']).length, latencySites.length);
+  test('two apps of one service are one tile; the AI chats are services too', () {
+    expect(keys(['com.instagram.android', 'com.instagram.lite'], ['com.instagram.android', 'com.instagram.lite']), ['instagram']);
+    expect(keys(['com.anthropic.claude', 'com.google.android.apps.bard'], ['com.anthropic.claude', 'com.google.android.apps.bard']), [
+      'claude',
+      'gemini',
+    ]);
+  });
+
+  test('no more than nine tiles', () {
+    final apps = [for (var i = 0; i < 15; i++) 'app.number$i'];
+    expect(keys(apps, apps).length, maxHomeSites);
+  });
+
+  test('a computer has the six services', () {
+    expect(keys(['whatever'], ['whatever'], android: false), ['instagram', 'whatsapp', 'telegram', 'chatgpt', 'youtube', 'gdrive']);
   });
 
   test('a drag as the list reports it', () {
-    final keys = ['a', 'b', 'c', 'd'];
-    expect(movedKey(keys, 0, 3), ['b', 'c', 'a', 'd']);
-    expect(movedKey(keys, 3, 0), ['d', 'a', 'b', 'c']);
-    expect(movedKey(keys, 1, 2), keys);
-    expect(movedKey(keys, 0, 4), ['b', 'c', 'd', 'a']);
-    expect(movedKey(keys, 9, 0), keys);
+    final list = ['a', 'b', 'c', 'd'];
+    expect(movedKey(list, 0, 3), ['b', 'c', 'a', 'd']);
+    expect(movedKey(list, 3, 0), ['d', 'a', 'b', 'c']);
+    expect(movedKey(list, 1, 2), list);
+    expect(movedKey(list, 0, 4), ['b', 'c', 'd', 'a']);
+    expect(movedKey(list, 9, 0), list);
   });
 }

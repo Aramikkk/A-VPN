@@ -557,7 +557,29 @@ class _SankeyPainter extends CustomPainter {
     return colour;
   }
 
+  /// Laid-out labels kept between paints: the names hardly ever change, and laying text out is most of a paint's
+  /// cost (the diagram is painted again at every poll). The key holds everything that makes a label look as it does.
+  static final _labels = <String, TextPainter>{};
+
   TextPainter _text(
+    String text,
+    double width, {
+    required bool strong,
+    required double size,
+    Color? color,
+    int lines = 1,
+    Paint? foreground,
+  }) {
+    final key =
+        '$text|${width.round()}|$size|$strong|$lines|${family ?? ''}|${foreground == null ? (color ?? c.ink).toARGB32() : 'h${foreground.color.toARGB32()}'}';
+    final kept = _labels[key];
+    if (kept != null) return kept;
+    // a long session shows many names: start the keeping over rather than let it grow
+    if (_labels.length > 600) _labels.clear();
+    return _labels[key] = _build(text, width, strong: strong, size: size, color: color, lines: lines, foreground: foreground);
+  }
+
+  TextPainter _build(
     String text,
     double width, {
     required bool strong,

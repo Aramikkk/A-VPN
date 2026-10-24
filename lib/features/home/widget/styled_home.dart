@@ -3281,8 +3281,9 @@ class _SiteTiles extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final sites = ref.watch(siteLatencyProvider);
-    // the sites the user marked in Settings → Sites
+    // the tiles: the apps marked in Settings → Sites (their own icons and names)
     final shown = ref.watch(homeSitesProvider);
+    final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     // the marks of a good delay, by the method (HTTPS is higher by nature)
     final grade = siteGrade(ref.watch(ConfigOptions.pingHttps));
     final accent = theme.araAccent;
@@ -3292,6 +3293,8 @@ class _SiteTiles extends HookConsumerWidget {
     final mainServer = ref.watch(proxiesOverviewNotifierProvider.select((v) => SiteLatency.mainServer(v.valueOrNull)));
 
     Widget tile(LatencySite site) {
+      // an app that isn't a known service: its own icon and name
+      final app = site.key.startsWith('app:') ? installed[site.key.substring(4)] : null;
       final measured = sites.ms.containsKey(site.key);
       final ms = sites.ms[site.key];
       final colour = !measured ? scheme.outlineVariant : _colour(ms, grade);
@@ -3351,10 +3354,15 @@ class _SiteTiles extends HookConsumerWidget {
                   height: disc,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(shape: BoxShape.circle, color: sign),
-                  child: _sign(site, _ink(sign), size: 15 * k),
+                  child: app?.icon != null
+                      ? Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: ClipOval(child: Image.memory(app!.icon!, width: disc, height: disc, fit: BoxFit.cover)),
+                        )
+                      : _sign(site, _ink(sign), size: 15 * k),
                 );
                 final name = Text(
-                  site.name,
+                  app?.name ?? site.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium?.copyWith(
