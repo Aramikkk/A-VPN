@@ -34,9 +34,11 @@ class SankeyFlow {
   final String host;
   final int count;
 
-  /// the thickness it is given on the picture: the square root of its weight, so one huge flow doesn't swallow the
-  /// others (the amounts written stay the real ones)
-  double get shown => math.sqrt(weight);
+  /// the thickness it is given on the picture: the logarithm of its weight in [unit]s, so one huge flow doesn't
+  /// swallow the others (the amounts written stay the real ones)
+  double shownAt(double unit) => math.log(1 + weight / unit);
+
+  double get shown => shownAt(flowMinBytes.toDouble());
 }
 
 class SankeyNode {
@@ -97,16 +99,19 @@ class SankeyModel {
     required String otherOut,
     int top = 6,
     double minShare = .02,
+
+    /// what one step of the scale is: bytes (the smallest flow shown) or one connection
+    double unit = 20480,
   }) {
     final list = flows.where((f) => f.weight > 0).toList();
-    final total = list.fold<double>(0, (s, f) => s + f.shown);
+    final total = list.fold<double>(0, (s, f) => s + f.shownAt(unit));
     if (total <= 0) return SankeyModel._(const [[], [], []], const [], 0);
 
     // a column keeps the biggest keys that are worth a node, everything else goes to its "other"
     Set<String> keep(String Function(SankeyFlow) keyOf) {
       final by = <String, double>{};
       for (final f in list) {
-        by[keyOf(f)] = (by[keyOf(f)] ?? 0) + f.shown;
+        by[keyOf(f)] = (by[keyOf(f)] ?? 0) + f.shownAt(unit);
       }
       final ranked = by.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       return {
@@ -141,7 +146,7 @@ class SankeyModel {
         n.flows.add(f);
       }
       for (final l in [link(a, r, f.route), link(r, o, f.route)]) {
-        l.weight += f.shown;
+        l.weight += f.shownAt(unit);
         l.flows.add(f);
       }
     }
@@ -219,7 +224,7 @@ class SankeyGeometry {
     xs = [labelL, (labelL + x2) / 2, x2];
   }
 
-  static const nodeW = 8.0;
+  static const nodeW = 6.0;
   late final double labelL;
   late final double labelR;
   late final List<double> xs;
@@ -268,7 +273,17 @@ class SankeySelection {
 /// server, direct, blocked) on the right; each ribbon as thick as its traffic, in the way's colour. A tap on a
 /// route shows its details.
 class TrafficSankey extends ConsumerWidget {
-  const TrafficSankey({super.key, required this.items, required this.weight, required this.value, this.height});
+  const TrafficSankey({
+    super.key,
+    required this.items,
+    required this.weight,
+    required this.value,
+    this.height,
+    this.unit = 20480,
+  });
+
+  /// one step of the thickness scale: bytes, or 1 when connections are counted
+  final double unit;
 
   /// null: by how many names the widest column holds
   final double? height;
@@ -301,6 +316,7 @@ class TrafficSankey extends ConsumerWidget {
       flows: flows,
       value: value,
       height: height,
+      unit: unit,
       otherApp: t.avpn.connOther,
       otherRule: t.avpn.connOther,
       otherOut: t.avpn.connOther,
@@ -322,9 +338,12 @@ class SankeyDiagram extends StatefulWidget {
     required this.otherRule,
     required this.otherOut,
     this.height,
+    this.unit = 20480,
     this.onSelect,
     this.initialSelection,
   });
+
+  final double unit;
 
   final List<SankeyFlow> flows;
   final String Function(double w) value;
@@ -354,6 +373,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
     otherApp: widget.otherApp,
     otherRule: widget.otherRule,
     otherOut: widget.otherOut,
+    unit: widget.unit,
   );
 
   @override
@@ -453,12 +473,21 @@ class _SankeyPainter extends CustomPainter {
   final Brightness brightness;
   final Set<SankeyFlow> lit;
 
-  Color _route(ConnectionRoute? r) => switch (r) {
+  Color _route(ConnectionRoute? r) => _soft(switch (r) {
     ConnectionRoute.vpn => c.vpn,
     ConnectionRoute.direct => c.direct,
     ConnectionRoute.block => c.block,
     null => c.app,
-  };
+  });
+
+  /// a colour near black on a light page (or near white on a dark one) is drawn lighter: a pure black node and
+  /// ribbon looks heavy on a picture of many thin lines
+  Color _soft(Color colour) {
+    final lum = colour.computeLuminance();
+    if (brightness == Brightness.light && lum < .12) return Color.lerp(colour, Colors.white, .5)!;
+    if (brightness == Brightness.dark && lum > .85) return Color.lerp(colour, Colors.black, .4)!;
+    return colour;
+  }
 
   TextPainter _text(
     String text,
@@ -562,36 +591,40 @@ class _SankeyPainter extends CustomPainter {
         final alpha = bright ? 1.0 : .3;
         final fill = _route(n.route);
         final top = n.y.roundToDouble();
-        final bottom = math.max((n.y + n.h).roundToDouble(), top + 3);
+        final bottom = math.max((n.y + n.h).roundToDouble(), top + 2);
         canvas.drawRRect(
           RRect.fromRectAndRadius(
             Rect.fromLTRB(xs[ci], top, xs[ci] + SankeyGeometry.nodeW, bottom),
-            const Radius.circular(4),
+            const Radius.circular(3),
           ),
           Paint()
             ..isAntiAlias = true
             ..color = (ci == 0 ? fill.withValues(alpha: .8) : fill).withValues(alpha: (ci == 0 ? .8 : 1) * alpha),
         );
-        // a label only where the one above it is done: thin neighbours would print over each other
+        // the name over two lines at most, the amount under it where the node is tall; a label only where the one
+        // above it is done: thin neighbours would print over each other
         final tall = n.h >= 28;
-        final labelTop = n.y + n.h / 2 - (tall ? 13 : 7);
-        if (labelTop < lastBottom[ci] + 1) continue;
-        lastBottom[ci] = labelTop + (tall ? 27 : 14);
         final amount = value(n.real);
-        switch (ci) {
-          case 0:
-            _label(canvas, n.label, Offset(xs[0] - 7, labelTop), g.labelL - 9, right: true, alpha: alpha);
-            if (tall) {
-              _label(canvas, amount, Offset(xs[0] - 7, labelTop + 13), g.labelL - 9, right: true, strong: false, size: 10.5, color: c.soft, alpha: alpha);
-            }
-          case 1:
-            final room = (xs[2] - xs[1]) - SankeyGeometry.nodeW - 10;
-            _label(canvas, n.label, Offset(xs[1] + SankeyGeometry.nodeW + 5, labelTop), room, lines: n.h >= 44 ? 3 : (tall ? 2 : 1), strong: false, size: 10.5, alpha: alpha);
-          default:
-            _label(canvas, n.label, Offset(xs[2] + SankeyGeometry.nodeW + 7, labelTop), g.labelR - 9, alpha: alpha);
-            if (tall) {
-              _label(canvas, amount, Offset(xs[2] + SankeyGeometry.nodeW + 7, labelTop + 13), g.labelR - 9, strong: false, size: 10.5, color: c.soft, alpha: alpha);
-            }
+        final width = switch (ci) {
+          0 => g.labelL - 9,
+          1 => (xs[2] - xs[1]) - SankeyGeometry.nodeW - 10,
+          _ => g.labelR - 9,
+        };
+        final nameStrong = ci != 1;
+        final nameSize = ci == 1 ? 10.5 : 11.5;
+        final nameH = _text(n.label, width, strong: nameStrong, size: nameSize, lines: 2).height;
+        final blockH = nameH + (tall ? 13 : 0);
+        final labelTop = n.y + n.h / 2 - blockH / 2;
+        if (labelTop < lastBottom[ci] + 1) continue;
+        lastBottom[ci] = labelTop + blockH;
+        final x = switch (ci) {
+          0 => xs[0] - 7,
+          1 => xs[1] + SankeyGeometry.nodeW + 5,
+          _ => xs[2] + SankeyGeometry.nodeW + 7,
+        };
+        _label(canvas, n.label, Offset(x, labelTop), width, right: ci == 0, strong: nameStrong, size: nameSize, lines: 2, alpha: alpha);
+        if (tall && ci != 1) {
+          _label(canvas, amount, Offset(x, labelTop + nameH), width, right: ci == 0, strong: false, size: 10.5, color: c.soft, alpha: alpha);
         }
       }
     }

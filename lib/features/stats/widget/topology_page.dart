@@ -173,6 +173,7 @@ class TopologyPage extends HookConsumerWidget {
                               : TrafficSankey(
                                   items: openNow,
                                   height: chartHeight,
+                                  unit: byTraffic.value ? flowMinBytes.toDouble() : 1,
                                   // a connection that has moved nothing yet is still a thread of its own
                                   weight: (c) => byTraffic.value ? math.max(1, c.total.toDouble()) : c.count.toDouble(),
                                   value: value,

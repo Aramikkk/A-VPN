@@ -101,7 +101,7 @@ void main() {
     final big = model.columns[0].firstWhere((n) => n.label == 'big');
     final a = model.columns[0].firstWhere((n) => n.label == 'a');
     // 10 times the traffic, about 3 times the width
-    expect(big.weight / a.weight, lessThan(4));
+    expect(big.weight / a.weight, lessThan(3.5));
     expect(big.real / a.real, closeTo(10, 1e-9));
   });
 
