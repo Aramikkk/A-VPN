@@ -223,7 +223,11 @@ class ConnectionsState {
     this.since,
     this.usage = const {},
     this.routeUsage = const {},
+    this.rates = const {},
   });
+
+  /// the speed of each open connection now, bytes a second (by id): the change since the last poll, smoothed
+  final Map<String, double> rates;
 
   /// by app: the stretches of time it had a connection open (ms since the epoch, from and to, merged, oldest
   /// first); see [usageSince]
@@ -532,6 +536,9 @@ class Connections extends Notifier<ConnectionsState> {
     _save();
   }
 
+  /// each open connection's total at the last poll, when it was, and its speed then
+  final _rates = <String, ({int total, int at, double bps})>{};
+
   Future<void> _poll(HttpClient client, Uri url, String secret) async {
     List<dynamic>? list;
     try {
@@ -550,6 +557,7 @@ class Connections extends Notifier<ConnectionsState> {
       return;
     }
     final open = <String>{};
+    final polledAt = DateTime.now().millisecondsSinceEpoch;
     for (final entry in list ?? const []) {
       if (entry is! Map<String, dynamic>) continue;
       final c = SeenConnection.fromClash(entry, session: ref.read(sessionStartProvider)?.millisecondsSinceEpoch);
@@ -557,7 +565,21 @@ class Connections extends Notifier<ConnectionsState> {
       if (c == null || isAdultHost(c.host) || _hidden(c.app)) continue;
       open.add(c.id);
       _seen[c.id] = c;
+      // its speed: what it moved since the last poll, half and half with the speed before
+      final before = _rates[c.id];
+      _rates[c.id] = (
+        total: c.total,
+        at: polledAt,
+        bps: before == null
+            ? 0
+            : smoothRate(
+                previous: before.bps,
+                bytes: c.total - before.total,
+                elapsed: Duration(milliseconds: polledAt - before.at),
+              ),
+      );
     }
+    if (list != null) _rates.removeWhere((id, _) => !open.contains(id));
     if (list != null) {
       for (final id in _seen.keys.toList()) {
         if (!open.contains(id) && _seen[id]!.active) _seen[id] = _seen[id]!.closed();
@@ -572,6 +594,7 @@ class Connections extends Notifier<ConnectionsState> {
       since: _since,
       usage: Map.of(_usage),
       routeUsage: _routeUsage,
+      rates: {for (final e in _rates.entries) e.key: e.value.bps},
     );
     if (DateTime.now().difference(_saved) > saveEvery) _save();
   }
@@ -789,3 +812,12 @@ SeenConnection dailyConnection(SeenConnection c, (int, int) baseline, DateTime d
   active: c.active,
   count: c.count,
 );
+
+/// A connection's speed from its change since the last poll: half the new reading and half the old one (so it
+/// doesn't jump), or the reading alone after a long gap (the old one is stale).
+double smoothRate({required double previous, required int bytes, required Duration elapsed}) {
+  final seconds = elapsed.inMilliseconds / 1000;
+  if (seconds <= .2) return previous;
+  final instant = (bytes < 0 ? 0 : bytes) / seconds;
+  return seconds > 10 ? instant : previous * .5 + instant * .5;
+}

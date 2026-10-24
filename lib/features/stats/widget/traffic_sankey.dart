@@ -24,7 +24,16 @@ class SankeyFlow {
     required this.weight,
     this.host = '',
     this.count = 1,
+    this.site = '',
+    this.speed = 0,
   });
+
+  /// the middle column's name (the site, as a domain); empty: the rule's
+  final String site;
+  String get middle => site.isEmpty ? rule : site;
+
+  /// bytes a second now
+  final double speed;
 
   final String app;
   final String rule;
@@ -56,6 +65,9 @@ class SankeyNode {
 
   /// the real amount (what is written)
   double get real => flows.fold<double>(0, (s, f) => s + f.weight);
+
+  /// the speed now of what makes the node up
+  double get speed => flows.fold<double>(0, (s, f) => s + f.speed);
   double y = 0;
   double h = 0;
   final outLinks = <SankeyLink>[];
@@ -82,7 +94,10 @@ class SankeyLink {
 /// The flow diagram's data: three columns (apps, rules, destinations) and the ribbons between them, each as thick
 /// as the traffic it carries. Only the biggest of each column are kept, the rest added up in one "other" node.
 class SankeyModel {
-  SankeyModel._(this.columns, this.links, this.total);
+  SankeyModel._(this.columns, this.links, this.total, this.maxUnit);
+
+  /// the thickest a unit of weight may be drawn (no limit when null): with few links they stay slim, not huge
+  final double? maxUnit;
 
   final List<List<SankeyNode>> columns;
   final List<SankeyLink> links;
@@ -102,25 +117,41 @@ class SankeyModel {
 
     /// what one step of the scale is: bytes (the smallest flow shown) or one connection
     double unit = 20480,
+
+    /// every route (an app to a site to a destination) as thick as any other, and the nodes in a fixed order
+    /// (by name): nothing changes size or place as the traffic moves, only what is written
+    bool even = false,
   }) {
     final list = flows.where((f) => f.weight > 0).toList();
-    final total = list.fold<double>(0, (s, f) => s + f.shownAt(unit));
-    if (total <= 0) return SankeyModel._(const [[], [], []], const [], 0);
+    // what a flow weighs on the picture: one route, one unit (even), or the logarithm of its traffic
+    final seenRoutes = <String>{};
+    double shown(SankeyFlow f, String routeKey) {
+      if (!even) return f.shownAt(unit);
+      return seenRoutes.add(routeKey) ? 1 : 0;
+    }
+
+    var total = 0.0;
+    if (even) {
+      total = list.map((f) => '${f.app}|${f.middle}|${f.route.index}|${f.out}').toSet().length.toDouble();
+    } else {
+      total = list.fold<double>(0, (s, f) => s + f.shownAt(unit));
+    }
+    if (total <= 0) return SankeyModel._(const [[], [], []], const [], 0, null);
 
     // a column keeps the biggest keys that are worth a node, everything else goes to its "other"
     Set<String> keep(String Function(SankeyFlow) keyOf) {
       final by = <String, double>{};
       for (final f in list) {
-        by[keyOf(f)] = (by[keyOf(f)] ?? 0) + f.shownAt(unit);
+        by[keyOf(f)] = (by[keyOf(f)] ?? 0) + (even ? f.weight : f.shownAt(unit));
       }
       final ranked = by.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       return {
         for (final e in ranked.take(top))
-          if (e.value >= total * minShare) e.key,
+          if (even || e.value >= total * minShare) e.key,
       };
     }
 
-    String ruleKey(SankeyFlow f) => '${f.route.index}|${f.rule}';
+    String ruleKey(SankeyFlow f) => '${f.route.index}|${f.middle}';
     String outKey(SankeyFlow f) => '${f.route.index}|${f.out}';
     final apps = keep((f) => f.app);
     final rules = keep(ruleKey);
@@ -137,7 +168,7 @@ class SankeyModel {
     for (final f in list) {
       final a = apps.contains(f.app) ? node('a|${f.app}', f.app, null, 0) : node('a|', otherApp, null, 0);
       final r = rules.contains(ruleKey(f))
-          ? node('r|${ruleKey(f)}', f.rule, f.route, 1)
+          ? node('r|${ruleKey(f)}', f.middle, f.route, 1)
           : node('r|${f.route.index}|', otherRule, f.route, 1);
       final o = outs.contains(outKey(f))
           ? node('o|${outKey(f)}', f.out, f.route, 2)
@@ -145,8 +176,9 @@ class SankeyModel {
       for (final n in [a, r, o]) {
         n.flows.add(f);
       }
+      final weight = shown(f, '${a.key}|${r.key}|${o.key}');
       for (final l in [link(a, r, f.route), link(r, o, f.route)]) {
-        l.weight += f.shownAt(unit);
+        l.weight += weight;
         l.flows.add(f);
       }
     }
@@ -171,9 +203,10 @@ class SankeyModel {
           final aOther = a.key.endsWith('|');
           final bOther = b.key.endsWith('|');
           if (aOther != bOther) return aOther ? 1 : -1;
+          if (even) return a.label.toLowerCase().compareTo(b.label.toLowerCase());
           return b.weight.compareTo(a.weight);
         });
-    return SankeyModel._([column(0), column(1), column(2)], links.values.toList(), total);
+    return SankeyModel._([column(0), column(1), column(2)], links.values.toList(), total, even ? 44 : null);
   }
 
   /// Places the nodes in [height] (each column fills it, the room not taken by nodes shared between them as gaps)
@@ -181,7 +214,8 @@ class SankeyModel {
   /// Edges sit on whole pixels, so they stay crisp.
   void layout(double height, {double minGap = 6}) {
     if (isEmpty) return;
-    final k = (height - minGap * (widest - 1)) / total;
+    var k = (height - minGap * (widest - 1)) / total;
+    if (maxUnit != null && k > maxUnit!) k = maxUnit!;
     for (final column in columns) {
       if (column.isEmpty) continue;
       final used = column.fold<double>(0, (s, n) => s + n.weight * k);
@@ -225,6 +259,9 @@ class SankeyGeometry {
   }
 
   static const nodeW = 6.0;
+
+  /// the room over the nodes for the columns' names
+  static const headerH = 20.0;
   late final double labelL;
   late final double labelR;
   late final List<double> xs;
@@ -266,6 +303,7 @@ class SankeySelection {
   final double total;
 
   double get weight => flows.fold<double>(0, (s, f) => s + f.weight);
+  double get speed => flows.fold<double>(0, (s, f) => s + f.speed);
   int get connections => flows.fold<int>(0, (s, f) => s + f.count);
 }
 
@@ -280,10 +318,16 @@ class TrafficSankey extends ConsumerWidget {
     required this.value,
     this.height,
     this.unit = 20480,
+    this.speed,
+    this.speedValue,
   });
 
   /// one step of the thickness scale: bytes, or 1 when connections are counted
   final double unit;
+
+  /// a connection's speed now (bytes a second), and how it is written; null: no speeds
+  final double Function(SeenConnection c)? speed;
+  final String Function(double bytesPerSecond)? speedValue;
 
   /// null: by how many names the widest column holds
   final double? height;
@@ -310,6 +354,8 @@ class TrafficSankey extends ConsumerWidget {
           weight: weight(c),
           host: c.host,
           count: c.count,
+          site: siteOf(c.host),
+          speed: speed?.call(c) ?? 0,
         ),
     ];
     return SankeyDiagram(
@@ -317,12 +363,15 @@ class TrafficSankey extends ConsumerWidget {
       value: value,
       height: height,
       unit: unit,
+      even: true,
+      speedValue: speedValue,
+      headers: [t.avpn.sankeyApps, t.avpn.sankeySites, t.avpn.sankeyTo],
       otherApp: t.avpn.connOther,
       otherRule: t.avpn.connOther,
       otherOut: t.avpn.connOther,
       onSelect: (selection) async => showGlassPopup(
         context,
-        SankeyDetails(selection: selection, value: value),
+        SankeyDetails(selection: selection, value: value, speedValue: speedValue),
       ),
     );
   }
@@ -339,11 +388,23 @@ class SankeyDiagram extends StatefulWidget {
     required this.otherOut,
     this.height,
     this.unit = 20480,
+    this.even = false,
+    this.speedValue,
+    this.headers = const [],
     this.onSelect,
     this.initialSelection,
   });
 
   final double unit;
+
+  /// every route as thick as any other, in a fixed order: only the written amounts change
+  final bool even;
+
+  /// a speed (bytes a second) as written, or null when there are no speeds to show
+  final String Function(double bytesPerSecond)? speedValue;
+
+  /// the three columns' names (apps, sites, where it goes)
+  final List<String> headers;
 
   final List<SankeyFlow> flows;
   final String Function(double w) value;
@@ -374,6 +435,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
     otherRule: widget.otherRule,
     otherOut: widget.otherOut,
     unit: widget.unit,
+    even: widget.even,
   );
 
   @override
@@ -401,7 +463,8 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
 
   void _tap(Offset at, double width, double height) {
     final geometry = SankeyGeometry(width);
-    _model.layout(height);
+    _model.layout(height - SankeyGeometry.headerH);
+    at = at.translate(0, -SankeyGeometry.headerH);
     for (final n in _model.columns.expand((c) => c)) {
       if (geometry.hit(n, width).contains(at)) {
         unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _model.total)));
@@ -453,6 +516,8 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
               theme.textTheme.labelSmall?.fontFamily,
               theme.brightness,
               _lit,
+              widget.headers,
+              widget.speedValue,
             ),
           ),
         ),
@@ -464,7 +529,10 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
 typedef _Colours = ({Color vpn, Color direct, Color block, Color app, Color ink, Color soft, Color halo});
 
 class _SankeyPainter extends CustomPainter {
-  _SankeyPainter(this.model, this.c, this.value, this.family, this.brightness, this.lit);
+  _SankeyPainter(this.model, this.c, this.value, this.family, this.brightness, this.lit, this.headers, this.speedValue);
+
+  final List<String> headers;
+  final String Function(double)? speedValue;
 
   final SankeyModel model;
   final _Colours c;
@@ -547,7 +615,16 @@ class _SankeyPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final g = SankeyGeometry(size.width);
     final xs = g.xs;
-    model.layout(size.height);
+    // the columns' names over them, then the picture under
+    for (final (i, title) in headers.indexed) {
+      if (title.isEmpty) continue;
+      final width = i == 1 ? (xs[2] - xs[1]) : (i == 0 ? g.labelL : g.labelR + 10);
+      final p = _text(title.toUpperCase(), width, strong: true, size: 9.5, color: c.soft);
+      p.paint(canvas, Offset(i == 0 ? xs[0] - 7 - p.width : (i == 1 ? xs[1] : xs[2]), 0));
+    }
+    canvas.save();
+    canvas.translate(0, SankeyGeometry.headerH);
+    model.layout(size.height - SankeyGeometry.headerH);
     final picking = lit.isNotEmpty;
     bool on(Set<SankeyFlow> flows) => !picking || flows.any(lit.contains);
 
@@ -605,15 +682,19 @@ class _SankeyPainter extends CustomPainter {
         // above it is done: thin neighbours would print over each other
         final tall = n.h >= 28;
         final amount = value(n.real);
+        final speedText = speedValue?.call(n.speed);
+        final lines = 1 + (tall && speedText != null && n.h >= 44 ? 1 : 0);
         final width = switch (ci) {
           0 => g.labelL - 9,
-          1 => (xs[2] - xs[1]) - SankeyGeometry.nodeW - 10,
+          1 => (xs[2] - xs[1]) - SankeyGeometry.nodeW - 6,
           _ => g.labelR - 9,
         };
         final nameStrong = ci != 1;
-        final nameSize = ci == 1 ? 10.5 : 11.5;
-        final nameH = _text(n.label, width, strong: nameStrong, size: nameSize, lines: 2).height;
-        final blockH = nameH + (tall ? 13 : 0);
+        final nameSize = ci == 1 ? 10.0 : 11.5;
+        // a site is one line (a domain broken in the middle reads badly), an app or a server up to two
+        final nameLines = ci == 1 ? 1 : 2;
+        final nameH = _text(n.label, width, strong: nameStrong, size: nameSize, lines: nameLines).height;
+        final blockH = nameH + (tall ? 13 * lines : 0);
         final labelTop = n.y + n.h / 2 - blockH / 2;
         if (labelTop < lastBottom[ci] + 1) continue;
         lastBottom[ci] = labelTop + blockH;
@@ -622,12 +703,16 @@ class _SankeyPainter extends CustomPainter {
           1 => xs[1] + SankeyGeometry.nodeW + 5,
           _ => xs[2] + SankeyGeometry.nodeW + 7,
         };
-        _label(canvas, n.label, Offset(x, labelTop), width, right: ci == 0, strong: nameStrong, size: nameSize, lines: 2, alpha: alpha);
-        if (tall && ci != 1) {
+        _label(canvas, n.label, Offset(x, labelTop), width, right: ci == 0, strong: nameStrong, size: nameSize, lines: nameLines, alpha: alpha);
+        if (tall) {
           _label(canvas, amount, Offset(x, labelTop + nameH), width, right: ci == 0, strong: false, size: 10.5, color: c.soft, alpha: alpha);
+          if (lines == 2) {
+            _label(canvas, speedText!, Offset(x, labelTop + nameH + 13), width, right: ci == 0, strong: false, size: 10.5, color: c.soft, alpha: alpha);
+          }
         }
       }
     }
+    canvas.restore();
   }
 
   @override
@@ -637,10 +722,11 @@ class _SankeyPainter extends CustomPainter {
 /// The details of a tapped route: how much, its share, how many connections, and what it is made of (the apps, the
 /// sites, the servers, the rules), each with its amount.
 class SankeyDetails extends ConsumerWidget {
-  const SankeyDetails({super.key, required this.selection, required this.value, this.rows = 5});
+  const SankeyDetails({super.key, required this.selection, required this.value, this.speedValue, this.rows = 5});
 
   final SankeySelection selection;
   final String Function(double w) value;
+  final String Function(double bytesPerSecond)? speedValue;
   final int rows;
 
   @override
@@ -735,6 +821,11 @@ class SankeyDetails extends ConsumerWidget {
                 ),
               ],
             ),
+            if (speedValue != null)
+              Text(
+                '${t.avpn.sankeySpeed}: ${speedValue!(selection.speed)}',
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
             for (final (title, data) in sections) ...[
               const Gap(14),
               Text(
@@ -807,4 +898,18 @@ class _Rows extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A host as the site it belongs to, for the diagram's middle column: "rr4---sn.googlevideo.com" becomes
+/// "googlevideo.com", "api.telegram.org" "telegram.org", "a.b.example.co.uk" "example.co.uk"; an address stays as it is.
+String siteOf(String host) {
+  final h = host.trim().toLowerCase();
+  if (h.isEmpty) return '';
+  if (RegExp(r'^[\d.]+$').hasMatch(h) || h.contains(':')) return h;
+  final parts = h.split('.');
+  if (parts.length <= 2) return h;
+  // a second-level zone of a country (co.uk, com.tr): one more label
+  const zones = {'co', 'com', 'org', 'net', 'gov', 'edu', 'ac'};
+  final keep = parts.last.length == 2 && zones.contains(parts[parts.length - 2]) ? 3 : 2;
+  return parts.sublist(parts.length - keep).join('.');
 }

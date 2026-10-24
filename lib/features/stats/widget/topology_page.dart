@@ -53,9 +53,11 @@ class TopologyPage extends HookConsumerWidget {
     };
     final items = open.where((c) => bigApps.contains(c.app)).toList();
     // the open ones that moved something: a connection under 20 KB is background chatter, not a flow
+    final rates = state.rates;
     final openNow = open
         .where((c) => c.active && c.route != ConnectionRoute.block && c.total >= flowMinBytes)
         .toList();
+    String speedValue(double w) => '${formatBytes(w.round(), units)}/${t.avpn.perSecond}';
     double weight(SeenConnection c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble();
     String value(double w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}';
     final total = items.fold<double>(0, (s, c) => s + weight(c));
@@ -173,10 +175,12 @@ class TopologyPage extends HookConsumerWidget {
                               : TrafficSankey(
                                   items: openNow,
                                   height: chartHeight,
-                                  unit: byTraffic.value ? flowMinBytes.toDouble() : 1,
-                                  // a connection that has moved nothing yet is still a thread of its own
-                                  weight: (c) => byTraffic.value ? math.max(1, c.total.toDouble()) : c.count.toDouble(),
+                                  // who goes where, as thick as every other route and in a fixed order; the traffic and
+                                  // the speed are written
+                                  weight: (c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble(),
                                   value: value,
+                                  speed: byTraffic.value ? (c) => rates[c.id] ?? 0 : null,
+                                  speedValue: byTraffic.value ? speedValue : null,
                                 ),
                         ),
                       ],

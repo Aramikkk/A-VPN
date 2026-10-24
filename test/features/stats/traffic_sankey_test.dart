@@ -105,6 +105,75 @@ void main() {
     expect(big.real / a.real, closeTo(10, 1e-9));
   });
 
+
+  group('even: nothing changes size or place as traffic moves', () {
+    SankeyModel even(List<SankeyFlow> f) =>
+        SankeyModel.build(f, otherApp: 'other', otherRule: 'other', otherOut: 'other', even: true);
+
+    test('every route is as thick as any other, whatever its traffic', () {
+      final model = even([
+        flow('Chrome', 'a.com', 'direct', ConnectionRoute.direct, 5000000),
+        flow('Telegram', 'b.org', 'SE', ConnectionRoute.vpn, 30),
+        flow('Disk', 'c.net', 'direct', ConnectionRoute.direct, 400),
+      ]);
+      final weights = model.links.map((l) => l.weight).toSet();
+      expect(weights, {1.0});
+    });
+
+    test('two connections of one route are one route', () {
+      final model = even([
+        flow('Chrome', 'a.com', 'direct', ConnectionRoute.direct, 100),
+        flow('Chrome', 'a.com', 'direct', ConnectionRoute.direct, 900),
+      ]);
+      expect(model.links.map((l) => l.weight), everyElement(1.0));
+      expect(model.total, 1);
+      expect(model.columns[0].single.real, 1000);
+    });
+
+    test('the same places when the amounts change', () {
+      List<String> order(double a, double b) => even([
+        flow('Zed', 'z.com', 'direct', ConnectionRoute.direct, a),
+        flow('Alpha', 'a.com', 'direct', ConnectionRoute.direct, b),
+      ]).columns[0].map((n) => n.label).toList();
+      expect(order(10, 9000), order(9000, 10));
+      expect(order(10, 9000), ['Alpha', 'Zed']);
+    });
+
+    test('a node keeps its height when only its traffic grows', () {
+      double height(double bytes) {
+        final model = even([
+          flow('Chrome', 'a.com', 'direct', ConnectionRoute.direct, bytes),
+          flow('Disk', 'b.com', 'direct', ConnectionRoute.direct, 100),
+        ])..layout(400);
+        return model.columns[0].firstWhere((n) => n.label == 'Chrome').h;
+      }
+
+      expect(height(1000), height(900000));
+    });
+
+    test('few routes stay slim, not huge', () {
+      final model = even([flow('Chrome', 'a.com', 'direct', ConnectionRoute.direct, 5)])..layout(500);
+      expect(model.columns[0].single.h, lessThanOrEqualTo(44));
+    });
+  });
+
+  test('a host as its site', () {
+    expect(siteOf('rr4---sn.googlevideo.com'), 'googlevideo.com');
+    expect(siteOf('api.telegram.org'), 'telegram.org');
+    expect(siteOf('a.b.example.co.uk'), 'example.co.uk');
+    expect(siteOf('192.168.31.1'), '192.168.31.1');
+    expect(siteOf('ya.ru'), 'ya.ru');
+    expect(siteOf(''), '');
+  });
+
+  test('speed: smoothed, and the reading alone after a long gap', () {
+    expect(smoothRate(previous: 0, bytes: 2000, elapsed: const Duration(seconds: 2)), 500);
+    expect(smoothRate(previous: 1000, bytes: 0, elapsed: const Duration(seconds: 2)), 500);
+    expect(smoothRate(previous: 5000, bytes: 3000, elapsed: const Duration(seconds: 30)), 100);
+    expect(smoothRate(previous: 700, bytes: 10, elapsed: const Duration(milliseconds: 50)), 700);
+    expect(smoothRate(previous: 400, bytes: -5, elapsed: const Duration(seconds: 2)), 200);
+  });
+
   test('no traffic, no diagram', () {
     expect(build([]).isEmpty, isTrue);
     expect(build([flow('a', 'r', 'o', ConnectionRoute.vpn, 0)]).isEmpty, isTrue);
