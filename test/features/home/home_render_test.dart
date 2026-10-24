@@ -5,6 +5,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
@@ -163,6 +164,14 @@ class _Stats extends StatsNotifier {
   }
 }
 
+/// ICONS=<folder>: an app's own icon from <folder>/<package>.png (the phone gives the real ones), else none
+Uint8List? _icon(String package) {
+  final dir = Platform.environment['ICONS'];
+  if (dir == null) return null;
+  final file = File('$dir/$package.png');
+  return file.existsSync() ? file.readAsBytesSync() : null;
+}
+
 Future<void> _loadFont(String family, List<String> files) async {
   final loader = FontLoader(family);
   for (final file in files) {
@@ -312,8 +321,8 @@ void main() {
                   'com.google.android.youtube': (name: 'YouTube', icon: null),
                   'com.instagram.android': (name: 'Instagram', icon: null),
                   'com.anthropic.claude': (name: 'Claude', icon: null),
-                  'ru.yandex.disk': (name: 'Яндекс Диск', icon: null),
-                  'ru.sberbankmobile': (name: 'СберБанк', icon: null),
+                  'ru.yandex.disk': (name: 'Яндекс Диск', icon: _icon('ru.yandex.disk')),
+                  'ru.sberbankmobile': (name: 'СберБанк', icon: _icon('ru.sberbankmobile')),
                 },
               ),
             ],

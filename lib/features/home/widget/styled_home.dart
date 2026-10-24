@@ -3248,9 +3248,10 @@ class _SiteTiles extends HookConsumerWidget {
   static Widget _sign(LatencySite site, Color colour, {double size = 15}) {
     final path = siteLogoPaths[site.key];
     final hex = colour.toARGB32().toRadixString(16).substring(2);
+    final rule = siteLogoEvenOdd.contains(site.key) ? ' fill-rule="evenodd"' : '';
     return path != null
         ? SvgPicture.string(
-            '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#$hex" d="$path"/></svg>',
+            '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#$hex"$rule d="$path"/></svg>',
             width: size,
             height: size,
           )
@@ -3356,10 +3357,18 @@ class _SiteTiles extends HookConsumerWidget {
                   decoration: BoxDecoration(shape: BoxShape.circle, color: sign),
                   child: app?.icon != null
                       ? Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: ClipOval(child: Image.memory(app!.icon!, width: disc, height: disc, fit: BoxFit.cover)),
+                          padding: const EdgeInsets.all(1.5),
+                          child: ClipOval(
+                            child: Image.memory(
+                              app!.icon!,
+                              width: disc,
+                              height: disc,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                          ),
                         )
-                      : _sign(site, _ink(sign), size: 15 * k),
+                      : _sign(site, _ink(sign), size: (site.key == 'claude' ? 17 : 15) * k),
                 );
                 final name = Text(
                   app?.name ?? site.name,

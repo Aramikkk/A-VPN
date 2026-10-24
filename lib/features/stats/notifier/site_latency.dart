@@ -33,6 +33,7 @@ const latencySites = <LatencySite>[
   (key: 'gemini', name: 'Gemini', letter: 'G', url: 'http://gemini.google.com/', get: false),
   (key: 'claude', name: 'Claude', letter: 'C', url: 'http://claude.ai/', get: false),
   (key: 'perplexity', name: 'Perplexity', letter: 'P', url: 'http://www.perplexity.ai/', get: false),
+  (key: 'deepseek', name: 'DeepSeek', letter: 'D', url: 'http://chat.deepseek.com/', get: false),
 ];
 
 /// The services the home screen shows until the user marks other apps (Settings → Sites).
@@ -58,6 +59,7 @@ const appServices = {
   'com.google.android.apps.bard': 'gemini',
   'com.anthropic.claude': 'claude',
   'ai.perplexity.app.android': 'perplexity',
+  'com.deepseek.chat': 'deepseek',
 };
 
 /// Whether the app [package] is marked for the home screen: in the saved list, or (until the list was ever saved,
