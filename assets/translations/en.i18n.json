@@ -117,6 +117,8 @@
     "lightLookMsg": "No see-through blocks or blur, no gliding animations or sliding pages, a flat background, less memory for pictures. The theme's colours stay. For a weak phone or to save battery",
     "lightBackground": "Light background work",
     "lightBackgroundMsg": "Polls connections, ping and the screen less often while the app is out of sight: a little less CPU and memory. The look doesn't change; the sites' server choice and auto-pause react a bit slower",
+    "nightMode": "Night mode",
+    "nightModeMsg": "While the screen is locked the checks sleep: the core doesn't ping the servers, the service and the app wake less often. Everything returns with the screen. It saves noticeable battery overnight; open connections and calls aren't touched",
     "trafficSmallHidden": "No app has used 30 MB this session yet",
     "pingSwitched": "No ping for a minute — ping address now: $name",
     "pingChecks": "Checks",

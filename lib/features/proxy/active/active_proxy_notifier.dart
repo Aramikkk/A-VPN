@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'dart:async';
 
@@ -164,8 +165,19 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     });
     // the light background work: the safety net looks three times less often
     final safetyNet = Timer.periodic(
-      Duration(seconds: ref.read(lightBackgroundProvider) ? 45 : 15),
+      Duration(seconds: ref.read(lightBackgroundProvider) || ref.read(nightModeProvider) ? 45 : 15),
       (_) => refilterIfNetworkChanged(),
+    );
+    // back on screen after the night mode let the checks sleep: the servers are pinged again at once (at most every
+    // three minutes), so the list and the auto choice aren't the night's
+    var lastRefresh = DateTime.now();
+    final back = AppLifecycleListener(
+      onResume: () {
+        final now = DateTime.now();
+        if (now.difference(lastRefresh) < const Duration(minutes: 3)) return;
+        lastRefresh = now;
+        _proxyRepo.urlTest("select").run();
+      },
     );
     ref.onDispose(() {
       for (final timer in checks) {
@@ -173,6 +185,7 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
       }
       safetyNet.cancel();
       networkChanges.cancel();
+      back.dispose();
     });
     return _proxyRepo
         .watchActiveProxies()

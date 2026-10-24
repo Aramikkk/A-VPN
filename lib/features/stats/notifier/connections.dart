@@ -351,6 +351,8 @@ class Connections extends Notifier<ConnectionsState> {
     ref.watch(sessionStartProvider);
     // the light background work: the polls twice as far apart, and a long way apart out of sight
     final saving = ref.watch(lightBackgroundProvider);
+    // the night mode: out of sight the list is asked for six times less often (every three minutes)
+    final night = ref.watch(nightModeProvider);
     _rollDay();
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
     final enabled = ref.watch(ConfigOptions.enableClashApi);
@@ -380,7 +382,7 @@ class Connections extends Notifier<ConnectionsState> {
     Timer? timer;
     void schedule() {
       timer?.cancel();
-      timer = Timer(foreground ? interval * (saving ? 2 : 1) : backgroundInterval * (saving ? 4 : 1), () {
+      timer = Timer(foreground ? interval * (saving ? 2 : 1) : backgroundInterval * (saving ? 4 : (night ? 6 : 1)), () {
         if (disposed) return;
         unawaited(_poll(client, url, secret));
         schedule();

@@ -119,6 +119,10 @@ object Settings {
     val lightBackground: Boolean
         get() = preferences.getBoolean(SettingsKey.LIGHT_BACKGROUND, false)
 
+    /** The night mode: with the screen locked the core's periodic checks sleep (on by default). */
+    val nightMode: Boolean
+        get() = preferences.getBoolean(SettingsKey.NIGHT_MODE, true)
+
     /** Pause the VPN on a home Wi-Fi (its router runs a VPN of its own). */
     val homeWifiEnabled: Boolean
         get() = preferences.getBoolean(SettingsKey.HOME_WIFI_ENABLED, false)

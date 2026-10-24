@@ -94,6 +94,13 @@ class GeneralPage extends HookConsumerWidget {
                   onChanged: ref.read(Preferences.lightLook.notifier).update,
                 ),
                 SwitchListTile.adaptive(
+                  title: Text(t.avpn.nightMode),
+                  subtitle: Text(t.avpn.nightModeMsg),
+                  secondary: const Icon(Icons.bedtime_rounded),
+                  value: ref.watch(Preferences.nightMode),
+                  onChanged: ref.read(Preferences.nightMode.notifier).update,
+                ),
+                SwitchListTile.adaptive(
                   title: Text(t.avpn.lightBackground),
                   subtitle: Text(t.avpn.lightBackgroundMsg),
                   secondary: const Icon(Icons.battery_saver_rounded),

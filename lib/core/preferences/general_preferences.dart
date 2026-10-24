@@ -279,6 +279,10 @@ abstract class Preferences {
   /// A-VPN's light version, the background: slower polls, fewer wake-ups while the app is out of sight.
   static final lightBackground = PreferencesNotifier.create<bool, bool>("light_background", false);
 
+  /// The night mode (on by default): with the screen locked the periodic checks sleep (the core's server pings, the
+  /// service's watchers) and the polls out of sight go far apart; they wake with the screen.
+  static final nightMode = PreferencesNotifier.create<bool, bool>("night_mode", true);
+
   /// A-VPN: how the server list shows each server's ping.
   static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
     "ping_style",

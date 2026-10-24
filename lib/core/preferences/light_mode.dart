@@ -23,6 +23,11 @@ final lightBackgroundProvider = Provider<bool>(
   (ref) => ref.watch(sharedPreferencesProvider).hasValue && ref.watch(Preferences.lightBackground),
 );
 
+/// The night mode: the checks sleep while the screen is locked (on by default, until the settings are read too).
+final nightModeProvider = Provider<bool>(
+  (ref) => !ref.watch(sharedPreferencesProvider).hasValue || ref.watch(Preferences.nightMode),
+);
+
 /// [lightLookProvider] for the places with no `ref` (a page's transition, a hook widget): as of the last time the
 /// provider was worked out.
 bool lightLookNow = false;

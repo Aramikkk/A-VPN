@@ -143,7 +143,10 @@ class BoxService(
                     }
                 }
 
-                Intent.ACTION_SCREEN_ON, Intent.ACTION_SCREEN_OFF -> screenWake.trySend(Unit)
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_SCREEN_OFF -> {
+                    screenWake.trySend(Unit)
+                    syncNightMode()
+                }
             }
         }
     }
@@ -353,6 +356,7 @@ class BoxService(
             }
             if (operation != generation.get() || stopping) return@withLock
             watchNetwork()
+            syncNightMode()
         } catch (e: Exception) { terminateFailedSession(e.message) }
     }
 
@@ -436,6 +440,8 @@ class BoxService(
                 }
             if (operation != generation.get() || stopping) return
             status.postValue(Status.Started)
+            // the screen may be off already (a network change at night restarted the core): it sleeps at once
+            syncNightMode()
 //            if (delayStart) {
 //                delay(1000L)
 //            }
@@ -505,14 +511,16 @@ class BoxService(
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    private fun serviceUpdateIdleMode() {
-        if (Application.powerManager.isDeviceIdleMode) {
-//            boxService?.pause()
-            //Mobile.pause()
-        } else {
-            Mobile.wake()
-//            boxService?.wake()
-        }
+    private fun serviceUpdateIdleMode() = syncNightMode()
+
+    /**
+     * The night mode: with the screen locked (or the phone in Doze) the core's periodic checks (the servers' pings,
+     * the site groups' tests, the monitoring rounds) sleep, and wake with the screen. Open connections go on.
+     */
+    private fun syncNightMode() {
+        val sleeping = !Application.powerManager.isInteractive ||
+            (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Application.powerManager.isDeviceIdleMode)
+        runCatching { if (sleeping && Settings.nightMode) Mobile.pause() else Mobile.wake() }
     }
 
     private fun stopService() {
