@@ -402,6 +402,7 @@ class TrafficSankey extends ConsumerWidget {
       unit: unit,
       even: true,
       calm: true,
+      chips: true,
       speedValue: speedValue,
       headers: [t.avpn.sankeyApps, t.avpn.sankeySites, t.avpn.sankeyTo],
       otherApp: t.avpn.connOther,
@@ -428,6 +429,7 @@ class SankeyDiagram extends StatefulWidget {
     this.unit = 20480,
     this.even = false,
     this.calm = false,
+    this.chips = false,
     this.speedValue,
     this.headers = const [],
     this.onSelect,
@@ -438,6 +440,10 @@ class SankeyDiagram extends StatefulWidget {
 
   /// every route as thick as any other, in a fixed order: only the written amounts change
   final bool even;
+
+  /// chips: each node a plate of one size in a row of its own, joined by thin lines (a dot where it moves), instead
+  /// of ribbons as wide as the traffic; the rows start from the top and keep their places (needs [calm] data)
+  final bool chips;
 
   /// calm: fixed sizes from the top, the nodes in the order they came, a route kept a few seconds after its
   /// connection closed (see [SankeyModel.calm])
@@ -494,6 +500,8 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
       _held.removeWhere((key, v) => !present.contains(key) && now.difference(v.seen) > _hold);
       flows = [for (final e in _held.entries) present.contains(e.key) ? e.value.flow : e.value.flow.held()];
     }
+    // chips: as many rows as the height holds, the last of them "other"
+    final rows = widget.chips ? (((widget.height ?? 500) - _ChipsLayout.headerH) / _ChipsLayout.pitch).floor() : 9;
     final model = SankeyModel.build(
       flows,
       otherApp: widget.otherApp,
@@ -502,6 +510,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
       unit: widget.unit,
       even: widget.even,
       calm: widget.calm,
+      top: widget.chips ? math.max(2, rows - 3) : 6,
     );
     if (widget.calm) model.keepOrder(_order);
     return model;
@@ -561,6 +570,26 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
     if (_model.isEmpty) return const SizedBox(height: 120);
     // a line of 40 for each name in the widest column, so the names never meet
     final height = widget.height ?? (60 + 40.0 * _model.widest).clamp(260.0, 500.0);
+    if (widget.chips) {
+      return _ChipsView(
+        model: _model,
+        height: height,
+        lit: _lit,
+        value: widget.value,
+        speedValue: widget.speedValue,
+        headers: widget.headers,
+        onNode: widget.onSelect == null
+            ? null
+            : (n) => unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _model.total))),
+        onLink: widget.onSelect == null
+            ? null
+            : (l) => unawaited(
+                _select(
+                  SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _model.total),
+                ),
+              ),
+      );
+    }
     final colours = (
       vpn: theme.araAccent,
       direct: const Color(0xFF9AA0A6),
@@ -1003,4 +1032,243 @@ String siteOf(String host) {
   const zones = {'co', 'com', 'org', 'net', 'gov', 'edu', 'ac'};
   final keep = parts.last.length == 2 && zones.contains(parts[parts.length - 2]) ? 3 : 2;
   return parts.sublist(parts.length - keep).join('.');
+}
+
+/// Where the plates stand in the chips view.
+class _ChipsLayout {
+  static const headerH = 22.0;
+  static const pitch = 56.0;
+  static const chipH = 46.0;
+}
+
+/// The diagram as plates and thin lines: three columns of plates (an app, a site, a server) in rows of one size from
+/// the top, each plate with its name, its traffic and its speed; a thin line for each route, a dot on it where the
+/// traffic is moving. A tap on a plate or a line picks that route out (the rest dims) and shows its details.
+class _ChipsView extends StatelessWidget {
+  const _ChipsView({
+    required this.model,
+    required this.height,
+    required this.lit,
+    required this.value,
+    required this.speedValue,
+    required this.headers,
+    required this.onNode,
+    required this.onLink,
+  });
+
+  final SankeyModel model;
+  final double height;
+  final Set<SankeyFlow> lit;
+  final String Function(double w) value;
+  final String Function(double bytesPerSecond)? speedValue;
+  final List<String> headers;
+  final void Function(SankeyNode node)? onNode;
+  final void Function(SankeyLink link)? onLink;
+
+  static final _flag = RegExp(r'^([\u{1F1E6}-\u{1F1FF}]{2})\s*', unicode: true);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = theme.araAccent;
+    final picking = lit.isNotEmpty;
+    Color routeColour(ConnectionRoute? r) => switch (r) {
+      ConnectionRoute.vpn => accent,
+      ConnectionRoute.direct => const Color(0xFF9AA0A6),
+      ConnectionRoute.block => scheme.error,
+      null => scheme.onSurfaceVariant,
+    };
+    return LayoutBuilder(
+      builder: (context, box) {
+        final w = box.maxWidth;
+        final colW = [w * .285, w * .295, w * .30];
+        final xs = [0.0, w * .35, w * .70];
+        double top(int i) => _ChipsLayout.headerH + i * _ChipsLayout.pitch;
+        final lines = [
+          for (final l in model.links)
+            (
+              link: l,
+              from: Offset(xs[l.from.column] + colW[l.from.column], top(model.columns[l.from.column].indexOf(l.from)) + _ChipsLayout.chipH / 2),
+              to: Offset(xs[l.to.column], top(model.columns[l.to.column].indexOf(l.to)) + _ChipsLayout.chipH / 2),
+              moving: l.flows.fold<double>(0, (s, f) => s + f.speed) > 512,
+              on: !picking || l.flows.any(lit.contains),
+            ),
+        ];
+        Widget plate(SankeyNode n, int col, int i) {
+          final on = !picking || n.flows.any(lit.contains);
+          final flag = _flag.firstMatch(n.label);
+          final name = flag == null ? n.label : n.label.substring(flag.end);
+          final speed = speedValue?.call(n.speed);
+          // the speed only where something moves
+          final second = speed == null || n.speed < 1 ? value(n.real) : '${value(n.real)} · $speed';
+          return Positioned(
+            left: xs[col],
+            top: top(i),
+            width: colW[col],
+            height: _ChipsLayout.chipH,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onNode == null ? null : () => onNode!(n),
+              child: AnimatedOpacity(
+                opacity: on ? 1 : .35,
+                duration: const Duration(milliseconds: 150),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest.withValues(alpha: .55),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(
+                      color: picking && on ? routeColour(n.route ?? ConnectionRoute.vpn).withValues(alpha: .9) : scheme.onSurface.withValues(alpha: .08),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (flag != null) ...[
+                        Text(flag.group(1)!, style: const TextStyle(fontSize: 15, fontFamilyFallback: ['Emoji'])),
+                        const SizedBox(width: 5),
+                      ],
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                fontFamilyFallback: const ['Emoji'],
+                              ),
+                            ),
+                            Text(
+                              second,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 9.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: height,
+          width: double.infinity,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            // a tap on the space between the plates: the line nearest to it, if one is close
+            onTapUp: onLink == null
+                ? null
+                : (d) {
+                    SankeyLink? best;
+                    var nearest = 14.0;
+                    for (final line in lines) {
+                      final d2 = _distanceToCurve(d.localPosition, line.from, line.to);
+                      if (d2 < nearest) {
+                        nearest = d2;
+                        best = line.link;
+                      }
+                    }
+                    if (best != null) onLink!(best);
+                  },
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _ChipLines(
+                      [for (final line in lines) (from: line.from, to: line.to, colour: routeColour(line.link.route), moving: line.moving, on: line.on)],
+                      scheme.onSurface,
+                      accent,
+                    ),
+                  ),
+                ),
+                for (final (i, title) in headers.indexed)
+                  if (title.isNotEmpty)
+                    Positioned(
+                      left: xs[i],
+                      top: 0,
+                      width: colW[i],
+                      child: Text(
+                        title.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .6,
+                          fontSize: 9.5,
+                        ),
+                      ),
+                    ),
+                for (final (col, column) in model.columns.indexed)
+                  for (final (i, n) in column.indexed) plate(n, col, i),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The line between two plates as a curve (the same one the painter draws): the nearest it comes to [at].
+double _distanceToCurve(Offset at, Offset from, Offset to) {
+  final mid = (from.dx + to.dx) / 2;
+  var best = double.infinity;
+  for (var i = 0; i <= 24; i++) {
+    final t = i / 24;
+    final u = 1 - t;
+    final x = u * u * u * from.dx + 3 * u * u * t * mid + 3 * u * t * t * mid + t * t * t * to.dx;
+    final y = u * u * u * from.dy + 3 * u * u * t * from.dy + 3 * u * t * t * to.dy + t * t * t * to.dy;
+    best = math.min(best, (Offset(x, y) - at).distance);
+  }
+  return best;
+}
+
+typedef _ChipLine = ({Offset from, Offset to, Color colour, bool moving, bool on});
+
+class _ChipLines extends CustomPainter {
+  _ChipLines(this.lines, this.ink, this.accent);
+
+  final List<_ChipLine> lines;
+  final Color ink;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // the dimmed ones first, so a picked route lies over them
+    final ordered = [...lines]..sort((a, b) => (a.on ? 1 : 0).compareTo(b.on ? 1 : 0));
+    for (final l in ordered) {
+      final mid = (l.from.dx + l.to.dx) / 2;
+      final path = Path()
+        ..moveTo(l.from.dx, l.from.dy)
+        ..cubicTo(mid, l.from.dy, mid, l.to.dy, l.to.dx, l.to.dy);
+      final base = l.moving ? l.colour : ink;
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.7
+          ..isAntiAlias = true
+          ..strokeCap = StrokeCap.round
+          ..color = base.withValues(alpha: l.on ? (l.moving ? .85 : .3) : .1),
+      );
+      if (l.moving && l.on) {
+        final metric = path.computeMetrics().first;
+        canvas.drawCircle(metric.getTangentForOffset(metric.length * .5)!.position, 3, Paint()..color = l.colour);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChipLines old) => true;
 }
