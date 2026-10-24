@@ -62,4 +62,11 @@ void main() {
     expect(movedKey(list, 0, 4), ['b', 'c', 'd', 'a']);
     expect(movedKey(list, 9, 0), list);
   });
+
+  test('the order of the user: named first as named, the rest after', () {
+    expect(orderedKeys(['a', 'b', 'c', 'd'], []), ['a', 'b', 'c', 'd']);
+    expect(orderedKeys(['a', 'b', 'c', 'd'], ['c', 'a']), ['c', 'a', 'b', 'd']);
+    expect(orderedKeys(['a', 'b'], ['x', 'b']), ['b', 'a']);
+    expect(orderedKeys(['a', 'b', 'c'], ['b', 'b']), ['b', 'a', 'c']);
+  });
 }

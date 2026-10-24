@@ -68,10 +68,12 @@ class SitesPage extends HookConsumerWidget {
     final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     // which of them are tiles of the home screen's delay block
     final homeSaved = ref.watch(Preferences.homeApps);
+    // in the user's order (kept apart from the list itself: a change of the list restarts the connection)
+    final shownApps = orderedKeys(apps, ref.watch(Preferences.appsOrder));
 
     Future<void> markHome(String package, bool on) async {
       final current = {
-        for (final a in apps)
+        for (final a in shownApps)
           if (homeMarked(homeSaved, a)) a,
       };
       if (on && !current.contains(package) && current.length >= maxHomeSites) {
@@ -80,7 +82,7 @@ class SitesPage extends HookConsumerWidget {
       }
       final next = on ? {...current, package} : ({...current}..remove(package));
       await ref.read(Preferences.homeApps.notifier).update([
-        for (final a in apps)
+        for (final a in shownApps)
           if (next.contains(a)) a,
       ]);
     }
@@ -137,11 +139,11 @@ class SitesPage extends HookConsumerWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               buildDefaultDragHandles: false,
-              itemCount: apps.length,
+              itemCount: shownApps.length,
               onReorder: (from, to) async =>
-                  ref.read(ConfigOptions.siteGroupApps.notifier).update(movedKey(apps, from, to)),
+                  ref.read(Preferences.appsOrder.notifier).update(movedKey(shownApps, from, to)),
               itemBuilder: (context, i) {
-                final app = apps[i];
+                final app = shownApps[i];
                 return ReorderableDelayedDragStartListener(
                   key: ValueKey(app),
                   index: i,

@@ -287,6 +287,10 @@ abstract class Preferences {
   /// "*" (until the user touches a switch): the six services' apps, as the screen always had.
   static final homeApps = PreferencesNotifier.create<List<String>, List<String>>("home_apps", <String>['*']);
 
+  /// The order of those apps in Settings → Sites (their packages, dragged up and down) and of the home screen's tiles.
+  /// Kept apart from the apps' own list: the connection follows that one and would restart at every drag.
+  static final appsOrder = PreferencesNotifier.create<List<String>, List<String>>("apps_order", <String>[]);
+
   /// A-VPN: how the server list shows each server's ping.
   static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
     "ping_style",

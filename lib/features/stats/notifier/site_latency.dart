@@ -97,6 +97,16 @@ String _appName(String package) {
   return last.isEmpty ? package : last;
 }
 
+/// [items] in the user's [order]: the named ones first as named, the others after them as they were.
+List<String> orderedKeys(List<String> items, List<String> order) {
+  final rest = [...items];
+  final named = <String>[];
+  for (final key in order) {
+    if (rest.remove(key)) named.add(key);
+  }
+  return [...named, ...rest];
+}
+
 /// [keys] with the one at [from] moved to [to], as a ReorderableListView reports it (the target counts the moved one
 /// still in place, so a move down is one less).
 List<String> movedKey(List<String> keys, int from, int to) {
@@ -111,7 +121,7 @@ List<String> movedKey(List<String> keys, int from, int to) {
 final homeSitesProvider = Provider<List<LatencySite>>(
   (ref) => homeSitesFor(
     android: PlatformUtils.isAndroid,
-    apps: ref.watch(ConfigOptions.siteGroupApps),
+    apps: orderedKeys(ref.watch(ConfigOptions.siteGroupApps), ref.watch(Preferences.appsOrder)),
     saved: ref.watch(Preferences.homeApps),
     testUrl: ref.watch(ConfigOptions.connectionTestUrl),
   ),
