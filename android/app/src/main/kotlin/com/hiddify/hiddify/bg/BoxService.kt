@@ -113,6 +113,7 @@ class BoxService(
         }
 
         fun stop() {
+            ServiceLog.write("stop requested by " + ServiceLog.caller())
             Application.application.sendBroadcast(
                     Intent(Action.SERVICE_CLOSE).setPackage(
                             Application.application.packageName
@@ -573,8 +574,9 @@ class BoxService(
 //            }
 //            commandServer = null
             Settings.startedByUser = false
+            // the core's close can take long: not on the main thread (an ANR there killed the app and the VPN with it)
+            Mobile.close(4L)
             withContext(Dispatchers.Main) {
-                Mobile.close(4L)
                 status.value = Status.Stopped
                 service.stopSelf()
             }

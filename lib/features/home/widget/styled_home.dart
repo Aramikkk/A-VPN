@@ -3282,6 +3282,10 @@ class _SiteTiles extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final sites = ref.watch(siteLatencyProvider);
+    // the "own server per app" switch of the network the phone is on now (Wi-Fi and LTE each have theirs)
+    final onMobile = useListenable(_actualNetworkKind).value == NetworkKind.mobile;
+    final multiPref = onMobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups;
+    final multiOn = ref.watch(multiPref);
     // the tiles: the apps marked in Settings → Sites (their own icons and names)
     final shown = ref.watch(homeSitesProvider);
     final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
@@ -3541,6 +3545,36 @@ class _SiteTiles extends HookConsumerWidget {
                       color: scheme.onSurfaceVariant,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
+                GestureDetector(
+                  key: const Key('multi-servers'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => ref.read(multiPref.notifier).update(!multiOn),
+                  child: Container(
+                    height: 30,
+                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
+                      border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.alt_route_rounded, size: 15, color: multiOn ? accent : scheme.onSurfaceVariant),
+                        const Gap(6),
+                        Text(
+                          '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .3,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

@@ -50,6 +50,7 @@
     "homeWifiNotOnWifi": "Connect to the home Wi-Fi and try again",
     "homeWifiNoPanel": "No VPN panel found on router $gateway (ports 3058, 9090, 9091, 9999, 7890): such a network can't be told from another",
     "homeWifiHow": "A home is told by its router, with no location access: the router's address on the Wi-Fi and its VPN panel's ports. Connect to the home Wi-Fi and tap Add. For a second home, do the same on its network.",
+    "multiServers": "Multi-server",
     "sitesTitle": "Delay",
     "sitesHomeMsg": "The switch on the right shows the app on the home screen in the Delay block (up to $n). Drag to set the order: the handle on the right, or a long press on a row",
     "sitesHomeLimit": "The home screen shows at most $n apps",
