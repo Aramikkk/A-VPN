@@ -263,6 +263,10 @@ class SankeyModel {
   /// Edges sit on whole pixels, so they stay crisp.
   void layout(double height, {double minGap = 6}) {
     if (isEmpty) return;
+    if (calm) {
+      _layoutEqual(height);
+      return;
+    }
     final gapBetween = calm ? 10.0 : minGap;
     // what the columns really hold (the routes joined in an "other" node count once), so the picture fills the height
     final routes = columns.first.fold<double>(0, (s, n) => s + n.weight);
@@ -295,6 +299,32 @@ class SankeyModel {
       }
     }
     _k = k;
+  }
+
+  /// calm: every node the same size, from the top at a fixed distance, whatever it carries; the lines meet a node one
+  /// after the other along it (a line's ends are its centres: thickness 0), in the order of where they go.
+  void _layoutEqual(double height) {
+    const gap = 10.0;
+    final nodeH = ((height - gap * (widest - 1)) / widest).clamp(18.0, 44.0);
+    for (final column in columns) {
+      var y = 0.0;
+      for (final n in column) {
+        n.y = y;
+        n.h = nodeH;
+        y += nodeH + gap;
+      }
+    }
+    for (final n in columns.expand((c) => c)) {
+      final outs = [...n.outLinks]..sort((a, b) => a.to.y.compareTo(b.to.y));
+      for (final (i, l) in outs.indexed) {
+        l.fromY = n.y + n.h * (i + .5) / outs.length;
+      }
+      final ins = [...n.inLinks]..sort((a, b) => a.from.y.compareTo(b.from.y));
+      for (final (i, l) in ins.indexed) {
+        l.toY = n.y + n.h * (i + .5) / ins.length;
+      }
+    }
+    _k = 0;
   }
 
   double _k = 0;
@@ -679,6 +709,27 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
         return;
       }
     }
+    // a thin line: the nearest one, when it is near enough
+    if (widget.look == SankeyLook.thin || widget.look == SankeyLook.dots) {
+      SankeyLink? best;
+      var nearest = 14.0;
+      for (final l in _model.links) {
+        final xa = geometry.xs[l.from.column] + SankeyGeometry.nodeW;
+        final xb = geometry.xs[l.to.column];
+        final d = _distanceToCurve(at, Offset(xa, l.fromY), Offset(xb, l.toY));
+        if (d < nearest) {
+          nearest = d;
+          best = l;
+        }
+      }
+      if (best != null) {
+        final l = best;
+        unawaited(
+          _select(SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _model.total)),
+        );
+      }
+      return;
+    }
     // a ribbon: the thinnest first, so a thin one under a thick one can still be got
     final links = [..._model.links]..sort((a, b) => a.weight.compareTo(b.weight));
     for (final l in links) {
@@ -792,6 +843,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
                   pulse: _pulse,
                   icons: _images,
                   lit: _lit,
+                  halo: scheme.surfaceContainerLow,
                 ),
               ),
             ),
@@ -969,6 +1021,22 @@ class _SankeyPainter extends CustomPainter {
       final p = _text(title.toUpperCase(), width, strong: true, size: 9.5, color: c.soft);
       p.paint(canvas, Offset(i == 0 ? xs[0] - 7 - p.width : (i == 1 ? xs[1] : xs[2]), 0));
     }
+    // a long arrow along the top from the first column to the last: the flow goes from the left to the right
+    if (look == SankeyLook.thin || look == SankeyLook.dots) {
+      final rail = Paint()
+        ..color = c.ink.withValues(alpha: .28)
+        ..strokeWidth = 1.5;
+      final railY = SankeyGeometry.headerH - 4;
+      canvas.drawLine(Offset(xs[0], railY), Offset(size.width - 6, railY), rail);
+      canvas.drawPath(
+        Path()
+          ..moveTo(size.width - 1, railY)
+          ..lineTo(size.width - 12, railY - 5)
+          ..lineTo(size.width - 12, railY + 5)
+          ..close(),
+        Paint()..color = c.ink.withValues(alpha: .28),
+      );
+    }
     canvas.save();
     canvas.translate(0, SankeyGeometry.headerH);
     model.layout(size.height - SankeyGeometry.headerH);
@@ -1054,13 +1122,25 @@ class _SankeyPainter extends CustomPainter {
                 colors: [from.withValues(alpha: (live ? .95 : .35) * (bright ? 1 : .3)), colour.withValues(alpha: (live ? 1 : .35) * (bright ? 1 : .3))],
               ).createShader(shaderBox),
           );
+          final metric = centre.computeMetrics().first;
           if (look == SankeyLook.dots && live && bright) {
-            final metric = centre.computeMetrics().first;
             for (var d = 0; d < 3; d++) {
               final at = ((pulse.value + d / 3) % 1.0) * metric.length;
               canvas.drawCircle(metric.getTangentForOffset(at)!.position, 3.2, Paint()..color = colour);
             }
           }
+          // an arrowhead pointing the way (to the right), as on the picture from the top to the bottom
+          final a1 = metric.getTangentForOffset(metric.length * .62)!.position;
+          final a2 = metric.getTangentForOffset(metric.length * .62 + 3)!.position;
+          final turn = math.atan2(a2.dy - a1.dy, a2.dx - a1.dx);
+          canvas.drawPath(
+            Path()
+              ..moveTo(a2.dx + 6 * math.cos(turn), a2.dy + 6 * math.sin(turn))
+              ..lineTo(a2.dx + 6 * math.cos(turn + 2.5), a2.dy + 6 * math.sin(turn + 2.5))
+              ..lineTo(a2.dx + 6 * math.cos(turn - 2.5), a2.dy + 6 * math.sin(turn - 2.5))
+              ..close(),
+            Paint()..color = colour.withValues(alpha: (live ? 1 : .45) * (bright ? 1 : .3)),
+          );
         case SankeyLook.dashed:
           if (live) {
             canvas.drawPath(path, fill);
@@ -1621,6 +1701,7 @@ class _TopDownPainter extends CustomPainter {
     required this.pulse,
     required this.icons,
     required this.lit,
+    required this.halo,
   }) : super(repaint: pulse);
 
   final SankeyModel model;
@@ -1631,6 +1712,9 @@ class _TopDownPainter extends CustomPainter {
   final Animation<double> pulse;
   final Map<String, ui.Image> icons;
   final Set<SankeyFlow> lit;
+
+  /// the card's colour, drawn round the site names so the lines don't cut through them
+  final Color halo;
 
   static const left = 22.0;
   static const right = 12.0;
@@ -1778,11 +1862,39 @@ class _TopDownPainter extends CustomPainter {
           _icon(canvas, n, Offset(cx, rowY[0] - 22), alpha);
         } else if (ci == 1) {
           // the site's name written upright above its bar
-          final p = _text(shortSite(n.label), 10.5, ink.withValues(alpha: alpha * (live ? 1 : .85)), width: 104);
+          final name = shortSite(n.label);
+          final back = TextPainter(
+            text: TextSpan(
+              text: name,
+              style: TextStyle(
+                fontFamily: family,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 4
+                  ..strokeJoin = StrokeJoin.round
+                  ..color = halo.withValues(alpha: .92),
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+            maxLines: 1,
+            ellipsis: '…',
+          )..layout(maxWidth: 108);
+          final p = TextPainter(
+            text: TextSpan(
+              text: name,
+              style: TextStyle(fontFamily: family, fontSize: 11.5, fontWeight: FontWeight.w600, color: ink.withValues(alpha: math.max(alpha, .5))),
+            ),
+            textDirection: TextDirection.ltr,
+            maxLines: 1,
+            ellipsis: '…',
+          )..layout(maxWidth: 108);
           canvas
             ..save()
             ..translate(cx - p.height / 2, rowY[1] - 8)
             ..rotate(-math.pi / 2);
+          back.paint(canvas, Offset.zero);
           p.paint(canvas, Offset.zero);
           canvas.restore();
         } else {
