@@ -125,7 +125,7 @@ class TopologyPage extends HookConsumerWidget {
             builder: (context, box) {
               final pageHeight = box.maxHeight;
               // the toggle and the gaps over the card; the card's own title and padding inside it
-              final chartHeight = (pageHeight - 44 - 12 - 8 - 62).clamp(240.0, 900.0);
+              final chartHeight = (pageHeight - 44 - 12 - 8 - 62 - 28).clamp(240.0, 900.0);
               return ListView(
                 controller: controller,
                 physics: _PageSnap(pageHeight),
@@ -182,6 +182,9 @@ class TopologyPage extends HookConsumerWidget {
                                   speedValue: byTraffic.value ? speedValue : null,
                                 ),
                         ),
+                        // the next page is below, as in the statistics
+                        const Gap(4),
+                        Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: scheme.onSurfaceVariant)),
                       ],
                     ),
                   ),
