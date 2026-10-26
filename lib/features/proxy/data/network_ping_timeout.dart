@@ -11,7 +11,7 @@ Future<String> withNetworkPingTimeout(
   bool siteGroups = false,
   int siteGroupsTolerance = 80,
 }) async {
-  final seconds = timeout.inSeconds.clamp(1, 30);
+  final seconds = timeout.inSeconds.clamp(1, 120);
   final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
   final experimental = Map<String, dynamic>.from(config['experimental'] as Map? ?? {});
   final monitoring = Map<String, dynamic>.from(experimental['monitoring'] as Map? ?? {});

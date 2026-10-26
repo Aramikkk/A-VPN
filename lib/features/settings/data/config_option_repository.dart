@@ -249,6 +249,9 @@ abstract class ConfigOptions {
     mapTo: const IntervalInSecondsConverter().toJson,
   );
 
+  /// The longest wait for one ping the settings allow, in seconds.
+  static const maxPingTimeout = 120;
+
   /// How long one server's ping may take before it counts as unreachable.
   static final urlTestTimeout = PreferencesNotifier.create<Duration, int>(
     "url-test-timeout",
@@ -260,18 +263,18 @@ abstract class ConfigOptions {
   static final urlTestTimeoutWifi = PreferencesNotifier.create<Duration, int>(
     "url-test-timeout-wifi",
     const Duration(seconds: 5),
-    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, 30)),
+    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, maxPingTimeout)),
     mapFrom: const IntervalInSecondsConverter().fromJson,
     mapTo: const IntervalInSecondsConverter().toJson,
-    validator: (value) => value.inSeconds >= 1 && value.inSeconds <= 30,
+    validator: (value) => value.inSeconds >= 1 && value.inSeconds <= maxPingTimeout,
   );
   static final urlTestTimeoutMobile = PreferencesNotifier.create<Duration, int>(
     "url-test-timeout-mobile",
     const Duration(seconds: 5),
-    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, 30)),
+    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, maxPingTimeout)),
     mapFrom: const IntervalInSecondsConverter().fromJson,
     mapTo: const IntervalInSecondsConverter().toJson,
-    validator: (value) => value.inSeconds >= 1 && value.inSeconds <= 30,
+    validator: (value) => value.inSeconds >= 1 && value.inSeconds <= maxPingTimeout,
   );
 
   static final balancerToleranceWifi = PreferencesNotifier.create<int, int>('balancer-tolerance-wifi', 150);

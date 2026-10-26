@@ -175,7 +175,7 @@ void main() {
         expect([for (final n in tall.columns[column]) n.y], [for (final n in short.columns[column]) n.y]);
       }
       expect(tall.columns[0].first.y, 0);
-      expect(tall.columns[0][1].y - tall.columns[0][0].h, 14);
+      expect(tall.columns[0][1].y - tall.columns[0][0].h, 10);
     });
 
     test('a new node comes last and the old ones stay where they were', () {

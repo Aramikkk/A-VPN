@@ -5,7 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('network timeouts migrate legacy value, remain independent and enforce 1..30', () async {
+  test('network timeouts migrate legacy value, remain independent and enforce 1..120', () async {
     SharedPreferences.setMockInitialValues({'url-test-timeout': 12});
     final prefs = await SharedPreferences.getInstance();
     final container = ProviderContainer(
@@ -18,12 +18,12 @@ void main() {
     expect(container.read(ConfigOptions.balancerToleranceMobile), 50);
     expect(container.read(ConfigOptions.balancerToleranceWifi), 150);
     await container.read(ConfigOptions.urlTestTimeoutWifi.notifier).update(const Duration(seconds: 1));
-    await container.read(ConfigOptions.urlTestTimeoutMobile.notifier).update(const Duration(seconds: 30));
+    await container.read(ConfigOptions.urlTestTimeoutMobile.notifier).update(const Duration(seconds: 120));
     await container.read(ConfigOptions.urlTestTimeoutWifi.notifier).update(Duration.zero);
-    await container.read(ConfigOptions.urlTestTimeoutMobile.notifier).update(const Duration(seconds: 31));
+    await container.read(ConfigOptions.urlTestTimeoutMobile.notifier).update(const Duration(seconds: 121));
     expect(container.read(ConfigOptions.urlTestTimeoutWifi), const Duration(seconds: 1));
-    expect(container.read(ConfigOptions.urlTestTimeoutMobile), const Duration(seconds: 30));
+    expect(container.read(ConfigOptions.urlTestTimeoutMobile), const Duration(seconds: 120));
     expect(prefs.getInt('url-test-timeout-wifi'), 1);
-    expect(prefs.getInt('url-test-timeout-mobile'), 30);
+    expect(prefs.getInt('url-test-timeout-mobile'), 120);
   });
 }

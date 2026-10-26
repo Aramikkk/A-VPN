@@ -240,7 +240,7 @@ class SankeyModel {
           if (even) return a.label.toLowerCase().compareTo(b.label.toLowerCase());
           return b.weight.compareTo(a.weight);
         });
-    return SankeyModel._([column(0), column(1), column(2)], links.values.toList(), total, even ? (calm ? 38 : 44) : null, calm: calm);
+    return SankeyModel._([column(0), column(1), column(2)], links.values.toList(), total, even ? (calm ? 22 : 44) : null, calm: calm);
   }
 
   /// Places the nodes in [height] (each column fills it, the room not taken by nodes shared between them as gaps)
@@ -248,7 +248,7 @@ class SankeyModel {
   /// Edges sit on whole pixels, so they stay crisp.
   void layout(double height, {double minGap = 6}) {
     if (isEmpty) return;
-    final gapBetween = calm ? 14.0 : minGap;
+    final gapBetween = calm ? 10.0 : minGap;
     var k = (height - gapBetween * (widest - 1)) / total;
     if (maxUnit != null && k > maxUnit!) k = maxUnit!;
     for (final column in columns) {
@@ -778,6 +778,15 @@ class _SankeyPainter extends CustomPainter {
     bool on(Set<SankeyFlow> flows) => !picking || flows.any(lit.contains);
 
     final day = brightness == Brightness.light;
+    // a faint line through every node, from the first column to the last: the rows read as rows on a narrow screen
+    final guide = Paint()
+      ..strokeWidth = 1
+      ..color = c.ink.withValues(alpha: day ? .12 : .14);
+    for (final n in model.columns.expand((col) => col)) {
+      final y = (n.y + math.min(n.h, 30) / 2).roundToDouble() + .5;
+      final x0 = xs[n.column];
+      canvas.drawLine(Offset(x0, y), Offset(xs[2] + SankeyGeometry.nodeW, y), guide);
+    }
     // the ribbons, thick ones under thin ones
     final links = [...model.links]..sort((a, b) => model.thickness(b).compareTo(model.thickness(a)));
     for (final l in links) {

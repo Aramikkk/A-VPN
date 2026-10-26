@@ -216,7 +216,7 @@ class PingPage extends HookConsumerWidget {
               onTap: () async {
                 final picked = await pick(
                   '${t.avpn.pingTimeout} · ${entry.$1}',
-                  List.generate(30, (i) => i + 1),
+                  [...List.generate(30, (i) => i + 1), 40, 45, 60, 90, 120],
                   ref.read(entry.$2).inSeconds,
                   (n) => t.avpn.seconds(n: n),
                 );
