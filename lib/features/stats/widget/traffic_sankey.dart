@@ -9,6 +9,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
+import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -1940,6 +1941,16 @@ class _TopDownPainter extends CustomPainter {
           } else {
             final p = _text(flag ?? label, flag != null ? 20 : 11, ink.withValues(alpha: alpha), bold: flag == null, width: 70);
             p.paint(canvas, Offset(cx - p.width / 2, top));
+            // a whitelist ("БС", LTE only) server: a faint square frame round its flag, to tell it from the others
+            if (flag != null && ServerRegionFilter.isMobileOnly(label)) {
+              canvas.drawRect(
+                Rect.fromLTWH(cx - p.width / 2 - 4, top - 2, p.width + 8, p.height + 4),
+                Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 1
+                  ..color = ink.withValues(alpha: .38 * alpha),
+              );
+            }
             // the subscription's mark under the flag
             final mark = splitMark(n.label);
             final badge = mark.profile != null && mark.profile! >= 0 && mark.profile! < profileBadgesNow.length
