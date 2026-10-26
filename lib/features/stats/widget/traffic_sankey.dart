@@ -6,6 +6,7 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -793,7 +794,10 @@ class _SankeyPainter extends CustomPainter {
       final path = g.ribbon(model, l);
       final colour = _route(l.route);
       final bright = on(l.flows);
-      final k = bright ? 1.0 : .22;
+      // where traffic moves the ribbon is full colour and its brightness swells and ebbs; a still one is pale
+      final moving = _movingLink(l);
+      final breath = moving ? .8 + .2 * math.sin(pulse.value * 2 * math.pi) : .45;
+      final k = (bright ? 1.0 : .22) * breath;
       final xa = xs[l.from.column] + SankeyGeometry.nodeW;
       final xb = xs[l.to.column];
       final from = l.from.route == null ? c.app : colour;
@@ -808,23 +812,6 @@ class _SankeyPainter extends CustomPainter {
             ],
           ).createShader(Rect.fromLTRB(xa, 0, xb, size.height)),
       );
-      // where traffic moves: a light runs along the ribbon, source to server, and the ribbon breathes a little
-      if (bright && _movingLink(l)) {
-        final t = pulse.value;
-        canvas.drawPath(path, Paint()..isAntiAlias = true..color = colour.withValues(alpha: .1 * (.5 + .5 * math.sin(t * 2 * math.pi))));
-        final head = xa + (xb - xa) * (-.2 + 1.4 * t);
-        final band = (xb - xa) * .22;
-        canvas.save();
-        canvas.clipPath(path);
-        canvas.drawRect(
-          Rect.fromLTRB(head - band, l.fromY - 40, head + band, size.height),
-          Paint()
-            ..shader = LinearGradient(
-              colors: [colour.withValues(alpha: 0), colour.withValues(alpha: day ? .55 : .7), colour.withValues(alpha: 0)],
-            ).createShader(Rect.fromLTRB(head - band, 0, head + band, 0)),
-        );
-        canvas.restore();
-      }
       // a thin edge gives the ribbon its shape against the background
       canvas.drawPath(
         path,
@@ -832,7 +819,7 @@ class _SankeyPainter extends CustomPainter {
           ..isAntiAlias = true
           ..style = PaintingStyle.stroke
           ..strokeWidth = .8
-          ..color = colour.withValues(alpha: (bright ? .5 : .12)),
+          ..color = colour.withValues(alpha: (bright ? (moving ? .55 : .3) : .12)),
       );
     }
 
@@ -855,7 +842,7 @@ class _SankeyPainter extends CustomPainter {
         );
         // the name over two lines at most, the amount under it where the node is tall; a label only where the one
         // above it is done: thin neighbours would print over each other
-        final tall = n.h >= 28;
+        final tall = n.h >= 18;
         final amount = value(n.real);
         final speedText = speedValue?.call(n.speed);
         final lines = 1 + (tall && speedText != null && n.h >= 44 ? 1 : 0);
@@ -868,7 +855,13 @@ class _SankeyPainter extends CustomPainter {
         final nameSize = ci == 1 ? 10.0 : 11.5;
         // a site is one line (a domain broken in the middle reads badly), an app or a server up to two
         final nameLines = ci == 1 ? 1 : 2;
-        final nameH = _text(n.label, width, strong: nameStrong, size: nameSize, lines: nameLines).height;
+        // a server of one of several subscriptions: its mark (a coloured circle with the letter) before the name
+        final mark = ci == 2 ? splitMark(n.label) : (profile: null, text: n.label);
+        final badge = mark.profile != null && mark.profile! >= 0 && mark.profile! < profileBadgesNow.length
+            ? profileBadgesNow[mark.profile!]
+            : null;
+        final nameW = width - (badge == null ? 0 : 15);
+        final nameH = _text(mark.text, nameW, strong: nameStrong, size: nameSize, lines: nameLines).height;
         final blockH = nameH + (tall ? 13 * lines : 0);
         final labelTop = n.y + n.h / 2 - blockH / 2;
         if (labelTop < lastBottom[ci] + 1) continue;
@@ -876,9 +869,16 @@ class _SankeyPainter extends CustomPainter {
         final x = switch (ci) {
           0 => xs[0] - 7,
           1 => xs[1] + SankeyGeometry.nodeW + 5,
-          _ => xs[2] + SankeyGeometry.nodeW + 7,
+          _ => xs[2] + SankeyGeometry.nodeW + 7 + (badge == null ? 0 : 15),
         };
-        _label(canvas, n.label, Offset(x, labelTop), width, right: ci == 0, strong: nameStrong, size: nameSize, lines: nameLines, alpha: alpha);
+        if (badge != null) {
+          final cy = labelTop + nameH / 2;
+          final cx = xs[2] + SankeyGeometry.nodeW + 7 + 6;
+          canvas.drawCircle(Offset(cx, cy), 6, Paint()..color = badge.colour.withValues(alpha: alpha));
+          final letter = _text(badge.letter, 12, strong: true, size: 8.5, color: Colors.white);
+          letter.paint(canvas, Offset(cx - letter.width / 2, cy - letter.height / 2));
+        }
+        _label(canvas, mark.text, Offset(x, labelTop), nameW, right: ci == 0, strong: nameStrong, size: nameSize, lines: nameLines, alpha: alpha);
         if (tall) {
           _label(canvas, amount, Offset(x, labelTop + nameH), width, right: ci == 0, strong: false, size: 10.5, color: c.soft, alpha: alpha);
           if (lines == 2) {
