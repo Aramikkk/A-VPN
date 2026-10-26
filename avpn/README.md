@@ -11,7 +11,7 @@ Android (`com.aravpn.app`) и Windows 11.
 | `.\tools\hcore-build` | Ядро hiddify-core v5 с патчами A-VPN. Ветка **`aravpn`** (и в подмодуле `hiddify-sing-box` тоже `aravpn`) |
 | `.\tools\flutter`, `go`, `jdk-17…`, `llvm-mingw`, `innosetup` | Инструменты сборки |
 | `.\tools\core-backup\hiddify-core-5.0.0-official.aar` | Официальное ядро (откат на крайний случай) |
-| `.\A-VPN` | Готовые сборки: `releases\<версия>\A-VPN-<версия>-arm64.apk` (только 64-бит, armv7 больше не собирается) и `A-VPN-Setup-<версия>.exe`; `share\A-VPN.apk` — для ссылки на телефон. Резервная копия в Google Диск: `bash avpn/scripts/backup.sh` |
+| `.\A-VPN` | Готовые сборки: `releases\<версия>\A-VPN-<версия>-arm64.apk` (только 64-бит, armv7 больше не собирается) и `A-VPN-Setup-<версия>-windows.exe`; `share\A-VPN.apk` — для ссылки на телефон. Резервная копия в Google Диск: `bash avpn/scripts/backup.sh` |
 | `aravpn\scripts\` (в этом репо) | Копии скриптов сборки: `env.sh`, `build-core.sh`, `build-core-windows.sh`, `make_icon.py`, `gen_rkn_domains.py` |
 
 Все команды — в Git Bash.

@@ -20,7 +20,7 @@ DisableProgramGroupPage=yes
 ; admin rights: the sign-in task that starts A-VPN runs with highest privileges, so TUN needs no UAC prompt
 PrivilegesRequired=admin
 OutputDir=..\..\..\build\windows\installer
-OutputBaseFilename=A-VPN-Setup-{#AppVersion}
+OutputBaseFilename=A-VPN-Setup-{#AppVersion}-windows
 SetupIconFile=..\..\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 Compression=lzma2/max
