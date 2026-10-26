@@ -457,7 +457,7 @@ void main() {
         expect(find.byType(AraHomeBody), findsOneWidget);
         expect(find.textContaining('Обычные'), findsNothing);
         expect(t.avpn.autoBestHint, 'Сервер с наименьшим пингом');
-        if (connected && contrast) {
+        if (connected && contrast && Platform.environment['SUPERLIGHT'] != '1') {
           for (final amount in ['8 МБ', '2 МБ']) {
             expect(
               find.byWidgetPredicate((w) => w is Text && w.textSpan?.toPlainText() == amount),
@@ -479,6 +479,10 @@ void main() {
         if (connected && contrast && Platform.environment['SUPERLIGHT'] == '1') {
           expect(find.byKey(const Key('contrast-sites')), findsNothing);
           expect(find.text('Раздача'), findsNothing);
+          // the time and the two speeds, not the totals
+          expect(find.text('Загрузка'), findsOneWidget);
+          expect(find.text('Отдача'), findsOneWidget);
+          expect(find.text('Через VPN'), findsNothing);
         }
         // TAP=<text>: a tap on it first, to look at what it opens
         final tap = Platform.environment['TAP'];

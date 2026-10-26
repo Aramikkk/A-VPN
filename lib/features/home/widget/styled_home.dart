@@ -294,6 +294,34 @@ class _StatusBlock extends HookConsumerWidget {
       final vpn = amount(viaVpn);
       final direct = amount(total - viaVpn);
       final sessionLength = now.value.difference(confirmedStart.value ?? since.value ?? now.value);
+      // the super light mode: the connection time and the two speeds (what comes in, what goes out), not the totals
+      if (ref.watch(superLightProvider)) {
+        final inRate = amount(connected ? stats?.downlink.toInt() ?? 0 : 0);
+        final outRate = amount(connected ? stats?.uplink.toInt() ?? 0 : 0);
+        return _ContrastStats(
+          items: [
+            (
+              Icons.access_time_filled_rounded,
+              t.avpn.contrastTime,
+              connected ? time : (waiting ?? '—'),
+              '',
+              false,
+              connected ? sessionLength.inMinutes / (24 * 60) : 0,
+              const Color(0xFF8FA8BD),
+            ),
+            (Icons.south_rounded, t.avpn.superLightDown, inRate.$1, '${inRate.$2}/${t.avpn.perSecond}', true, 0.0, theme.araAccent),
+            (
+              Icons.north_rounded,
+              t.avpn.superLightUp,
+              outRate.$1,
+              '${outRate.$2}/${t.avpn.perSecond}',
+              false,
+              0.0,
+              const Color(0xFF9AA0A6),
+            ),
+          ],
+        );
+      }
       final routed = total == 0 ? 1 : total;
       final vpnShare = viaVpn / routed;
       return _ContrastStats(
