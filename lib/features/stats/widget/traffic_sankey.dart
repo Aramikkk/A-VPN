@@ -1803,20 +1803,6 @@ class _TopDownPainter extends CustomPainter {
     final picking = lit.isNotEmpty;
     bool on(Set<SankeyFlow> flows) => !picking || flows.any(lit.contains);
 
-    // a long arrow down the left edge: the flow goes from the top to the bottom
-    final rail = Paint()
-      ..color = ink.withValues(alpha: .28)
-      ..strokeWidth = 1.5;
-    canvas.drawLine(const Offset(10, 8), Offset(10, size.height - 12), rail);
-    canvas.drawPath(
-      Path()
-        ..moveTo(10, size.height - 4)
-        ..lineTo(5, size.height - 15)
-        ..lineTo(15, size.height - 15)
-        ..close(),
-      Paint()..color = ink.withValues(alpha: .28),
-    );
-
     // the rows' names on the right, small
     for (final (i, title) in const ['', '', ''].indexed) {
       if (title.isEmpty) continue;
@@ -2003,6 +1989,24 @@ class _TopDownPainter extends CustomPainter {
   /// an app's icon in a disc, or its first letter where the icon isn't known
   void _icon(Canvas canvas, SankeyNode n, Offset centre, double alpha) {
     const r = 12.0;
+    // the "other" node: a grey disc with three dots, not a letter
+    if (n.key.endsWith('|')) {
+      canvas.drawCircle(centre, r, Paint()..color = const Color(0xFF8A9099).withValues(alpha: alpha));
+      final dots = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(Icons.more_horiz_rounded.codePoint),
+          style: TextStyle(
+            fontFamily: Icons.more_horiz_rounded.fontFamily,
+            package: Icons.more_horiz_rounded.fontPackage,
+            fontSize: 17,
+            color: Colors.white.withValues(alpha: alpha),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      dots.paint(canvas, Offset(centre.dx - dots.width / 2, centre.dy - dots.height / 2));
+      return;
+    }
     final image = icons[n.label];
     if (image != null) {
       canvas
