@@ -419,6 +419,7 @@ class TrafficSankey extends ConsumerWidget {
       unit: unit,
       even: true,
       calm: true,
+      look: SankeyLook.dots,
       speedValue: speedValue,
       headers: [t.avpn.sankeyApps, t.avpn.sankeySites, t.avpn.sankeyTo],
       otherApp: t.avpn.connOther,
@@ -430,6 +431,27 @@ class TrafficSankey extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// How the routes are drawn in the ribbons view.
+enum SankeyLook {
+  /// wide translucent ribbons
+  ribbons,
+
+  /// thin curves, the colour running from the app to the server
+  thin,
+
+  /// ribbons, the open ones with a soft glow along them
+  glow,
+
+  /// ribbons with right-angle steps instead of curves
+  steps,
+
+  /// thin curves with dots running along the ones in use
+  dots,
+
+  /// open: solid ribbons; closed: only a dashed outline
+  dashed,
 }
 
 /// The diagram itself, from flows already named (the preview and the tests draw it without any providers).
@@ -446,6 +468,7 @@ class SankeyDiagram extends StatefulWidget {
     this.even = false,
     this.calm = false,
     this.chips = false,
+    this.look = SankeyLook.ribbons,
     this.speedValue,
     this.headers = const [],
     this.onSelect,
@@ -460,6 +483,9 @@ class SankeyDiagram extends StatefulWidget {
   /// chips: each node a plate of one size in a row of its own, joined by thin lines (a dot where it moves), instead
   /// of ribbons as wide as the traffic; the rows start from the top and keep their places (needs [calm] data)
   final bool chips;
+
+  /// how the routes are drawn (ribbons view)
+  final SankeyLook look;
 
   /// calm: fixed sizes from the top, the nodes in the order they came, a route kept a few seconds after its
   /// connection closed (see [SankeyModel.calm])
@@ -678,6 +704,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
               widget.headers,
               widget.speedValue,
               _pulse,
+              widget.look,
             ),
           ),
         ),
@@ -696,8 +723,10 @@ bool _movingLink(SankeyLink l) => l.flows.fold<double>(0, (s, f) => s + f.speed)
 typedef _Colours = ({Color vpn, Color direct, Color block, Color app, Color ink, Color soft, Color halo});
 
 class _SankeyPainter extends CustomPainter {
-  _SankeyPainter(this.model, this.c, this.value, this.family, this.brightness, this.lit, this.headers, this.speedValue, this.pulse)
+  _SankeyPainter(this.model, this.c, this.value, this.family, this.brightness, this.lit, this.headers, this.speedValue, this.pulse, this.look)
       : super(repaint: pulse);
+
+  final SankeyLook look;
 
   /// the pulse's turn, 0..1
   final Animation<double> pulse;
@@ -839,26 +868,95 @@ class _SankeyPainter extends CustomPainter {
       final xa = xs[l.from.column] + SankeyGeometry.nodeW;
       final xb = xs[l.to.column];
       final from = l.from.route == null ? c.app : colour;
-      canvas.drawPath(
-        path,
-        Paint()
-          ..isAntiAlias = true
-          ..shader = LinearGradient(
-            colors: [
-              from.withValues(alpha: (day ? .2 : .26) * k),
-              colour.withValues(alpha: (day ? .5 : .58) * k),
-            ],
-          ).createShader(Rect.fromLTRB(xa, 0, xb, size.height)),
-      );
-      // a thin edge gives the ribbon its shape against the background
-      canvas.drawPath(
-        path,
-        Paint()
-          ..isAntiAlias = true
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .8
-          ..color = colour.withValues(alpha: (bright ? (live ? .55 : .14) : .1)),
-      );
+      final th = model.thickness(l);
+      final centre = Path()
+        ..moveTo(xa, l.fromY + th / 2)
+        ..cubicTo((xa + xb) / 2, l.fromY + th / 2, (xa + xb) / 2, l.toY + th / 2, xb, l.toY + th / 2);
+      final shaderBox = Rect.fromLTRB(xa, 0, xb, size.height);
+      final fill = Paint()
+        ..isAntiAlias = true
+        ..shader = LinearGradient(
+          colors: [from.withValues(alpha: (day ? .2 : .26) * k), colour.withValues(alpha: (day ? .5 : .58) * k)],
+        ).createShader(shaderBox);
+      final edge = Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8
+        ..color = colour.withValues(alpha: (bright ? (live ? .55 : .14) : .1));
+      switch (look) {
+        case SankeyLook.ribbons:
+          canvas.drawPath(path, fill);
+          canvas.drawPath(path, edge);
+        case SankeyLook.glow:
+          if (live && bright) {
+            canvas.drawPath(
+              path,
+              Paint()
+                ..isAntiAlias = true
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 5
+                ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5)
+                ..color = colour.withValues(alpha: .55 * breath),
+            );
+          }
+          canvas.drawPath(path, fill);
+          canvas.drawPath(
+            path,
+            edge
+              ..strokeWidth = live ? 1.3 : .8
+              ..color = colour.withValues(alpha: live ? .9 : .12),
+          );
+        case SankeyLook.steps:
+          final mid = ((xa + xb) / 2).roundToDouble();
+          final stepped = Path()
+            ..moveTo(xa, l.fromY)
+            ..lineTo(mid, l.fromY)
+            ..lineTo(mid, l.toY)
+            ..lineTo(xb, l.toY)
+            ..lineTo(xb, l.toY + th)
+            ..lineTo(mid, l.toY + th)
+            ..lineTo(mid, l.fromY + th)
+            ..lineTo(xa, l.fromY + th)
+            ..close();
+          canvas.drawPath(stepped, fill);
+          canvas.drawPath(stepped, edge);
+        case SankeyLook.thin || SankeyLook.dots:
+          canvas.drawPath(
+            centre,
+            Paint()
+              ..isAntiAlias = true
+              ..style = PaintingStyle.stroke
+              ..strokeCap = StrokeCap.round
+              ..strokeWidth = live ? 2.6 : 1.6
+              ..shader = LinearGradient(
+                colors: [from.withValues(alpha: (live ? .95 : .35) * (bright ? 1 : .3)), colour.withValues(alpha: (live ? 1 : .35) * (bright ? 1 : .3))],
+              ).createShader(shaderBox),
+          );
+          if (look == SankeyLook.dots && live && bright) {
+            final metric = centre.computeMetrics().first;
+            for (var d = 0; d < 3; d++) {
+              final at = ((pulse.value + d / 3) % 1.0) * metric.length;
+              canvas.drawCircle(metric.getTangentForOffset(at)!.position, 3.2, Paint()..color = colour);
+            }
+          }
+        case SankeyLook.dashed:
+          if (live) {
+            canvas.drawPath(path, fill);
+            canvas.drawPath(path, edge);
+          } else {
+            // closed: no fill, only the outline, in dashes
+            final dash = Paint()
+              ..isAntiAlias = true
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.2
+              ..color = colour.withValues(alpha: bright ? .6 : .2);
+            for (final metric in path.computeMetrics()) {
+              for (var at = 0.0; at < metric.length; at += 9) {
+                canvas.drawPath(metric.extractPath(at, math.min(at + 5, metric.length)), dash);
+              }
+            }
+          }
+      }
     }
 
     final lastBottom = [-99.0, -99.0, -99.0];

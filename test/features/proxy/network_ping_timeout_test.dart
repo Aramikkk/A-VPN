@@ -51,6 +51,10 @@ void main() {
     expect(w['experimental']['monitoring']['site_groups'], true);
     expect(w['experimental']['monitoring']['site_groups_tolerance'], 2500);
     expect(m['experimental']['monitoring']['site_groups'], false);
+    // Wi-Fi has many servers: its background checks are spread; mobile data checks them all at once
+    expect(w['outbounds'][0]['options']['start_batch'], 8);
+    expect(w['outbounds'][0]['options']['start_gap'], '20s');
+    expect(m['outbounds'][0]['options'].containsKey('start_batch'), false);
     expect(wifi, isNot(mobile));
   });
 }

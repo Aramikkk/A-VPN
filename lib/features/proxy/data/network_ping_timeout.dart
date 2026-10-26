@@ -25,6 +25,15 @@ Future<String> withNetworkPingTimeout(
     if (outbound['tag'] != 'lowest') continue;
     final options = Map<String, dynamic>.from(outbound['options'] as Map? ?? {});
     options['tolerance'] = balancerTolerance;
+    // Wi-Fi has dozens of servers: the background checks go eight at a time, twenty seconds apart, so a start (or a
+    // resume after a pause) doesn't test them all at once. Mobile data has only a few: all of them at once.
+    if (network == NetworkKind.wifi) {
+      options['start_batch'] = 8;
+      options['start_gap'] = '20s';
+    } else {
+      options.remove('start_batch');
+      options.remove('start_gap');
+    }
     outbound['options'] = options;
   }
   final output = File('$path.ping-${network.name}.json');
