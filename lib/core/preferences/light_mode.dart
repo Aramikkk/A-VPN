@@ -27,9 +27,14 @@ final lightBackgroundProvider = Provider<bool>(
 );
 
 /// The super light mode (see [Preferences.superLight]).
-final superLightProvider = Provider<bool>(
-  (ref) => ref.watch(sharedPreferencesProvider).hasValue && ref.watch(Preferences.superLight),
-);
+final superLightProvider = Provider<bool>((ref) {
+  final on = ref.watch(sharedPreferencesProvider).hasValue && ref.watch(Preferences.superLight);
+  superLightNow = on;
+  return on;
+});
+
+/// [superLightProvider] for the places with no `ref` (a swipe's detector): as of the last time it was worked out.
+bool superLightNow = false;
 
 /// The night mode: the checks sleep while the screen is locked (on by default, until the settings are read too).
 final nightModeProvider = Provider<bool>(

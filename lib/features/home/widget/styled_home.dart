@@ -1777,8 +1777,8 @@ class _LongSwipe extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final drag = useRef(0.0);
-    // a computer goes by its menu, not by dragging the mouse
-    if (PlatformUtils.isDesktop) return child;
+    // a computer goes by its menu, not by dragging the mouse; the super light mode has no swipes at all
+    if (PlatformUtils.isDesktop || superLightNow) return child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onVerticalDragStart: (_) => drag.value = 0,

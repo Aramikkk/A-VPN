@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/preferences/light_mode.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
@@ -47,7 +49,13 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
   void initState() {
     super.initState();
     _back.addListener(() => setState(() => _drag = _backFrom * (1 - Curves.easeOutCubic.transform(_back.value))));
+    // the super light mode switched on or off: the swipes with it
+    _superLight = ProviderScope.containerOf(context, listen: false).listen(superLightProvider, (_, _) {
+      if (mounted) setState(() {});
+    });
   }
+
+  ProviderSubscription<bool>? _superLight;
 
   double _backFrom = 0;
 
@@ -80,6 +88,7 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
 
   @override
   void dispose() {
+    _superLight?.close();
     _slide.dispose();
     _back.dispose();
     super.dispose();
@@ -188,8 +197,9 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
         },
       ),
     );
-    // a computer: no swipes (a drag of the mouse moved the page by accident), only its menu and keys
-    if (PlatformUtils.isDesktop) return pages;
+    // a computer: no swipes (a drag of the mouse moved the page by accident), only its menu and keys; nor in the
+    // super light mode
+    if (PlatformUtils.isDesktop || superLightNow) return pages;
     Widget swiper = GestureDetector(
       behavior: HitTestBehavior.translucent,
       onHorizontalDragUpdate: _dragged,

@@ -1,3 +1,4 @@
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -145,6 +146,13 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
             (ref.watch(hasAnyProfileProvider).value == false)) {
           // Prevent showing chainOptions while hasAnyProfile == false
           return '/settings';
+        } else if (ref.read(superLightProvider)) {
+          // the super light mode: only Home (with its servers) and Settings; the statistics, the topology and the
+          // connections are off
+          final where = state.matchedLocation;
+          if (where == '/speed' || where == '/home/traffic' || where.startsWith('/connections') || where.startsWith('/topology')) {
+            return '/home';
+          }
         }
         return null;
       },
