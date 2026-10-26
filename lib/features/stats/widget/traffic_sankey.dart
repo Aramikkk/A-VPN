@@ -723,7 +723,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
     at = at.translate(0, -SankeyGeometry.headerH);
     for (final n in _model.columns.expand((c) => c)) {
       if (geometry.hit(n, width).contains(at)) {
-        unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _model.total)));
+        unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _realTotal)));
         return;
       }
     }
@@ -743,7 +743,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
       if (best != null) {
         final l = best;
         unawaited(
-          _select(SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _model.total)),
+          _select(SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal)),
         );
       }
       return;
@@ -754,13 +754,17 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
       if (geometry.ribbon(_model, l).contains(at)) {
         unawaited(
           _select(
-            SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _model.total),
+            SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal),
           ),
         );
         return;
       }
     }
   }
+
+  /// what the whole picture holds, in the unit of the flows' weights (bytes or connections): the share in the details
+  /// is a part of this (the model's own total counts routes, for the layout)
+  double get _realTotal => _model.columns.first.fold<double>(0, (sum, n) => sum + n.real);
 
   /// A tap on the top-down picture: a node (its icon, name or flag, or its bar), else the nearest line.
   void _tapTopDown(Offset at, Size size) {
@@ -781,7 +785,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
           _ => rowY[2] + 62,
         };
         if (Rect.fromLTRB(cx - half, top, cx + half, bottom).contains(at)) {
-          unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _model.total)));
+          unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _realTotal)));
           return;
         }
       }
@@ -804,7 +808,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
     }
     if (best != null) {
       final l = best;
-      unawaited(_select(SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _model.total)));
+      unawaited(_select(SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal)));
     }
   }
 
@@ -830,12 +834,12 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
         headers: widget.headers,
         onNode: widget.onSelect == null
             ? null
-            : (n) => unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _model.total))),
+            : (n) => unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _realTotal))),
         onLink: widget.onSelect == null
             ? null
             : (l) => unawaited(
                 _select(
-                  SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _model.total),
+                  SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal),
                 ),
               ),
       );
