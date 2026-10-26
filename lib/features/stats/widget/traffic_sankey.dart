@@ -255,7 +255,9 @@ class SankeyModel {
   void layout(double height, {double minGap = 6}) {
     if (isEmpty) return;
     final gapBetween = calm ? 10.0 : minGap;
-    var k = (height - gapBetween * (widest - 1)) / total;
+    // what the columns really hold (the routes joined in an "other" node count once), so the picture fills the height
+    final routes = columns.first.fold<double>(0, (s, n) => s + n.weight);
+    var k = (height - gapBetween * (widest - 1)) / (routes > 0 ? routes : total);
     // calm: a route is at most an eighth of the height thick, so a few routes fill the page and many fit on it
     final cap = calm && maxUnit != null ? ((height - 12) / 8).clamp(22.0, 64.0) : maxUnit;
     if (cap != null && k > cap) k = cap;
@@ -296,7 +298,7 @@ class SankeyModel {
 class SankeyGeometry {
   SankeyGeometry(double width) {
     final labelL = math.min(88.0, width * .24);
-    labelR = math.min(92.0, width * .25);
+    labelR = math.min(70.0, width * .19);
     this.labelL = labelL;
     final x2 = width - labelR - nodeW;
     xs = [labelL, (labelL + x2) / 2, x2];
@@ -803,7 +805,7 @@ class _SankeyPainter extends CustomPainter {
       // where traffic moves the ribbon is full colour and its brightness swells and ebbs; a still one is pale
       final live = l.flows.any((f) => f.live);
       final moving = live && _movingLink(l);
-      final breath = !live ? .3 : (moving ? .8 + .2 * math.sin(pulse.value * 2 * math.pi) : .8);
+      final breath = !live ? .2 : (moving ? .85 + .15 * math.sin(pulse.value * 2 * math.pi) : .85);
       final k = (bright ? 1.0 : .22) * breath;
       final xa = xs[l.from.column] + SankeyGeometry.nodeW;
       final xb = xs[l.to.column];
@@ -835,7 +837,7 @@ class _SankeyPainter extends CustomPainter {
       for (final n in column) {
         final bright = on(n.flows);
         final live = n.flows.any((f) => f.live);
-        final alpha = (bright ? 1.0 : .3) * (live ? 1.0 : .4);
+        final alpha = (bright ? 1.0 : .3) * (live ? 1.0 : .32);
         final fill = _route(n.route);
         final top = n.y.roundToDouble();
         final bottom = math.max((n.y + n.h).roundToDouble(), top + 2);

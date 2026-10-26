@@ -125,7 +125,7 @@ class TopologyPage extends HookConsumerWidget {
             builder: (context, box) {
               final pageHeight = box.maxHeight;
               // the toggle and the gaps over the card; the card's own title and padding inside it
-              final chartHeight = (pageHeight - 44 - 12 - 8 - 62 - 28).clamp(240.0, 900.0);
+              // the chart takes what the page leaves (see the section below)
               return ListView(
                 controller: controller,
                 physics: _PageSnap(pageHeight),
@@ -159,21 +159,22 @@ class TopologyPage extends HookConsumerWidget {
                         ),
                         const Gap(8),
                         // the connections open now, as a flow: apps, the rules that took them, where they went
-                        _Section(
+                        Expanded(
+                          child: _Section(
+                          expand: true,
                           title: t.avpn.topoSankey,
+                          trailing: _FlowLegend(live: t.avpn.flowLive, closed: t.avpn.flowClosed),
                           child: openNow.isEmpty
-                              ? SizedBox(
-                                  height: chartHeight,
-                                  child: Center(
-                                    child: Text(
-                                      t.avpn.topoSankeyEmpty,
-                                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                                    ),
+                              ? Center(
+                                  child: Text(
+                                    t.avpn.topoSankeyEmpty,
+                                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                                   ),
                                 )
-                              : TrafficSankey(
+                              : LayoutBuilder(
+                                  builder: (context, box) => TrafficSankey(
                                   items: openNow,
-                                  height: chartHeight,
+                                  height: box.maxHeight,
                                   // who goes where, as thick as every other route and in a fixed order; the traffic and
                                   // the speed are written
                                   weight: (c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble(),
@@ -181,6 +182,8 @@ class TopologyPage extends HookConsumerWidget {
                                   speed: byTraffic.value ? (c) => rates[c.id] ?? 0 : null,
                                   speedValue: byTraffic.value ? speedValue : null,
                                 ),
+                                ),
+                          ),
                         ),
                         // the next page is below, as in the statistics
                         const Gap(4),
@@ -349,8 +352,13 @@ class TopologyDayTotal extends ConsumerWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child, this.hint});
+  const _Section({required this.title, required this.child, this.hint, this.expand = false, this.trailing});
 
+  /// the child takes the height the section is given (the section must be given one)
+  final bool expand;
+
+  /// at the right end of the title's line
+  final Widget? trailing;
   final String title;
   final String? hint;
   final Widget child;
@@ -359,23 +367,24 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final titleText = Text(
+      title.toUpperCase(),
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: scheme.onSurfaceVariant,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1,
+      ),
+    );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: scheme.onSurfaceVariant,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1,
-          ),
-        ),
+        trailing == null ? titleText : Row(children: [Expanded(child: titleText), trailing!]),
         if (hint != null) ...[
           const Gap(3),
           Text(hint!, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
         ],
         const Gap(10),
-        child,
+        if (expand) Expanded(child: child) else child,
       ],
     );
     // the same frosted glass as the home screen's blocks
@@ -485,6 +494,42 @@ class _RuleRows extends ConsumerWidget {
               );
             },
           ),
+      ],
+    );
+  }
+}
+
+/// The key of the flows picture: lit ones are open now, faint ones have closed.
+class _FlowLegend extends StatelessWidget {
+  const _FlowLegend({required this.live, required this.closed});
+
+  final String live;
+  final String closed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final style = theme.textTheme.labelSmall?.copyWith(color: muted, fontSize: 10);
+    Widget dot(Color colour, {bool hollow = false}) => Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hollow ? null : colour,
+        border: hollow ? Border.all(color: colour.withValues(alpha: .6), width: 1.4) : null,
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        dot(theme.araAccent),
+        const Gap(4),
+        Text(live, style: style),
+        const Gap(10),
+        dot(muted, hollow: true),
+        const Gap(4),
+        Text(closed, style: style),
       ],
     );
   }
