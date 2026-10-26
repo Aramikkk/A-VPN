@@ -157,6 +157,12 @@ void main() {
     });
   });
 
+  test('keeping the order of an empty model does nothing and does not throw', () {
+    final m = SankeyModel.build(const [], otherApp: 'o', otherRule: 'o', otherOut: 'o', even: true, calm: true);
+    m.keepOrder({});
+    expect(m.isEmpty, true);
+  });
+
   group('calm: nothing slides when a route comes or goes', () {
     SankeyModel calm(List<SankeyFlow> f, [Map<String, int>? order]) {
       final m = SankeyModel.build(f, otherApp: 'other', otherRule: 'other', otherOut: 'other', even: true, calm: true);

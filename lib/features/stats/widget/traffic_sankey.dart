@@ -132,6 +132,8 @@ class SankeyModel {
   /// Puts each column in the order the nodes were first seen (new ones last) instead of by name: [order] holds the
   /// places so far and gets the new nodes' places.
   void keepOrder(Map<String, int> order) {
+    // an empty model holds constant lists, which can't be sorted
+    if (isEmpty) return;
     for (final column in columns) {
       for (final n in column) {
         order.putIfAbsent(n.key, () => order.length);

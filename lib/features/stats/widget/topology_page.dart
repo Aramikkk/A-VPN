@@ -56,7 +56,16 @@ class TopologyPage extends HookConsumerWidget {
     // the ones that moved something, the closed ones too (dimmed on the picture): a connection under 20 KB is
     // background chatter, not a flow
     final rates = state.rates;
-    final openNow = open.where((c) => c.route != ConnectionRoute.block && c.total >= flowMinBytes).toList();
+    // (a closed one stays ten minutes, as on the picture)
+    final now = DateTime.now();
+    final openNow = open
+        .where(
+          (c) =>
+              c.route != ConnectionRoute.block &&
+              c.total >= flowMinBytes &&
+              (c.active || (c.ended != null && now.difference(c.ended!) <= const Duration(minutes: 10))),
+        )
+        .toList();
     String speedValue(double w) => '${formatBytes(w.round(), units)}/${t.avpn.perSecond}';
     double weight(SeenConnection c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble();
     String value(double w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}';
