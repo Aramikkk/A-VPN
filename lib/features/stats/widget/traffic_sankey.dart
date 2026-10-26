@@ -402,7 +402,6 @@ class TrafficSankey extends ConsumerWidget {
       unit: unit,
       even: true,
       calm: true,
-      chips: true,
       speedValue: speedValue,
       headers: [t.avpn.sankeyApps, t.avpn.sankeySites, t.avpn.sankeyTo],
       otherApp: t.avpn.connOther,
@@ -474,8 +473,28 @@ class SankeyDiagram extends StatefulWidget {
   State<SankeyDiagram> createState() => _SankeyDiagramState();
 }
 
-class _SankeyDiagramState extends State<SankeyDiagram> {
+class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProviderStateMixin {
   late SankeyModel _model;
+
+  /// 0..1 round and round: a light runs along the ribbons where traffic moves, and they breathe (stopped while
+  /// nothing moves, so an idle diagram costs nothing)
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
+
+  void _syncPulse() {
+    final moving = _model.links.any(_movingLink);
+    if (moving && !_pulse.isAnimating) {
+      _pulse.repeat();
+    } else if (!moving && _pulse.isAnimating) {
+      _pulse.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
   Set<SankeyFlow> _lit = const {};
 
   /// the places the nodes took in the order they came (calm)
@@ -520,6 +539,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
   void initState() {
     super.initState();
     _model = _build();
+    _syncPulse();
     final key = widget.initialSelection;
     if (key != null) {
       final node = _model.columns.expand((c) => c).where((n) => n.key == key).firstOrNull;
@@ -531,6 +551,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
   void didUpdateWidget(SankeyDiagram old) {
     super.didUpdateWidget(old);
     _model = _build();
+    _syncPulse();
   }
 
   Future<void> _select(SankeySelection selection) async {
@@ -616,6 +637,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
               _lit,
               widget.headers,
               widget.speedValue,
+              _pulse,
             ),
           ),
         ),
@@ -624,10 +646,17 @@ class _SankeyDiagramState extends State<SankeyDiagram> {
   }
 }
 
+/// a route with traffic moving on it now (the speed's mark, as in the chips)
+bool _movingLink(SankeyLink l) => l.flows.fold<double>(0, (s, f) => s + f.speed) > 512;
+
 typedef _Colours = ({Color vpn, Color direct, Color block, Color app, Color ink, Color soft, Color halo});
 
 class _SankeyPainter extends CustomPainter {
-  _SankeyPainter(this.model, this.c, this.value, this.family, this.brightness, this.lit, this.headers, this.speedValue);
+  _SankeyPainter(this.model, this.c, this.value, this.family, this.brightness, this.lit, this.headers, this.speedValue, this.pulse)
+      : super(repaint: pulse);
+
+  /// the pulse's turn, 0..1
+  final Animation<double> pulse;
 
   final List<String> headers;
   final String Function(double)? speedValue;
@@ -770,6 +799,23 @@ class _SankeyPainter extends CustomPainter {
             ],
           ).createShader(Rect.fromLTRB(xa, 0, xb, size.height)),
       );
+      // where traffic moves: a light runs along the ribbon, source to server, and the ribbon breathes a little
+      if (bright && _movingLink(l)) {
+        final t = pulse.value;
+        canvas.drawPath(path, Paint()..isAntiAlias = true..color = colour.withValues(alpha: .1 * (.5 + .5 * math.sin(t * 2 * math.pi))));
+        final head = xa + (xb - xa) * (-.2 + 1.4 * t);
+        final band = (xb - xa) * .22;
+        canvas.save();
+        canvas.clipPath(path);
+        canvas.drawRect(
+          Rect.fromLTRB(head - band, l.fromY - 40, head + band, size.height),
+          Paint()
+            ..shader = LinearGradient(
+              colors: [colour.withValues(alpha: 0), colour.withValues(alpha: day ? .55 : .7), colour.withValues(alpha: 0)],
+            ).createShader(Rect.fromLTRB(head - band, 0, head + band, 0)),
+        );
+        canvas.restore();
+      }
       // a thin edge gives the ribbon its shape against the background
       canvas.drawPath(
         path,
