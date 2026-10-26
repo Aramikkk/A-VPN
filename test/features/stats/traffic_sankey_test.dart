@@ -171,11 +171,12 @@ void main() {
       ];
       final tall = calm(flows)..layout(600);
       final short = calm(flows)..layout(300);
-      for (final column in [0, 1, 2]) {
-        expect([for (final n in tall.columns[column]) n.y], [for (final n in short.columns[column]) n.y]);
+      // the height sets how thick a route is drawn (a few routes fill the page); the start and the gap stay
+      for (final m in [tall, short]) {
+        expect(m.columns[0].first.y, 0);
+        expect(m.columns[0][1].y - m.columns[0][0].h, 10);
       }
-      expect(tall.columns[0].first.y, 0);
-      expect(tall.columns[0][1].y - tall.columns[0][0].h, 10);
+      expect(tall.columns[0].first.h, greaterThan(short.columns[0].first.h));
     });
 
     test('a new node comes last and the old ones stay where they were', () {

@@ -28,7 +28,11 @@ class SankeyFlow {
     this.site = '',
     this.speed = 0,
     this.id = '',
+    this.live = true,
   });
+
+  /// open now (a closed one is still drawn, but dimmed)
+  final bool live;
 
   /// the connection it is (empty when the flows aren't connections)
   final String id;
@@ -45,6 +49,7 @@ class SankeyFlow {
     site: site,
     speed: 0,
     id: id,
+    live: false,
   );
 
   /// the middle column's name (the site, as a domain); empty: the rule's
@@ -251,7 +256,9 @@ class SankeyModel {
     if (isEmpty) return;
     final gapBetween = calm ? 10.0 : minGap;
     var k = (height - gapBetween * (widest - 1)) / total;
-    if (maxUnit != null && k > maxUnit!) k = maxUnit!;
+    // calm: a route is at most an eighth of the height thick, so a few routes fill the page and many fit on it
+    final cap = calm && maxUnit != null ? ((height - 12) / 8).clamp(22.0, 64.0) : maxUnit;
+    if (cap != null && k > cap) k = cap;
     for (final column in columns) {
       if (column.isEmpty) continue;
       final used = column.fold<double>(0, (s, n) => s + n.weight * k);
@@ -394,6 +401,7 @@ class TrafficSankey extends ConsumerWidget {
           site: siteOf(c.host),
           speed: speed?.call(c) ?? 0,
           id: c.id,
+          live: c.active,
         ),
     ];
     return SankeyDiagram(
@@ -530,7 +538,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
       unit: widget.unit,
       even: widget.even,
       calm: widget.calm,
-      top: widget.chips ? math.max(2, rows - 3) : 6,
+      top: widget.chips ? math.max(2, rows - 3) : (widget.calm ? 9 : 6),
     );
     if (widget.calm) model.keepOrder(_order);
     return model;
@@ -647,6 +655,10 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
   }
 }
 
+/// A server's name as its flag alone (the flag, then the country and tags: only the flag); null where it has no flag.
+String? _flagOnly(String name) =>
+    RegExp(r'^[\u{1F1E6}-\u{1F1FF}]{2}', unicode: true).firstMatch(name.trimLeft())?.group(0);
+
 /// a route with traffic moving on it now (the speed's mark, as in the chips)
 bool _movingLink(SankeyLink l) => l.flows.fold<double>(0, (s, f) => s + f.speed) > 512;
 
@@ -697,14 +709,15 @@ class _SankeyPainter extends CustomPainter {
     Color? color,
     int lines = 1,
     Paint? foreground,
+    bool right = false,
   }) {
     final key =
-        '$text|${width.round()}|$size|$strong|$lines|${family ?? ''}|${foreground == null ? (color ?? c.ink).toARGB32() : 'h${foreground.color.toARGB32()}'}';
+        '$text|${width.round()}|$size|$strong|$lines|$right|${family ?? ''}|${foreground == null ? (color ?? c.ink).toARGB32() : 'h${foreground.color.toARGB32()}'}';
     final kept = _labels[key];
     if (kept != null) return kept;
     // a long session shows many names: start the keeping over rather than let it grow
     if (_labels.length > 600) _labels.clear();
-    return _labels[key] = _build(text, width, strong: strong, size: size, color: color, lines: lines, foreground: foreground);
+    return _labels[key] = _build(text, width, strong: strong, size: size, color: color, lines: lines, foreground: foreground, right: right);
   }
 
   TextPainter _build(
@@ -715,6 +728,7 @@ class _SankeyPainter extends CustomPainter {
     Color? color,
     int lines = 1,
     Paint? foreground,
+    bool right = false,
   }) {
     return TextPainter(
       text: TextSpan(
@@ -730,9 +744,10 @@ class _SankeyPainter extends CustomPainter {
         ),
       ),
       textDirection: TextDirection.ltr,
+      textAlign: right ? TextAlign.right : TextAlign.left,
       maxLines: lines,
       ellipsis: '…',
-    )..layout(maxWidth: width);
+    )..layout(minWidth: right ? width : 0, maxWidth: width);
   }
 
   /// a label with a halo of the card's colour, so it reads over the ribbons
@@ -753,8 +768,8 @@ class _SankeyPainter extends CustomPainter {
       ..strokeWidth = 3.2
       ..strokeJoin = StrokeJoin.round
       ..color = c.halo.withValues(alpha: .9 * alpha);
-    final back = _text(text, width, strong: strong, size: size, lines: lines, foreground: halo);
-    final front = _text(text, width, strong: strong, size: size, color: (color ?? c.ink).withValues(alpha: alpha), lines: lines);
+    final back = _text(text, width, strong: strong, size: size, lines: lines, foreground: halo, right: right);
+    final front = _text(text, width, strong: strong, size: size, color: (color ?? c.ink).withValues(alpha: alpha), lines: lines, right: right);
     final dx = (right ? at.dx - front.width : at.dx).roundToDouble();
     final dy = at.dy.roundToDouble();
     back.paint(canvas, Offset(dx, dy));
@@ -779,15 +794,6 @@ class _SankeyPainter extends CustomPainter {
     bool on(Set<SankeyFlow> flows) => !picking || flows.any(lit.contains);
 
     final day = brightness == Brightness.light;
-    // a faint line through every node, from the first column to the last: the rows read as rows on a narrow screen
-    final guide = Paint()
-      ..strokeWidth = 1
-      ..color = c.ink.withValues(alpha: day ? .12 : .14);
-    for (final n in model.columns.expand((col) => col)) {
-      final y = (n.y + math.min(n.h, 30) / 2).roundToDouble() + .5;
-      final x0 = xs[n.column];
-      canvas.drawLine(Offset(x0, y), Offset(xs[2] + SankeyGeometry.nodeW, y), guide);
-    }
     // the ribbons, thick ones under thin ones
     final links = [...model.links]..sort((a, b) => model.thickness(b).compareTo(model.thickness(a)));
     for (final l in links) {
@@ -795,8 +801,9 @@ class _SankeyPainter extends CustomPainter {
       final colour = _route(l.route);
       final bright = on(l.flows);
       // where traffic moves the ribbon is full colour and its brightness swells and ebbs; a still one is pale
-      final moving = _movingLink(l);
-      final breath = moving ? .8 + .2 * math.sin(pulse.value * 2 * math.pi) : .45;
+      final live = l.flows.any((f) => f.live);
+      final moving = live && _movingLink(l);
+      final breath = !live ? .3 : (moving ? .8 + .2 * math.sin(pulse.value * 2 * math.pi) : .8);
       final k = (bright ? 1.0 : .22) * breath;
       final xa = xs[l.from.column] + SankeyGeometry.nodeW;
       final xb = xs[l.to.column];
@@ -819,7 +826,7 @@ class _SankeyPainter extends CustomPainter {
           ..isAntiAlias = true
           ..style = PaintingStyle.stroke
           ..strokeWidth = .8
-          ..color = colour.withValues(alpha: (bright ? (moving ? .55 : .3) : .12)),
+          ..color = colour.withValues(alpha: (bright ? (live ? .55 : .14) : .1)),
       );
     }
 
@@ -827,7 +834,8 @@ class _SankeyPainter extends CustomPainter {
     for (final (ci, column) in model.columns.indexed) {
       for (final n in column) {
         final bright = on(n.flows);
-        final alpha = bright ? 1.0 : .3;
+        final live = n.flows.any((f) => f.live);
+        final alpha = (bright ? 1.0 : .3) * (live ? 1.0 : .4);
         final fill = _route(n.route);
         final top = n.y.roundToDouble();
         final bottom = math.max((n.y + n.h).roundToDouble(), top + 2);
@@ -861,7 +869,17 @@ class _SankeyPainter extends CustomPainter {
             ? profileBadgesNow[mark.profile!]
             : null;
         final nameW = width - (badge == null ? 0 : 15);
-        final nameH = _text(mark.text, nameW, strong: nameStrong, size: nameSize, lines: nameLines).height;
+        // a server: its flag alone; the direct way and a block: an icon
+        final flag = ci == 2 ? _flagOnly(mark.text) : null;
+        final icon = ci == 2 ? switch (n.route) {
+          ConnectionRoute.direct => Icons.trending_flat_rounded,
+          ConnectionRoute.block => Icons.block_rounded,
+          _ => null,
+        } : null;
+        final shownName = flag ?? mark.text;
+        final shownSize = flag != null ? 17.0 : nameSize;
+        final shownLines = flag != null || icon != null ? 1 : nameLines;
+        final nameH = icon != null ? 20.0 : _text(shownName, nameW, strong: nameStrong, size: shownSize, lines: shownLines, right: ci == 0).height;
         final blockH = nameH + (tall ? 13 * lines : 0);
         final labelTop = n.y + n.h / 2 - blockH / 2;
         if (labelTop < lastBottom[ci] + 1) continue;
@@ -878,7 +896,18 @@ class _SankeyPainter extends CustomPainter {
           final letter = _text(badge.letter, 12, strong: true, size: 8.5, color: Colors.white);
           letter.paint(canvas, Offset(cx - letter.width / 2, cy - letter.height / 2));
         }
-        _label(canvas, mark.text, Offset(x, labelTop), nameW, right: ci == 0, strong: nameStrong, size: nameSize, lines: nameLines, alpha: alpha);
+        if (icon != null) {
+          final glyph = TextPainter(
+            text: TextSpan(
+              text: String.fromCharCode(icon.codePoint),
+              style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 19, color: _route(n.route).withValues(alpha: alpha)),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          glyph.paint(canvas, Offset(x, labelTop));
+        } else {
+          _label(canvas, shownName, Offset(x, labelTop), nameW, right: ci == 0, strong: nameStrong, size: shownSize, lines: shownLines, alpha: alpha);
+        }
         if (tall) {
           _label(canvas, amount, Offset(x, labelTop + nameH), width, right: ci == 0, strong: false, size: 10.5, color: c.soft, alpha: alpha);
           if (lines == 2) {

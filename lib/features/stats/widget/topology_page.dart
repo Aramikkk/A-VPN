@@ -52,11 +52,10 @@ class TopologyPage extends HookConsumerWidget {
         if (g.total >= smallTraffic) g.key,
     };
     final items = open.where((c) => bigApps.contains(c.app)).toList();
-    // the open ones that moved something: a connection under 20 KB is background chatter, not a flow
+    // the ones that moved something, the closed ones too (dimmed on the picture): a connection under 20 KB is
+    // background chatter, not a flow
     final rates = state.rates;
-    final openNow = open
-        .where((c) => c.active && c.route != ConnectionRoute.block && c.total >= flowMinBytes)
-        .toList();
+    final openNow = open.where((c) => c.route != ConnectionRoute.block && c.total >= flowMinBytes).toList();
     String speedValue(double w) => '${formatBytes(w.round(), units)}/${t.avpn.perSecond}';
     double weight(SeenConnection c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble();
     String value(double w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}';
