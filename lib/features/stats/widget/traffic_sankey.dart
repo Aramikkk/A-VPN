@@ -261,10 +261,10 @@ class SankeyModel {
   /// Places the nodes in [height] (each column fills it, the room not taken by nodes shared between them as gaps)
   /// and the ribbons' ends along the nodes' sides, ordered by where they go so they cross as little as they can.
   /// Edges sit on whole pixels, so they stay crisp.
-  void layout(double height, {double minGap = 6}) {
+  void layout(double height, {double minGap = 6, bool spread = false}) {
     if (isEmpty) return;
     if (calm) {
-      _layoutEqual(height);
+      _layoutEqual(height, spread);
       return;
     }
     final gapBetween = calm ? 10.0 : minGap;
@@ -303,10 +303,22 @@ class SankeyModel {
 
   /// calm: every node the same size, from the top at a fixed distance, whatever it carries; the lines meet a node one
   /// after the other along it (a line's ends are its centres: thickness 0), in the order of where they go.
-  void _layoutEqual(double height) {
+  void _layoutEqual(double height, bool spread) {
     const gap = 10.0;
-    final nodeH = ((height - gap * (widest - 1)) / widest).clamp(18.0, 44.0);
-    for (final column in columns) {
+    for (final (ci, column) in columns.indexed) {
+      if (column.isEmpty) continue;
+      if (spread) {
+        // each column over the whole length, the first at one end and the last at the other, all of one size (the
+        // servers' wider: the lines of many routes meet them)
+        final cap = const [44.0, 56.0, 120.0][ci];
+        final size = math.min(cap, math.max(18.0, (height - gap * (column.length - 1)) / column.length));
+        for (final (i, n) in column.indexed) {
+          n.h = size;
+          n.y = column.length == 1 ? (height - size) / 2 : i * (height - size) / (column.length - 1);
+        }
+        continue;
+      }
+      final nodeH = ((height - gap * (widest - 1)) / widest).clamp(18.0, 44.0);
       var y = 0.0;
       for (final n in column) {
         n.y = y;
@@ -747,7 +759,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
   /// A tap on the top-down picture: a node (its icon, name or flag, or its bar), else the nearest line.
   void _tapTopDown(Offset at, Size size) {
     final rowY = _TopDownPainter.rows(size.height);
-    _model.layout(_TopDownPainter.laneWidth(size.width));
+    _model.layout(_TopDownPainter.laneWidth(size.width), spread: true);
     for (final (ci, column) in _model.columns.indexed) {
       for (final n in column) {
         final cx = _TopDownPainter.centreX(n);
@@ -794,7 +806,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final narrow = widget.topDown && !widget.chips && MediaQuery.sizeOf(context).width < 600;
+    final narrow = widget.topDown && !widget.chips;
     if (narrow != _narrow) {
       _narrow = narrow;
       _model = _build();
@@ -827,6 +839,8 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
       return LayoutBuilder(
         builder: (context, box) {
           final size = Size(box.maxWidth, height);
+          // a narrow screen (the folded phone): the apps as icons; a wide one: their names
+          final names = box.maxWidth >= 560;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: widget.onSelect == null ? null : (d) => _tapTopDown(d.localPosition, size),
@@ -844,6 +858,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
                   icons: _images,
                   lit: _lit,
                   halo: scheme.surfaceContainerLow,
+                  names: names,
                 ),
               ),
             ),
@@ -1702,6 +1717,7 @@ class _TopDownPainter extends CustomPainter {
     required this.icons,
     required this.lit,
     required this.halo,
+    required this.names,
   }) : super(repaint: pulse);
 
   final SankeyModel model;
@@ -1715,6 +1731,9 @@ class _TopDownPainter extends CustomPainter {
 
   /// the card's colour, drawn round the site names so the lines don't cut through them
   final Color halo;
+
+  /// the apps written by name (a wide screen) rather than as icons
+  final bool names;
 
   static const left = 22.0;
   static const right = 12.0;
@@ -1779,7 +1798,7 @@ class _TopDownPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rowY = rows(size.height);
-    model.layout(laneWidth(size.width));
+    model.layout(laneWidth(size.width), spread: true);
     final picking = lit.isNotEmpty;
     bool on(Set<SankeyFlow> flows) => !picking || flows.any(lit.contains);
 
@@ -1859,7 +1878,11 @@ class _TopDownPainter extends CustomPainter {
         );
         final label = n.label.replaceAll('\u200b', '');
         if (ci == 0) {
-          _icon(canvas, n, Offset(cx, rowY[0] - 22), alpha);
+          if (names) {
+            _appName(canvas, label, cx, rowY[0] - 8, alpha, laneWidth(size.width) / column.length - 4, size.width);
+          } else {
+            _icon(canvas, n, Offset(cx, rowY[0] - 22), alpha);
+          }
         } else if (ci == 1) {
           // the site's name written upright above its bar
           final name = shortSite(n.label);
@@ -1932,6 +1955,38 @@ class _TopDownPainter extends CustomPainter {
         }
       }
     }
+  }
+
+  /// an app's name over its bar (up to two lines, centred), with the halo
+  void _appName(Canvas canvas, String name, double cx, double bottom, double alpha, double width, double canvasWidth) {
+    final w = math.max(width, 56.0);
+    TextPainter make(TextStyle style) => TextPainter(
+      text: TextSpan(text: name, style: style),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      ellipsis: '…',
+    )..layout(minWidth: w, maxWidth: w);
+    final back = make(
+      TextStyle(
+        fontFamily: family,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        height: 1.1,
+        foreground: Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4
+          ..strokeJoin = StrokeJoin.round
+          ..color = halo.withValues(alpha: .92),
+      ),
+    );
+    final front = make(
+      TextStyle(fontFamily: family, fontSize: 12, fontWeight: FontWeight.w800, height: 1.1, color: ink.withValues(alpha: math.max(alpha, .5))),
+    );
+    // kept inside the picture: a name at either end doesn't run out of it
+    final at = Offset((cx - w / 2).clamp(0.0, math.max(0.0, canvasWidth - w)), bottom - front.height);
+    back.paint(canvas, at);
+    front.paint(canvas, at);
   }
 
   /// an app's icon in a disc, or its first letter where the icon isn't known
