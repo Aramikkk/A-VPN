@@ -29,7 +29,11 @@ class SankeyFlow {
     this.speed = 0,
     this.id = '',
     this.live = true,
+    this.closedAt,
   });
+
+  /// when its connection closed (null: open, or not known)
+  final DateTime? closedAt;
 
   /// open now (a closed one is still drawn, but dimmed)
   final bool live;
@@ -50,6 +54,7 @@ class SankeyFlow {
     speed: 0,
     id: id,
     live: false,
+    closedAt: closedAt ?? DateTime.now(),
   );
 
   /// the middle column's name (the site, as a domain); empty: the rule's
@@ -404,6 +409,7 @@ class TrafficSankey extends ConsumerWidget {
           speed: speed?.call(c) ?? 0,
           id: c.id,
           live: c.active,
+          closedAt: c.ended,
         ),
     ];
     return SankeyDiagram(
@@ -517,18 +523,41 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
   /// how long a route stays after its connection closed (calm)
   static const _hold = Duration(seconds: 8);
 
+  /// how long a closed connection stays on the picture
+  static const _closedKeep = Duration(minutes: 10);
+
   SankeyModel _build() {
     var flows = widget.flows;
     if (widget.calm) {
       final now = DateTime.now();
+      // a closed one stays ten minutes (one whose closing isn't known is an old one: gone)
+      flows = [
+        for (final f in flows)
+          if (f.live || (f.closedAt != null && now.difference(f.closedAt!) <= _closedKeep)) f,
+      ];
       final present = <String>{};
-      for (final (i, f) in widget.flows.indexed) {
+      for (final (i, f) in flows.indexed) {
         final key = f.id.isEmpty ? '#$i' : f.id;
         present.add(key);
         _held[key] = (flow: f, seen: now);
       }
       _held.removeWhere((key, v) => !present.contains(key) && now.difference(v.seen) > _hold);
       flows = [for (final e in _held.entries) present.contains(e.key) ? e.value.flow : e.value.flow.held()];
+      // as many routes as the height holds: the open ones first, then the closed by how lately they closed, so the
+      // oldest give way to newer ones
+      final room = (((widget.height ?? 500) - SankeyGeometry.headerH) / 30).floor().clamp(6, 40);
+      final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+      flows.sort((a, b) {
+        if (a.live != b.live) return a.live ? -1 : 1;
+        return (b.closedAt ?? epoch).compareTo(a.closedAt ?? epoch);
+      });
+      final routes = <String>{};
+      flows = [
+        for (final f in flows)
+          if (routes.contains('${f.app}|${f.middle}|${f.route.index}|${f.out}') ||
+              (routes.length < room && routes.add('${f.app}|${f.middle}|${f.route.index}|${f.out}')))
+            f,
+      ];
     }
     // chips: as many rows as the height holds, the last of them "other"
     final rows = widget.chips ? (((widget.height ?? 500) - _ChipsLayout.headerH) / _ChipsLayout.pitch).floor() : 9;

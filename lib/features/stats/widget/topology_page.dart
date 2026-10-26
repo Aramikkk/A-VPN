@@ -6,6 +6,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
@@ -162,6 +163,7 @@ class TopologyPage extends HookConsumerWidget {
                         Expanded(
                           child: _Section(
                           expand: true,
+                          solid: true,
                           title: t.avpn.topoSankey,
                           trailing: _FlowLegend(live: t.avpn.flowLive, closed: t.avpn.flowClosed),
                           child: openNow.isEmpty
@@ -352,10 +354,13 @@ class TopologyDayTotal extends ConsumerWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child, this.hint, this.expand = false, this.trailing});
+  const _Section({required this.title, required this.child, this.hint, this.expand = false, this.trailing, this.solid = false});
+
+  /// a pane with only a little see-through left in it, instead of the frosted glass
 
   /// the child takes the height the section is given (the section must be given one)
   final bool expand;
+  final bool solid;
 
   /// at the right end of the title's line
   final Widget? trailing;
@@ -388,6 +393,18 @@ class _Section extends StatelessWidget {
       ],
     );
     // the same frosted glass as the home screen's blocks
+    if (solid) {
+      final dark = theme.brightness == Brightness.dark;
+      return Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          color: ContrastColours.of(context).pane(dark).withValues(alpha: dark ? .94 : .93),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
+        ),
+        child: content,
+      );
+    }
     return ContrastFrost(radius: 18, padding: const EdgeInsets.fromLTRB(14, 12, 14, 14), solo: true, child: content);
   }
 }

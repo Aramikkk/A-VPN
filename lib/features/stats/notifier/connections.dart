@@ -38,10 +38,14 @@ class SeenConnection {
     required this.active,
     this.count = 1,
     this.session,
+    this.ended,
   });
 
   final String id;
   final int? session;
+
+  /// when it closed, as the app saw it (null: open, or closed before this run of the app)
+  final DateTime? ended;
 
   /// the app's package (Android) or program path (Windows); empty when the core couldn't tell
   final String app;
@@ -87,6 +91,7 @@ class SeenConnection {
     down: down,
     active: false,
     count: count,
+    ended: DateTime.now(),
   );
 
   /// [other] added to this one, kept under [id]
