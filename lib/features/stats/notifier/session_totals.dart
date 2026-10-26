@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -46,6 +47,10 @@ class SessionTotalsNotifier extends Notifier<SessionTotals> {
   }
 
   DateTime? _session;
+  int _stops = manualStopCount;
+
+  /// a reading of this run of the app has been taken (the totals restored from the disk are not one)
+  bool _live = false;
   SessionTotals _carried = (up: 0, down: 0, vpnUp: 0, vpnDown: 0);
   SessionTotals _last = (up: 0, down: 0, vpnUp: 0, vpnDown: 0);
   SessionTotals _total = (up: 0, down: 0, vpnUp: null, vpnDown: null);
@@ -82,9 +87,22 @@ class SessionTotalsNotifier extends Notifier<SessionTotals> {
       vpnDown: stats.vpnDownlinkTotal,
     );
     if (session != _session) {
-      // A manual VPN restart starts a new session.
-      _session = session;
-      _carried = (up: 0, down: 0, vpnUp: 0, vpnDown: 0);
+      if (_session != null && _live && manualStopCount == _stops) {
+        // The core started again without a manual stop (auto-pause, Wi-Fi to LTE): the same session, what it had
+        // counted so far stays and the new run's counters add to it.
+        _carried = (
+          up: _carried.up + _last.up,
+          down: _carried.down + _last.down,
+          vpnUp: _last.vpnUp == null ? _carried.vpnUp : (_carried.vpnUp ?? 0) + _last.vpnUp!,
+          vpnDown: _last.vpnDown == null ? _carried.vpnDown : (_carried.vpnDown ?? 0) + _last.vpnDown!,
+        );
+        _session = session;
+      } else {
+        // A manual stop and start is a new session.
+        _session = session;
+        _carried = (up: 0, down: 0, vpnUp: 0, vpnDown: 0);
+      }
+      _stops = manualStopCount;
     } else {
       // Outbound counters can reset on their own when servers are replaced.
       int carry(int? current, int? previous, int? total) =>
@@ -97,6 +115,7 @@ class SessionTotalsNotifier extends Notifier<SessionTotals> {
       );
     }
     _last = now;
+    _live = true;
     _total = (
       up: _carried.up + now.up,
       down: _carried.down + now.down,

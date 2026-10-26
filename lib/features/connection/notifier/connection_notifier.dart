@@ -13,6 +13,7 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/model/startup_connection.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hiddify/utils/windows_elevation.dart';
@@ -141,6 +142,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
           // default:
           await haptic.mediumImpact();
           await ref.read(Preferences.startedByUser.notifier).update(false);
+          manualStopCount++;
           await _disconnect();
         default:
           loggy.warning("switching status, debounce");

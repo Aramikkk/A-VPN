@@ -7,6 +7,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 
@@ -87,6 +88,7 @@ void main() {
     final after = SessionTotalsNotifier()..restore(before.snapshot());
     expect(after.add(SystemInfo()).down, 220);
     expect(after.add(reading(15, 30)).down, 230);
+    manualStopCount++; // switched off by hand, then on: a new session
     expect(after.add(reading(1, 2, start: 2000)).down, 2);
   });
   test('a reload within the session keeps what was counted before it', () {
@@ -99,11 +101,21 @@ void main() {
     expect(after.vpnDown, 90);
   });
 
-  test('a new session starts from zero', () {
+  test('a new session after the VPN was switched off by hand starts from zero', () {
     final totals = SessionTotalsNotifier();
     totals.add(reading(20, 300));
+    manualStopCount++;
     final next = totals.add(reading(5, 40, start: 2000));
     expect(next.down, 40);
+  });
+
+  test('the core starting again without a manual stop (auto-pause, Wi-Fi to LTE) is the same session', () {
+    final totals = SessionTotalsNotifier();
+    totals.add(reading(20, 300, vpn: 80));
+    final next = totals.add(reading(5, 40, vpn: 10, start: 2000));
+    expect(next.down, 340);
+    expect(next.up, 25);
+    expect(next.vpnDown, 90);
   });
 
   test('an empty reading during a network handoff keeps the session totals', () {
