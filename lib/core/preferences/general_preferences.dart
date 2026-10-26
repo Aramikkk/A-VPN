@@ -283,6 +283,11 @@ abstract class Preferences {
   /// service's watchers) and the polls out of sight go far apart; they wake with the screen.
   static final nightMode = PreferencesNotifier.create<bool, bool>("night_mode", true);
 
+  /// The super light mode: only the home screen (the servers, the statistics block above and the connect panel
+  /// below, refreshed every ten seconds); no graphs, topology, site delays or per-app servers, the background
+  /// checks cut to a ping of the servers every half hour. The button is on the home screen.
+  static final superLight = PreferencesNotifier.create<bool, bool>("super_light", false);
+
   /// The apps of Settings → Sites (the ones with a server of their own) marked for the home screen's delay block.
   /// "*" (until the user touches a switch): the six services' apps, as the screen always had.
   static final homeApps = PreferencesNotifier.create<List<String>, List<String>>("home_apps", <String>['*']);

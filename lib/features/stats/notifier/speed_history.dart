@@ -1,3 +1,4 @@
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -11,7 +12,7 @@ class SpeedHistory extends Notifier<List<({int down, int up})>> {
   List<({int down, int up})> build() {
     ref.listen(statsNotifierProvider, (_, next) {
       final stats = next.valueOrNull;
-      if (stats == null) return;
+      if (stats == null || ref.read(superLightProvider)) return;
       final sample = (down: stats.downlink.toInt(), up: stats.uplink.toInt());
       state = [...state.skip(state.length >= length ? state.length - length + 1 : 0), sample];
     });

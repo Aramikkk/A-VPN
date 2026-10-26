@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -603,6 +604,9 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
     }
   }
 
+  /// the pulse as the top-down picture reads it: at most about thirty repaints a second
+  late final _slowPulse = _SlowPulse(_pulse, const Duration(milliseconds: 33));
+
   /// 0..1 round and round: a light runs along the ribbons where traffic moves, and they breathe (stopped while
   /// nothing moves, so an idle diagram costs nothing)
   late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
@@ -618,6 +622,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
 
   @override
   void dispose() {
+    _slowPulse.dispose();
     _pulse.dispose();
     super.dispose();
   }
@@ -855,7 +860,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
                   ink: scheme.onSurface,
                   error: scheme.error,
                   family: theme.textTheme.labelSmall?.fontFamily,
-                  pulse: _pulse,
+                  pulse: _slowPulse,
                   icons: _images,
                   lit: _lit,
                   halo: scheme.surfaceContainerLow,
@@ -1726,12 +1731,16 @@ class _TopDownPainter extends CustomPainter {
   final Color ink;
   final Color error;
   final String? family;
-  final Animation<double> pulse;
+  final ValueListenable<double> pulse;
   final Map<String, ui.Image> icons;
   final Set<SankeyFlow> lit;
 
   /// the card's colour, drawn round the site names so the lines don't cut through them
   final Color halo;
+
+  /// the lines as paths, built once for a size: a repaint only draws them (the dots run along the kept metrics)
+  List<({SankeyLink link, bool live, Path path, ui.PathMetric metric, Path head, Color colour})>? _geo;
+  Size? _geoSize;
 
   /// the apps written by name (a wide screen) rather than as icons
   final bool names;
@@ -1781,6 +1790,33 @@ class _TopDownPainter extends CustomPainter {
     )..layout(maxWidth: width);
   }
 
+  /// The layout and the lines' paths for [size]: done once, not at every repaint.
+  void _prepare(Size size, List<double> rowY) {
+    model.layout(laneWidth(size.width), spread: true);
+    final links = [...model.links]
+      ..sort((a, b) => (a.flows.any((f) => f.live) ? 1 : 0).compareTo(b.flows.any((f) => f.live) ? 1 : 0));
+    _geo = [
+      for (final l in links)
+        () {
+          final pts = curve(model, l, rowY);
+          final path = Path()
+            ..moveTo(pts[0].dx, pts[0].dy)
+            ..cubicTo(pts[1].dx, pts[1].dy, pts[2].dx, pts[2].dy, pts[3].dx, pts[3].dy);
+          final metric = path.computeMetrics().first;
+          final p1 = metric.getTangentForOffset(metric.length * .62)!.position;
+          final p2 = metric.getTangentForOffset(metric.length * .62 + 3)!.position;
+          final ang = math.atan2(p2.dy - p1.dy, p2.dx - p1.dx);
+          final head = Path()
+            ..moveTo(p2.dx + 6 * math.cos(ang), p2.dy + 6 * math.sin(ang))
+            ..lineTo(p2.dx + 6 * math.cos(ang + 2.5), p2.dy + 6 * math.sin(ang + 2.5))
+            ..lineTo(p2.dx + 6 * math.cos(ang - 2.5), p2.dy + 6 * math.sin(ang - 2.5))
+            ..close();
+          return (link: l, live: l.flows.any((f) => f.live), path: path, metric: metric, head: head, colour: colourOf(l.route));
+        }(),
+    ];
+    _geoSize = size;
+  }
+
   /// a site's name short: no "www."
   static String shortSite(String name) => name.startsWith('www.') ? name.substring(4) : name;
 
@@ -1799,7 +1835,7 @@ class _TopDownPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rowY = rows(size.height);
-    model.layout(laneWidth(size.width), spread: true);
+    if (_geoSize != size || _geo == null) _prepare(size, rowY);
     final picking = lit.isNotEmpty;
     bool on(Set<SankeyFlow> flows) => !picking || flows.any(lit.contains);
 
@@ -1810,18 +1846,14 @@ class _TopDownPainter extends CustomPainter {
       p.paint(canvas, Offset(size.width - right - p.width, rowY[i] + 8));
     }
 
-    final links = [...model.links]..sort((a, b) => (a.flows.any((f) => f.live) ? 1 : 0).compareTo(b.flows.any((f) => f.live) ? 1 : 0));
-    for (final l in links) {
-      final live = l.flows.any((f) => f.live);
+    for (final g in _geo!) {
+      final l = g.link;
+      final live = g.live;
       final bright = on(l.flows);
-      final colour = colourOf(l.route);
-      final pts = curve(model, l, rowY);
-      final path = Path()
-        ..moveTo(pts[0].dx, pts[0].dy)
-        ..cubicTo(pts[1].dx, pts[1].dy, pts[2].dx, pts[2].dy, pts[3].dx, pts[3].dy);
+      final colour = g.colour;
       final k = bright ? 1.0 : .25;
       canvas.drawPath(
-        path,
+        g.path,
         Paint()
           ..isAntiAlias = true
           ..style = PaintingStyle.stroke
@@ -1829,26 +1861,16 @@ class _TopDownPainter extends CustomPainter {
           ..strokeWidth = live ? 2.6 : 1.5
           ..color = colour.withValues(alpha: (live ? 1 : .32) * k),
       );
-      final metric = path.computeMetrics().first;
       // dots running down the ones in use
       if (live && bright && _moving(l)) {
+        final dot = Paint()..color = colour;
         for (var d = 0; d < 3; d++) {
-          final at = ((pulse.value + d / 3) % 1.0) * metric.length;
-          canvas.drawCircle(metric.getTangentForOffset(at)!.position, 3, Paint()..color = colour);
+          final at = ((pulse.value + d / 3) % 1.0) * g.metric.length;
+          canvas.drawCircle(g.metric.getTangentForOffset(at)!.position, 3, dot);
         }
       }
       // an arrowhead pointing down the way
-      final p1 = metric.getTangentForOffset(metric.length * .62)!.position;
-      final p2 = metric.getTangentForOffset(metric.length * .62 + 3)!.position;
-      final ang = math.atan2(p2.dy - p1.dy, p2.dx - p1.dx);
-      canvas.drawPath(
-        Path()
-          ..moveTo(p2.dx + 6 * math.cos(ang), p2.dy + 6 * math.sin(ang))
-          ..lineTo(p2.dx + 6 * math.cos(ang + 2.5), p2.dy + 6 * math.sin(ang + 2.5))
-          ..lineTo(p2.dx + 6 * math.cos(ang - 2.5), p2.dy + 6 * math.sin(ang - 2.5))
-          ..close(),
-        Paint()..color = colour.withValues(alpha: (live ? 1 : .45) * k),
-      );
+      canvas.drawPath(g.head, Paint()..color = colour.withValues(alpha: (live ? 1 : .45) * k));
     }
 
     for (final (ci, column) in model.columns.indexed) {
@@ -2023,12 +2045,51 @@ class _TopDownPainter extends CustomPainter {
       canvas.restore();
       return;
     }
-    final hue = ((n.label.isEmpty ? 0 : n.label.codeUnitAt(0)) * 47) % 360;
-    canvas.drawCircle(centre, r, Paint()..color = HSLColor.fromAHSL(alpha, hue.toDouble(), .5, .42).toColor());
-    final letter = _text(n.label.isEmpty ? '?' : n.label.substring(0, 1).toUpperCase(), 12, Colors.white.withValues(alpha: alpha), bold: true, width: 20);
-    letter.paint(canvas, Offset(centre.dx - letter.width / 2, centre.dy - letter.height / 2));
+    // no icon known (a system service, mostly): a neutral disc with the robot, not a letter
+    canvas.drawCircle(centre, r, Paint()..color = const Color(0xFF59606B).withValues(alpha: alpha));
+    final robot = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.android_rounded.codePoint),
+        style: TextStyle(
+          fontFamily: Icons.android_rounded.fontFamily,
+          package: Icons.android_rounded.fontPackage,
+          fontSize: 16,
+          color: Colors.white.withValues(alpha: .85 * alpha),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    robot.paint(canvas, Offset(centre.dx - robot.width / 2, centre.dy - robot.height / 2));
   }
 
   @override
   bool shouldRepaint(_TopDownPainter old) => true;
+}
+
+/// An animation's value, passed on at most once in [gap]: what repaints with it repaints that seldom.
+class _SlowPulse extends ChangeNotifier implements ValueListenable<double> {
+  _SlowPulse(this._source, this.gap) {
+    _source.addListener(_tick);
+  }
+
+  final Animation<double> _source;
+  final Duration gap;
+  final _clock = Stopwatch()..start();
+  int _last = -1000;
+
+  void _tick() {
+    final now = _clock.elapsedMilliseconds;
+    if (now - _last < gap.inMilliseconds) return;
+    _last = now;
+    notifyListeners();
+  }
+
+  @override
+  double get value => _source.value;
+
+  @override
+  void dispose() {
+    _source.removeListener(_tick);
+    super.dispose();
+  }
 }

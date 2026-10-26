@@ -165,7 +165,7 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     });
     // the light background work: the safety net looks three times less often
     final safetyNet = Timer.periodic(
-      Duration(seconds: ref.read(lightBackgroundProvider) || ref.read(nightModeProvider) ? 45 : 15),
+      Duration(seconds: ref.read(superLightProvider) ? 120 : (ref.read(lightBackgroundProvider) || ref.read(nightModeProvider) ? 45 : 15)),
       (_) => refilterIfNetworkChanged(),
     );
     // back on screen after the night mode let the checks sleep: the servers are pinged again at once (at most every

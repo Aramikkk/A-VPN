@@ -41,6 +41,8 @@ class _StyledHome extends HookConsumerWidget {
         if (item.isVisible && item.tag != 'balance' && item.tag != picked?.tag) item,
     ];
     final serverMode = ref.watch(ConfigOptions.homeNetwork);
+    // the super light mode: the servers in a list of their own where the delays were, and nothing else
+    final superLight = ref.watch(superLightProvider);
     // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one
     // (about 830) keeps everything tight
     final roomy = MediaQuery.sizeOf(context).height >= 900;
@@ -77,6 +79,7 @@ class _StyledHome extends HookConsumerWidget {
     Widget share() => spread ? const Spacer() : const SizedBox.shrink();
     if (theme.contrastLayout) {
       return _ContrastHome(
+        superLight: superLight,
         header: header,
         // Windows without the administrator's rights: the system proxy instead of the VPN mode chosen, and a way to
         // the full one
@@ -146,8 +149,18 @@ class _StyledHome extends HookConsumerWidget {
                 ],
               ),
         // Contrast: the delay to the sites the user uses most, where the traffic was (that is in Topology)
-        traffic: traffic && hasList ? _SiteTiles(visible: visible) : null,
-        toggles: _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
+        traffic: superLight
+            ? (hasList
+                  ? _StyledServerList(
+                      servers: servers,
+                      selectedTag: group?.selected,
+                      autoNow: autoNow,
+                      activeOutbound: activeOutbound,
+                      testing: testing,
+                    )
+                  : null)
+            : (traffic && hasList ? _SiteTiles(visible: visible) : null),
+        toggles: superLight ? null : _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
       );
     }
     return LayoutBuilder(
@@ -1639,6 +1652,7 @@ class _ContrastHome extends StatelessWidget {
     required this.traffic,
     required this.toggles,
     this.notice,
+    this.superLight = false,
   });
 
   /// "Серверы · Sigma · 23 дн. · Обновить", over the blocks
@@ -1649,15 +1663,20 @@ class _ContrastHome extends StatelessWidget {
   final Widget status;
   final Widget servers;
   final Widget? traffic;
-  final Widget toggles;
+  final Widget? toggles;
+
+  /// the super light mode: no swipes to the pages that are off
+  final bool superLight;
 
   @override
   Widget build(BuildContext context) {
     return _LongSwipe(
       // down: the session's traffic comes down from the top (Settings are on the cog); up: the day's connections
       // come up from the panel
-      onDown: () => context.goNamed('traffic'),
-      onUp: () => context.goNamed('connections'),
+      onDown: () => superLight ? context.goNamed('settings') : context.goNamed('traffic'),
+      onUp: () {
+        if (!superLight) context.goNamed('connections');
+      },
       child: LayoutBuilder(
         // a short screen: no room for the traffic block (it's on the Statistics tab)
         builder: (context, box) {
@@ -1672,11 +1691,11 @@ class _ContrastHome extends StatelessWidget {
                 if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(14)],
                 _ContrastBlock(child: status),
                 const Gap(14),
-                _ContrastBlock(child: servers),
-                const Gap(14),
+                // the super light mode: the servers' list below holds the one in use, so not twice
+                if (!superLight) ...[_ContrastBlock(child: servers), const Gap(14)],
                 if (traffic != null) Expanded(child: _ContrastBlock(expand: true, child: traffic!)) else const Spacer(),
                 // a short screen (the phone turned): the toggles are under the connect control at the side
-                if (!ContrastShellDock.sideways(context)) ...[const Gap(14), _ContrastBlock(child: toggles)],
+                if (toggles != null && !ContrastShellDock.sideways(context)) ...[const Gap(14), _ContrastBlock(child: toggles!)],
               ],
             ),
           );

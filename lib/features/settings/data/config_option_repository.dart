@@ -2,6 +2,7 @@ import 'package:dartx/dartx.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/core/model/region.dart';
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/core/utils/json_converters.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
@@ -609,7 +610,7 @@ abstract class ConfigOptions {
       balancerToleranceWifi: ref.watch(balancerToleranceWifi),
       balancerToleranceMobile: ref.watch(balancerToleranceMobile),
       balancerKeepConnections: true,
-      siteGroups: ref.watch(siteGroups),
+      siteGroups: ref.watch(siteGroups) && !ref.watch(superLightProvider),
       siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
       adBlock: ref.watch(adBlock),
       adBlockLevel: ref.watch(adBlockLevel),
@@ -641,7 +642,7 @@ abstract class ConfigOptions {
       mtu: ref.watch(mtu),
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: pingUrl(ref.watch(connectionTestUrl), ref.watch(pingHttps)),
-      urlTestInterval: ref.watch(urlTestInterval),
+      urlTestInterval: ref.watch(superLightProvider) ? const Duration(minutes: 30) : ref.watch(urlTestInterval),
       urlTestTimeout: ref.watch(urlTestTimeoutWifi),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),

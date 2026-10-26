@@ -11,6 +11,7 @@ import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
@@ -194,7 +195,10 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                     ],
                   ),
             // Glass: the menu floats under the page as a pane of glass, the backdrop round it
-            bottomNavigationBar: isMobileBreakpoint && glass != null
+            // the super light mode: only the home screen, so no menu
+            bottomNavigationBar: ref.watch(superLightProvider)
+                ? null
+                : isMobileBreakpoint && glass != null
                 ? FocusScope(
                     node: navScopeNode,
                     child: SafeArea(

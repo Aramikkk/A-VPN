@@ -5,6 +5,8 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
@@ -231,6 +233,7 @@ void main() {
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
           if (Platform.environment['LIGHT'] == '1') 'light_look': true,
+          if (Platform.environment['SUPERLIGHT'] == '1') 'super_light': true,
           if (Platform.environment['BADGES'] == '1') 'extra_profiles': 'chill;third',
         });
         // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
@@ -294,6 +297,8 @@ void main() {
               connectionsProvider.overrideWith(_Connections.new),
               connectionQualityProvider.overrideWith(_Quality.new),
               siteLatencyProvider.overrideWith(_Sites.new),
+              // SUPERLIGHT=1: the super light mode
+              if (Platform.environment['SUPERLIGHT'] == '1') superLightProvider.overrideWithValue(true),
               // HOMEAPPS=pkg,pkg: these apps of Settings -> Sites marked for the home screen's delay block (the phone's way)
               if ((Platform.environment['HOMEAPPS'] ?? '').isNotEmpty)
                 homeSitesProvider.overrideWithValue(
@@ -340,6 +345,17 @@ void main() {
                         appBar: AppBar(
                           title: const Text('A-VPN'),
                           backgroundColor: contrast ? Colors.transparent : null,
+                          actions: [
+                            // the super light switch, where "add a profile" was
+                            IconButton(
+                              onPressed: () {},
+                              icon: Icon(
+                                Platform.environment['SUPERLIGHT'] == '1' ? Icons.eco_rounded : Icons.eco_outlined,
+                                color: Platform.environment['SUPERLIGHT'] == '1' ? const Color(0xFFD7F26B) : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                         ),
                         body: unfolded && contrast
                             // Contrast unfolded: the folded column on the left, the connections on the right, the
@@ -388,7 +404,7 @@ void main() {
                                 ],
                               )
                             : const AraHomeBody(),
-                        bottomNavigationBar: pc
+                        bottomNavigationBar: pc || Platform.environment['SUPERLIGHT'] == '1'
                             ? null
                             : contrast
                             ? NavigationBar(
@@ -451,13 +467,18 @@ void main() {
           }
         }
         // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
-        if (connected && contrast) {
+        if (connected && contrast && Platform.environment['SUPERLIGHT'] != '1') {
           final sites = find.byKey(const Key('contrast-sites'));
           expect(sites, findsOneWidget);
           expect(find.byKey(const Key('contrast-traffic')), findsNothing);
           for (final name in ['Instagram', 'WhatsApp', 'Telegram', 'ChatGPT', 'YouTube', 'Google Диск']) {
             expect(find.descendant(of: sites, matching: find.text(name)), findsOneWidget);
           }
+        }
+        // the super light mode: no delay tiles, no toggles
+        if (connected && contrast && Platform.environment['SUPERLIGHT'] == '1') {
+          expect(find.byKey(const Key('contrast-sites')), findsNothing);
+          expect(find.text('Раздача'), findsNothing);
         }
         // TAP=<text>: a tap on it first, to look at what it opens
         final tap = Platform.environment['TAP'];

@@ -8,7 +8,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// The light look: no see-through blocks and no pictures behind them (a flat colour), no gliding of the arcs and
 /// the water, no sliding of the pages, a smaller cache of pictures. The colours stay.
 final lightLookProvider = Provider<bool>((ref) {
-  final on = ref.watch(sharedPreferencesProvider).hasValue && ref.watch(Preferences.lightLook);
+  final on = ref.watch(sharedPreferencesProvider).hasValue &&
+      (ref.watch(Preferences.lightLook) || ref.watch(Preferences.superLight));
   lightLookNow = on;
   // the pictures the app keeps decoded: fewer in the light look
   PaintingBinding.instance.imageCache
@@ -20,7 +21,14 @@ final lightLookProvider = Provider<bool>((ref) {
 /// The light background work: what runs while the app is out of sight (and the slow polls in it) slows down and
 /// stops where nobody looks; the look is the same.
 final lightBackgroundProvider = Provider<bool>(
-  (ref) => ref.watch(sharedPreferencesProvider).hasValue && ref.watch(Preferences.lightBackground),
+  (ref) =>
+      ref.watch(sharedPreferencesProvider).hasValue &&
+      (ref.watch(Preferences.lightBackground) || ref.watch(Preferences.superLight)),
+);
+
+/// The super light mode (see [Preferences.superLight]).
+final superLightProvider = Provider<bool>(
+  (ref) => ref.watch(sharedPreferencesProvider).hasValue && ref.watch(Preferences.superLight),
 );
 
 /// The night mode: the checks sleep while the screen is locked (on by default, until the settings are read too).

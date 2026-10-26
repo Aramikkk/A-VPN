@@ -362,13 +362,15 @@ class Connections extends Notifier<ConnectionsState> {
     final saving = ref.watch(lightBackgroundProvider);
     // the night mode: out of sight the list is asked for six times less often (every three minutes)
     final night = ref.watch(nightModeProvider);
+    // the super light mode: the list isn't asked for at all (the topology and the connections are off)
+    final superLight = ref.watch(superLightProvider);
     _rollDay();
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
     final enabled = ref.watch(ConfigOptions.enableClashApi);
     final port = ref.watch(ConfigOptions.clashApiPort);
     final secret = ref.watch(ConfigOptions.clashApiSecret);
     // not connected (or only for a moment while the app comes back): nothing to ask, the list stays as it is
-    if (!connected || !enabled) {
+    if (!connected || !enabled || superLight) {
       return ConnectionsState(
         items: _sorted(),
         sessionItems: _sessionItems(),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
@@ -23,13 +24,30 @@ class AutoPing {
       if (next.valueOrNull is Connected) _check();
     });
     _check();
+    // the super light mode: the one check that is left, every half hour (the app opened or not)
+    _timer = Timer.periodic(every, (_) => _periodic());
   }
 
   static const every = Duration(minutes: 30);
 
   final Ref _ref;
   late final AppLifecycleListener _lifecycle;
+  Timer? _timer;
   DateTime? _last;
+
+  void _periodic() {
+    if (!_ref.read(superLightProvider)) return;
+    if (_ref.read(connectionNotifierProvider).valueOrNull is! Connected) return;
+    _last = DateTime.now();
+    unawaited(_ref.read(Preferences.lastAutoPing.notifier).update(_last!.millisecondsSinceEpoch));
+    unawaited(() async {
+      try {
+        await _ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select");
+      } catch (_) {
+        // the list isn't there: the next half hour tries again
+      }
+    }());
+  }
 
   void _check() {
     if (!_ref.read(Preferences.autoPingOnOpen)) return;
@@ -50,5 +68,8 @@ class AutoPing {
     });
   }
 
-  void dispose() => _lifecycle.dispose();
+  void dispose() {
+    _timer?.cancel();
+    _lifecycle.dispose();
+  }
 }

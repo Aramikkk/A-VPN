@@ -6,6 +6,8 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
@@ -21,6 +23,7 @@ class HomePage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final t = ref.watch(translationsProvider).requireValue;
+    final superLight = ref.watch(superLightProvider);
 
     // Contrast: the app bar on the upper zone's light, no band of its own; the settings by the "+"
     final contrast = theme.contrastLayout;
@@ -69,13 +72,17 @@ class HomePage extends HookConsumerWidget {
           //     material: (context, platform) => MaterialIconButtonData(
           //           tooltip: t.profile.add.buttonText,
           //         )),
+          // the super light mode's switch (adding a profile is on the empty home screen and in the profiles list)
           Semantics(
-            key: const ValueKey("profile_add_button"),
-            label: t.pages.profiles.add,
+            key: const ValueKey("super_light_button"),
+            label: t.avpn.superLight,
             child: plate(
               IconButton(
-                icon: Icon(Icons.add_rounded, color: theme.colorScheme.primary),
-                onPressed: () => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
+                tooltip: superLight ? t.avpn.superLightOn : t.avpn.superLightHint,
+                isSelected: superLight,
+                icon: Icon(Icons.eco_outlined, color: theme.colorScheme.primary),
+                selectedIcon: Icon(Icons.eco_rounded, color: theme.araAccent),
+                onPressed: () => ref.read(Preferences.superLight.notifier).update(!superLight),
               ),
             ),
           ),

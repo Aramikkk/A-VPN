@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:grpc/grpc.dart';
@@ -281,7 +282,9 @@ class HiddifyCoreService with InfraLogger {
         balancerTolerance: ref.read(
           current == NetworkKind.mobile ? ConfigOptions.balancerToleranceMobile : ConfigOptions.balancerToleranceWifi,
         ),
-        siteGroups: ref.read(current == NetworkKind.mobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups),
+        siteGroups:
+            !ref.read(superLightProvider) &&
+            ref.read(current == NetworkKind.mobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups),
         siteGroupsTolerance: ref.read(
           current == NetworkKind.mobile ? ConfigOptions.siteGroupsToleranceMobile : ConfigOptions.siteGroupsTolerance,
         ),

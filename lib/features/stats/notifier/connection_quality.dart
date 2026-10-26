@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
+import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -83,6 +84,9 @@ class ConnectionQuality extends Notifier<List<int?>> {
   /// three minutes of samples (one every three seconds)
   static const length = 60;
   static const interval = Duration(seconds: 3);
+
+  /// how far apart the probes are now (ten seconds in the super light mode)
+  Duration _every = interval;
   static const timeout = Duration(seconds: 2);
   static const _minutesKept = 2 * 24 * 60;
 
@@ -158,6 +162,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
       _sawConnecting = false;
       _lastUp = now;
     }
+    _every = ref.watch(superLightProvider) ? const Duration(seconds: 10) : interval;
     final port = ref.watch(ConfigOptions.mixedPort);
     final url = Uri.parse(pingUrl(ref.watch(ConfigOptions.connectionTestUrl), ref.watch(ConfigOptions.pingHttps)));
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
@@ -170,7 +175,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     Timer? timer;
     void schedule() {
       timer?.cancel();
-      if (_probing) timer = Timer.periodic(interval, (_) => unawaited(_probe(client, url)));
+      if (_probing) timer = Timer.periodic(_every, (_) => unawaited(_probe(client, url)));
     }
 
     void background() {
