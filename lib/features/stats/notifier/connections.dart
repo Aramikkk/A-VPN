@@ -719,9 +719,6 @@ List<SeenConnection> sessionConnections(
 /// Apps and sites that moved less than this are hidden by default (1 MB).
 const smallTraffic = 1024 * 1024;
 
-/// The session's traffic by app (the home screen's block and the session panel) counts the apps from this up (10 MB).
-const sessionTrafficMin = 10 * 1024 * 1024;
-
 /// Connections added up by a key (an app, or a site).
 class ConnectionGroup {
   ConnectionGroup(this.key);

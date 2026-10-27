@@ -1489,7 +1489,7 @@ class _HomeTraffic extends ConsumerWidget {
     final current = sessionConnections(state, connected: connected, sessionStart: sessionStart);
     final big = {
       for (final g in groupConnections(current, (c) => c.app))
-        if (g.total >= sessionTrafficMin) g.key,
+        if (g.total >= smallTraffic) g.key,
     };
     final items = current.where((c) => big.contains(c.app)).toList();
     final servers = groupConnections(
@@ -2737,8 +2737,8 @@ class _ContrastMosaic extends ConsumerWidget {
   /// the most tiles: the rest in one tile of their own
   static const _most = 11;
 
-  /// the least an app has to have used to get a tile: 30 MB
-  static const _least = 30 * 1024 * 1024;
+  /// the least an app has to have used to get a tile: 10 MB
+  static const _least = 10 * 1024 * 1024;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2750,7 +2750,7 @@ class _ContrastMosaic extends ConsumerWidget {
     final units = t.avpn.bytesUnits.split(',');
     final vpnBytes = vpnTotal;
     final directBytes = directTotal;
-    // one card an app, through the VPN and direct together; only the apps with 30 MB or more (the totals above
+    // one card an app, through the VPN and direct together; only the apps with 10 MB or more (the totals above
     // count everything)
     final merged = <String, ({_AppShare app, int vpnBytes})>{};
     for (final (a, onVpn) in [for (final a in vpn) (a, true), for (final a in direct) (a, false)]) {
