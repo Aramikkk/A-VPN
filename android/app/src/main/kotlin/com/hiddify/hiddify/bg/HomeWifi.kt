@@ -51,10 +51,14 @@ object HomeWifi {
     /** Whether [port] on [host] answers, asked over the Wi-Fi itself (past the VPN). */
     private fun answers(network: Network, host: String, port: Int): Boolean = runCatching {
         network.socketFactory.createSocket().use { socket ->
-            socket.connect(InetSocketAddress(host, port), 800)
+            socket.connect(InetSocketAddress(host, port), 1500)
             true
         }
     }.getOrDefault(false)
+
+    /** [answers] twice: one lost packet on a busy or sleeping Wi-Fi isn't a router without its panel. */
+    private fun answersWell(network: Network, host: String, port: Int): Boolean =
+        answers(network, host, port) || answers(network, host, port)
 
     /** The router of the Wi-Fi the phone is on now, with the marker ports it answers on; null off Wi-Fi. */
     fun capture(context: Context): Router? {
@@ -65,13 +69,20 @@ object HomeWifi {
         return Router(gateway, ports)
     }
 
+    /** How sure the look at the Wi-Fi is: [UNSURE] is the home's router address with its panel not answering now. */
+    enum class Verdict { HOME, AWAY, UNSURE }
+
     /** Whether the phone is on one of the saved homes now: its router's address and every port saved for it. */
-    fun atHome(context: Context): Boolean {
+    fun verdict(context: Context): Verdict {
         val homes = parse(Settings.homeWifiList)
-        if (homes.isEmpty()) return false
-        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
-        val network = wifi(cm) ?: return false
-        val gateway = gateway(cm, network) ?: return false
-        return homes.any { home -> home.gateway == gateway && home.ports.all { answers(network, gateway, it) } }
+        if (homes.isEmpty()) return Verdict.AWAY
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return Verdict.AWAY
+        val network = wifi(cm) ?: return Verdict.AWAY
+        val gateway = gateway(cm, network) ?: return Verdict.AWAY
+        val same = homes.filter { it.gateway == gateway }
+        if (same.isEmpty()) return Verdict.AWAY
+        return if (same.any { home -> home.ports.all { answersWell(network, gateway, it) } }) Verdict.HOME else Verdict.UNSURE
     }
+
+    fun atHome(context: Context): Boolean = verdict(context) == Verdict.HOME
 }

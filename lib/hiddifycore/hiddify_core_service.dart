@@ -282,8 +282,10 @@ class HiddifyCoreService with InfraLogger {
         balancerTolerance: ref.read(
           current == NetworkKind.mobile ? ConfigOptions.balancerToleranceMobile : ConfigOptions.balancerToleranceWifi,
         ),
+        // the super light mode leaves them off on Wi-Fi (dozens of servers); on mobile data there are only a few, and
+        // the services' own servers are what keeps the apps working when the main choice is off
         siteGroups:
-            !ref.read(superLightProvider) &&
+            (!ref.read(superLightProvider) || current == NetworkKind.mobile) &&
             ref.read(current == NetworkKind.mobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups),
         siteGroupsTolerance: ref.read(
           current == NetworkKind.mobile ? ConfigOptions.siteGroupsToleranceMobile : ConfigOptions.siteGroupsTolerance,

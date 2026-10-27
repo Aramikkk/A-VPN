@@ -646,7 +646,7 @@ abstract class ConfigOptions {
       mtu: ref.watch(mtu),
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: pingUrl(ref.watch(connectionTestUrl), ref.watch(pingHttps)),
-      urlTestInterval: ref.watch(superLightProvider) ? const Duration(minutes: 30) : ref.watch(urlTestInterval),
+      urlTestInterval: ref.watch(superLightProvider) ? const Duration(minutes: 10) : ref.watch(urlTestInterval),
       urlTestTimeout: ref.watch(urlTestTimeoutWifi),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),

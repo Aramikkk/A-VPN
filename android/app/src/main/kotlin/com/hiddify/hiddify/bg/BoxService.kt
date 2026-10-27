@@ -259,7 +259,7 @@ class BoxService(
             delay(4_000)
             if (Settings.homeWifiEnabled || pausedForHome) {
                 lastHomeCheck = android.os.SystemClock.elapsedRealtime()
-                checkHome()
+                checkHome(networkChanged = true)
             }
             lifecycle.withLock { if (operation == generation.get() && !stopping) switchToNetwork(operation) }
         }
@@ -303,16 +303,28 @@ class BoxService(
     }
 
     /** The VPN on a home Wi-Fi pauses (the router runs one of its own) and comes back off it. */
-    private suspend fun checkHome() {
-        val home = Settings.homeWifiEnabled && runCatching { HomeWifi.atHome(service) }.getOrDefault(false)
-        if (home && !paused && status.value == Status.Started) {
+    private suspend fun checkHome(networkChanged: Boolean = false) {
+        val verdict = if (!Settings.homeWifiEnabled) HomeWifi.Verdict.AWAY
+        else runCatching { HomeWifi.verdict(service) }.getOrDefault(HomeWifi.Verdict.UNSURE)
+        if (verdict == HomeWifi.Verdict.HOME) homeUnsure = 0
+        if (verdict == HomeWifi.Verdict.HOME && !paused && status.value == Status.Started) {
             Log.i(TAG, "home Wi-Fi: pausing the VPN")
             pause(null)
-        } else if (!home && paused && pausedForHome) {
+        } else if (paused && pausedForHome && verdict != HomeWifi.Verdict.HOME) {
+            // the router's address is still the home's but its panel didn't answer: a busy or sleeping Wi-Fi more
+            // often than a router left; the VPN comes back only when that goes on for a minute
+            if (verdict == HomeWifi.Verdict.UNSURE && !networkChanged && ++homeUnsure < 4) {
+                ServiceLog.write("home Wi-Fi: the router's panel did not answer (" + homeUnsure + "), staying paused")
+                return
+            }
+            homeUnsure = 0
             Log.i(TAG, "off the home Wi-Fi: the VPN comes back")
             resume()
         }
     }
+
+    /** checks in a row in which the home router's panel didn't answer */
+    private var homeUnsure = 0
 
     /** [app]: paused while it is on screen; null: paused for a home Wi-Fi. */
     private suspend fun pause(app: String?) = lifecycle.withLock {
