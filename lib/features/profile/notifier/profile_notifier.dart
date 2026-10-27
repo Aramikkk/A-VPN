@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
@@ -134,6 +135,8 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
     _resetTimer?.cancel();
     state = const AsyncLoading();
     if (!isBulk) await ref.read(hapticServiceProvider.notifier).lightImpact();
+    // what the subscription held before: a refresh that brings the same servers reconnects nothing
+    final before = await profileContentFingerprint(ref.read(profilePathResolverProvider).file(profile.id));
     state = await AsyncValue.guard(() async {
       return await _profilesRepo
           .upsertRemote(profile.url)
@@ -160,7 +163,14 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
 
               await ref.read(activeProfileProvider.future).then((active) async {
                 if (active != null && active.id == profile.id) {
-                  await ref.read(connectionNotifierProvider.notifier).reconnect(profile);
+                  // the connection restarts only when the servers changed: every refresh used to drop and bring up the VPN
+                  // (a blink of "disconnected" and the home screen animating again), hours apart, at random
+                  final after = await profileContentFingerprint(ref.read(profilePathResolverProvider).file(profile.id));
+                  if (before == null || after == null || before != after) {
+                    await ref.read(connectionNotifierProvider.notifier).reconnect(profile);
+                  } else {
+                    loggy.info('the subscription brought nothing new: no reconnect');
+                  }
                 }
               });
               return unit;
@@ -228,4 +238,15 @@ Future<List<FreeProfile>> freeProfilesFilteredByRegion(Ref ref) async {
   final freeProfiles = await ref.watch(freeProfilesNotifierProvider.future);
   final region = ref.watch(ConfigOptions.region);
   return freeProfiles.where((e) => e.region.contains(region.name) || e.region.isEmpty).toList();
+}
+
+/// A fingerprint of a profile's stored config: its length and a hash of its bytes; null when there is no file.
+Future<String?> profileContentFingerprint(File file) async {
+  try {
+    if (!await file.exists()) return null;
+    final bytes = await file.readAsBytes();
+    return '${bytes.length}:${Object.hashAll(bytes)}';
+  } catch (_) {
+    return null;
+  }
 }

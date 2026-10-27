@@ -1489,7 +1489,7 @@ class _HomeTraffic extends ConsumerWidget {
     final current = sessionConnections(state, connected: connected, sessionStart: sessionStart);
     final big = {
       for (final g in groupConnections(current, (c) => c.app))
-        if (g.total >= smallTraffic) g.key,
+        if (g.total >= sessionTrafficMin) g.key,
     };
     final items = current.where((c) => big.contains(c.app)).toList();
     final servers = groupConnections(
@@ -1922,8 +1922,9 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     if (!widget.own && context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
     final brightness = Theme.of(context).brightness;
     final palette = ref.watch(contrastColoursProvider);
-    // the light look: no picture behind, the page's colour (nothing to draw, nothing kept in memory)
-    if (ref.watch(lightLookProvider)) {
+    // the light look: no picture behind, the page's colour (nothing to draw, nothing kept in memory); and while a popup
+    // is open, to keep its opening smooth
+    if (ref.watch(lightLookProvider) || ref.watch(popupsOpenProvider) > 0) {
       return _GlowAnchor(
         child: Stack(
           fit: StackFit.passthrough,
@@ -2017,7 +2018,7 @@ class ContrastFrost extends ConsumerWidget {
         ? ref.watch(Preferences.contrastClarity)
         : ContrastClarity.fallback;
     // the light look: a plain pane, nothing frosted behind it
-    if (ref.watch(lightLookProvider)) {
+    if (ref.watch(lightLookProvider) || ref.watch(popupsOpenProvider) > 0) {
       return RepaintBoundary(
         child: Container(
           padding: padding,
@@ -3043,6 +3044,9 @@ class _MosaicCell extends StatelessWidget {
 /// Contrast's popups: a see-through frosted card in the middle of the screen, a fifth smaller than the screen's
 /// free room, growing from just above the panel.
 Future<void> showGlassPopup(BuildContext context, Widget child) {
+  // the page under it is flat while it is open (see [popupsOpenProvider])
+  final container = ProviderScope.containerOf(context, listen: false);
+  container.read(popupsOpenProvider.notifier).state++;
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -3052,7 +3056,7 @@ Future<void> showGlassPopup(BuildContext context, Widget child) {
     pageBuilder: (_, _, _) => _GlassPopup(child: child),
     transitionBuilder: (context, animation, _, child) =>
         HomePopupTransition(animation: animation, alignment: const Alignment(0, .9), child: child),
-  );
+  ).whenComplete(() => container.read(popupsOpenProvider.notifier).state--);
 }
 
 class _GlassPopup extends ConsumerWidget {

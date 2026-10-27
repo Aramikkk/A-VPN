@@ -36,7 +36,7 @@ class TrafficPanel extends ConsumerWidget {
     // the VPN off: no session, the picture (the last session's list isn't shown)
     final connected = ref.watch(shownConnectionProvider).isConnected;
     final current = sessionConnections(state, connected: connected, sessionStart: sessionStart);
-    final groups = groupConnections(current, (c) => c.app).where((g) => g.total >= smallTraffic).toList()
+    final groups = groupConnections(current, (c) => c.app).where((g) => g.total >= sessionTrafficMin).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
     final items = [for (final g in groups) ...g.items];
     // the tiles: the current session's traffic, as the heading says
