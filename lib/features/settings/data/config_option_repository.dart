@@ -281,6 +281,10 @@ abstract class ConfigOptions {
   static final balancerToleranceWifi = PreferencesNotifier.create<int, int>('balancer-tolerance-wifi', 150);
   static final balancerToleranceMobile = PreferencesNotifier.create<int, int>('balancer-tolerance-mobile', 50);
 
+  /// How many ms faster than the priority subscription's servers another subscription's must be to be taken, by network
+  static final priorityMarginWifi = PreferencesNotifier.create<int, int>('priority-margin-wifi', 100);
+  static final priorityMarginMobile = PreferencesNotifier.create<int, int>('priority-margin-mobile', 150);
+
   static final enableClashApi = PreferencesNotifier.create<bool, bool>("enable-clash-api", true);
 
   /// the Clash API's key, made up once per install (bootstrap), so the Connections tab can read the core's list

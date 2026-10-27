@@ -84,6 +84,18 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
     }
   }
 
+  /// The priority subscription: its servers are kept to unless the others are clearly faster (or the choice is taken
+  /// off it again). The core makes its choice at the start, so a running VPN is restarted to take it.
+  Future<void> togglePriority(ProfileEntity profile) async {
+    final on = ref.read(Preferences.priorityProfile) == profile.id;
+    loggy.debug('profile [${profile.id}] as the priority one: ${!on}');
+    await ref.read(Preferences.priorityProfile.notifier).update(on ? '' : profile.id);
+    final active = await ref.read(activeProfileProvider.future);
+    if (active != null && ref.read(connectionNotifierProvider).valueOrNull is Connected) {
+      await ref.read(connectionNotifierProvider.notifier).reconnect(active);
+    }
+  }
+
   Future<void> togglePin(ProfileEntity profile) async {
     loggy.debug('toggling pin for profile: [${profile.id}] -> ${!profile.pinned}');
     await _profilesRepo.setPinned(profile.id, !profile.pinned).getOrElse((err) {

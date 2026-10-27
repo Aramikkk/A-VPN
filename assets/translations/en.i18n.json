@@ -122,6 +122,8 @@
     "profileManagementNoCountries": "No server in this profile has a country I can tell",
     "profileCountriesAll": "all countries",
     "profileExtraOn": "Add to the active one (servers together)",
+    "profilePriorityOn": "Priority subscription",
+    "profilePriorityOff": "Remove priority",
     "profileExtraOff": "Take out of the work",
     "ruleOwnServer": "$name: own server",
     "lightLook": "Light look",

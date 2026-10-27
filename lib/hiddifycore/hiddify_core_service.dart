@@ -288,9 +288,29 @@ class HiddifyCoreService with InfraLogger {
         siteGroupsTolerance: ref.read(
           current == NetworkKind.mobile ? ConfigOptions.siteGroupsToleranceMobile : ConfigOptions.siteGroupsTolerance,
         ),
+        priorityProfile: _priorityProfile(profilePath),
+        priorityMargin: _priorityMargin(current),
       );
     }
-    return filtered;
+    return withPriority(filtered, current, _priorityProfile(profilePath), _priorityMargin(current));
+  }
+
+  int _priorityMargin(NetworkKind current) =>
+      ref.read(current == NetworkKind.mobile ? ConfigOptions.priorityMarginMobile : ConfigOptions.priorityMarginWifi);
+
+  /// Which of the merged subscriptions is the priority one: 1 the active profile, 2 the first added (in the order
+  /// [_withProfiles] adds them), and so on; 0 when none is, or the priority profile is not in the work.
+  int _priorityProfile(String profilePath) {
+    final id = ref.read(Preferences.priorityProfile);
+    if (id.isEmpty) return 0;
+    if (ProfileMerge.idOf(profilePath) == id) return 1;
+    final resolver = ref.read(profilePathResolverProvider);
+    final extras = [
+      for (final extra in ref.read(Preferences.extraProfiles))
+        if (resolver.file(extra).path != profilePath) extra,
+    ];
+    final index = extras.indexOf(id);
+    return index < 0 ? 0 : index + 2;
   }
 
   /// The countries outside the region filter that the user switched on by hand (for the active profile and the added

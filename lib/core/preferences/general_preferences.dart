@@ -144,6 +144,10 @@ abstract class Preferences {
     mapTo: (value) => value.join(';'),
   );
 
+  /// The priority subscription: the id of the profile whose servers the automatic choice keeps to unless the others
+  /// are clearly faster (see the margins in ConfigOptions). Empty: none.
+  static final priorityProfile = PreferencesNotifier.create<String, String>("priority_profile", "");
+
   /// Settings → Profile management: the countries of each profile switched off, by network:
   /// {profile id: {"wifi": [codes], "mobile": [codes]}}. Nothing here: every country is on.
   static final profileCountriesOff = PreferencesNotifier.create<Map<String, Map<String, List<String>>>, String>(

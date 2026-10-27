@@ -57,4 +57,32 @@ void main() {
     expect(m['outbounds'][0]['options'].containsKey('start_batch'), false);
     expect(wifi, isNot(mobile));
   });
+
+  test('the priority subscription and its margin reach the core per network', () async {
+    final dir = await Directory.systemTemp.createTemp('network-priority');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/profile.json');
+    await file.writeAsString(jsonEncode({'outbounds': [{'type': 'direct', 'tag': 'plain'}]}));
+    final wifi = await withNetworkPingTimeout(
+      file.path, NetworkKind.wifi, const Duration(seconds: 5),
+      priorityProfile: 2, priorityMargin: 100,
+    );
+    final mobile = await withNetworkPingTimeout(
+      file.path, NetworkKind.mobile, const Duration(seconds: 5),
+      priorityProfile: 2, priorityMargin: 150,
+    );
+    Map<String, dynamic> monitoring(String path) =>
+        (jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>)['experimental']['monitoring'];
+    expect(monitoring(wifi)['priority_profile'], 2);
+    expect(monitoring(wifi)['priority_margin'], 100);
+    expect(monitoring(mobile)['priority_margin'], 150);
+    // a later call for the same network rewrites its file: without a priority, none is left in it
+    final none = await withNetworkPingTimeout(file.path, NetworkKind.wifi, const Duration(seconds: 5));
+    expect(monitoring(none).containsKey('priority_profile'), false);
+
+    // the computer: only the priority is added; nothing to add leaves the file as it is
+    expect(await withPriority(file.path, NetworkKind.wifi, 0, 100), file.path);
+    final desktop = await withPriority(file.path, NetworkKind.wifi, 1, 100);
+    expect(monitoring(desktop)['priority_profile'], 1);
+  });
 }

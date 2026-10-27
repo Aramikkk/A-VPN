@@ -55,6 +55,7 @@ class ProfileTile extends HookConsumerWidget {
     // the servers of this profile are in the work too, with the active one's (several subscriptions)
     final extra = !profile.active && ref.watch(Preferences.extraProfiles).contains(profile.id);
     final showActionButton = profile is RemoteProfileEntity || !isMain;
+    final priority = ref.watch(Preferences.priorityProfile) == profile.id;
 
     void handleTap() {
       if (isMain) {
@@ -106,7 +107,7 @@ class ProfileTile extends HookConsumerWidget {
                 ),
                 if (profile.active) VerticalDivider(width: 1, color: theme.colorScheme.outline) else const Gap(1),
               ],
-              Expanded(child: _body(context, t, theme, subInfo, showActionButton, handleTap, showLinks, extra)),
+              Expanded(child: _body(context, t, theme, subInfo, showActionButton, handleTap, showLinks, extra, priority)),
             ],
           ),
         ),
@@ -138,6 +139,7 @@ class ProfileTile extends HookConsumerWidget {
     VoidCallback onTap,
     bool squareBottom,
     bool extra,
+    bool priority,
   ) {
     return Semantics(
       button: true,
@@ -157,7 +159,7 @@ class ProfileTile extends HookConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _title(t, theme, extra),
+              _title(t, theme, extra, priority),
               if (subInfo != null) ...[
                 const Gap(4),
                 RemainingTrafficIndicator(subInfo.ratio),
@@ -174,7 +176,7 @@ class ProfileTile extends HookConsumerWidget {
 
   /// Profile name with a trailing affordance: a dropdown on the main card, or a
   /// pin badge on list rows when the profile is pinned.
-  Widget _title(TranslationsEn t, ThemeData theme, bool extra) {
+  Widget _title(TranslationsEn t, ThemeData theme, bool extra, bool priority) {
     final nameText = Text(
       // the provider calls the profile «Доступ»; the app calls it Sigma, as on the home screen
       sigmaName(profile.name),
@@ -188,6 +190,8 @@ class ProfileTile extends HookConsumerWidget {
 
     final Widget? trailing = isMain
         ? const Icon(Icons.arrow_drop_down_rounded)
+        : priority
+        ? Icon(Icons.star_rounded, size: 18, color: theme.colorScheme.primary)
         : extra
         ? Icon(Icons.layers_rounded, size: 18, color: theme.colorScheme.primary)
         : profile.pinned
@@ -360,6 +364,16 @@ class ProfileActionsMenu extends HookConsumerWidget {
         title: profile.pinned ? t.common.unpin : t.common.pin,
         leadingIcon: Icon(profile.pinned ? Icons.push_pin : Icons.push_pin_outlined),
         onTap: () => ref.read(profilesNotifierProvider.notifier).togglePin(profile),
+      ),
+      // the priority subscription: its servers first, the others only when clearly faster
+      AdaptiveMenuItem(
+        title: ref.watch(Preferences.priorityProfile) == profile.id
+            ? t.avpn.profilePriorityOff
+            : t.avpn.profilePriorityOn,
+        leadingIcon: Icon(
+          ref.watch(Preferences.priorityProfile) == profile.id ? Icons.star_rounded : Icons.star_outline_rounded,
+        ),
+        onTap: () => ref.read(profilesNotifierProvider.notifier).togglePriority(profile),
       ),
       // several subscriptions at once: this one's servers beside the active profile's
       if (!profile.active)

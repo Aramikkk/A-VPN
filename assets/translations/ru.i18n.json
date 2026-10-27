@@ -122,6 +122,8 @@
     "profileManagementNoCountries": "В профиле нет серверов с определённой страной",
     "profileCountriesAll": "все страны",
     "profileExtraOn": "Добавить к активному (серверы вместе)",
+    "profilePriorityOn": "Приоритетная подписка",
+    "profilePriorityOff": "Снять приоритет",
     "profileExtraOff": "Убрать из работы",
     "ruleOwnServer": "$name: свой сервер",
     "lightLook": "Лёгкий вид",

@@ -10,6 +10,8 @@ Future<String> withNetworkPingTimeout(
   int balancerTolerance = 150,
   bool siteGroups = false,
   int siteGroupsTolerance = 80,
+  int priorityProfile = 0,
+  int priorityMargin = 0,
 }) async {
   final seconds = timeout.inSeconds.clamp(1, 120);
   final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
@@ -19,6 +21,7 @@ Future<String> withNetworkPingTimeout(
   // this network's own Auto per site (Settings → Ping → Sites): the core builds the groups from it
   monitoring['site_groups'] = siteGroups;
   monitoring['site_groups_tolerance'] = siteGroupsTolerance.clamp(10, 3000);
+  _setPriority(monitoring, priorityProfile, priorityMargin);
   experimental['monitoring'] = monitoring;
   config['experimental'] = experimental;
   for (final outbound in (config['outbounds'] as List? ?? const []).whereType<Map<String, dynamic>>()) {
@@ -37,6 +40,32 @@ Future<String> withNetworkPingTimeout(
     outbound['options'] = options;
   }
   final output = File('$path.ping-${network.name}.json');
+  await output.writeAsString(jsonEncode(config));
+  return output.path;
+}
+
+/// The priority subscription (1 = the active profile, 2 = the first added...; 0 = none) and its margin in ms, for the
+/// core's automatic choice (it reads them from the monitoring block).
+void _setPriority(Map<String, dynamic> monitoring, int profile, int margin) {
+  if (profile > 0 && margin > 0) {
+    monitoring['priority_profile'] = profile;
+    monitoring['priority_margin'] = margin.clamp(1, 2000);
+  } else {
+    monitoring.remove('priority_profile');
+    monitoring.remove('priority_margin');
+  }
+}
+
+/// [path] with only the priority subscription set (the computer's config has no other network-specific parts).
+Future<String> withPriority(String path, NetworkKind network, int profile, int margin) async {
+  if (profile <= 0 || margin <= 0) return path;
+  final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
+  final experimental = Map<String, dynamic>.from(config['experimental'] as Map? ?? {});
+  final monitoring = Map<String, dynamic>.from(experimental['monitoring'] as Map? ?? {});
+  _setPriority(monitoring, profile, margin);
+  experimental['monitoring'] = monitoring;
+  config['experimental'] = experimental;
+  final output = File('$path.priority-${network.name}.json');
   await output.writeAsString(jsonEncode(config));
   return output.path;
 }
