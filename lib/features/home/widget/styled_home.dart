@@ -1401,7 +1401,15 @@ class _Orb extends StatelessWidget {
         actualMobile: actualMobile,
       );
     }
-    return _WaterButton(on: on, busy: busy, onTap: onTap, size: size, networkLabel: networkLabel, actualMobile: actualMobile);
+    return _WaterButton(
+      on: on,
+      busy: busy,
+      onTap: onTap,
+      size: size,
+      level: ping,
+      networkLabel: networkLabel,
+      actualMobile: actualMobile,
+    );
   }
 }
 
@@ -1410,6 +1418,7 @@ class _WaterButton extends HookWidget {
     required this.on,
     required this.busy,
     required this.size,
+    required this.level,
     required this.networkLabel,
     required this.actualMobile,
     this.onTap,
@@ -1418,6 +1427,9 @@ class _WaterButton extends HookWidget {
   final bool on;
   final bool busy;
   final double size;
+
+  /// the water's height while connected: the ping's fill (0 = not measured yet, half a tile)
+  final double level;
   final String? networkLabel;
   final bool actualMobile;
   final VoidCallback? onTap;
@@ -1465,8 +1477,8 @@ class _WaterButton extends HookWidget {
             builder: (context, _) => water(.22 + .5 * Curves.easeInOut.transform(wave.value)),
           )
         : TweenAnimationBuilder<double>(
-            tween: Tween(end: on ? .82 : 0.0),
-            duration: lightDuration(const Duration(milliseconds: 600)),
+            tween: Tween(end: on ? (level > 0 ? .1 + .85 * level : .5) : 0.0),
+            duration: lightDuration(const Duration(milliseconds: 900)),
             curve: Curves.easeOutCubic,
             builder: (context, level, _) => level < .005 ? const SizedBox.shrink() : water(level),
           );
