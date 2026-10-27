@@ -2081,9 +2081,8 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     if (!widget.own && context.findAncestorStateOfType<_ContrastGlowState>() != null) return widget.child;
     final brightness = Theme.of(context).brightness;
     final palette = ref.watch(contrastColoursProvider);
-    // the light look: no picture behind, the page's colour (nothing to draw, nothing kept in memory); and while a popup
-    // is open, to keep its opening smooth
-    if (ref.watch(lightLookProvider) || ref.watch(popupsOpenProvider) > 0) {
+    // the light look: no picture behind, the page's colour (nothing to draw, nothing kept in memory)
+    if (ref.watch(lightLookProvider)) {
       return _GlowAnchor(
         child: Stack(
           fit: StackFit.passthrough,
@@ -2177,7 +2176,7 @@ class ContrastFrost extends ConsumerWidget {
         ? ref.watch(Preferences.contrastClarity)
         : ContrastClarity.fallback;
     // the light look: a plain pane, nothing frosted behind it
-    if (ref.watch(lightLookProvider) || ref.watch(popupsOpenProvider) > 0) {
+    if (ref.watch(lightLookProvider)) {
       return RepaintBoundary(
         child: Container(
           padding: padding,
@@ -3202,54 +3201,36 @@ class _MosaicCell extends StatelessWidget {
 
 /// Contrast's popups: a see-through frosted card in the middle of the screen, a fifth smaller than the screen's
 /// free room, growing from just above the panel.
-/// Counts one open popup in [popupsOpenProvider], and a moment after it is gone takes it off, once, however it went.
-class _PopupGuard {
-  _PopupGuard(this.container) {
-    container.read(popupsOpenProvider.notifier).state++;
+Future<void> showGlassPopup(BuildContext context, Widget child) async {
+  // the page under it held as a picture while it opens and closes (see [FreezeFrame])
+  final frozen = await FreezeFrame.freeze();
+  if (!context.mounted) {
+    if (frozen) FreezeFrame.thawSoon();
+    return;
   }
-
-  final ProviderContainer container;
-  bool _released = false;
-
-  void release() {
-    if (_released) return;
-    _released = true;
-    // flat a moment longer: opened again at once, the page isn't switched back and forth
-    Timer(const Duration(milliseconds: 700), () {
-      try {
-        container.read(popupsOpenProvider.notifier).state--;
-      } catch (_) {
-        // the app is closing
-      }
-    });
+  try {
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black26,
+      transitionDuration: lightDuration(const Duration(milliseconds: 300)),
+      pageBuilder: (_, _, _) => _GlassPopup(child: child),
+      transitionBuilder: (context, animation, _, child) =>
+          HomePopupTransition(animation: animation, alignment: const Alignment(0, .9), child: child),
+    );
+  } finally {
+    if (frozen) FreezeFrame.thawSoon();
   }
 }
 
-Future<void> showGlassPopup(BuildContext context, Widget child) {
-  // the page under it is flat while it is open (see [popupsOpenProvider])
-  final guard = _PopupGuard(ProviderScope.containerOf(context, listen: false));
-  return showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: Colors.black26,
-    transitionDuration: lightDuration(const Duration(milliseconds: 300)),
-    pageBuilder: (_, _, _) => _GlassPopup(guard: guard, child: child),
-    transitionBuilder: (context, animation, _, child) =>
-        HomePopupTransition(animation: animation, alignment: const Alignment(0, .9), child: child),
-  ).whenComplete(guard.release);
-}
-
-class _GlassPopup extends HookConsumerWidget {
-  const _GlassPopup({required this.child, required this.guard});
+class _GlassPopup extends ConsumerWidget {
+  const _GlassPopup({required this.child});
 
   final Widget child;
-  final _PopupGuard guard;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // the route going away, however it goes, lets the page back
-    useEffect(() => guard.release, const []);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final screen = MediaQuery.sizeOf(context);
     return Center(

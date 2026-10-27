@@ -17,6 +17,7 @@ import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/features/home/widget/freeze_frame.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
 import 'package:hiddify/features/stats/notifier/speed_history.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
@@ -124,7 +125,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
             : null,
       ),
     );
-    return PopScope(
+    // the page is held as a picture while a popup opens and closes over it (see [FreezeFrame])
+    return FreezeFrame(
+      child: PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
@@ -277,7 +280,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 
   /// Back on a computer (Esc, the mouse's back button): the page opened over a tab, else to Home.

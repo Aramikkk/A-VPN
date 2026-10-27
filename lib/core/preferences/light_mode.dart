@@ -26,10 +26,6 @@ final lightBackgroundProvider = Provider<bool>(
       (ref.watch(Preferences.lightBackground) || ref.watch(Preferences.superLight)),
 );
 
-/// How many popups (the servers' list, the details) are open: while one is, the page under it is drawn flat, without
-/// the frosted pictures, so its opening and closing don't redraw them at every frame (the first frames took 35 ms).
-final popupsOpenProvider = StateProvider<int>((ref) => 0);
-
 /// The super light mode (see [Preferences.superLight]).
 final superLightProvider = Provider<bool>((ref) {
   final on = ref.watch(sharedPreferencesProvider).hasValue && ref.watch(Preferences.superLight);

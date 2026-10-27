@@ -40,6 +40,7 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
+import 'package:hiddify/features/home/widget/freeze_frame.dart';
 import 'package:hiddify/features/proxy/notifier/home_refresh.dart';
 import 'package:hiddify/features/proxy/data/lan_sharing.dart';
 import 'package:hiddify/features/proxy/data/hidden_servers.dart';
