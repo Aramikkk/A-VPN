@@ -3296,6 +3296,11 @@ class _SessionServers extends ConsumerWidget {
           c,
     ], (c) => c.outbound)..sort((a, b) => b.total.compareTo(a.total));
     final total = servers.fold<int>(0, (s, g) => s + g.total);
+    // The connections seen are only a sample (the short ones close between two readings): the servers share the
+    // session's VPN traffic from the core, the same number as the tile above, in the proportions seen.
+    final totals = ref.watch(sessionTotalsProvider);
+    final sessionVpn = (totals.vpnUp ?? 0) + (totals.vpnDown ?? 0);
+    final scale = total > 0 && sessionVpn > total ? sessionVpn / total : 1.0;
     final ink = scheme.onSurface;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
@@ -3415,7 +3420,7 @@ class _SessionServers extends ConsumerWidget {
                               ),
                             ),
                             Text(
-                              formatBytes(g.total, units),
+                              formatBytes((g.total * scale).round(), units),
                               style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ],
