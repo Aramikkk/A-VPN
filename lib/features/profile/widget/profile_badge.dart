@@ -33,13 +33,26 @@ final profileBadgesProvider = Provider<List<ProfileBadge>>((ref) {
 /// was worked out.
 List<ProfileBadge> profileBadgesNow = const [];
 
-const _colours = [Color(0xFF4F8CFF), Color(0xFFF0A030), Color(0xFF45B97C), Color(0xFFB36BFF), Color(0xFFE5483B)];
+/// The providers' own colours, always the same whichever subscription is first: Sigma blue, Chill yellow, Phantom
+/// purple (found by a word in the name).
+const _providerColours = {
+  'sigma': Color(0xFF4F8CFF),
+  'chill': Color(0xFFF5C518),
+  'phantom': Color(0xFFB36BFF),
+};
+
+/// for any other subscription, by its place: none of the three above
+const _otherColours = [Color(0xFF45B97C), Color(0xFFE5483B), Color(0xFF2FB8C9), Color(0xFFE8833A)];
 
 /// The mark of the [index]th subscription, [name] its name.
 ProfileBadge badgeOf(int index, String name) {
   final text = sigmaName(name).trim();
   final letter = text.isEmpty ? '?' : String.fromCharCode(text.runes.first).toUpperCase();
-  return (letter: letter, colour: _colours[index % _colours.length]);
+  final lower = text.toLowerCase();
+  for (final e in _providerColours.entries) {
+    if (lower.contains(e.key)) return (letter: letter, colour: e.value);
+  }
+  return (letter: letter, colour: _otherColours[index % _otherColours.length]);
 }
 
 /// Which subscription a server of the running config is from: the provider's own `§ N` ending of its name is shifted by

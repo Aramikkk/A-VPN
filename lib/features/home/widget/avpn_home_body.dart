@@ -40,6 +40,7 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/home_network.dart';
+import 'package:hiddify/features/proxy/notifier/home_refresh.dart';
 import 'package:hiddify/features/proxy/data/lan_sharing.dart';
 import 'package:hiddify/features/proxy/data/hidden_servers.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
@@ -113,7 +114,8 @@ class AraHomeBody extends HookConsumerWidget {
         if (homePingTesting.value) return;
         last = DateTime.now();
         try {
-          await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select", quiet: true);
+          // quietly, and the ping and the delays to the sites with it
+          await refreshHomeIndicators(read: ref.read, quiet: true);
         } catch (_) {
           // the core went away meanwhile: next time
         }

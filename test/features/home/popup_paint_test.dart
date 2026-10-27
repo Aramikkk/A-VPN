@@ -44,5 +44,8 @@ void main() {
       reason: 'static content should be retained while only the transition moves',
     );
     await tester.pumpAndSettle();
+    // the popup goes with the tree; the page under it is let back a moment after
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
 }

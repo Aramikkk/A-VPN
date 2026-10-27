@@ -1119,8 +1119,8 @@ class _GraphiteDock extends HookConsumerWidget {
 /// ping (the lower, the fuller), in the
 /// accent, the inner one the loss (none: full), in a deep shade of it; the numbers under the arcs' ends.
 /// Off, or connected before the first ping, just the button; connecting, a short arc runs along the outer one.
-class _Orb extends HookWidget {
-  const _Orb({
+class _GaugeOrb extends HookWidget {
+  const _GaugeOrb({
     required this.on,
     required this.busy,
     this.onTap,
@@ -1348,6 +1348,165 @@ class _Orb extends HookWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Contrast's connect button, as a tile like the session tiles above: while connected the water of the accent fills it
+/// and the network's sign (Wi-Fi, LTE) stands on it; off, an empty tile with the power sign; connecting, the water
+/// rises and falls. No frames round it: the ping and the servers are the numbers at its sides.
+class _Orb extends StatelessWidget {
+  const _Orb({
+    required this.on,
+    required this.busy,
+    this.onTap,
+    this.size = 74,
+    this.ping = 0,
+    this.loss = 0,
+    this.pingLabel,
+    this.lossLabel,
+    this.networkLabel,
+    this.actualMobile = false,
+  });
+
+  final double size;
+  final double ping;
+  final double loss;
+  final String? pingLabel;
+  final String? lossLabel;
+  final String? networkLabel;
+  final bool actualMobile;
+  final bool on;
+  final bool busy;
+  final VoidCallback? onTap;
+
+  /// the old gauge's scales, still used by the other themes
+  static double pingFill(int delay) => _GaugeOrb.pingFill(delay);
+  static double lossFill(double percent) => _GaugeOrb.lossFill(percent);
+
+  @override
+  Widget build(BuildContext context) {
+    if (!Theme.of(context).contrastLayout) {
+      return _GaugeOrb(
+        on: on,
+        busy: busy,
+        onTap: onTap,
+        size: size,
+        ping: ping,
+        loss: loss,
+        pingLabel: pingLabel,
+        lossLabel: lossLabel,
+        networkLabel: networkLabel,
+        actualMobile: actualMobile,
+      );
+    }
+    return _WaterButton(on: on, busy: busy, onTap: onTap, size: size, networkLabel: networkLabel, actualMobile: actualMobile);
+  }
+}
+
+class _WaterButton extends HookWidget {
+  const _WaterButton({
+    required this.on,
+    required this.busy,
+    required this.size,
+    required this.networkLabel,
+    required this.actualMobile,
+    this.onTap,
+  });
+
+  final bool on;
+  final bool busy;
+  final double size;
+  final String? networkLabel;
+  final bool actualMobile;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.araAccent;
+    // connecting: the water rises and falls, back and forth
+    final wave = useAnimationController(duration: const Duration(milliseconds: 1300));
+    useEffect(() {
+      if (busy) {
+        wave.repeat(reverse: true);
+      } else {
+        wave.stop();
+      }
+      return null;
+    }, [busy]);
+    final side = size * 1.35;
+    final tile = dark ? const Color(0xFF1F2227) : const Color(0xFFF1EFEA);
+    const ink = Color(0xFF14171C);
+    final lit = on && !busy;
+    Widget water(double level) => Align(
+      alignment: Alignment.bottomCenter,
+      child: FractionallySizedBox(
+        heightFactor: level.clamp(0.0, 1.0),
+        widthFactor: 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [accent.withValues(alpha: .82), accent.withValues(alpha: .46)],
+            ),
+            border: Border(top: BorderSide(color: accent, width: 1.5)),
+          ),
+        ),
+      ),
+    );
+    final fill = busy
+        ? AnimatedBuilder(
+            animation: wave,
+            builder: (context, _) => water(.22 + .5 * Curves.easeInOut.transform(wave.value)),
+          )
+        : TweenAnimationBuilder<double>(
+            tween: Tween(end: on ? .82 : 0.0),
+            duration: lightDuration(const Duration(milliseconds: 600)),
+            curve: Curves.easeOutCubic,
+            builder: (context, level, _) => level < .005 ? const SizedBox.shrink() : water(level),
+          );
+    final showNetwork = networkLabel != null || (PlatformUtils.isDesktop && on && !busy);
+    final signColour = lit ? ink : (busy ? scheme.onSurface : scheme.onSurfaceVariant);
+    final sign = showNetwork
+        ? Semantics(
+            key: const ValueKey('home-network-indicator'),
+            excludeSemantics: true,
+            label: networkLabel ?? 'ПК',
+            child: networkLabel == null
+                ? Icon(Icons.computer_rounded, size: size * .42, color: signColour)
+                : HomeNetworkIndicator(mobile: actualMobile, iconSize: size * .42, color: signColour),
+          )
+        : Icon(Icons.power_settings_new_rounded, size: size * .46, color: signColour);
+    return SizedBox(
+      width: size * 2.1,
+      height: side + 10,
+      child: Center(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: side,
+            height: side,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: tile,
+              borderRadius: BorderRadius.circular(side * .28),
+              border: Border.all(color: on || busy ? accent.withValues(alpha: .6) : scheme.outlineVariant),
+              boxShadow: [if (lit) BoxShadow(color: accent.withValues(alpha: dark ? .35 : .25), blurRadius: 24)],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(child: RepaintBoundary(child: fill)),
+                sign,
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2025,7 +2184,7 @@ class ContrastFrost extends ConsumerWidget {
           decoration: BoxDecoration(
             color: ContrastColours.of(context).pane(dark),
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .7)),
+            border: Border.all(color: dark ? Colors.white.withValues(alpha: .12) : Colors.black.withValues(alpha: .1)),
           ),
           child: child,
         ),
@@ -3043,29 +3202,54 @@ class _MosaicCell extends StatelessWidget {
 
 /// Contrast's popups: a see-through frosted card in the middle of the screen, a fifth smaller than the screen's
 /// free room, growing from just above the panel.
+/// Counts one open popup in [popupsOpenProvider], and a moment after it is gone takes it off, once, however it went.
+class _PopupGuard {
+  _PopupGuard(this.container) {
+    container.read(popupsOpenProvider.notifier).state++;
+  }
+
+  final ProviderContainer container;
+  bool _released = false;
+
+  void release() {
+    if (_released) return;
+    _released = true;
+    // flat a moment longer: opened again at once, the page isn't switched back and forth
+    Timer(const Duration(milliseconds: 700), () {
+      try {
+        container.read(popupsOpenProvider.notifier).state--;
+      } catch (_) {
+        // the app is closing
+      }
+    });
+  }
+}
+
 Future<void> showGlassPopup(BuildContext context, Widget child) {
   // the page under it is flat while it is open (see [popupsOpenProvider])
-  final container = ProviderScope.containerOf(context, listen: false);
-  container.read(popupsOpenProvider.notifier).state++;
+  final guard = _PopupGuard(ProviderScope.containerOf(context, listen: false));
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black26,
     transitionDuration: lightDuration(const Duration(milliseconds: 300)),
-    pageBuilder: (_, _, _) => _GlassPopup(child: child),
+    pageBuilder: (_, _, _) => _GlassPopup(guard: guard, child: child),
     transitionBuilder: (context, animation, _, child) =>
         HomePopupTransition(animation: animation, alignment: const Alignment(0, .9), child: child),
-  ).whenComplete(() => container.read(popupsOpenProvider.notifier).state--);
+  ).whenComplete(guard.release);
 }
 
-class _GlassPopup extends ConsumerWidget {
-  const _GlassPopup({required this.child});
+class _GlassPopup extends HookConsumerWidget {
+  const _GlassPopup({required this.child, required this.guard});
 
   final Widget child;
+  final _PopupGuard guard;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // the route going away, however it goes, lets the page back
+    useEffect(() => guard.release, const []);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final screen = MediaQuery.sizeOf(context);
     return Center(
@@ -3541,7 +3725,7 @@ class _SiteTiles extends HookConsumerWidget {
     return GestureDetector(
       key: const Key('contrast-sites'),
       behavior: HitTestBehavior.opaque,
-      onTap: () => ref.read(siteLatencyProvider.notifier).test(),
+      onTap: () => unawaited(pingAllServers(ref)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -3551,54 +3735,50 @@ class _SiteTiles extends HookConsumerWidget {
             padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
             child: Row(
               children: [
-                SizedBox(
-                  width: 30,
+                // the delay check, a pill like the multi-server one beside it: the sign and the name; while the sites are
+                // asked the sign is a small ring of the accent that fills a site at a time
+                Container(
                   height: 30,
-                  child: Stack(
-                    alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 9),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
+                    border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: scheme.outlineVariant),
+                      sites.testing
+                          ? TweenAnimationBuilder<double>(
+                              tween: Tween(end: (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0)),
+                              duration: lightDuration(const Duration(milliseconds: 500)),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, fill, _) => SizedBox(
+                                width: 15,
+                                height: 15,
+                                child: CircularProgressIndicator(
+                                  value: fill,
+                                  strokeWidth: 2,
+                                  strokeCap: StrokeCap.round,
+                                  color: accent,
+                                  backgroundColor: scheme.outlineVariant,
+                                ),
+                              ),
+                            )
+                          : Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurfaceVariant),
+                      const Gap(6),
+                      Text(
+                        t.avpn.sitesTitle,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .3,
                         ),
                       ),
-                      AnimatedOpacity(
-                        opacity: sites.testing ? 1 : 0,
-                        duration: Duration(milliseconds: sites.testing ? 150 : 900),
-                        curve: Curves.easeIn,
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween(
-                            end: sites.testing ? (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0) : 1.0,
-                          ),
-                          duration: lightDuration(const Duration(milliseconds: 500)),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, fill, _) => SizedBox.expand(
-                            child: CircularProgressIndicator(
-                              value: fill,
-                              strokeWidth: 2.5,
-                              strokeCap: StrokeCap.round,
-                              color: accent,
-                              backgroundColor: Colors.transparent,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Icon(Icons.refresh_rounded, size: 16, color: scheme.onSurface),
                     ],
                   ),
                 ),
-                const Gap(10),
-                Expanded(
-                  child: Text(
-                    t.avpn.sitesTitle.toUpperCase(),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
+                const Spacer(),
                 // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
                 GestureDetector(
                   key: const Key('multi-servers'),
@@ -3606,7 +3786,7 @@ class _SiteTiles extends HookConsumerWidget {
                   onTap: () => ref.read(multiPref.notifier).update(!multiOn),
                   child: Container(
                     height: 30,
-                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                    padding: const EdgeInsets.symmetric(horizontal: 9),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
                       color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
@@ -3704,7 +3884,8 @@ Future<void> pingAllServers(WidgetRef ref) async {
   if (homePingTesting.value) return;
   homePingTesting.value = true;
   try {
-    await ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select");
+    // the ping, the delays to the sites and the servers' pings together
+    await refreshHomeIndicators(read: ref.read);
     await Future<void>.delayed(const Duration(seconds: 4));
   } catch (_) {
     // not connected: nothing to ping

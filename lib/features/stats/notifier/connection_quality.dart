@@ -91,6 +91,14 @@ class ConnectionQuality extends Notifier<List<int?>> {
   static const _minutesKept = 2 * 24 * 60;
 
   HttpClient? _client;
+  Uri? _url;
+
+  /// One probe now (the home screen's refresh), not at the next turn of the timer.
+  void probeNow() {
+    final client = _client;
+    final url = _url;
+    if (client != null && url != null) unawaited(_probe(client, url));
+  }
   final _samples = <int?>[];
   final _minutes = <int, PingBucket>{};
   final _days = <int, PingBucket>{};
@@ -165,6 +173,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     _every = ref.watch(superLightProvider) ? const Duration(seconds: 10) : interval;
     final port = ref.watch(ConfigOptions.mixedPort);
     final url = Uri.parse(pingUrl(ref.watch(ConfigOptions.connectionTestUrl), ref.watch(ConfigOptions.pingHttps)));
+    _url = url;
     // the probes go through A-VPN's own proxy port: without it every probe would look lost
     if (!connected || !ref.watch(ConfigOptions.enableMixedPort)) return List.of(_samples);
 

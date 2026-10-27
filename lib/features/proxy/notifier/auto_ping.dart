@@ -5,7 +5,7 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
-import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
+import 'package:hiddify/features/proxy/notifier/home_refresh.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Pings every server when the app is opened (or comes back to the screen) and the last such ping was at least
@@ -42,7 +42,7 @@ class AutoPing {
     unawaited(_ref.read(Preferences.lastAutoPing.notifier).update(_last!.millisecondsSinceEpoch));
     unawaited(() async {
       try {
-        await _ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select");
+        await refreshHomeIndicators(read: _ref.read);
       } catch (_) {
         // the list isn't there: the next half hour tries again
       }
@@ -60,7 +60,7 @@ class AutoPing {
     // a moment for the core's server list after connecting
     Future<void>.delayed(const Duration(seconds: 2), () async {
       try {
-        await _ref.read(proxiesOverviewNotifierProvider.notifier).urlTest("select");
+        await refreshHomeIndicators(read: _ref.read);
       } catch (_) {
         // the list isn't there yet: the next opening tries again
         _last = null;

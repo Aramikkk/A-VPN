@@ -1935,13 +1935,13 @@ class _TopDownPainter extends CustomPainter {
           canvas.restore();
         } else {
           final flag = flagOnly(label);
-          final icon = switch (n.route) {
-            ConnectionRoute.direct => Icons.trending_flat_rounded,
-            ConnectionRoute.block => Icons.block_rounded,
-            _ => null,
-          };
+          // the direct way: a crossed shield (the VPN's shield, struck out); a block: its own sign
+          final direct = n.route == ConnectionRoute.direct;
+          final icon = n.route == ConnectionRoute.block ? Icons.block_rounded : null;
           final top = rowY[2] + 12;
-          if (icon != null) {
+          if (direct) {
+            _shieldOff(canvas, Offset(cx, top + 10), colourOf(n.route).withValues(alpha: alpha));
+          } else if (icon != null) {
             final glyph = TextPainter(
               text: TextSpan(
                 text: String.fromCharCode(icon.codePoint),
@@ -2096,4 +2096,28 @@ class _SlowPulse extends ChangeNotifier implements ValueListenable<double> {
     _source.removeListener(_tick);
     super.dispose();
   }
+}
+
+/// A shield with a stroke across it (26 by 22 round [centre]): traffic that goes without the VPN.
+void _shieldOff(Canvas canvas, Offset centre, Color colour) {
+  const w = 26.0;
+  const h = 22.0;
+  final left = centre.dx - w / 2;
+  final top = centre.dy - h / 2;
+  final pen = Paint()
+    ..color = colour
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.8
+    ..strokeCap = StrokeCap.round
+    ..isAntiAlias = true;
+  final shield = Path()
+    ..moveTo(left + w / 2, top + 1)
+    ..lineTo(left + w - 3, top + 5)
+    ..lineTo(left + w - 3, top + h * .5)
+    ..quadraticBezierTo(left + w - 4, top + h - 4, left + w / 2, top + h - 1)
+    ..quadraticBezierTo(left + 4, top + h - 4, left + 3, top + h * .5)
+    ..lineTo(left + 3, top + 5)
+    ..close();
+  canvas.drawPath(shield, pen);
+  canvas.drawLine(Offset(left + 2, top + h - 2), Offset(left + w - 2, top + 2), pen..strokeWidth = 2.2);
 }

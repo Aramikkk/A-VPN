@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 
@@ -9,6 +10,20 @@ void main() {
     expect(profileOfTag('🇫🇮 Финляндия § 2007 §hide§'), 2);
     expect(profileOfTag('🇸🇪 Швеция'), 0);
     expect(profileOfTag('select'), 0);
+  });
+
+  test('the providers keep their colours whichever subscription is first: Sigma blue, Chill yellow, Phantom purple', () {
+    const blue = Color(0xFF4F8CFF);
+    const yellow = Color(0xFFF5C518);
+    const purple = Color(0xFFB36BFF);
+    for (final index in [0, 1, 2, 3]) {
+      expect(badgeOf(index, 'Sigma').colour, blue);
+      expect(badgeOf(index, 'Доступ').colour, blue, reason: 'renamed to Sigma');
+      expect(badgeOf(index, 'ChillGuy VPN 🚀').colour, yellow);
+      expect(badgeOf(index, 'PHANTOM VPN').colour, purple);
+    }
+    // any other: not one of the three
+    expect({blue, yellow, purple}.contains(badgeOf(0, 'Другой').colour), false);
   });
 
   test('a mark: the first letter of the name, its own colour for each subscription', () {
