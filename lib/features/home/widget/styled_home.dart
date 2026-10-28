@@ -3655,8 +3655,6 @@ class _SiteTiles extends HookConsumerWidget {
     final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const {};
     // the server everything else goes through: a site's flag shows only when its own one is another
     final mainServer = ref.watch(proxiesOverviewNotifierProvider.select((v) => SiteLatency.mainServer(v.valueOrNull)));
-    // the subscriptions' marks: none with a single one
-    final badges = ref.watch(profileBadgesProvider);
 
     Widget tile(LatencySite site) {
       // an app that isn't a known service: its own icon and name
@@ -3673,9 +3671,13 @@ class _SiteTiles extends HookConsumerWidget {
       // the same server)
       final own = server == null || server == mainServer ? '' : _flagOf(server);
       final flag = own == _flagOf(mainServer ?? '') ? '' : own;
-      // with several subscriptions: the one the site's server is from
-      final subscription = flag.isEmpty || server == null ? -1 : serverNameOf(server).profile;
-      final badge = subscription >= 0 && subscription < badges.length ? badges[subscription] : null;
+      // the country's name: the server's name without the provider's prefix and its number
+      var country = '';
+      if (flag.isNotEmpty && server != null) {
+        final title = serverNameOf(server).title;
+        final dash = title.indexOf(' - ');
+        country = (dash < 0 ? title : title.substring(dash + 3)).replaceAll(RegExp(r'\s*\d+\s*$'), '').trim();
+      }
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -3717,20 +3719,21 @@ class _SiteTiles extends HookConsumerWidget {
                         ),
                 ),
               ),
-            // the site's own server's flag as a soft blur of its colours in the tile's corner (not the main server's country)
+            // the site's own server's flag as a soft blur of its colours over the whole tile (not the main server's country)
             if (flag.isNotEmpty)
               Positioned.fill(
                 child: ExcludeSemantics(
                   child: ClipRect(
                     child: ImageFiltered(
-                      imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14, tileMode: TileMode.decal),
+                      imageFilter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16, tileMode: TileMode.decal),
                       child: Opacity(
                         opacity: dark ? .5 : .6,
-                        child: Align(
-                          alignment: const Alignment(1.5, -1.4),
+                        child: OverflowBox(
+                          maxWidth: double.infinity,
+                          maxHeight: double.infinity,
                           child: Text(
                             flag,
-                            style: const TextStyle(fontSize: 70, height: 1, fontFamilyFallback: ['Emoji']),
+                            style: const TextStyle(fontSize: 120, height: 1, fontFamilyFallback: ['Emoji']),
                           ),
                         ),
                       ),
@@ -3791,31 +3794,14 @@ class _SiteTiles extends HookConsumerWidget {
                     fontSize: 12 * k,
                   ),
                 );
-                // the subscription's name, only with more than one: a dot in its colour and the name, small
-                final corner = badge == null
+                // the country of the site's server, small, top right
+                final corner = country.isEmpty
                     ? null
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: badge.colour),
-                          ),
-                          const Gap(3),
-                          Flexible(
-                            child: Text(
-                              badge.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10 * k,
-                                fontWeight: FontWeight.w700,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
+                    : Text(
+                        country,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10 * k, fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant),
                       );
                 final unitStyle = TextStyle(
                   fontSize: 12 * k,
