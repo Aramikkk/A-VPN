@@ -42,7 +42,7 @@ class AutoPing {
     unawaited(_ref.read(Preferences.lastAutoPing.notifier).update(_last!.millisecondsSinceEpoch));
     unawaited(() async {
       try {
-        await refreshHomeIndicators(read: _ref.read);
+        await refreshHomeIndicators(read: _ref.read, quiet: true);
       } catch (_) {
         // the list isn't there: the next half hour tries again
       }
@@ -60,7 +60,7 @@ class AutoPing {
     // a moment for the core's server list after connecting
     Future<void>.delayed(const Duration(seconds: 2), () async {
       try {
-        await refreshHomeIndicators(read: _ref.read);
+        await refreshHomeIndicators(read: _ref.read, quiet: true);
       } catch (_) {
         // the list isn't there yet: the next opening tries again
         _last = null;

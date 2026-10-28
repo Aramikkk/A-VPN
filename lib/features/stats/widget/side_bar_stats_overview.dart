@@ -276,11 +276,6 @@ class SideBarStatsOverview extends ConsumerWidget {
       final muted = scheme.onSurfaceVariant;
       Widget pane({required Widget child, EdgeInsets padding = const EdgeInsets.all(10)}) => Container(
         padding: padding,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: dark ? .07 : .24),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
-        ),
         child: child,
       );
       // as dense as the other pages' cards (solo), not the lighter home block that has tiles of its own inside
@@ -1263,11 +1258,6 @@ class _LossDay extends ConsumerWidget {
         : '${(v * 100).toStringAsFixed(v < .1 ? 1 : 0).replaceAll('.', ',')}%';
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: dark ? .07 : .24),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1347,7 +1337,6 @@ class _PingBlock extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
     final muted = scheme.onSurfaceVariant;
     final samples = ref.watch(connectionQualityProvider);
     final full = ref.read(connectionQualityProvider.notifier).period(range);
@@ -1392,11 +1381,6 @@ class _PingBlock extends ConsumerWidget {
     );
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: dark ? .07 : .24),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
