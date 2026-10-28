@@ -91,6 +91,7 @@ class HomePage extends HookConsumerWidget {
                 ),
               ),
             ),
+          if (contrast && !superLight) const Gap(6),
           // the super light mode's switch (adding a profile is on the empty home screen and in the profiles list)
           Semantics(
             key: const ValueKey("super_light_button"),
@@ -106,6 +107,7 @@ class HomePage extends HookConsumerWidget {
             ),
           ),
           // the cog: the phone's way to Settings (a computer has them in its menu)
+          if (contrast && !PlatformUtils.isDesktop) const Gap(6),
           if (contrast && !PlatformUtils.isDesktop)
             plate(
               IconButton(

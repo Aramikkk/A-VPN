@@ -510,23 +510,48 @@ class ContrastThemePicker extends ConsumerWidget {
           ),
         ),
         if (!glass) ...[
-          // how the home screen is laid out: the tiles as they were, or one of the newer layouts
+          // how the home screen is laid out: a picture of each, with its name
           heading(t.avpn.homeLayoutTitle),
           card(
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Row(
               children: [
                 for (final l in HomeLayout.values)
-                  ChoiceChip(
-                    label: Text(switch (l) {
-                      HomeLayout.classic => t.avpn.homeLayoutClassic,
-                      HomeLayout.vessel => t.avpn.homeLayoutVessel,
-                      HomeLayout.pulse => t.avpn.homeLayoutPulse,
-                      HomeLayout.route => t.avpn.homeLayoutRoute,
-                    }),
-                    selected: ref.watch(Preferences.homeLayout) == l,
-                    onSelected: (_) => ref.read(Preferences.homeLayout.notifier).update(l),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => ref.read(Preferences.homeLayout.notifier).update(l),
+                        child: Column(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: l == ref.watch(Preferences.homeLayout) ? accent : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                              child: AspectRatio(
+                                aspectRatio: .56,
+                                child: CustomPaint(painter: _HomeLayoutThumb(l, accent: accent, dark: dark)),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            label(
+                              switch (l) {
+                                HomeLayout.classic => t.avpn.homeLayoutClassic,
+                                HomeLayout.vessel => t.avpn.homeLayoutVessel,
+                                HomeLayout.pulse => t.avpn.homeLayoutPulse,
+                              },
+                              l == ref.watch(Preferences.homeLayout),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -618,4 +643,125 @@ class ContrastThemePicker extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// A small picture of a home layout: the blocks of the screen as flat shapes.
+class _HomeLayoutThumb extends CustomPainter {
+  _HomeLayoutThumb(this.layout, {required this.accent, required this.dark});
+
+  final HomeLayout layout;
+  final Color accent;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final screen = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(w * .1));
+    canvas.drawRRect(screen, Paint()..color = dark ? const Color(0xFF1B1D21) : const Color(0xFFEFEDE8));
+    final tile = Paint()..color = dark ? const Color(0xFF2A2D33) : Colors.white;
+    final water = Paint()..color = accent.withValues(alpha: .8);
+    final soft = Paint()..color = accent.withValues(alpha: .35);
+    final line = Paint()
+      ..color = accent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * .022
+      ..strokeCap = StrokeCap.round;
+    final pad = w * .07;
+    final r = Radius.circular(w * .045);
+    void box(Rect rect, Paint paint) => canvas.drawRRect(RRect.fromRectAndRadius(rect, r), paint);
+    var y = h * .05;
+
+    // the top block
+    switch (layout) {
+      case HomeLayout.classic:
+        final tw = (w - pad * 2 - w * .04) / 3;
+        for (var i = 0; i < 3; i++) {
+          final x = pad + i * (tw + w * .02);
+          box(Rect.fromLTWH(x, y, tw, h * .11), tile);
+          if (i != 1) box(Rect.fromLTWH(x, y + h * .06, tw, h * .05), soft);
+        }
+        y += h * .14;
+      case HomeLayout.vessel:
+        final d = w * .5;
+        final c = Offset(w / 2, y + d / 2);
+        canvas.drawCircle(c, d / 2, tile);
+        canvas.save();
+        canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: d / 2)));
+        canvas.drawRect(Rect.fromLTWH(c.dx - d / 2, c.dy - d * .1, d, d * .6), water);
+        canvas.restore();
+        y += d + h * .02;
+        box(Rect.fromLTWH(pad, y, (w - pad * 2) * .48, h * .045), tile);
+        box(Rect.fromLTWH(pad + (w - pad * 2) * .52, y, (w - pad * 2) * .48, h * .045), tile);
+        y += h * .065;
+      case HomeLayout.pulse:
+        box(Rect.fromLTWH(pad, y, w - pad * 2, h * .15), tile);
+        final p = Path()..moveTo(pad * 1.6, y + h * .1);
+        for (var i = 1; i <= 8; i++) {
+          p.lineTo(pad * 1.6 + (w - pad * 3.2) * i / 8, y + h * (i.isEven ? .11 : .075));
+        }
+        canvas.drawPath(p, line);
+        y += h * .16;
+        box(Rect.fromLTWH(pad, y, (w - pad * 2) * .48, h * .045), tile);
+        box(Rect.fromLTWH(pad + (w - pad * 2) * .52, y, (w - pad * 2) * .48, h * .045), tile);
+        y += h * .065;
+    }
+
+    // the server's card
+    box(Rect.fromLTWH(pad, y, w - pad * 2, h * .06), tile);
+    canvas.drawCircle(Offset(pad * 1.9, y + h * .03), w * .025, soft);
+    y += h * .08;
+
+    // the sites
+    switch (layout) {
+      case HomeLayout.classic:
+        final tw = (w - pad * 2 - w * .04) / 3;
+        for (var row = 0; row < 2; row++) {
+          for (var i = 0; i < 3; i++) {
+            final x = pad + i * (tw + w * .02);
+            final top = y + row * (h * .15 + h * .02);
+            box(Rect.fromLTWH(x, top, tw, h * .15), tile);
+            box(Rect.fromLTWH(x, top + h * .15 * (row == 1 && i == 2 ? .6 : .35), tw, h * .15 * (row == 1 && i == 2 ? .4 : .65)), soft);
+          }
+        }
+        y += h * .32;
+      case HomeLayout.vessel:
+        box(Rect.fromLTWH(pad, y, w - pad * 2, h * .17), tile);
+        for (var i = 0; i < 6; i++) {
+          final bh = h * (.05 + ((i * 5) % 7) * .012);
+          final x = pad * 1.6 + i * ((w - pad * 3.2) / 6) + w * .012;
+          box(Rect.fromLTWH(x, y + h * .15 - bh, w * .035, bh), water);
+        }
+        y += h * .19;
+      case HomeLayout.pulse:
+        final tw = (w - pad * 2 - w * .04) / 3;
+        for (var row = 0; row < 2; row++) {
+          for (var i = 0; i < 3; i++) {
+            final x = pad + i * (tw + w * .02);
+            final top = y + row * (h * .1 + h * .02);
+            box(Rect.fromLTWH(x, top, tw, h * .1), tile);
+            final q = Path()..moveTo(x + tw * .08, top + h * .08);
+            for (var k = 1; k <= 5; k++) {
+              q.lineTo(x + tw * (.08 + .84 * k / 5), top + h * (k.isEven ? .085 : .06));
+            }
+            canvas.drawPath(q, line..strokeWidth = w * .015);
+          }
+        }
+        line.strokeWidth = w * .022;
+        y += h * .24;
+    }
+
+    // the connections' block and the connect panel
+    box(Rect.fromLTWH(pad, y, w - pad * 2, h * .05), tile);
+    final panel = RRect.fromRectAndCorners(
+      Rect.fromLTWH(0, h * .86, w, h * .14),
+      topLeft: Radius.circular(w * .1),
+      topRight: Radius.circular(w * .1),
+    );
+    canvas.drawRRect(panel, Paint()..color = dark ? const Color(0xFF0B0C0E) : Colors.white);
+    box(Rect.fromCenter(center: Offset(w / 2, h * .905), width: w * .2, height: h * .06), water);
+  }
+
+  @override
+  bool shouldRepaint(_HomeLayoutThumb old) => old.layout != layout || old.accent != accent || old.dark != dark;
 }

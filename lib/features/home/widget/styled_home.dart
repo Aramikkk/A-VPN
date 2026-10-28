@@ -89,7 +89,7 @@ class _StyledHome extends HookConsumerWidget {
             ? const _NoAdminNote()
             : null,
         status: _StatusBlock(status: status, lastServer: currentName, visible: visible, layout: layout),
-        // the vessel and the pulse keep the sites small, the route puts the flow diagram where the tiles were
+        // the vessel and the pulse keep the sites small
         compactTraffic: layout == HomeLayout.vessel || layout == HomeLayout.pulse,
         servers: hasList
             ? Column(
@@ -167,11 +167,10 @@ class _StyledHome extends HookConsumerWidget {
                   ? switch (layout) {
                       HomeLayout.vessel => const _SiteBars(),
                       HomeLayout.pulse => _SiteTiles(visible: visible, compact: true),
-                      HomeLayout.route => const _RouteMini(),
                       HomeLayout.classic => _SiteTiles(visible: visible),
                     }
                   : null),
-        toggles: superLight ? null : (layout == HomeLayout.route ? null : const _ConnectionsBlock()),
+        toggles: superLight ? null : const _ConnectionsBlock(),
       );
     }
     return LayoutBuilder(
@@ -1900,7 +1899,7 @@ class _ContrastHome extends StatelessWidget {
                 if (!superLight) ...[_ContrastBlock(child: servers), const Gap(14)],
                 if (traffic != null && compactTraffic) ...[
                   const Spacer(),
-                  traffic!,
+                  _ContrastBlock(child: traffic!),
                   const Spacer(),
                 ] else if (traffic != null)
                   Expanded(child: _ContrastBlock(expand: true, child: traffic!))
@@ -3535,16 +3534,13 @@ class _SiteTiles extends HookConsumerWidget {
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final sites = ref.watch(siteLatencyProvider);
-    // the "own server per app" switch of the network the phone is on now (Wi-Fi and LTE each have theirs)
-    final onMobile = useListenable(_actualNetworkKind).value == NetworkKind.mobile;
-    final multiPref = onMobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups;
-    final multiOn = ref.watch(multiPref);
+    // the sites' last delays, for the pulse behind a compact tile
+    final history = compact ? ref.watch(siteHistoryProvider) : const <String, List<int?>>{};
     // the tiles: the apps marked in Settings → Sites (their own icons and names)
     final shown = ref.watch(homeSitesProvider);
     final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     // the marks of a good delay, by the method (HTTPS is higher by nature)
     final grade = siteGrade(ref.watch(ConfigOptions.pingHttps));
-    final accent = theme.araAccent;
     // each site's own server (Settings → Ping → Sites, beta): its flag in the tile's corner
     final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const {};
     // the server everything else goes through: a site's flag shows only when its own one is another
@@ -3570,17 +3566,10 @@ class _SiteTiles extends HookConsumerWidget {
         child: Stack(
           children: [
             if (compact)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: 5,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: FractionallySizedBox(
-                    widthFactor: math.max(level, .06),
-                    child: Container(color: colour),
-                  ),
+              // the delay's last rounds as a soft curve across the tile's lower part, in the delay's colour
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(painter: _TilePulsePainter(history: history[site.key] ?? const [], colour: colour)),
                 ),
               )
             else

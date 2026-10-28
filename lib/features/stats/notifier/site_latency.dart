@@ -245,3 +245,31 @@ class SiteLatency extends Notifier<SiteLatencyState> {
     state = (ms: results, at: DateTime.now(), testing: false, done: shown.length);
   }
 }
+
+/// Each site's last delays, one per finished round (null: no answer), oldest first: what the sites' tiles draw as their
+/// pulse. Kept while the app runs.
+final siteHistoryProvider = NotifierProvider<SiteHistory, Map<String, List<int?>>>(SiteHistory.new);
+
+class SiteHistory extends Notifier<Map<String, List<int?>>> {
+  /// how many rounds are kept
+  static const length = 30;
+
+  DateTime? _last;
+
+  @override
+  Map<String, List<int?>> build() {
+    ref.listen(siteLatencyProvider, (_, next) {
+      // a round that has just finished
+      if (next.testing || next.at == null || next.at == _last) return;
+      _last = next.at;
+      final grown = {for (final e in state.entries) e.key: List<int?>.of(e.value)};
+      for (final e in next.ms.entries) {
+        final list = grown.putIfAbsent(e.key, () => <int?>[]);
+        list.add(e.value);
+        if (list.length > length) list.removeAt(0);
+      }
+      state = grown;
+    });
+    return const {};
+  }
+}

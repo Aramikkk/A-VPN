@@ -411,14 +411,13 @@ class _PulseStats extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final accent = theme.araAccent;
     final samples = connected ? ref.watch(connectionQualityProvider) : const <int?>[];
     final line = AraLook.readableOn(accent, scheme.surface);
     Widget pill(IconData icon, String text, Color colour) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         color: colour.withValues(alpha: .12),
@@ -427,11 +426,11 @@ class _PulseStats extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: colour),
-          const Gap(5),
+          Icon(icon, size: 16, color: colour),
+          const Gap(6),
           Text(
             text,
-            style: theme.textTheme.labelMedium?.copyWith(
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
               color: scheme.onSurface,
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -440,7 +439,6 @@ class _PulseStats extends ConsumerWidget {
         ],
       ),
     );
-    final clean = loss == 0;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -474,7 +472,7 @@ class _PulseStats extends ConsumerWidget {
                             ],
                           ),
                           style: theme.textTheme.headlineMedium?.copyWith(
-                            fontSize: 44,
+                            fontSize: 40,
                             height: 1.05,
                             fontWeight: FontWeight.w600,
                             letterSpacing: -2,
@@ -485,23 +483,16 @@ class _PulseStats extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      pill(Icons.access_time_filled_rounded, timeText, scheme.onSurfaceVariant),
-                      const Gap(6),
-                      pill(
-                        clean ? Icons.check_circle_rounded : Icons.error_rounded,
-                        t.avpn.dockLoss(loss: _lossText(loss)),
-                        clean ? accent : scheme.error,
-                      ),
-                    ],
+                  // the time alone (the loss is in the connect panel)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: pill(Icons.access_time_filled_rounded, timeText, scheme.onSurfaceVariant),
                   ),
                 ],
               ),
               const Gap(4),
               SizedBox(
-                height: 62,
+                height: 52,
                 child: RepaintBoundary(
                   child: CustomPaint(
                     painter: _PulsePainter(
@@ -517,7 +508,7 @@ class _PulseStats extends ConsumerWidget {
               ),
             ],
           ),
-          padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+          padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
           radius: 22,
         ),
         const Gap(6),
@@ -626,34 +617,71 @@ class _SiteBars extends ConsumerWidget {
   }
 }
 
-/// The connections as a small flow diagram, the same as on the Topology tab: who goes where, as thick as their count.
-class _RouteMini extends ConsumerWidget {
-  const _RouteMini();
+/// A site tile's pulse: the delay's last rounds as a soft curve with a glow under it, across the tile's lower half.
+class _TilePulsePainter extends CustomPainter {
+  _TilePulsePainter({required this.history, required this.colour});
+
+  final List<int?> history;
+  final Color colour;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final open = [
-      for (final c in ref.watch(connectionsProvider).items)
-        if (c.active) c,
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const _SitesHeader(),
-        Expanded(
-          child: open.isEmpty
-              ? const Center(child: TrafficPlaceholder(height: 60))
-              : LayoutBuilder(
-                  builder: (context, box) => TrafficSankey(
-                    items: open,
-                    height: box.maxHeight.isFinite ? box.maxHeight : 220,
-                    unit: 1,
-                    weight: (c) => c.count.toDouble(),
-                    value: (w) => '${w.round()}',
-                  ),
-                ),
-        ),
-      ],
-    );
+  void paint(Canvas canvas, Size size) {
+    final answered = [for (final h in history) if (h != null) h];
+    if (history.length < 2 || answered.length < 2) return;
+    var low = answered.reduce(math.min).toDouble();
+    var high = answered.reduce(math.max).toDouble();
+    if (high - low < 40) {
+      final mid = (high + low) / 2;
+      low = mid - 20;
+      high = mid + 20;
+    }
+    final top = size.height * .5;
+    final bottom = size.height * .82;
+    double y(num ms) => bottom - (ms - low) / (high - low) * (bottom - top);
+    final step = size.width / (history.length - 1);
+    final runs = <List<Offset>>[];
+    var current = <Offset>[];
+    for (final (i, h) in history.indexed) {
+      if (h == null) {
+        if (current.isNotEmpty) runs.add(current);
+        current = [];
+        continue;
+      }
+      current.add(Offset(i * step, y(h)));
+    }
+    if (current.isNotEmpty) runs.add(current);
+    final fill = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [colour.withValues(alpha: .17), colour.withValues(alpha: 0)],
+      ).createShader(Rect.fromLTWH(0, top, size.width, size.height - top));
+    final stroke = Paint()
+      ..color = colour.withValues(alpha: .5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    for (final run in runs) {
+      if (run.length < 2) continue;
+      final path = Path()..moveTo(run.first.dx, run.first.dy);
+      for (var k = 1; k < run.length; k++) {
+        final a = run[k - 1];
+        final b = run[k];
+        final mid = (a.dx + b.dx) / 2;
+        path.cubicTo(mid, a.dy, mid, b.dy, b.dx, b.dy);
+      }
+      canvas.drawPath(
+        Path.from(path)
+          ..lineTo(run.last.dx, size.height)
+          ..lineTo(run.first.dx, size.height)
+          ..close(),
+        fill,
+      );
+      canvas.drawPath(path, stroke);
+    }
   }
+
+  @override
+  bool shouldRepaint(_TilePulsePainter old) => !listEquals(old.history, history) || old.colour != colour;
 }

@@ -298,6 +298,7 @@ void main() {
               connectionsProvider.overrideWith(_Connections.new),
               connectionQualityProvider.overrideWith(_Quality.new),
               siteLatencyProvider.overrideWith(_Sites.new),
+              siteHistoryProvider.overrideWith(_SiteHistory.new),
               // SUPERLIGHT=1: the super light mode
               if (Platform.environment['SUPERLIGHT'] == '1') superLightProvider.overrideWithValue(true),
               // HOMEAPPS=pkg,pkg: these apps of Settings -> Sites marked for the home screen's delay block (the phone's way)
@@ -611,6 +612,20 @@ class _ShellPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Theme(data: contrastPageTheme(Theme.of(context)), child: child);
+}
+
+/// WAVY=1: a history of the sites' delays for their pulse.
+class _SiteHistory extends SiteHistory {
+  @override
+  Map<String, List<int?>> build() => Platform.environment['WAVY'] != '1'
+      ? const {}
+      : {
+          for (final (i, site) in latencySites.indexed)
+            site.key: [
+              for (var k = 0; k < 24; k++)
+                k == 9 && i == 4 ? null : 40 + i * 25 + ((k * (13 + i * 5)) % 31) + (k > 16 ? 10 * (i % 3) : 0),
+            ],
+        };
 }
 
 /// The sites' delays as measured: SITES=<ms,...> in the order of latencySites ('-' for no answer).
