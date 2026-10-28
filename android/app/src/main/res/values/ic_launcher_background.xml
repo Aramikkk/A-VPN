@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- by day a white icon with a dark peak; by night (values-night) a dark one with a white peak -->
-    <color name="ic_launcher_background">#FAFAFA</color>
+    <!-- by day the Dots paper with black dots; by night (values-night) black with light dots -->
+    <color name="ic_launcher_background">#EAE9E5</color>
 </resources>
