@@ -301,6 +301,10 @@ void main() {
                                 'serversOptions',
                                 'dnsOptions',
                                 'inboundOptions',
+                                'profileManagement',
+                                'pingOptions',
+                                'sitesOptions',
+                                'adBlockOptions',
                                 'logs',
                                 'about',
                               ])

@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
@@ -509,6 +510,27 @@ class ContrastThemePicker extends ConsumerWidget {
           ),
         ),
         if (!glass) ...[
+          // how the home screen is laid out: the tiles as they were, or one of the newer layouts
+          heading(t.avpn.homeLayoutTitle),
+          card(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final l in HomeLayout.values)
+                  ChoiceChip(
+                    label: Text(switch (l) {
+                      HomeLayout.classic => t.avpn.homeLayoutClassic,
+                      HomeLayout.vessel => t.avpn.homeLayoutVessel,
+                      HomeLayout.pulse => t.avpn.homeLayoutPulse,
+                      HomeLayout.route => t.avpn.homeLayoutRoute,
+                    }),
+                    selected: ref.watch(Preferences.homeLayout) == l,
+                    onSelected: (_) => ref.read(Preferences.homeLayout.notifier).update(l),
+                  ),
+              ],
+            ),
+          ),
           heading(t.avpn.contrastBackdropTitle),
           card(
             GridView.count(

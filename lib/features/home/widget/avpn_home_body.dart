@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +27,8 @@ import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/features/stats/widget/traffic_sankey.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
@@ -59,6 +62,7 @@ import 'package:hiddify/utils/windows_elevation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 part 'styled_home.dart';
+part 'home_layouts.dart';
 
 final _actualNetworkKind = ValueNotifier<NetworkKind>(NetworkKind.unknown);
 

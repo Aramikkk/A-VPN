@@ -1,5 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/core/theme/ara_accent.dart';
+import 'package:hiddify/core/theme/contrast_look.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -138,107 +143,123 @@ class SettingsPage extends HookConsumerWidget {
           const Gap(8),
         ],
       ),
-      // the sections in one outlined block, so the list reads as a whole; its rows share the screen's height, so it
-      // fills it exactly (on a short screen they keep their usual height and the list scrolls)
-      body: LayoutBuilder(
-        builder: (context, box) {
-          final rows = 11 + (PlatformUtils.isIOS ? 1 : 0);
-          final row = ((box.maxHeight - 14) / rows).clamp(44.0, 72.0);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            children: [
-              _Frame(
-                child: Material(
-                  type: MaterialType.transparency,
+      // the sections as squares in one block: a sign, the name and a line of what is in it
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        children: [
+          _Frame(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: _SectionGrid(
+                items: [
+                  (Icons.view_list_rounded, t.pages.profiles.title, t.avpn.settingsCapProfiles, context.namedLocation('profiles')),
+                  (Icons.tune_rounded, t.avpn.profileManagement, t.avpn.settingsCapManagement, context.namedLocation('profileManagement')),
+                  (Icons.layers_rounded, t.pages.settings.general.title, t.avpn.settingsCapGeneral, context.namedLocation('general')),
+                  (Icons.power_settings_new_rounded, t.avpn.settingsConnection, t.avpn.settingsCapConnection, context.namedLocation('connectionOptions')),
+                  (Icons.palette_rounded, t.avpn.themes, t.avpn.settingsCapThemes, context.namedLocation('themes')),
+                  (Icons.route_rounded, t.pages.settings.routing.title, t.avpn.settingsCapRouting, context.namedLocation('routingOptions')),
+                  (Icons.dns_outlined, t.avpn.settingsServers, t.avpn.settingsCapServers, context.namedLocation('serversOptions')),
+                  (Icons.network_ping_rounded, t.avpn.pingSettings, t.avpn.settingsCapPing, context.namedLocation('pingOptions')),
+                  // each site and chosen app through its own server (beta); DNS is under Inbound now
+                  (Icons.alt_route_rounded, t.avpn.pingSites, t.avpn.settingsCapSites, context.namedLocation('sitesOptions')),
+                  (Icons.block_rounded, t.avpn.adBlock, t.avpn.settingsCapAdBlock, context.namedLocation('adBlockOptions')),
+                  (Icons.input_rounded, t.pages.settings.inbound.title, t.avpn.settingsCapInbound, context.namedLocation('inboundOptions')),
+                ],
+              ),
+            ),
+          ),
+          if (PlatformUtils.isIOS)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Material(
+                child: ListTile(
+                  title: Text(t.pages.settings.resetTunnel),
+                  leading: const Icon(Icons.autorenew_rounded),
+                  onTap: () async {
+                    await ref.read(resetTunnelNotifierProvider.notifier).run();
+                  },
+                ),
+              ),
+            ),
+          // the logs and About are in General now
+        ],
+      ),
+    );
+  }
+}
+
+/// The sections as squares, two to a row: the last one, when alone in its row, stretches across it.
+class _SectionGrid extends StatelessWidget {
+  const _SectionGrid({required this.items});
+
+  /// (sign, name, what is in it, where it goes)
+  final List<(IconData, String, String, String)> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.araAccent;
+    return LayoutBuilder(
+      builder: (context, box) {
+        const gap = 8.0;
+        final side = (box.maxWidth - gap) / 2;
+        Widget tile(int i, double width) {
+          final (icon, title, caption, where) = items[i];
+          return SizedBox(
+            width: width,
+            // enough for the sign, two lines of the name and two of the caption on a narrow screen
+            height: math.max(side * .82, 140.0),
+            child: Material(
+              color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => context.go(where),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // TipCard(message: t.settings.experimentalMsg),
-                      SettingsSection(
-                        height: row,
-                        title: t.pages.profiles.title,
-                        icon: Icons.view_list_rounded,
-                        namedLocation: context.namedLocation('profiles'),
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
+                        child: Icon(icon, size: 19, color: ContrastPalette.ink),
                       ),
-                      SettingsSection(
-                        height: row,
-                        title: t.avpn.profileManagement,
-                        icon: Icons.tune_rounded,
-                        namedLocation: context.namedLocation('profileManagement'),
+                      const Spacer(),
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.15),
                       ),
-                      SettingsSection(
-                        height: row,
-                        title: t.pages.settings.general.title,
-                        icon: Icons.layers_rounded,
-                        namedLocation: context.namedLocation('general'),
+                      const Gap(2),
+                      Text(
+                        caption,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
                       ),
-                      SettingsSection(
-                        height: row,
-                        title: t.avpn.settingsConnection,
-                        icon: Icons.power_settings_new_rounded,
-                        namedLocation: context.namedLocation('connectionOptions'),
-                      ),
-                      SettingsSection(
-                        height: row,
-                        title: t.avpn.themes,
-                        icon: Icons.palette_rounded,
-                        namedLocation: context.namedLocation('themes'),
-                      ),
-                      SettingsSection(
-                        height: row,
-                        title: t.pages.settings.routing.title,
-                        icon: Icons.route_rounded,
-                        namedLocation: context.namedLocation('routingOptions'),
-                      ),
-                      SettingsSection(
-                        height: row,
-                        title: t.avpn.settingsServers,
-                        icon: Icons.dns_outlined,
-                        namedLocation: context.namedLocation('serversOptions'),
-                      ),
-                      SettingsSection(
-                        height: row,
-                        title: t.avpn.pingSettings,
-                        icon: Icons.network_ping_rounded,
-                        namedLocation: context.namedLocation('pingOptions'),
-                      ),
-                      // each site and chosen app through its own server (beta); DNS is under Inbound now
-                      SettingsSection(
-                        height: row,
-                        title: t.avpn.pingSites,
-                        icon: Icons.alt_route_rounded,
-                        namedLocation: context.namedLocation('sitesOptions'),
-                      ),
-                      SettingsSection(
-                        height: row,
-                        title: t.avpn.adBlock,
-                        icon: Icons.block_rounded,
-                        namedLocation: context.namedLocation('adBlockOptions'),
-                      ),
-                      SettingsSection(
-                        height: row,
-                        title: t.pages.settings.inbound.title,
-                        icon: Icons.input_rounded,
-                        namedLocation: context.namedLocation('inboundOptions'),
-                      ),
-                      if (PlatformUtils.isIOS)
-                        Material(
-                          child: ListTile(
-                            title: Text(t.pages.settings.resetTunnel),
-                            leading: const Icon(Icons.autorenew_rounded),
-                            onTap: () async {
-                              await ref.read(resetTunnelNotifierProvider.notifier).run();
-                            },
-                          ),
-                        ),
-                      // the logs and About are in General now
                     ],
                   ),
                 ),
               ),
-            ],
+            ),
           );
-        },
-      ),
+        }
+
+        final tiles = <Widget>[];
+        for (var i = 0; i < items.length; i++) {
+          final alone = i == items.length - 1 && items.length.isOdd;
+          tiles.add(tile(i, alone ? box.maxWidth : side));
+        }
+        return Wrap(spacing: gap, runSpacing: gap, children: tiles);
+      },
     );
   }
 }

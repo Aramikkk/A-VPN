@@ -1,3 +1,4 @@
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -256,6 +257,14 @@ abstract class Preferences {
     ContrastPalette.fallback,
     mapFrom: (value) =>
         ContrastPalette.values.firstWhere((e) => e.name == value, orElse: () => ContrastPalette.fallback),
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: how the home screen is laid out (Contrast).
+  static final homeLayout = PreferencesNotifier.create<HomeLayout, String>(
+    "home_layout",
+    HomeLayout.classic,
+    mapFrom: HomeLayout.fromName,
     mapTo: (value) => value.name,
   );
 

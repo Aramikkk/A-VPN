@@ -233,6 +233,7 @@ void main() {
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
           if (Platform.environment['LIGHT'] == '1') 'light_look': true,
+          if ((Platform.environment['HOMELAYOUT'] ?? '').isNotEmpty) 'home_layout': Platform.environment['HOMELAYOUT']!,
           if (Platform.environment['SUPERLIGHT'] == '1') 'super_light': true,
           if (Platform.environment['BADGES'] == '1') 'extra_profiles': 'chill;third',
         });
@@ -480,7 +481,7 @@ void main() {
           }
         }
         // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
-        if (connected && contrast && Platform.environment['SUPERLIGHT'] != '1') {
+        if (connected && contrast && Platform.environment['SUPERLIGHT'] != '1' && (Platform.environment['HOMELAYOUT'] ?? '').isEmpty) {
           final sites = find.byKey(const Key('contrast-sites'));
           expect(sites, findsOneWidget);
           expect(find.byKey(const Key('contrast-traffic')), findsNothing);

@@ -43,6 +43,8 @@ class _StyledHome extends HookConsumerWidget {
     final serverMode = ref.watch(ConfigOptions.homeNetwork);
     // the super light mode: the servers in a list of their own where the delays were, and nothing else
     final superLight = ref.watch(superLightProvider);
+    // how the blocks are laid out (the super light mode has its own look)
+    final layout = superLight ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
     // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one
     // (about 830) keeps everything tight
     final roomy = MediaQuery.sizeOf(context).height >= 900;
@@ -86,7 +88,9 @@ class _StyledHome extends HookConsumerWidget {
         notice: ref.watch(tunDeniedProvider) && ref.watch(ConfigOptions.serviceMode) == ServiceMode.tun
             ? const _NoAdminNote()
             : null,
-        status: _StatusBlock(status: status, lastServer: currentName, visible: visible),
+        status: _StatusBlock(status: status, lastServer: currentName, visible: visible, layout: layout),
+        // the vessel and the pulse keep the sites small, the route puts the flow diagram where the tiles were
+        compactTraffic: layout == HomeLayout.vessel || layout == HomeLayout.pulse,
         servers: hasList
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,8 +163,15 @@ class _StyledHome extends HookConsumerWidget {
                       testing: testing,
                     )
                   : null)
-            : (traffic && hasList ? _SiteTiles(visible: visible) : null),
-        toggles: superLight ? null : const _ConnectionsBlock(),
+            : (traffic && hasList
+                  ? switch (layout) {
+                      HomeLayout.vessel => const _SiteBars(),
+                      HomeLayout.pulse => const _SiteChips(),
+                      HomeLayout.route => const _RouteMini(),
+                      HomeLayout.classic => _SiteTiles(visible: visible),
+                    }
+                  : null),
+        toggles: superLight ? null : (layout == HomeLayout.route ? null : const _ConnectionsBlock()),
       );
     }
     return LayoutBuilder(
@@ -235,7 +246,15 @@ class _StyledHome extends HookConsumerWidget {
 
 /// "Защищено" with the time and the speed, or "Отключено".
 class _StatusBlock extends HookConsumerWidget {
-  const _StatusBlock({required this.status, required this.lastServer, required this.visible});
+  const _StatusBlock({
+    required this.status,
+    required this.lastServer,
+    required this.visible,
+    this.layout = HomeLayout.classic,
+  });
+
+  /// how the top of the home screen is laid out
+  final HomeLayout layout;
 
   final ConnectionStatus status;
   final String? lastServer;
@@ -325,6 +344,36 @@ class _StatusBlock extends HookConsumerWidget {
       }
       final routed = total == 0 ? 1 : total;
       final vpnShare = viaVpn / routed;
+      final quality = _sessionQuality(ref, connected);
+      final downFigure = amount(connected ? stats?.downlink.toInt() ?? 0 : 0, perSecond: true);
+      final upFigure = amount(connected ? stats?.uplink.toInt() ?? 0 : 0, perSecond: true);
+      final timeFigure = connected ? time : (waiting ?? '—');
+      if (layout == HomeLayout.vessel) {
+        return _VesselStats(
+          connected: connected,
+          timeText: timeFigure,
+          ping: quality.ping,
+          loss: quality.loss,
+          down: downFigure,
+          up: upFigure,
+          vpn: vpn,
+          direct: direct,
+          vpnShare: total == 0 ? 0 : vpnShare,
+        );
+      }
+      if (layout == HomeLayout.pulse) {
+        return _PulseStats(
+          connected: connected,
+          timeText: timeFigure,
+          ping: quality.ping,
+          loss: quality.loss,
+          down: downFigure,
+          up: upFigure,
+          vpn: vpn,
+          direct: direct,
+          vpnShare: total == 0 ? 0 : vpnShare,
+        );
+      }
       // the two routes in one tile, the time in the middle, the speeds on the right
       return _HomeStats(
         timeText: connected ? time : (waiting ?? '—'),
@@ -1805,7 +1854,11 @@ class _ContrastHome extends StatelessWidget {
     required this.toggles,
     this.notice,
     this.superLight = false,
+    this.compactTraffic = false,
   });
+
+  /// the traffic block holds only what it needs (the rest of the room is left under it)
+  final bool compactTraffic;
 
   /// "Серверы · Sigma · 23 дн. · Обновить", over the blocks
   final Widget header;
@@ -1845,7 +1898,14 @@ class _ContrastHome extends StatelessWidget {
                 const Gap(14),
                 // the super light mode: the servers' list below holds the one in use, so not twice
                 if (!superLight) ...[_ContrastBlock(child: servers), const Gap(14)],
-                if (traffic != null) Expanded(child: _ContrastBlock(expand: true, child: traffic!)) else const Spacer(),
+                if (traffic != null && compactTraffic) ...[
+                  const Spacer(),
+                  traffic!,
+                  const Spacer(),
+                ] else if (traffic != null)
+                  Expanded(child: _ContrastBlock(expand: true, child: traffic!))
+                else
+                  const Spacer(),
                 // a short screen (the phone turned): the toggles are under the connect control at the side
                 if (toggles != null && !ContrastShellDock.sideways(context)) ...[const Gap(14), _ContrastBlock(child: toggles!)],
               ],
