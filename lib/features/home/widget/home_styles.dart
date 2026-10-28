@@ -126,7 +126,8 @@ class _SparkPainter extends CustomPainter {
     if (values.length < 2) return;
     // from zero to a round number over the highest answer (at least 200 ms): 40 ms and 100 ms sit at different
     // heights, the same on every look (it was drawn from the lowest to the highest answer, so any ping filled it)
-    final top = _niceMax(values.reduce(math.max), least: 200);
+    // capped at 400 ms: a few timeouts (1500 ms) must not squash every normal answer into a stripe; they run off the top
+    final top = math.min(_niceMax(values.reduce(math.max), least: 200), 400.0);
     final plot = size.width - 22;
     for (final mark in const [100, 200, 400, 800]) {
       if (mark > top) break;
@@ -155,7 +156,7 @@ class _SparkPainter extends CustomPainter {
     final path = Path();
     for (final (i, v) in values.indexed) {
       final x = plot * i / (values.length - 1);
-      final y = 3 + (size.height - 6) * (1 - v / top);
+      final y = 3 + (size.height - 6) * (1 - (v / top).clamp(0.0, 1.0));
       i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
     }
     canvas.drawPath(
@@ -707,45 +708,67 @@ class _DotNumberPainter extends CustomPainter {
 /// A line of the dotted sheet: a label in small capitals on the left, the value on the right.
 Widget _dotRow(BuildContext context, String label, String value, {Color? valueColour, String? country}) {
   final dark = Theme.of(context).brightness == Brightness.dark;
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(
-      children: [
-        Expanded(
+  final row = Row(
+    children: [
+      Expanded(
+        child: Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _Dots.mono(11, _Dots.soft(dark)),
+        ),
+      ),
+      const Gap(8),
+      // the sites' lines: the country in a column of its own between the name and the delay, where the site's server
+      // is in another country than the main one (blank where it is the same), the delay in a column too
+      if (country != null) ...[
+        SizedBox(
+          width: 112,
           child: Text(
-            label.toUpperCase(),
+            country.toUpperCase(),
+            textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: _Dots.mono(11, _Dots.soft(dark)),
+            style: _Dots.mono(10, _Dots.ink(dark), spacing: 1),
           ),
         ),
-        const Gap(8),
-        // the sites' lines: the country in a column of its own between the name and the delay, where the site's server
-        // is in another country than the main one (blank where it is the same), the delay in a column too
-        if (country != null) ...[
-          SizedBox(
-            width: 112,
+        SizedBox(
+          width: 40,
+          child: Align(
+            alignment: Alignment.centerRight,
             child: Text(
-              country.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: _Dots.mono(10, _Dots.ink(dark), spacing: 1),
+              value,
+              style: _Dots.mono(15, valueColour ?? _Dots.ink(dark), weight: FontWeight.w800, spacing: .5),
             ),
           ),
-          SizedBox(
-            width: 40,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                value,
-                style: _Dots.mono(15, valueColour ?? _Dots.ink(dark), weight: FontWeight.w800, spacing: .5),
+        ),
+      ] else
+        Text(value, style: _Dots.mono(15, valueColour ?? _Dots.ink(dark), weight: FontWeight.w800, spacing: .5)),
+    ],
+  );
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    // a site in another country than the main one: a faint plate under the whole line (name, country, delay)
+    child: country != null && country.isNotEmpty
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: -6,
+                right: -6,
+                top: -2,
+                bottom: -2,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _Dots.ink(dark).withValues(alpha: dark ? .09 : .07),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ] else
-          Text(value, style: _Dots.mono(15, valueColour ?? _Dots.ink(dark), weight: FontWeight.w800, spacing: .5)),
-      ],
-    ),
+              row,
+            ],
+          )
+        : row,
   );
 }
 
@@ -795,7 +818,8 @@ class _DotsStats extends HookConsumerWidget {
     final bars = samples.length > 24 ? samples.sublist(samples.length - 24) : samples;
     // from zero to a round number over the highest answer (at least 200 ms), marked at 100, 200, 400: a ping of 40 and
     // one of 100 stand at different heights (the bars were scaled to the highest of them, so any ping filled them)
-    final scale = _niceMax(answers.isEmpty ? 1 : answers.reduce(math.max).toDouble(), least: 200);
+    // capped at 400 ms: a few timeouts (1500 ms) must not squash every normal answer into a stripe; they run off the top
+    final scale = math.min(_niceMax(answers.isEmpty ? 1 : answers.reduce(math.max).toDouble(), least: 200), 400.0);
     return _dotPaper(
       context,
       Column(
@@ -1076,7 +1100,10 @@ class _BentoButton extends StatelessWidget {
 }
 
 /// Dots' connect control: a black disc (light by night) with a red dot that glows while connected.
-class _DotsButton extends StatelessWidget {
+/// Dots' connect control: a square-cornered plate (the pills' and plates' shape) with the power sign drawn in dots, a
+/// ring open at the top and a stem; off, faint dots on the paper in an outline, on, the plate in the ink with the sign
+/// lit in the accent; connecting, a lit stretch of the ring runs round it.
+class _DotsButton extends HookWidget {
   const _DotsButton({required this.on, required this.busy, required this.size, this.label, this.onTap});
 
   final bool on;
@@ -1088,36 +1115,98 @@ class _DotsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final disc = _Dots.ink(dark);
+    final spin = useAnimationController(duration: const Duration(milliseconds: 1400));
+    useEffect(() {
+      busy ? spin.repeat() : spin.stop();
+      return null;
+    }, [busy]);
+    final ink = _Dots.ink(dark);
     final paper = _Dots.paper(dark);
-    final dot = on ? _Dots.red : (busy ? _Dots.red.withValues(alpha: .45) : _Dots.soft(dark));
+    final side = size * 1.08;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: disc),
+        width: side,
+        height: side,
+        decoration: BoxDecoration(
+          color: on ? ink : paper,
+          borderRadius: BorderRadius.circular(dotsRadius + 2),
+          border: Border.all(color: ink.withValues(alpha: .7), width: on ? 1 : 1.4),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: size * .2,
-              height: size * .2,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: dot,
-                boxShadow: [if (on) BoxShadow(color: _Dots.red.withValues(alpha: .8), blurRadius: 12)],
+            AnimatedBuilder(
+              animation: spin,
+              builder: (context, _) => CustomPaint(
+                size: Size.square(side * .64),
+                painter: _PowerDotsPainter(
+                  lit: on ? _Dots.red : (busy ? _Dots.red : _Dots.soft(dark)),
+                  stem: on ? paper : _Dots.soft(dark),
+                  faint: (on ? paper : ink).withValues(alpha: .16),
+                  phase: busy ? spin.value : null,
+                  glow: on,
+                ),
               ),
             ),
             if (label != null) ...[
-              const Gap(5),
-              Text(label!.toUpperCase(), style: _Dots.mono(9, paper.withValues(alpha: .8), spacing: 1.6)),
+              const Gap(4),
+              Text(label!.toUpperCase(), style: _Dots.mono(8.5, (on ? paper : ink).withValues(alpha: .75), spacing: 1.4)),
             ],
           ],
         ),
       ),
     );
   }
+}
+
+class _PowerDotsPainter extends CustomPainter {
+  _PowerDotsPainter({required this.lit, required this.stem, required this.faint, required this.phase, required this.glow});
+
+  final Color lit;
+  final Color stem;
+  final Color faint;
+  final double? phase;
+  final bool glow;
+
+  static const _ring = 18;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width * .4;
+    final dot = size.width * .066;
+    final lamp = Paint()..color = lit;
+    for (var i = 0; i < _ring; i++) {
+      // from just right of the top, clockwise; the three at the top are left out for the stem
+      final a = -math.pi / 2 + 2 * math.pi * (i + .5) / _ring;
+      if ((i < 1) || i >= _ring - 1) continue;
+      final p = c + Offset(math.cos(a), math.sin(a)) * r;
+      var on = phase == null;
+      if (phase != null) {
+        final d = ((i / _ring) - phase!) % 1.0;
+        on = (d < 0 ? d + 1 : d) < .3;
+      }
+      canvas.drawCircle(p, dot, on ? lamp : (Paint()..color = faint));
+      if (on && glow) {
+        canvas.drawCircle(
+          p,
+          dot * 2.2,
+          Paint()
+            ..color = lit.withValues(alpha: .35)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+        );
+      }
+    }
+    for (var k = 0; k < 3; k++) {
+      final p = Offset(c.dx, c.dy - r * (1.15 - k * .5));
+      canvas.drawCircle(p, dot, Paint()..color = stem);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PowerDotsPainter old) =>
+      old.lit != lit || old.stem != stem || old.faint != faint || old.phase != phase || old.glow != glow;
 }
 
 /// A pill over the sites (the delay check, the multi-server switch) in a look that has its own: Bento's solid chip,
