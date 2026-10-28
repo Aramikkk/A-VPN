@@ -31,7 +31,9 @@ class TopologyPage extends HookConsumerWidget {
     final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
     final byTraffic = useState(true);
     final controller = useScrollController();
-    final onSecondPage = useState(false);
+    // which page: only the title follows it (a state here rebuilt the whole page, the flows' picture laid out and
+    // drawn again, as the scroll crossed the middle: a jerk between the two pages)
+    final onSecondPage = useValueNotifier(false);
     useEffect(() {
       void follow() {
         final second = controller.hasClients && controller.offset > 200;
@@ -106,15 +108,18 @@ class TopologyPage extends HookConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         // the period the tab covers, under its name
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(t.avpn.topologyTab),
-            // the first page is what is open now; the day is the second page's
-            if (onSecondPage.value)
-              Text(t.avpn.topoPeriod, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-          ],
+        title: ValueListenableBuilder<bool>(
+          valueListenable: onSecondPage,
+          builder: (context, second, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(t.avpn.topologyTab),
+              // the first page is what is open now; the day is the second page's
+              if (second)
+                Text(t.avpn.topoPeriod, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+            ],
+          ),
         ),
         actions: [
           // starts the picture over from now; it starts over by itself at 03:00
