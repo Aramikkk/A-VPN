@@ -3539,6 +3539,19 @@ class _SiteTiles extends HookConsumerWidget {
     final sites = ref.watch(siteLatencyProvider);
     // the sites' last delays, for the pulse behind a compact tile
     final history = compact ? ref.watch(siteHistoryProvider) : const <String, List<int?>>{};
+    // the pulse behind the tiles moves every 30 seconds (a round of the sites) while the block is on screen, and a
+    // new round slides it one step to the left over 0.8 s
+    final slide = useAnimationController(duration: const Duration(milliseconds: 800));
+    useEffect(() {
+      if (!compact) return null;
+      slide.forward(from: 0);
+      return null;
+    }, [history]);
+    useEffect(() {
+      if (!compact || !visible) return null;
+      final timer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(ref.read(siteLatencyProvider.notifier).test()));
+      return timer.cancel;
+    }, [compact, visible]);
     // the tiles: the apps marked in Settings → Sites (their own icons and names)
     final shown = ref.watch(homeSitesProvider);
     final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
@@ -3572,7 +3585,16 @@ class _SiteTiles extends HookConsumerWidget {
               // the delay's last rounds as a soft curve across the tile's lower part, in the delay's colour
               Positioned.fill(
                 child: RepaintBoundary(
-                  child: CustomPaint(painter: _TilePulsePainter(history: history[site.key] ?? const [], colour: colour)),
+                  child: AnimatedBuilder(
+                    animation: slide,
+                    builder: (context, _) => CustomPaint(
+                      painter: _TilePulsePainter(
+                        history: history[site.key] ?? const [],
+                        colour: colour,
+                        shift: 1 - Curves.easeOutCubic.transform(slide.value),
+                      ),
+                    ),
+                  ),
                 ),
               )
             else

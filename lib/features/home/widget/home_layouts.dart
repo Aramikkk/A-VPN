@@ -272,7 +272,16 @@ class _PulsePainter extends CustomPainter {
     required this.grid,
     required this.label,
     this.labelStyle,
+    this.shift = 0,
+    this.slots = 60,
   });
+
+  /// how far right (in steps, 1 to 0) the points still are from where they settle: a new answer slides the curve one
+  /// step to the left instead of jumping
+  final double shift;
+
+  /// the room for the answers across the chart (a step is the width over one less)
+  final int slots;
 
   final List<int?> samples;
   final Color line;
@@ -311,13 +320,15 @@ class _PulsePainter extends CustomPainter {
       text.paint(canvas, Offset(size.width - text.width, yy - text.height / 2));
     }
     if (samples.length < 2) return;
-    final step = chart.width / (samples.length - 1);
+    final step = chart.width / (slots - 1);
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(chart.left, 0, chart.right + 6, size.height));
 
     // the runs of answers between the lost probes, each a smooth curve
     final runs = <List<Offset>>[];
     var current = <Offset>[];
     for (final (i, s) in samples.indexed) {
-      final x = chart.left + i * step;
+      final x = chart.right - (samples.length - 1 - i) * step + shift * step;
       if (s == null) {
         if (current.isNotEmpty) runs.add(current);
         current = [];
@@ -378,15 +389,17 @@ class _PulsePainter extends CustomPainter {
           ..strokeWidth = 1.4,
       );
     }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_PulsePainter old) => !listEquals(old.samples, samples) || old.line != line || old.grid != grid;
+  bool shouldRepaint(_PulsePainter old) =>
+      !listEquals(old.samples, samples) || old.line != line || old.grid != grid || old.shift != shift;
 }
 
 /// The pulse: the ping as a big figure over its last minute drawn as a curve, the time and the loss as small pills; the
 /// speeds and the traffic in two tiles beneath.
-class _PulseStats extends ConsumerWidget {
+class _PulseStats extends HookConsumerWidget {
   const _PulseStats({
     required this.connected,
     required this.timeText,
@@ -416,6 +429,12 @@ class _PulseStats extends ConsumerWidget {
     final accent = theme.araAccent;
     final samples = connected ? ref.watch(connectionQualityProvider) : const <int?>[];
     final line = AraLook.readableOn(accent, scheme.surface);
+    // every new answer slides the curve one step left over 0.8 s (and rests the rest of the three seconds)
+    final slide = useAnimationController(duration: const Duration(milliseconds: 800));
+    useEffect(() {
+      slide.forward(from: 0);
+      return null;
+    }, [samples.length, samples.isEmpty ? null : samples.last, identityHashCode(samples)]);
     Widget pill(IconData icon, String text, Color colour) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
       decoration: BoxDecoration(
@@ -494,14 +513,19 @@ class _PulseStats extends ConsumerWidget {
               SizedBox(
                 height: 52,
                 child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _PulsePainter(
-                      samples: samples,
-                      line: line,
-                      lost: scheme.error,
-                      grid: scheme.onSurface.withValues(alpha: .14),
-                      label: scheme.onSurfaceVariant,
-                      labelStyle: theme.textTheme.labelSmall,
+                  child: AnimatedBuilder(
+                    animation: slide,
+                    builder: (context, _) => CustomPaint(
+                      painter: _PulsePainter(
+                        samples: samples,
+                        line: line,
+                        lost: scheme.error,
+                        grid: scheme.onSurface.withValues(alpha: .14),
+                        label: scheme.onSurfaceVariant,
+                        labelStyle: theme.textTheme.labelSmall,
+                        shift: 1 - Curves.easeOutCubic.transform(slide.value),
+                        slots: ConnectionQuality.length,
+                      ),
                     ),
                   ),
                 ),
@@ -617,17 +641,22 @@ class _SiteBars extends ConsumerWidget {
   }
 }
 
-/// A site tile's pulse: the delay's last rounds as a soft curve with a glow under it, across the tile's lower half.
+/// A site tile's pulse: the delay's last rounds as a soft curve with a glow under it, across the tile's lower half. The
+/// rounds sit in fixed places from the right edge (a new one slides the curve left, nothing is stretched), a round with
+/// no answer is bridged, and a lone answer is a flat line until there are more.
 class _TilePulsePainter extends CustomPainter {
-  _TilePulsePainter({required this.history, required this.colour});
+  _TilePulsePainter({required this.history, required this.colour, this.shift = 0});
 
   final List<int?> history;
   final Color colour;
 
+  /// how far right (in steps, 1 to 0) the points still are from where they settle
+  final double shift;
+
   @override
   void paint(Canvas canvas, Size size) {
     final answered = [for (final h in history) if (h != null) h];
-    if (history.length < 2 || answered.length < 2) return;
+    if (answered.isEmpty) return;
     var low = answered.reduce(math.min).toDouble();
     var high = answered.reduce(math.max).toDouble();
     if (high - low < 40) {
@@ -638,18 +667,19 @@ class _TilePulsePainter extends CustomPainter {
     final top = size.height * .5;
     final bottom = size.height * .82;
     double y(num ms) => bottom - (ms - low) / (high - low) * (bottom - top);
-    final step = size.width / (history.length - 1);
-    final runs = <List<Offset>>[];
-    var current = <Offset>[];
+    final step = size.width / (SiteHistory.length - 1);
+    final points = <Offset>[];
     for (final (i, h) in history.indexed) {
-      if (h == null) {
-        if (current.isNotEmpty) runs.add(current);
-        current = [];
-        continue;
-      }
-      current.add(Offset(i * step, y(h)));
+      if (h == null) continue;
+      points.add(Offset(size.width - (history.length - 1 - i) * step + shift * step, y(h)));
     }
-    if (current.isNotEmpty) runs.add(current);
+    if (points.length == 1) {
+      points
+        ..clear()
+        ..addAll([Offset(0, y(answered.first)), Offset(size.width, y(answered.first))]);
+    }
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
     final fill = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
@@ -662,26 +692,25 @@ class _TilePulsePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round;
-    for (final run in runs) {
-      if (run.length < 2) continue;
-      final path = Path()..moveTo(run.first.dx, run.first.dy);
-      for (var k = 1; k < run.length; k++) {
-        final a = run[k - 1];
-        final b = run[k];
-        final mid = (a.dx + b.dx) / 2;
-        path.cubicTo(mid, a.dy, mid, b.dy, b.dx, b.dy);
-      }
-      canvas.drawPath(
-        Path.from(path)
-          ..lineTo(run.last.dx, size.height)
-          ..lineTo(run.first.dx, size.height)
-          ..close(),
-        fill,
-      );
-      canvas.drawPath(path, stroke);
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var k = 1; k < points.length; k++) {
+      final a = points[k - 1];
+      final b = points[k];
+      final mid = (a.dx + b.dx) / 2;
+      path.cubicTo(mid, a.dy, mid, b.dy, b.dx, b.dy);
     }
+    canvas.drawPath(
+      Path.from(path)
+        ..lineTo(points.last.dx, size.height)
+        ..lineTo(points.first.dx, size.height)
+        ..close(),
+      fill,
+    );
+    canvas.drawPath(path, stroke);
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_TilePulsePainter old) => !listEquals(old.history, history) || old.colour != colour;
+  bool shouldRepaint(_TilePulsePainter old) =>
+      !listEquals(old.history, history) || old.colour != colour || old.shift != shift;
 }
