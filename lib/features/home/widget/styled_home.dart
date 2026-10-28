@@ -24,7 +24,21 @@ class _StyledHome extends HookConsumerWidget {
     // The home page listener resolves the physical network under the VPN.
     final networkKind = useListenable(_actualNetworkKind).value;
     final actualMobile = networkKind == NetworkKind.mobile;
-    final group = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    final liveGroup = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    // the servers' list is held for 15 seconds when it goes (a switch of the network, a restart of the core): the page
+    // keeps its blocks instead of collapsing to "connect to see the servers" and building up again a moment later
+    final heldGroup = useRef<OutboundGroup?>(null);
+    final heldExpired = useState(false);
+    if (liveGroup != null) heldGroup.value = liveGroup;
+    useEffect(() {
+      if (liveGroup != null) {
+        heldExpired.value = false;
+        return null;
+      }
+      final timer = Timer(const Duration(seconds: 15), () => heldExpired.value = true);
+      return timer.cancel;
+    }, [liveGroup == null]);
+    final group = liveGroup ?? (heldExpired.value ? null : heldGroup.value);
     final autoGroup = group?.items
         .where((i) => i.tag == (group.selected == 'balance' ? 'balance' : 'lowest'))
         .firstOrNull;
@@ -347,6 +361,7 @@ class _StatusBlock extends HookConsumerWidget {
       final downFigure = amount(connected ? stats?.downlink.toInt() ?? 0 : 0, perSecond: true);
       final upFigure = amount(connected ? stats?.uplink.toInt() ?? 0 : 0, perSecond: true);
       final timeFigure = connected ? time : (waiting ?? '—');
+      final speedLevelNow = connected ? _speedLevel(math.max(stats?.downlink.toInt() ?? 0, stats?.uplink.toInt() ?? 0)) : 0.0;
       if (layout == HomeLayout.vessel) {
         return _VesselStats(
           connected: connected,
@@ -358,6 +373,7 @@ class _StatusBlock extends HookConsumerWidget {
           vpn: vpn,
           direct: direct,
           vpnShare: total == 0 ? 0 : vpnShare,
+          speedLevel: speedLevelNow,
         );
       }
       if (layout == HomeLayout.pulse) {
@@ -371,6 +387,7 @@ class _StatusBlock extends HookConsumerWidget {
           vpn: vpn,
           direct: direct,
           vpnShare: total == 0 ? 0 : vpnShare,
+          speedLevel: speedLevelNow,
         );
       }
       // the two routes in one tile, the time in the middle, the speeds on the right

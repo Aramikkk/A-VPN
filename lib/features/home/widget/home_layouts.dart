@@ -1,5 +1,16 @@
 part of 'avpn_home_body.dart';
 
+/// The top of a chart's scale: the first round number over [value] (and at least [least]), so the scale stays put
+/// while the line moves and the figures at the grid are ones a person reads.
+double _niceMax(double value, {double least = 50}) {
+  const steps = [50.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0, 3000.0, 5000.0];
+  final need = math.max(value * 1.1, least);
+  for (final step in steps) {
+    if (step >= need) return step;
+  }
+  return (need / 1000).ceil() * 1000.0;
+}
+
 /// A tile of the home screen's blocks: the same frosted pane as the sites' tiles.
 Widget _homeTile(BuildContext context, Widget child, {EdgeInsets padding = const EdgeInsets.all(10), double radius = 18}) {
   final theme = Theme.of(context);
@@ -40,7 +51,17 @@ TextSpan _figureSpan(BuildContext context, (String, String) value, {double? size
 /// The speeds and the traffic of the session as two tiles, in the language of the sites' tiles: a sign on a disc, two
 /// figures, and along the bottom edge a bar (the share of the traffic through the VPN).
 class _SpeedTrafficRow extends StatelessWidget {
-  const _SpeedTrafficRow({required this.down, required this.up, required this.vpn, required this.direct, required this.vpnShare});
+  const _SpeedTrafficRow({
+    required this.down,
+    required this.up,
+    required this.vpn,
+    required this.direct,
+    required this.vpnShare,
+    required this.speedLevel,
+  });
+
+  /// how good the speed is, 0 to 1: the water of the speed's tile
+  final double speedLevel;
 
   final (String, String) down;
   final (String, String) up;
@@ -65,13 +86,15 @@ class _SpeedTrafficRow extends StatelessWidget {
         Text.rich(_figureSpan(context, value), style: figure),
       ],
     );
-    Widget tile(IconData sign, Widget a, Widget b, {double? bar}) => Expanded(
+    final dark = theme.brightness == Brightness.dark;
+    Widget tile(IconData sign, Widget a, Widget b, double level) => Expanded(
       child: _homeTile(
         context,
         Stack(
           children: [
+            Positioned.fill(child: RepaintBoundary(child: _Water(level: level, colour: accent, dark: dark))),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
               child: Row(
                 children: [
                   Container(
@@ -95,22 +118,6 @@ class _SpeedTrafficRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (bar != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: 5,
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: ColoredBox(color: scheme.onSurface.withValues(alpha: .08))),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: FractionallySizedBox(widthFactor: bar.clamp(.03, 1.0), child: Container(color: accent)),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
         padding: EdgeInsets.zero,
@@ -122,13 +129,14 @@ class _SpeedTrafficRow extends StatelessWidget {
           Icons.swap_vert_rounded,
           line(Icons.south_rounded, accent, down),
           line(Icons.north_rounded, scheme.onSurfaceVariant, up),
+          speedLevel,
         ),
         const Gap(6),
         tile(
           Icons.shield_rounded,
           line(Icons.shield_rounded, accent, vpn),
           line(Icons.alt_route_rounded, scheme.onSurfaceVariant, direct),
-          bar: vpnShare,
+          vpnShare,
         ),
       ],
     );
@@ -148,8 +156,10 @@ class _VesselStats extends HookConsumerWidget {
     required this.vpn,
     required this.direct,
     required this.vpnShare,
+    required this.speedLevel,
   });
 
+  final double speedLevel;
   final bool connected;
   final String timeText;
   final int? ping;
@@ -256,7 +266,7 @@ class _VesselStats extends HookConsumerWidget {
       children: [
         Center(child: vessel),
         const Gap(10),
-        _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare),
+        _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare, speedLevel: speedLevel),
       ],
     );
   }
@@ -296,19 +306,17 @@ class _PulsePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final answered = [for (final s in samples) if (s != null) s];
     final chart = Rect.fromLTRB(0, 8, size.width - _labelWidth, size.height - 6);
-    var low = answered.isEmpty ? 0.0 : answered.reduce(math.min).toDouble();
-    var high = answered.isEmpty ? 100.0 : answered.reduce(math.max).toDouble();
-    // room above and below, and never a flat line stretched over the whole height
-    final pad = math.max(8.0, (high - low) * .12);
-    low = math.max(0, low - pad);
-    high = math.max(high + pad, low + 30);
+    // the scale runs from 0 to a round number over the highest answer (and holds while the line moves), as the router's
+    // panel draws its charts
+    const low = 0.0;
+    final high = _niceMax(answered.isEmpty ? 0 : answered.reduce(math.max).toDouble(), least: 100);
     double y(num ms) => chart.bottom - (ms - low) / (high - low) * chart.height;
 
     // the grid: three dashed lines with their values at the right
     final gridPaint = Paint()
       ..color = grid
       ..strokeWidth = 1;
-    for (final v in [high, (high + low) / 2, low]) {
+    for (final v in [high, high / 2]) {
       final yy = y(v);
       for (var x = chart.left; x < chart.right; x += 7) {
         canvas.drawLine(Offset(x, yy), Offset(math.min(x + 3, chart.right), yy), gridPaint);
@@ -410,8 +418,10 @@ class _PulseStats extends HookConsumerWidget {
     required this.vpn,
     required this.direct,
     required this.vpnShare,
+    required this.speedLevel,
   });
 
+  final double speedLevel;
   final bool connected;
   final String timeText;
   final int? ping;
@@ -427,7 +437,12 @@ class _PulseStats extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final accent = theme.araAccent;
-    final samples = connected ? ref.watch(connectionQualityProvider) : const <int?>[];
+    // the last minute stays (dimmed) while the VPN is down or coming up again, so the block doesn't empty and fill
+    // again at a switch of the network
+    final live = ref.watch(connectionQualityProvider);
+    final lastSamples = useRef<List<int?>>(const []);
+    if (connected && live.isNotEmpty) lastSamples.value = live;
+    final samples = connected ? live : lastSamples.value;
     final line = AraLook.readableOn(accent, scheme.surface);
     // every new answer slides the curve one step left over 0.8 s (and rests the rest of the three seconds)
     final slide = useAnimationController(duration: const Duration(milliseconds: 800));
@@ -435,13 +450,9 @@ class _PulseStats extends HookConsumerWidget {
       slide.forward(from: 0);
       return null;
     }, [samples.length, samples.isEmpty ? null : samples.last, identityHashCode(samples)]);
-    Widget pill(IconData icon, String text, Color colour) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: colour.withValues(alpha: .12),
-        border: Border.all(color: colour.withValues(alpha: .35)),
-      ),
+    // the time, with no frame round it
+    Widget pill(IconData icon, String text, Color colour) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -513,7 +524,9 @@ class _PulseStats extends HookConsumerWidget {
               SizedBox(
                 height: 52,
                 child: RepaintBoundary(
-                  child: AnimatedBuilder(
+                  child: Opacity(
+                    opacity: connected ? 1 : .35,
+                    child: AnimatedBuilder(
                     animation: slide,
                     builder: (context, _) => CustomPaint(
                       painter: _PulsePainter(
@@ -528,6 +541,7 @@ class _PulseStats extends HookConsumerWidget {
                       ),
                     ),
                   ),
+                  ),
                 ),
               ),
             ],
@@ -536,7 +550,7 @@ class _PulseStats extends HookConsumerWidget {
           radius: 22,
         ),
         const Gap(6),
-        _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare),
+        _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare, speedLevel: speedLevel),
       ],
     );
   }
@@ -657,15 +671,11 @@ class _TilePulsePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final answered = [for (final h in history) if (h != null) h];
     if (answered.isEmpty) return;
-    var low = answered.reduce(math.min).toDouble();
-    var high = answered.reduce(math.max).toDouble();
-    if (high - low < 40) {
-      final mid = (high + low) / 2;
-      low = mid - 20;
-      high = mid + 20;
-    }
-    final top = size.height * .5;
-    final bottom = size.height * .82;
+    // from zero to a round number over the highest answer: a steady site is a low even line, a slow one climbs
+    const low = 0.0;
+    final high = _niceMax(answered.reduce(math.max).toDouble(), least: 150);
+    final top = size.height * .6;
+    final bottom = size.height * .92;
     double y(num ms) => bottom - (ms - low) / (high - low) * (bottom - top);
     final step = size.width / (SiteHistory.length - 1);
     final points = <Offset>[];
