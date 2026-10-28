@@ -236,7 +236,9 @@ void main() {
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
           if (Platform.environment['LIGHT'] == '1') 'light_look': true,
           // HOMELAYOUT=<name>: that look; the tiles (classic) when not given (a new install has Dots)
-          'home_layout': (Platform.environment['HOMELAYOUT'] ?? '').isNotEmpty ? Platform.environment['HOMELAYOUT']! : 'classic',
+          'home_layout': (Platform.environment['HOMELAYOUT'] ?? '').isNotEmpty
+              ? Platform.environment['HOMELAYOUT']!
+              : 'classic',
           if (Platform.environment['SUPERLIGHT'] == '1') 'super_light': true,
           if (Platform.environment['BADGES'] == '1') 'extra_profiles': 'chill;third',
         });
@@ -618,9 +620,15 @@ class _Quality extends ConnectionQuality {
     sinceConnect = ConnectionQuality.length;
     // WAVY=1: a ping that moves, for the graphs
     final wavy = Platform.environment['WAVY'] == '1';
+    // PINGLEVEL=<ms>: a ping around that, a little moving
+    final level = int.tryParse(Platform.environment['PINGLEVEL'] ?? '');
     return [
       for (var i = 0; i < ConnectionQuality.length; i++)
-        i == 30 ? null : (wavy ? 58 + ((i * 37) % 23) + (i % 7 == 3 ? 34 : 0) + (i > 40 ? 12 : 0) : 64),
+        i == 30
+            ? null
+            : (level != null
+                  ? level + ((i * 7) % 9) - 4
+                  : (wavy ? 58 + ((i * 37) % 23) + (i % 7 == 3 ? 34 : 0) + (i > 40 ? 12 : 0) : 64)),
     ];
   }
 }

@@ -493,7 +493,11 @@ class _PulseStats extends HookConsumerWidget {
 
 /// The sites the home screen times, with the delay's colour, as the tiles have them: the name, the delay, the level.
 class _SiteEntry {
-  const _SiteEntry(this.name, this.ms, this.measured, this.colour, this.level);
+  const _SiteEntry(this.name, this.ms, this.measured, this.colour, this.level, {this.country = ''});
+
+  /// the country the site's server is in, written out ("Финляндия"), when it is not the one the main server is in
+  /// ('' otherwise: the site goes where everything goes)
+  final String country;
 
   final String name;
   final int? ms;
@@ -502,11 +506,25 @@ class _SiteEntry {
   final double level;
 }
 
+/// The name of the country of a site's own [server] ("Финляндия"), or '' when it has none of its own or it is in the
+/// country the [main] server is in (the flag tells the country: the first word of the name).
+String _otherCountry(String? server, String? main) {
+  if (server == null) return '';
+  final flag = _SiteTiles._flagOf(server);
+  if (flag.isEmpty || flag == _SiteTiles._flagOf(main ?? '')) return '';
+  final title = serverNameOf(server).title;
+  final dash = title.indexOf(' - ');
+  return (dash < 0 ? title : title.substring(dash + 3)).replaceAll(RegExp(r'\s*\d+\s*$'), '').trim();
+}
+
 List<_SiteEntry> _siteEntries(WidgetRef ref, ColorScheme scheme) {
   final sites = ref.watch(siteLatencyProvider);
   final shown = ref.watch(homeSitesProvider);
   final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
   final grade = siteGrade(ref.watch(ConfigOptions.pingHttps));
+  // each site's own server (Settings → Ping → Sites), or the one everything else goes through
+  final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const <String, String>{};
+  final mainServer = ref.watch(proxiesOverviewNotifierProvider.select((v) => SiteLatency.mainServer(v.valueOrNull)));
   return [
     for (final site in shown)
       () {
@@ -519,6 +537,7 @@ List<_SiteEntry> _siteEntries(WidgetRef ref, ColorScheme scheme) {
           measured,
           !measured ? scheme.outlineVariant : _SiteTiles._colour(ms, grade),
           !measured ? 0.0 : (ms == null ? .08 : (1 - ms / grade.scale).clamp(.08, 1.0)),
+          country: _otherCountry(siteServers[site.key], mainServer),
         );
       }(),
   ];

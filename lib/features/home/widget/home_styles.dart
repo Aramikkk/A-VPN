@@ -121,12 +121,38 @@ class _SparkPainter extends CustomPainter {
         if (s != null) s.toDouble(),
     ];
     if (values.length < 2) return;
-    final lo = values.reduce(math.min);
-    final hi = math.max(values.reduce(math.max), lo + 20);
+    // from zero to a round number over the highest answer (at least 200 ms): 40 ms and 100 ms sit at different
+    // heights, the same on every look (it was drawn from the lowest to the highest answer, so any ping filled it)
+    final top = _niceMax(values.reduce(math.max), least: 200);
+    final plot = size.width - 22;
+    for (final mark in const [100, 200, 400, 800]) {
+      if (mark > top) break;
+      final y = 3 + (size.height - 6) * (1 - mark / top);
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(plot, y),
+        Paint()
+          ..color = colour.withValues(alpha: .28)
+          ..strokeWidth = 1,
+      );
+      final label = TextPainter(
+        text: TextSpan(
+          text: '$mark',
+          style: TextStyle(
+            fontFamily: 'Manrope',
+            fontSize: 8.5,
+            fontWeight: FontWeight.w800,
+            color: colour.withValues(alpha: .6),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, Offset(plot + 3, y - label.height / 2));
+    }
     final path = Path();
     for (final (i, v) in values.indexed) {
-      final x = size.width * i / (values.length - 1);
-      final y = 3 + (size.height - 6) * (1 - (v - lo) / (hi - lo));
+      final x = plot * i / (values.length - 1);
+      final y = 3 + (size.height - 6) * (1 - v / top);
       i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
     }
     canvas.drawPath(
@@ -309,17 +335,51 @@ class _SiteBento extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final entries = _siteEntries(ref, scheme);
     if (entries.isEmpty) return const SizedBox.shrink();
+    final anyCountry = entries.any((e) => e.country.isNotEmpty);
     Widget cell(_SiteEntry e) => Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 8, 9),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: _Bento.inner(dark), borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      // the fill as in Contrast's tiles: the water rises from the bottom, the faster the site answers the higher, in
+      // the delay's colour (green, amber, red)
+      child: Stack(
         children: [
-          Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: _Bento.label(scheme.onSurfaceVariant)),
-          const Gap(5),
-          Text(
-            !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
-            style: _Bento.figure(20, e.colour == _SiteTiles._good ? scheme.onSurface : e.colour),
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: _Water(level: e.level, colour: e.colour, dark: dark),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 8, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  e.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _Bento.label(scheme.onSurfaceVariant),
+                ),
+                // the country, between the name and the delay, where the site's server is in another country than the
+                // main one (the line is kept in every cell when any has one: the cells of a row stay equal)
+                if (anyCountry)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Text(
+                      e.country,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: _Bento.label(
+                        scheme.onSurface,
+                      ).copyWith(fontSize: 10.5, fontWeight: FontWeight.w800, height: 1.1),
+                    ),
+                  ),
+                const Gap(3),
+                Text(
+                  !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
+                  style: _Bento.figure(20, e.colour == _SiteTiles._good ? scheme.onSurface : e.colour),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -640,7 +700,7 @@ class _DotNumberPainter extends CustomPainter {
 }
 
 /// A line of the dotted sheet: a label in small capitals on the left, the value on the right.
-Widget _dotRow(BuildContext context, String label, String value, {Color? valueColour}) {
+Widget _dotRow(BuildContext context, String label, String value, {Color? valueColour, String? country}) {
   final dark = Theme.of(context).brightness == Brightness.dark;
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 3),
@@ -655,7 +715,30 @@ Widget _dotRow(BuildContext context, String label, String value, {Color? valueCo
           ),
         ),
         const Gap(8),
-        Text(value, style: _Dots.mono(15, valueColour ?? _Dots.ink(dark), weight: FontWeight.w800, spacing: .5)),
+        // the sites' lines: the country in a column of its own between the name and the delay, where the site's server
+        // is in another country than the main one (blank where it is the same), the delay in a column too
+        if (country != null) ...[
+          SizedBox(
+            width: 112,
+            child: Text(
+              country.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _Dots.mono(10, _Dots.ink(dark), spacing: 1),
+            ),
+          ),
+          SizedBox(
+            width: 40,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                style: _Dots.mono(15, valueColour ?? _Dots.ink(dark), weight: FontWeight.w800, spacing: .5),
+              ),
+            ),
+          ),
+        ] else
+          Text(value, style: _Dots.mono(15, valueColour ?? _Dots.ink(dark), weight: FontWeight.w800, spacing: .5)),
       ],
     ),
   );
@@ -705,7 +788,9 @@ class _DotsStats extends HookConsumerWidget {
     ];
     final average = answers.isEmpty ? null : (answers.reduce((a, b) => a + b) / answers.length).round();
     final bars = samples.length > 24 ? samples.sublist(samples.length - 24) : samples;
-    final top = answers.isEmpty ? 1 : answers.reduce(math.max);
+    // from zero to a round number over the highest answer (at least 200 ms), marked at 100, 200, 400: a ping of 40 and
+    // one of 100 stand at different heights (the bars were scaled to the highest of them, so any ping filled them)
+    final scale = _niceMax(answers.isEmpty ? 1 : answers.reduce(math.max).toDouble(), least: 200);
     return _dotPaper(
       context,
       Column(
@@ -744,24 +829,39 @@ class _DotsStats extends HookConsumerWidget {
           if (!slim) ...[
             const Gap(10),
             SizedBox(
-              height: 34,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              height: 46,
+              child: Stack(
                 children: [
-                  for (final (i, s) in bars.indexed) ...[
-                    if (i > 0) const Gap(3),
-                    Expanded(
-                      child: FractionallySizedBox(
-                        heightFactor: s == null ? 1 : (s / top).clamp(.12, 1.0),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: s == null || (average != null && s > average * 2) ? _Dots.red : ink,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _PingGridPainter(scale: scale, line: ink.withValues(alpha: .22), text: _Dots.soft(dark)),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 28),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          for (final (i, s) in bars.indexed) ...[
+                            if (i > 0) const Gap(3),
+                            Expanded(
+                              child: FractionallySizedBox(
+                                heightFactor: s == null ? 1 : (s / scale).clamp(.04, 1.0),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    // a lost probe or a slow answer (250 ms and over) in red
+                                    color: s == null || s >= 250 ? _Dots.red : ink,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
@@ -774,6 +874,42 @@ class _DotsStats extends HookConsumerWidget {
       ),
     );
   }
+}
+
+/// The marks behind the ping bars: a faint line at 100, 200, 400 ms (as far as the scale goes), its figure at the right.
+class _PingGridPainter extends CustomPainter {
+  _PingGridPainter({required this.scale, required this.line, required this.text});
+
+  final double scale;
+  final Color line;
+  final Color text;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final plot = size.width - 28;
+    for (final mark in const [100, 200, 400, 800]) {
+      if (mark > scale) break;
+      final y = size.height * (1 - mark / scale);
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(plot, y),
+        Paint()
+          ..color = line
+          ..strokeWidth = 1,
+      );
+      final label = TextPainter(
+        text: TextSpan(
+          text: '$mark',
+          style: _Dots.mono(8.5, text, weight: FontWeight.w700, spacing: 0),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, Offset(plot + 5, (y - label.height / 2).clamp(0, size.height - label.height)));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PingGridPainter old) => old.scale != scale || old.line != line || old.text != text;
 }
 
 /// Dots' sites: a line for each, the name on the left and the delay on the right, red when it is slow.
@@ -798,6 +934,7 @@ class _SiteDots extends ConsumerWidget {
               e.name,
               !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
               valueColour: e.measured && e.colour != _SiteTiles._good ? _Dots.red : null,
+              country: e.country,
             ),
         ],
       ),
