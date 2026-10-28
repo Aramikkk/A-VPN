@@ -2500,6 +2500,16 @@ Color contrastPanelColor(bool dark) => switch (homeLookNow) {
 /// The look Contrast's panel is drawn in: by night light text on black, the accent lifted to read on it; by day
 /// the page's own look on white.
 ThemeData contrastPanelTheme(ThemeData theme) {
+  // the same for the same input (see [lookTheme]): the panel rebuilt with a new theme at every tick of its clock
+  final kept = _panelThemes[theme];
+  if (kept != null) return kept;
+  if (_panelThemes.length > 8) _panelThemes.clear();
+  return _panelThemes[theme] = _contrastPanelTheme(theme);
+}
+
+final _panelThemes = <ThemeData, ThemeData>{};
+
+ThemeData _contrastPanelTheme(ThemeData theme) {
   if (theme.brightness == Brightness.light) {
     return theme.copyWith(colorScheme: theme.colorScheme.copyWith(surface: Colors.white));
   }

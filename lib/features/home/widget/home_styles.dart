@@ -1041,6 +1041,17 @@ Widget? lookPlate(HomeLayout look, BuildContext context, Widget child) {
 /// ink for the accent of the text and a square-cornered outlined tab; Bento its heavy round face for the titles and a
 /// solid tab in the accent. The others as they are.
 ThemeData lookTheme(ThemeData theme, HomeLayout look) {
+  // the same theme for the same input: a new one at every build of the shell (a tab switched) told the whole app its
+  // theme had changed and rebuilt it all, a stall of a tenth of a second at each switch
+  final kept = _lookThemes[(theme, look)];
+  if (kept != null) return kept;
+  if (_lookThemes.length > 8) _lookThemes.clear();
+  return _lookThemes[(theme, look)] = _lookTheme(theme, look);
+}
+
+final _lookThemes = <(ThemeData, HomeLayout), ThemeData>{};
+
+ThemeData _lookTheme(ThemeData theme, HomeLayout look) {
   final dark = theme.brightness == Brightness.dark;
   switch (look) {
     case HomeLayout.dots:

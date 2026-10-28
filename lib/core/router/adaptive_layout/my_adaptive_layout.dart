@@ -360,6 +360,17 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 /// The pages over Contrast's suns: see-through, their cards and blocks frosted panes the light shows through; the
 /// dialogs, sheets and menus they open stay solid.
 ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = ContrastClarity.medium]) {
+  // the same pages' theme for the same input (see [lookTheme]): a new one at every build rebuilt every page
+  final key = (theme, clarity, homeLookNow);
+  final kept = _pageThemes[key];
+  if (kept != null) return kept;
+  if (_pageThemes.length > 8) _pageThemes.clear();
+  return _pageThemes[key] = _contrastPageTheme(theme, clarity);
+}
+
+final _pageThemes = <(ThemeData, ContrastClarity, HomeLayout), ThemeData>{};
+
+ThemeData _contrastPageTheme(ThemeData theme, ContrastClarity clarity) {
   final scheme = theme.colorScheme;
   final dark = theme.brightness == Brightness.dark;
   // the cards as see-through as the blocks, as chosen in Settings → Themes (a level above or below them for the
