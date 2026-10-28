@@ -2032,10 +2032,45 @@ class _TopDownPainter extends CustomPainter {
     return [Offset(x0, y0), Offset(x0, (y0 + y1) / 2), Offset(x1, (y0 + y1) / 2), Offset(x1, y1)];
   }
 
+  /// everything but the running dots, recorded once for a size: the lines, the bars, the names and the icons were
+  /// drawn again at every frame the dots moved (the page stuttered)
+  ui.Picture? _still;
+  Size? _stillSize;
+
   @override
   void paint(Canvas canvas, Size size) {
     final rowY = rows(size.height);
     if (_geoSize != size || _geo == null) _prepare(size, rowY);
+    if (_still == null || _stillSize != size) {
+      final recorder = ui.PictureRecorder();
+      _paintStill(Canvas(recorder), size, rowY);
+      _still?.dispose();
+      _still = recorder.endRecording();
+      _stillSize = size;
+    }
+    canvas.drawPicture(_still!);
+    // the dots running down the ones in use
+    final picking = lit.isNotEmpty;
+    for (final g in _geo!) {
+      final l = g.link;
+      if (!g.live || (picking && !l.flows.any(lit.contains)) || !_moving(l)) continue;
+      final dot = Paint()..color = g.colour;
+      for (var d = 0; d < 3; d++) {
+        final at = ((pulse.value + d / 3) % 1.0) * g.metric.length;
+        final p = g.metric.getTangentForOffset(at)!.position;
+        switch (homeLookNow) {
+          case HomeLayout.dots:
+            canvas.drawRect(Rect.fromCenter(center: p, width: 6, height: 6), dot);
+          case HomeLayout.bento:
+            canvas.drawCircle(p, 3.5, dot);
+          default:
+            canvas.drawCircle(p, 3, dot);
+        }
+      }
+    }
+  }
+
+  void _paintStill(Canvas canvas, Size size, List<double> rowY) {
     final picking = lit.isNotEmpty;
     bool on(Set<SankeyFlow> flows) => !picking || flows.any(lit.contains);
 
@@ -2053,19 +2088,7 @@ class _TopDownPainter extends CustomPainter {
       final colour = g.colour;
       final k = bright ? 1.0 : .25;
       // Bento and Dots: their own line and head
-      if (_lookLine(canvas, g.metric, colour, live: live, alpha: k)) {
-        if (live && bright && _moving(l)) {
-          final dot = Paint()..color = colour;
-          for (var d = 0; d < 3; d++) {
-            final at = ((pulse.value + d / 3) % 1.0) * g.metric.length;
-            final p = g.metric.getTangentForOffset(at)!.position;
-            homeLookNow == HomeLayout.dots
-                ? canvas.drawRect(Rect.fromCenter(center: p, width: 6, height: 6), dot)
-                : canvas.drawCircle(p, 3.5, dot);
-          }
-        }
-        continue;
-      }
+      if (_lookLine(canvas, g.metric, colour, live: live, alpha: k)) continue;
       canvas.drawPath(
         g.path,
         Paint()
@@ -2075,14 +2098,6 @@ class _TopDownPainter extends CustomPainter {
           ..strokeWidth = live ? 2.6 : 1.5
           ..color = colour.withValues(alpha: (live ? 1 : .32) * k),
       );
-      // dots running down the ones in use
-      if (live && bright && _moving(l)) {
-        final dot = Paint()..color = colour;
-        for (var d = 0; d < 3; d++) {
-          final at = ((pulse.value + d / 3) % 1.0) * g.metric.length;
-          canvas.drawCircle(g.metric.getTangentForOffset(at)!.position, 3, dot);
-        }
-      }
       // an arrowhead pointing down the way
       canvas.drawPath(g.head, Paint()..color = colour.withValues(alpha: (live ? 1 : .45) * k));
     }

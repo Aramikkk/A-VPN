@@ -85,6 +85,8 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
     }
     if (isMobileBreakpoint == null) return loadingConfig;
     final speedBranch = StatefulShellBranch(
+      // built at the start: the first switch to it stalled while it was built
+      preload: true,
       routes: <GoRoute>[
         GoRoute(
           name: 'speed',
@@ -149,7 +151,10 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
           // the super light mode: only Home (with its servers) and Settings; the statistics, the topology and the
           // connections are off
           final where = state.matchedLocation;
-          if (where == '/speed' || where == '/home/traffic' || where.startsWith('/connections') || where.startsWith('/topology')) {
+          if (where == '/speed' ||
+              where == '/home/traffic' ||
+              where.startsWith('/connections') ||
+              where.startsWith('/topology')) {
             return '/home';
           }
         }
@@ -206,6 +211,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
             // the desktop: Connections right after Home (Statistics is its sidebar)
             if (!isMobileBreakpoint) connectionsBranch,
             StatefulShellBranch(
+              preload: true,
               routes: <GoRoute>[
                 GoRoute(
                   name: 'topology',
