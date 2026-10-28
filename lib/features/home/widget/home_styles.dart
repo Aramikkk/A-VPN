@@ -1175,3 +1175,25 @@ ShapeBorder? lookPopupShape(HomeLayout look, bool dark) => switch (look) {
   ),
   _ => null,
 };
+
+/// A mode's square in the modes' popup in a look that has its own: Bento's solid tile, the accent when on; Dots' inked
+/// box, filled with the ink when on. Null for the others.
+({BoxDecoration box, Color ink})? lookSquare(HomeLayout look, BuildContext context, {required bool on}) {
+  final theme = Theme.of(context);
+  final dark = theme.brightness == Brightness.dark;
+  return switch (look) {
+    HomeLayout.bento => (
+      box: BoxDecoration(color: on ? theme.araAccent : _Bento.inner(dark), borderRadius: BorderRadius.circular(24)),
+      ink: on ? ContrastPalette.ink : theme.colorScheme.onSurface,
+    ),
+    HomeLayout.dots => (
+      box: BoxDecoration(
+        color: on ? _Dots.ink(dark) : null,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: _Dots.ink(dark).withValues(alpha: .7)),
+      ),
+      ink: on ? _Dots.paper(dark) : _Dots.ink(dark),
+    ),
+    _ => null,
+  };
+}

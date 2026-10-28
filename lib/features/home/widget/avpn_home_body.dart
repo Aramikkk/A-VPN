@@ -671,6 +671,10 @@ class _ModeSquare extends ConsumerWidget {
     final accent = theme.araAccent;
     final dark = theme.brightness == Brightness.dark;
     final t = ref.watch(translationsProvider).requireValue;
+    // Bento and Dots: their own squares
+    final look = ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
+    final own = lookSquare(look, context, on: on);
+    final upper = look == HomeLayout.dots;
     return AspectRatio(
       aspectRatio: 1,
       child: GestureDetector(
@@ -678,30 +682,36 @@ class _ModeSquare extends ConsumerWidget {
         onLongPress: onHold,
         child: AnimatedContainer(
           duration: lightDuration(const Duration(milliseconds: 250)),
-          decoration: BoxDecoration(
-            color: on ? accent.withValues(alpha: .2) : (dark ? const Color(0xFF24272C) : const Color(0xFFF1EFEA)),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: on ? accent : scheme.outlineVariant, width: on ? 1.6 : 1),
-          ),
+          decoration:
+              own?.box ??
+              BoxDecoration(
+                color: on ? accent.withValues(alpha: .2) : (dark ? const Color(0xFF24272C) : const Color(0xFFF1EFEA)),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: on ? accent : scheme.outlineVariant, width: on ? 1.6 : 1),
+              ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 30, color: on ? accent : theme.araIcon),
+              Icon(icon, size: 30, color: own?.ink ?? (on ? accent : theme.araIcon)),
               const Gap(8),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  title,
+                  upper ? title.toUpperCase() : title,
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: on ? accent : scheme.onSurface,
+                    color: own?.ink ?? (on ? accent : scheme.onSurface),
                   ),
                 ),
               ),
               const Gap(2),
               Text(
-                on ? t.avpn.modeOn : t.avpn.modeOff,
-                style: theme.textTheme.labelSmall?.copyWith(color: on ? accent : scheme.onSurfaceVariant),
+                upper
+                    ? (on ? t.avpn.modeOn : t.avpn.modeOff).toUpperCase()
+                    : (on ? t.avpn.modeOn : t.avpn.modeOff),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: own == null ? (on ? accent : scheme.onSurfaceVariant) : own.ink.withValues(alpha: .75),
+                ),
               ),
             ],
           ),
