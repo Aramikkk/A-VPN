@@ -3647,10 +3647,7 @@ class _SiteTiles extends HookConsumerWidget {
       // the logo and its ring in the delay's colour too (green, amber, red); grey until the first round
       final sign = !measured ? scheme.onSurfaceVariant : colour;
       // the faster, the fuller; no answer or 450 ms and slower: a sliver
-      // on a log scale from 30 ms (full) to 1000 ms (a sliver): 200 and 700 ms are far apart, not both at the bottom
-      final level = !measured
-          ? 0.0
-          : (ms == null ? .06 : (1 - math.log(math.max(ms, 30) / 30) / math.log(1000 / 30)).clamp(.06, 1.0));
+      final level = !measured ? 0.0 : (ms == null ? .08 : (1 - ms / grade.scale).clamp(.08, 1.0));
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -3660,6 +3657,7 @@ class _SiteTiles extends HookConsumerWidget {
         ),
         child: Stack(
           children: [
+            if (!compact)
             Positioned.fill(
               child: TweenAnimationBuilder<double>(
                 tween: Tween(end: level),

@@ -211,7 +211,7 @@ class _SectionGrid extends StatelessWidget {
           return SizedBox(
             width: width,
             // enough for the sign, two lines of the name and two of the caption on a narrow screen
-            height: math.max(side * .82, 140.0),
+            height: math.max(side * .7, 128.0),
             child: Material(
               color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
               shape: RoundedRectangleBorder(
