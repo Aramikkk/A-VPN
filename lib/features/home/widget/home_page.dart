@@ -72,6 +72,24 @@ class HomePage extends HookConsumerWidget {
           //     material: (context, platform) => MaterialIconButtonData(
           //           tooltip: t.profile.add.buttonText,
           //         )),
+          // the modes (Sharing, Global, Server) in a popup: they were a row on the home screen
+          if (contrast && !superLight)
+            Semantics(
+              key: const ValueKey("modes_button"),
+              label: t.avpn.modesTitle,
+              child: plate(
+                IconButton(
+                  tooltip: t.avpn.modesHint,
+                  icon: Badge(
+                    isLabelVisible: anyHomeModeOn(ref),
+                    smallSize: 8,
+                    backgroundColor: theme.araAccent,
+                    child: Icon(Icons.tune_rounded, color: theme.colorScheme.primary),
+                  ),
+                  onPressed: () => showGlassPopup(context, const HomeModesPanel()),
+                ),
+              ),
+            ),
           // the super light mode's switch (adding a profile is on the empty home screen and in the profiles list)
           Semantics(
             key: const ValueKey("super_light_button"),

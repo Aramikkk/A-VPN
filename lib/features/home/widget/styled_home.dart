@@ -160,7 +160,7 @@ class _StyledHome extends HookConsumerWidget {
                     )
                   : null)
             : (traffic && hasList ? _SiteTiles(visible: visible) : null),
-        toggles: superLight ? null : _CheckRow(onCheck: onCheck, testing: testing, showCheck: false),
+        toggles: superLight ? null : const _ConnectionsBlock(),
       );
     }
     return LayoutBuilder(
@@ -3964,3 +3964,226 @@ double _textWidth(String text, TextStyle style) =>
       textDirection: TextDirection.ltr,
     )..layout()).width *
     .7;
+
+/// The home screen's connections block: how many are open and where they go; a tap opens the full description.
+class _ConnectionsBlock extends ConsumerWidget {
+  const _ConnectionsBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = theme.araAccent;
+    final open = [
+      for (final c in ref.watch(connectionsProvider).items)
+        if (c.active) c,
+    ];
+    var vpn = 0, direct = 0, blocked = 0;
+    for (final c in open) {
+      switch (c.route) {
+        case ConnectionRoute.vpn:
+          vpn += c.count;
+        case ConnectionRoute.direct:
+          direct += c.count;
+        case ConnectionRoute.block:
+          blocked += c.count;
+      }
+    }
+    Widget part(Color color, int n, String label) => Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const Gap(5),
+          Text(
+            '$n $label',
+            style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+    return Semantics(
+      key: const ValueKey('connections-block'),
+      button: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => showGlassPopup(context, const _ConnectionsDetails()),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.swap_vert_rounded, size: 26, color: theme.araIcon),
+              const Gap(10),
+              Text('${open.length}', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const Gap(8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${t.avpn.connBlockTitle} · ${t.avpn.connBlockOpen}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const Gap(3),
+                    Wrap(
+                      children: [
+                        part(accent, vpn, t.avpn.connViaVpn),
+                        part(scheme.onSurfaceVariant, direct, t.avpn.connDirect),
+                        if (blocked > 0) part(scheme.error, blocked, t.avpn.connBlocked),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What the open connections are: by app, where each goes (the VPN and its server, direct, blocked), and to which
+/// sites.
+class _ConnectionsDetails extends ConsumerWidget {
+  const _ConnectionsDetails();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = theme.araAccent;
+    final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
+    final open = [
+      for (final c in ref.watch(connectionsProvider).items)
+        if (c.active) c,
+    ];
+    final groups = groupConnections(open, (c) => c.app);
+    final units = t.avpn.bytesUnits.split(',');
+
+    String where(ConnectionGroup g) {
+      final servers = {
+        for (final c in g.items)
+          if (c.route == ConnectionRoute.vpn && c.outbound.isNotEmpty) c.outbound,
+      };
+      final parts = <String>[
+        if (g.vpn > 0) [t.avpn.connViaVpn, if (servers.isNotEmpty) serverFlags(servers)].join(' '),
+        if (g.direct > 0) t.avpn.connDirect,
+        if (g.blocked > 0) t.avpn.connBlocked,
+      ];
+      return parts.join(' · ');
+    }
+
+    Widget row(ConnectionGroup g) {
+      final hosts = <String, int>{};
+      for (final c in g.items) {
+        if (c.host.isNotEmpty) hosts[c.host] = (hosts[c.host] ?? 0) + c.count;
+      }
+      final top = (hosts.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => e.key).toList();
+      final shown = top.take(3).join(', ');
+      final more = top.length > 3 ? ' ${t.avpn.connSitesMore(n: top.length - 3)}' : '';
+      final name = connectionAppName(t, apps, g.key);
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ConnectionAppIcon(icon: apps[g.key]?.icon, name: name, size: 30),
+            const Gap(10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    where(g),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: g.vpn >= g.direct ? accent : scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (shown.isNotEmpty)
+                    Text(
+                      '$shown$more',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                ],
+              ),
+            ),
+            const Gap(8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  formatBytes(g.total, units),
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text('${g.open}', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Row(
+              children: [
+                Expanded(child: Text(t.avpn.connDetailsTitle, style: theme.textTheme.titleMedium)),
+                Text('${open.length}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          if (groups.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Center(child: Text(t.avpn.connDetailsNone, style: theme.textTheme.bodyMedium)),
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: groups.length,
+                separatorBuilder: (_, _) => Divider(height: 1, color: scheme.onSurface.withValues(alpha: .07)),
+                itemBuilder: (_, i) => row(groups[i]),
+              ),
+            ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.goNamed('connections');
+            },
+            child: Text(t.avpn.connShowAll),
+          ),
+        ],
+      ),
+    );
+  }
+}

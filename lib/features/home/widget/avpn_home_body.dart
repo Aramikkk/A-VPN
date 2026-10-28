@@ -543,6 +543,170 @@ class _Bars extends StatelessWidget {
   }
 }
 
+/// Whether one of the modes (Sharing, Global, Server) is on: the dot on the header's button.
+bool anyHomeModeOn(WidgetRef ref) =>
+    ref.watch(ConfigOptions.allowConnectionFromLan) ||
+    ref.watch(ConfigOptions.globalMode) ||
+    ref.watch(ConfigOptions.homeNetwork);
+
+/// The modes the home screen used to carry in a row (Sharing, Global, Server), in a popup: a square for each, with
+/// what it does under it.
+class HomeModesPanel extends HookConsumerWidget {
+  const HomeModesPanel({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final profile = ref.watch(activeProfileProvider).valueOrNull;
+    final configPath = profile == null ? null : ref.watch(profilePathResolverProvider).file(profile.id).path;
+    final lastAvailable = useRef(false);
+    final checked = useFuture(
+      useMemoized(() => configPath == null ? null : HomeNetwork.available(configPath), [configPath]),
+    ).data;
+    if (checked != null) lastAvailable.value = checked;
+    final serverAvailable = lastAvailable.value;
+    final serverOn = ref.watch(ConfigOptions.homeNetwork);
+    final sharingOn = ref.watch(ConfigOptions.allowConnectionFromLan);
+    final globalOn = ref.watch(ConfigOptions.globalMode);
+
+    Future<void> reconnectIfConnected() async {
+      if (ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false) {
+        await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
+      }
+    }
+
+    // Server and Global each decide every connection, so one turns the other off
+    Future<void> toggleServer(bool on) async {
+      if (on) await ref.read(ConfigOptions.globalMode.notifier).update(false);
+      await ref.read(ConfigOptions.homeNetwork.notifier).update(on);
+      await reconnectIfConnected();
+    }
+
+    Future<void> toggleGlobal(bool on) async {
+      if (on) await ref.read(ConfigOptions.homeNetwork.notifier).update(false);
+      await ref.read(ConfigOptions.globalMode.notifier).update(on);
+      await reconnectIfConnected();
+    }
+
+    Future<void> toggleSharing(bool on) async {
+      await ref.read(ConfigOptions.allowConnectionFromLan.notifier).update(on);
+      if (on && context.mounted) await showDialog<void>(context: context, builder: (_) => const _SharingDialog());
+    }
+
+    Widget mode(
+      IconData icon,
+      String title,
+      String info,
+      bool on,
+      Future<void> Function(bool) toggle, [
+      VoidCallback? hold,
+    ]) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ModeSquare(icon: icon, title: title, on: on, onTap: () => toggle(!on), onHold: hold),
+            const Gap(8),
+            Text(
+              info,
+              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.3),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+            child: Text(t.avpn.modesTitle, style: theme.textTheme.titleMedium),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 10,
+            children: [
+              mode(
+                Icons.wifi_tethering_rounded,
+                t.avpn.sharing,
+                t.avpn.sharingInfo,
+                sharingOn,
+                toggleSharing,
+                () => showDialog<void>(context: context, builder: (_) => const _SharingDialog()),
+              ),
+              mode(Icons.public_rounded, t.avpn.global, t.avpn.globalInfo, globalOn, toggleGlobal),
+              if (serverAvailable)
+                mode(Icons.home_rounded, t.avpn.server, t.avpn.serverInfo, serverOn, toggleServer),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A mode's square: its sign and name, filled with the accent when it is on.
+class _ModeSquare extends ConsumerWidget {
+  const _ModeSquare({required this.icon, required this.title, required this.on, required this.onTap, this.onHold});
+
+  final IconData icon;
+  final String title;
+  final bool on;
+  final VoidCallback onTap;
+  final VoidCallback? onHold;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = theme.araAccent;
+    final dark = theme.brightness == Brightness.dark;
+    final t = ref.watch(translationsProvider).requireValue;
+    return AspectRatio(
+      aspectRatio: 1,
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPress: onHold,
+        child: AnimatedContainer(
+          duration: lightDuration(const Duration(milliseconds: 250)),
+          decoration: BoxDecoration(
+            color: on ? accent.withValues(alpha: .2) : (dark ? const Color(0xFF24272C) : const Color(0xFFF1EFEA)),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: on ? accent : scheme.outlineVariant, width: on ? 1.6 : 1),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 30, color: on ? accent : theme.araIcon),
+              const Gap(8),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  title,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: on ? accent : scheme.onSurface,
+                  ),
+                ),
+              ),
+              const Gap(2),
+              Text(
+                on ? t.avpn.modeOn : t.avpn.modeOff,
+                style: theme.textTheme.labelSmall?.copyWith(color: on ? accent : scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CheckRow extends HookConsumerWidget {
   const _CheckRow({required this.onCheck, required this.testing, this.showCheck = true});
 

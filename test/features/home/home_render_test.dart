@@ -346,6 +346,19 @@ void main() {
                           title: const Text('A-VPN'),
                           backgroundColor: contrast ? Colors.transparent : null,
                           actions: [
+                            // the modes (Sharing, Global, Server): a popup from here
+                            if (Platform.environment['SUPERLIGHT'] != '1')
+                              Builder(
+                                builder: (context) => IconButton(
+                                  key: const ValueKey('modes_button'),
+                                  onPressed: () => showGlassPopup(context, const HomeModesPanel()),
+                                  icon: Badge(
+                                    isLabelVisible: Platform.environment['MODES_ON'] == '1',
+                                    smallSize: 8,
+                                    child: const Icon(Icons.tune_rounded),
+                                  ),
+                                ),
+                              ),
                             // the super light switch, where "add a profile" was
                             IconButton(
                               onPressed: () {},
@@ -486,6 +499,12 @@ void main() {
         }
         // TAP=<text>: a tap on it first, to look at what it opens
         final tap = Platform.environment['TAP'];
+        final tapKey = Platform.environment['TAPKEY'];
+        if (tapKey != null && tapKey.isNotEmpty) {
+          await tester.tap(find.byKey(ValueKey(tapKey)).first);
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.pump(const Duration(milliseconds: 400));
+        }
         if (tap != null && tap.isNotEmpty) {
           await tester.tap(find.text(tap).first);
           await tester.pump(const Duration(milliseconds: 100));
@@ -525,7 +544,7 @@ class _Connections extends Connections {
           SeenConnection(
             id: '$i',
             app: app,
-            host: 'example.com',
+            host: ['youtube.com', 'googlevideo.com', 'ytimg.com', 'instagram.com', 'telegram.org', 'claude.ai'][i % 6],
             port: 443,
             network: 'tcp',
             route: route,
@@ -534,8 +553,8 @@ class _Connections extends Connections {
             start: DateTime.now().subtract(const Duration(minutes: 30)),
             up: (down / 20).round(),
             down: down.round(),
-            active: false,
-            count: 1,
+            active: true,
+            count: 1 + (i * 3) % 5,
           ),
     ];
     return ConnectionsState(
