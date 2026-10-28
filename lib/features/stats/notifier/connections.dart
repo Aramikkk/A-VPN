@@ -436,7 +436,6 @@ class Connections extends Notifier<ConnectionsState> {
 
   /// Picks up the saved list once, and starts a new one when a new statistics day has begun (03:00).
   void _rollDay([DateTime? now]) {
-    _closedVersion++;
     final day = statsDayStart(now ?? DateTime.now());
     if (_day == null && _file != null) {
       _day = day;
@@ -444,6 +443,8 @@ class Connections extends Notifier<ConnectionsState> {
       _restore(day);
     }
     if (_day != null && _day != day) {
+      // the list changes: the closed ones sorted again (only here, at 03:00; at every poll it undid the keeping)
+      _closedVersion++;
       _dayBaselines.clear();
       for (final c in _seen.values.where((c) => c.active)) {
         _dayBaselines[c.id] = (c.up, c.down);
@@ -591,17 +592,13 @@ class Connections extends Notifier<ConnectionsState> {
   final _rates = <String, ({int total, int at, double bps})>{};
 
   Future<void> _poll(HttpClient client, Uri url, String secret) async {
-    final timer = Stopwatch();
     List<dynamic>? list;
     try {
       final request = await client.getUrl(url).timeout(const Duration(seconds: 3));
       if (secret.isNotEmpty) request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $secret');
       final response = await request.close().timeout(const Duration(seconds: 3));
       final body = await response.transform(utf8.decoder).join();
-      timer.start();
       if (response.statusCode == 200) list = (jsonDecode(body) as Map<String, dynamic>)['connections'] as List?;
-      // ignore: avoid_print
-      print('AVPNPERF poll decode ${timer.elapsedMilliseconds} ms, ${body.length} chars, ${list?.length} open');
     } catch (_) {
       list = null;
     }
@@ -639,7 +636,7 @@ class Connections extends Notifier<ConnectionsState> {
       for (final id in _seen.keys.toList()) {
         if (!open.contains(id) && _seen[id]!.active) {
           _seen[id] = _seen[id]!.closed();
-          _closedVersion++;
+          _justClosed.add(_seen[id]!);
         }
       }
     }
@@ -654,14 +651,7 @@ class Connections extends Notifier<ConnectionsState> {
       routeUsage: _routeUsage,
       rates: {for (final e in _rates.entries) e.key: e.value.bps},
     );
-    // ignore: avoid_print
-    print('AVPNPERF poll total ${timer.elapsedMilliseconds} ms, kept ${_seen.length}');
-    if (DateTime.now().difference(_saved) > saveEvery) {
-      final saving = Stopwatch()..start();
-      _save();
-      // ignore: avoid_print
-      print('AVPNPERF save ${saving.elapsedMilliseconds} ms');
-    }
+    if (DateTime.now().difference(_saved) > saveEvery) _save();
   }
 
   /// Each app with a connection open now: its stretch goes on to now, or a new one starts with the earliest of
@@ -767,7 +757,30 @@ class Connections extends Notifier<ConnectionsState> {
   int _closedListedVersion = -1;
   DateTime? _closedListedSince;
 
+  /// the ones closed since the closed list was sorted: put in their places (the newest first) instead of a sort of all
+  final _justClosed = <SeenConnection>[];
+
   List<SeenConnection> _sorted() {
+    if (_closedListedVersion == _closedVersion && _closedListedSince == _since && _justClosed.isNotEmpty) {
+      final list = List.of(_closedListed);
+      for (final c in _justClosed) {
+        final shown = _listed(c);
+        if (shown == null) continue;
+        // the first place whose start is not later than this one's
+        var lo = 0, hi = list.length;
+        while (lo < hi) {
+          final mid = (lo + hi) >> 1;
+          if (list[mid].start.isAfter(shown.start)) {
+            lo = mid + 1;
+          } else {
+            hi = mid;
+          }
+        }
+        list.insert(lo, shown);
+      }
+      _closedListed = list;
+    }
+    _justClosed.clear();
     if (_closedListedVersion != _closedVersion || _closedListedSince != _since) {
       _closedListed = [
         for (final c in _seen.values)
@@ -864,7 +877,9 @@ class ConnectionGroup {
 List<ConnectionGroup> groupConnections(Iterable<SeenConnection> items, String Function(SeenConnection) keyOf) {
   final groups = <String, ConnectionGroup>{};
   for (final c in items) {
-    groups.putIfAbsent(keyOf(c), () => ConnectionGroup(keyOf(c))).add(c);
+    // the key worked out once (it was twice for each connection)
+    final key = keyOf(c);
+    groups.putIfAbsent(key, () => ConnectionGroup(key)).add(c);
   }
   return groups.values.toList()..sort((a, b) {
     final byTraffic = b.total.compareTo(a.total);

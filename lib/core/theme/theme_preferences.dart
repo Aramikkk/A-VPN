@@ -9,7 +9,8 @@ class ThemePreferences extends _$ThemePreferences {
   @override
   AppThemeMode build() {
     final persisted = ref.watch(sharedPreferencesProvider).requireValue.getString("theme_mode");
-    if (persisted == null) return AppThemeMode.fallback;
+    // by the system for a new install (the owner's own, 1.0.72)
+    if (persisted == null) return AppThemeMode.system;
     // "black" was a theme of its own once, the same as the dark one
     return AppThemeMode.values.asNameMap()[persisted] ?? AppThemeMode.dark;
   }

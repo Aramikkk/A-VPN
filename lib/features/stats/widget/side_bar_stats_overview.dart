@@ -1330,6 +1330,9 @@ class _LossDay extends ConsumerWidget {
                   )
                 : ListView.builder(
                     padding: EdgeInsets.zero,
+                    // not a scroll of its own: a swipe started on it turns the page to the speed, as anywhere else
+                    // (the newest stretches on top; the rest are under the card's edge)
+                    physics: const NeverScrollableScrollPhysics(),
                     itemCount: day.episodes.length,
                     itemBuilder: (context, i) {
                       final e = day.episodes[i];

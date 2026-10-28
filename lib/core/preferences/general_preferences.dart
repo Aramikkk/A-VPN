@@ -87,11 +87,7 @@ abstract class Preferences {
   /// The computer's: starts in the tray with no window (on by default; the phone has no such thing).
   static final silentStart = PreferencesNotifier.create<bool, bool>("silent_start", true);
 
-  static final disableMemoryLimit = PreferencesNotifier.create<bool, bool>(
-    "disable_memory_limit",
-    // disable memory limit on desktop by default
-    PlatformUtils.isDesktop,
-  );
+  static final disableMemoryLimit = PreferencesNotifier.create<bool, bool>("disable_memory_limit", true);
 
   static final perAppProxyEnabled = PreferencesNotifier.create<bool, bool>("per_app_proxy_enabled", false);
 
@@ -117,13 +113,10 @@ abstract class Preferences {
   static final startedByUser = PreferencesNotifier.create<bool, bool>("started_by_user", false);
 
   /// A-VPN: connect as soon as the app opens. On from the start on a computer, off on a phone.
-  static final connectOnAppStart = PreferencesNotifier.create<bool, bool>(
-    "connect_on_app_start",
-    PlatformUtils.isDesktop,
-  );
+  static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", true);
 
   /// A-VPN (Android): turn the VPN on in the background when the phone starts, even if it was off before
-  static final connectOnBoot = PreferencesNotifier.create<bool, bool>("connect_on_boot", false);
+  static final connectOnBoot = PreferencesNotifier.create<bool, bool>("connect_on_boot", true);
 
   /// A-VPN: ping the servers when the app opens, if the last such ping was half an hour ago or more
   static final autoPingOnOpen = PreferencesNotifier.create<bool, bool>("auto_ping_on_open", true);
@@ -134,7 +127,7 @@ abstract class Preferences {
 
   /// A-VPN: how often the subscription (the server list) updates, in hours; 0: as the subscription says,
   /// -1: never
-  static final subUpdateHours = PreferencesNotifier.create<int, int>("sub_update_hours", 0);
+  static final subUpdateHours = PreferencesNotifier.create<int, int>("sub_update_hours", 6);
 
   /// More than one subscription at once: the ids of the profiles whose servers are added to the active profile's
   /// (see ProfileMerge). Kept as one ";"-separated string.
@@ -209,25 +202,31 @@ abstract class Preferences {
 
   /// A-VPN auto-pause (Android): the VPN steps aside while one of [autoPauseApps] is on screen. Read by the
   /// VPN service itself (SettingsKey.AUTO_PAUSE_*), so the list is one ";"-separated string.
-  static final autoPauseEnabled = PreferencesNotifier.create<bool, bool>("auto_pause_enabled", false);
+  static final autoPauseEnabled = PreferencesNotifier.create<bool, bool>("auto_pause_enabled", true);
 
   static final autoPauseApps = PreferencesNotifier.create<Set<String>, String>(
     "auto_pause_apps",
-    const {},
+    const {
+      'ru.gosuslugi.goskey',
+      'ru.rostel',
+      'ru.gosuslugi.auto',
+      'com.valvesoftware.android.steam.community',
+      'com.valvesoftware.android.steam.friendsui',
+    },
     mapFrom: (value) => value.split(';').where((e) => e.isNotEmpty).toSet(),
     mapTo: (value) => value.join(';'),
   );
 
   /// A-VPN home Wi-Fi (Android): the VPN pauses on a Wi-Fi whose router runs a VPN of its own. Read by the VPN
   /// service itself (SettingsKey.HOME_WIFI_*); the homes as JSON (see HomeWifiPage).
-  static final homeWifiEnabled = PreferencesNotifier.create<bool, bool>("aravpn-home-wifi-enabled", false);
+  static final homeWifiEnabled = PreferencesNotifier.create<bool, bool>("aravpn-home-wifi-enabled", true);
 
   static final homeWifiList = PreferencesNotifier.create<String, String>("aravpn-home-wifi-list", "[]");
 
   /// A-VPN: the accent colour and gradient.
   static final araAccent = PreferencesNotifier.create<AraAccent, String>(
     "ara_accent",
-    AraAccent.platformDefault,
+    AraAccent.neonOrange,
     mapFrom: (value) => AraAccent.values.firstWhere((e) => e.name == value, orElse: () => AraAccent.platformDefault),
     mapTo: (value) => value.name,
   );
@@ -246,7 +245,7 @@ abstract class Preferences {
   /// A-VPN: Glass's own colour scheme, when the look is Glass.
   static final glassScheme = PreferencesNotifier.create<GlassScheme, String>(
     "glass_scheme",
-    GlassScheme.fallback,
+    GlassScheme.cornflower,
     mapFrom: (value) => GlassScheme.values.firstWhere((e) => e.name == value, orElse: () => GlassScheme.fallback),
     mapTo: (value) => value.name,
   );
@@ -254,7 +253,7 @@ abstract class Preferences {
   /// A-VPN: Contrast's colour (a warm accent and a cool second colour).
   static final contrastPalette = PreferencesNotifier.create<ContrastPalette, String>(
     "contrast_palette",
-    ContrastPalette.fallback,
+    ContrastPalette.oled,
     mapFrom: (value) =>
         ContrastPalette.values.firstWhere((e) => e.name == value, orElse: () => ContrastPalette.fallback),
     mapTo: (value) => value.name,
@@ -267,6 +266,7 @@ abstract class Preferences {
   static final fontScalePercent = PreferencesNotifier.create<int, int>("font_scale_percent", 100);
 
   /// A-VPN: how the home screen is laid out (Contrast).
+  // (the defaults over this file are the owner's own settings as of 1.0.72, what a new install starts with)
   static final homeLayout = PreferencesNotifier.create<HomeLayout, String>(
     "home_layout",
     // Dots for a new install (1.0.71); a choice made stays
@@ -287,7 +287,7 @@ abstract class Preferences {
   /// A-VPN: how see-through Contrast's blocks are.
   static final contrastClarity = PreferencesNotifier.create<ContrastClarity, String>(
     "contrast_clarity",
-    ContrastClarity.fallback,
+    ContrastClarity.weak,
     mapFrom: (value) =>
         ContrastClarity.values.firstWhere((e) => e.name == value, orElse: () => ContrastClarity.fallback),
     mapTo: (value) => value.name,
@@ -310,16 +310,37 @@ abstract class Preferences {
 
   /// The apps of Settings → Sites (the ones with a server of their own) marked for the home screen's delay block.
   /// "*" (until the user touches a switch): the six services' apps, as the screen always had.
-  static final homeApps = PreferencesNotifier.create<List<String>, List<String>>("home_apps", <String>['*']);
+  static final homeApps = PreferencesNotifier.create<List<String>, List<String>>("home_apps", <String>[
+    'com.instagram.android',
+    'com.whatsapp',
+    'org.telegram.messenger',
+    'com.openai.chatgpt',
+    'com.anthropic.claude',
+    'com.google.android.youtube',
+  ]);
 
   /// The order of those apps in Settings → Sites (their packages, dragged up and down) and of the home screen's tiles.
   /// Kept apart from the apps' own list: the connection follows that one and would restart at every drag.
-  static final appsOrder = PreferencesNotifier.create<List<String>, List<String>>("apps_order", <String>[]);
+  static final appsOrder = PreferencesNotifier.create<List<String>, List<String>>("apps_order", <String>[
+    'com.instagram.android',
+    'com.whatsapp',
+    'org.telegram.messenger',
+    'com.openai.chatgpt',
+    'com.google.android.youtube',
+    'com.anthropic.claude',
+    'com.google.android.apps.bard',
+    'com.google.android.apps.docs',
+    'com.facebook.katana',
+    'com.instagram.barcelona',
+    'com.android.vending',
+    'ai.perplexity.app.android',
+    'com.deepseek.chat',
+  ]);
 
   /// A-VPN: how the server list shows each server's ping.
   static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
     "ping_style",
-    PingStyle.numbers,
+    PingStyle.barsAndNumbers,
     mapFrom: (value) => PingStyle.values.firstWhere((e) => e.name == value, orElse: () => PingStyle.numbers),
     mapTo: (value) => value.name,
   );
@@ -339,7 +360,7 @@ abstract class Preferences {
 
   /// How many records the in-memory log ring keeps. Saved, so a size picked
   /// once while chasing a bug is still there on the next run.
-  static final logBufferSize = PreferencesNotifier.create<int, int>("log-buffer-size", 1000);
+  static final logBufferSize = PreferencesNotifier.create<int, int>("log-buffer-size", 2500);
 
   static final profilesSort = PreferencesNotifier.create<({ProfilesSort by, SortMode mode}), String>(
     "profiles_sort",

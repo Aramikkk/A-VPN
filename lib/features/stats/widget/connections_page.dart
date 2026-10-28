@@ -695,6 +695,19 @@ class _InnerRow extends ConsumerWidget {
 /// Worked out once per rule: there are a few dozen of them and thousands of connections, and each label took a
 /// dozen regular expressions (the Topology tab lost frames redoing them on every update).
 String? ruleLabel(String rule, Translations t, {Map<String, InstalledApp> apps = const {}}) {
+  // all of it worked out once per rule, the own server's check too (its regular expression ran twice for each of
+  // the day's thousands of connections at every update of the Topology tab)
+  if (!identical(_ruleLabelsIn, t) || !identical(_ruleLabelsApps, apps)) {
+    _ruleLabels.clear();
+    _ruleLabelsIn = t;
+    _ruleLabelsApps = apps;
+  }
+  return _ruleLabels.putIfAbsent(rule, () => _ownOrRuleLabel(rule, t, apps));
+}
+
+Map<String, InstalledApp>? _ruleLabelsApps;
+
+String? _ownOrRuleLabel(String rule, Translations t, Map<String, InstalledApp> apps) {
   // a service's or a chosen app's own server (Settings → Sites): "Instagram: own server", by the group the rule sends to
   final own = RegExp(r'route\((site|app)-([^)]+)\)').firstMatch(rule);
   if (own != null) {
@@ -704,11 +717,7 @@ String? ruleLabel(String rule, Translations t, {Map<String, InstalledApp> apps =
         : (apps[key]?.name ?? key);
     return t.avpn.ruleOwnServer(name: name);
   }
-  if (!identical(_ruleLabelsIn, t)) {
-    _ruleLabels.clear();
-    _ruleLabelsIn = t;
-  }
-  return _ruleLabels.putIfAbsent(rule, () => _ruleLabel(rule, t));
+  return _ruleLabel(rule, t);
 }
 
 final _ruleLabels = <String, String?>{};

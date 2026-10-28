@@ -15,8 +15,8 @@ void main() {
     await container.read(sharedPreferencesProvider.future);
     expect(container.read(ConfigOptions.urlTestTimeoutWifi), const Duration(seconds: 12));
     expect(container.read(ConfigOptions.urlTestTimeoutMobile), const Duration(seconds: 12));
-    expect(container.read(ConfigOptions.balancerToleranceMobile), 50);
-    expect(container.read(ConfigOptions.balancerToleranceWifi), 150);
+    expect(container.read(ConfigOptions.balancerToleranceMobile), 25);
+    expect(container.read(ConfigOptions.balancerToleranceWifi), 50);
     await container.read(ConfigOptions.urlTestTimeoutWifi.notifier).update(const Duration(seconds: 1));
     await container.read(ConfigOptions.urlTestTimeoutMobile.notifier).update(const Duration(seconds: 120));
     await container.read(ConfigOptions.urlTestTimeoutWifi.notifier).update(Duration.zero);

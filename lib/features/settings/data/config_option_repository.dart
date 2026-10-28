@@ -60,7 +60,7 @@ abstract class ConfigOptions {
 
   static final remoteDnsAddress = PreferencesNotifier.create<String, String>(
     "remote-dns-address",
-    "https://8.8.8.8/dns-query",
+    "tcp://8.8.8.8",
     possibleValues: List.of([
       "https://8.8.8.8/dns-query",
       "local",
@@ -185,23 +185,36 @@ abstract class ConfigOptions {
   static final adBlock = PreferencesNotifier.create<bool, bool>("ad-block", false);
 
   /// How strict the ad lists are: 1 mild, 2 normal, 3 strict (every list; the one that breaks most sites).
-  static final adBlockLevel = PreferencesNotifier.create<int, int>("ad-block-level", 2);
+  static final adBlockLevel = PreferencesNotifier.create<int, int>("ad-block-level", 1);
 
   /// Protection from phishing and malware sites: its own lists, on its own (without the ad block).
-  static final blockPhishing = PreferencesNotifier.create<bool, bool>("block-phishing", true);
+  static final blockPhishing = PreferencesNotifier.create<bool, bool>("block-phishing", false);
 
   /// Cryptominers' domains refused.
   static final blockMiners = PreferencesNotifier.create<bool, bool>("block-miners", false);
 
   /// The user's exceptions to it: domains (and their subdomains) that are never blocked.
-  static final adBlockAllow = PreferencesNotifier.create<List<String>, List<String>>("ad-block-allow", <String>[]);
+  static final adBlockAllow = PreferencesNotifier.create<List<String>, List<String>>("ad-block-allow", <String>[
+    'ya.ru',
+  ]);
 
   /// The apps (package names) with a server of their own, chosen in Settings → Sites: on the phone the whole choice
   /// (a service of the home screen's six only when its app is here). At first the six services' apps.
-  static final siteGroupApps = PreferencesNotifier.create<List<String>, List<String>>(
-    "site-group-apps",
-    siteGroupServiceApps.keys.toList(),
-  );
+  static final siteGroupApps = PreferencesNotifier.create<List<String>, List<String>>("site-group-apps", const [
+    'com.instagram.android',
+    'com.google.android.apps.bard',
+    'com.whatsapp',
+    'org.telegram.messenger',
+    'com.openai.chatgpt',
+    'com.google.android.youtube',
+    'com.google.android.apps.docs',
+    'com.anthropic.claude',
+    'com.facebook.katana',
+    'com.instagram.barcelona',
+    'com.android.vending',
+    'ai.perplexity.app.android',
+    'com.deepseek.chat',
+  ]);
 
   /// The six services' apps (Settings → Sites shows their names when one isn't installed).
   static const siteGroupServiceApps = {
@@ -215,8 +228,8 @@ abstract class ConfigOptions {
 
   /// How much sooner (ms, 10 to 3000) another server must answer a site before the site moves to it; on Wi-Fi
   /// (and on a computer), and on mobile data.
-  static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 80);
-  static final siteGroupsToleranceMobile = PreferencesNotifier.create<int, int>("site-groups-tolerance-mobile", 80);
+  static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 200);
+  static final siteGroupsToleranceMobile = PreferencesNotifier.create<int, int>("site-groups-tolerance-mobile", 50);
 
   /// The thresholds offered: by 10 ms to 300, by 50 to a second, by 100 to three.
   static final siteGroupsTolerances = [
@@ -278,8 +291,8 @@ abstract class ConfigOptions {
     validator: (value) => value.inSeconds >= 1 && value.inSeconds <= maxPingTimeout,
   );
 
-  static final balancerToleranceWifi = PreferencesNotifier.create<int, int>('balancer-tolerance-wifi', 150);
-  static final balancerToleranceMobile = PreferencesNotifier.create<int, int>('balancer-tolerance-mobile', 50);
+  static final balancerToleranceWifi = PreferencesNotifier.create<int, int>('balancer-tolerance-wifi', 50);
+  static final balancerToleranceMobile = PreferencesNotifier.create<int, int>('balancer-tolerance-mobile', 25);
 
   /// How many ms faster than the priority subscription's servers another subscription's must be to be taken, by network
   static final priorityMarginWifi = PreferencesNotifier.create<int, int>('priority-margin-wifi', 100);
