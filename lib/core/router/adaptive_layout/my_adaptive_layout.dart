@@ -15,6 +15,7 @@ import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/home/widget/freeze_frame.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';
@@ -102,6 +103,11 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     // root of a branch.
     final glass = Theme.of(context).glassLook;
     final contrastPhone = isMobileBreakpoint;
+    // Bento and Dots: the whole screen in their look (the faces, the menu, the panel)
+    final look = contrastPhone && !ref.watch(superLightProvider)
+        ? ref.watch(Preferences.homeLayout)
+        : HomeLayout.classic;
+    homeLookNow = look;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final rail = FocusScope(
       node: navScopeNode,
@@ -125,161 +131,161 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       ),
     );
     // the page is held as a picture while a popup opens and closes over it (see [FreezeFrame])
-    return FreezeFrame(
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          final homeIndex = getIndexOfBranch(isMobileBreakpoint, showProfilesAction, 'home');
-          if (navigationShell.currentIndex != homeIndex) {
-            // on another branch: go home instead of closing the app
-            navigationShell.goBranch(homeIndex);
-          } else {
-            // already home: this is the way out of the app
-            SystemNavigator.pop();
-          }
-        },
-        // Keeps the claim above alive on the platform side.
-        //
-        // Every branch navigator broadcasts whether it can handle a back press,
-        // and the last broadcast wins. Popping a page inside a branch leaves it
-        // reporting "cannot handle", which reaches Android and makes it close the
-        // app on the next press without ever calling Flutter. The PopScope above
-        // always handles the press, so that report is wrong: replace it.
-        child: NotificationListener<NavigationNotification>(
-          onNotification: (notification) {
-            if (notification.canHandlePop) return false;
-            const NavigationNotification(canHandlePop: true).dispatch(context);
-            return true;
+    return Theme(
+      data: lookTheme(Theme.of(context), look),
+      child: FreezeFrame(
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            final homeIndex = getIndexOfBranch(isMobileBreakpoint, showProfilesAction, 'home');
+            if (navigationShell.currentIndex != homeIndex) {
+              // on another branch: go home instead of closing the app
+              navigationShell.goBranch(homeIndex);
+            } else {
+              // already home: this is the way out of the app
+              SystemNavigator.pop();
+            }
           },
-          child: Material(
-            type: glass != null ? MaterialType.transparency : MaterialType.canvas,
-            child: Scaffold(
-              // Contrast: the panel's colour under everything, so the system's gesture strip under the menu is of a
-              // piece with it (it showed the page's grey there)
-              // (the home screen's look sets the panel's colour: Bento's and Dots' own)
-              backgroundColor: contrastPhone
-                  ? (ref.watch(Preferences.homeLayout).index >= 0 ? contrastPanelColor(dark) : null)
-                  : null,
-              body: contrastPhone
-                  ? Listener(
-                      // a computer: the mouse's back button goes back
-                      onPointerDown: (event) {
-                        if (PlatformUtils.isDesktop && event.buttons & kBackMouseButton != 0) {
-                          _back(context, isMobileBreakpoint, showProfilesAction);
-                        }
-                      },
-                      child: ContrastGlow(
-                        child: Flex(
-                          direction: ContrastShellDock.sideways(context) ? Axis.horizontal : Axis.vertical,
-                          children: [
-                            Expanded(
-                              child: Theme(
-                                data: contrastPageTheme(Theme.of(context), ref.watch(Preferences.contrastClarity)),
-                                child: navigationShell,
+          // Keeps the claim above alive on the platform side.
+          //
+          // Every branch navigator broadcasts whether it can handle a back press,
+          // and the last broadcast wins. Popping a page inside a branch leaves it
+          // reporting "cannot handle", which reaches Android and makes it close the
+          // app on the next press without ever calling Flutter. The PopScope above
+          // always handles the press, so that report is wrong: replace it.
+          child: NotificationListener<NavigationNotification>(
+            onNotification: (notification) {
+              if (notification.canHandlePop) return false;
+              const NavigationNotification(canHandlePop: true).dispatch(context);
+              return true;
+            },
+            child: Material(
+              type: glass != null ? MaterialType.transparency : MaterialType.canvas,
+              child: Scaffold(
+                // Contrast: the panel's colour under everything, so the system's gesture strip under the menu is of a
+                // piece with it (it showed the page's grey there)
+                backgroundColor: contrastPhone ? contrastPanelColor(dark) : null,
+                body: contrastPhone
+                    ? Listener(
+                        // a computer: the mouse's back button goes back
+                        onPointerDown: (event) {
+                          if (PlatformUtils.isDesktop && event.buttons & kBackMouseButton != 0) {
+                            _back(context, isMobileBreakpoint, showProfilesAction);
+                          }
+                        },
+                        child: ContrastGlow(
+                          child: Flex(
+                            direction: ContrastShellDock.sideways(context) ? Axis.horizontal : Axis.vertical,
+                            children: [
+                              Expanded(
+                                child: Theme(
+                                  data: contrastPageTheme(Theme.of(context), ref.watch(Preferences.contrastClarity)),
+                                  child: navigationShell,
+                                ),
                               ),
-                            ),
-                            ContrastShellDock(side: ContrastShellDock.sideways(context)),
-                          ],
+                              ContrastShellDock(side: ContrastShellDock.sideways(context)),
+                            ],
+                          ),
                         ),
+                      )
+                    : isMobileBreakpoint
+                    ? navigationShell
+                    : Row(
+                        children: [
+                          // Glass: the menu and the stats on a pane of glass, floating over the backdrop
+                          if (glass != null)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+                              child: GlassPane(look: glass, radius: 26, child: rail),
+                            )
+                          else
+                            rail,
+                          Expanded(child: navigationShell),
+                        ],
                       ),
-                    )
-                  : isMobileBreakpoint
-                  ? navigationShell
-                  : Row(
-                      children: [
-                        // Glass: the menu and the stats on a pane of glass, floating over the backdrop
-                        if (glass != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
-                            child: GlassPane(look: glass, radius: 26, child: rail),
-                          )
-                        else
-                          rail,
-                        Expanded(child: navigationShell),
-                      ],
-                    ),
-              // Glass: the menu floats under the page as a pane of glass, the backdrop round it
-              // the super light mode: only the home screen, so no menu
-              bottomNavigationBar: ref.watch(superLightProvider)
-                  ? null
-                  : isMobileBreakpoint && glass != null
-                  ? FocusScope(
-                      node: navScopeNode,
-                      child: SafeArea(
-                        top: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                          child: GlassPane(
-                            look: glass,
-                            radius: 34,
-                            // room inside the pane's ends, so the first and the last tab's pill sit as far from its
-                            // edge as the pills are from each other
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            // icons only, the chosen tab on a pill of the scheme's colour, as in the preview; its icon in the
-                            // text's colour, readable on the pill
-                            child: NavigationBarTheme(
-                              data: NavigationBarTheme.of(context).copyWith(
-                                iconTheme: WidgetStateProperty.resolveWith(
-                                  (s) => IconThemeData(
-                                    color: s.contains(WidgetState.selected)
-                                        ? Theme.of(context).colorScheme.onSurface
-                                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                // Glass: the menu floats under the page as a pane of glass, the backdrop round it
+                // the super light mode: only the home screen, so no menu
+                bottomNavigationBar: ref.watch(superLightProvider)
+                    ? null
+                    : isMobileBreakpoint && glass != null
+                    ? FocusScope(
+                        node: navScopeNode,
+                        child: SafeArea(
+                          top: false,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                            child: GlassPane(
+                              look: glass,
+                              radius: 34,
+                              // room inside the pane's ends, so the first and the last tab's pill sit as far from its
+                              // edge as the pills are from each other
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              // icons only, the chosen tab on a pill of the scheme's colour, as in the preview; its icon in the
+                              // text's colour, readable on the pill
+                              child: NavigationBarTheme(
+                                data: NavigationBarTheme.of(context).copyWith(
+                                  iconTheme: WidgetStateProperty.resolveWith(
+                                    (s) => IconThemeData(
+                                      color: s.contains(WidgetState.selected)
+                                          ? Theme.of(context).colorScheme.onSurface
+                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              child: NavigationBar(
-                                height: 64,
-                                backgroundColor: Colors.transparent,
-                                elevation: 0,
-                                labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-                                indicatorColor: glass.tint(
-                                  Theme.of(context).colorScheme.onSurface,
-                                  glass.dark ? .28 : .75,
+                                child: NavigationBar(
+                                  height: 64,
+                                  backgroundColor: Colors.transparent,
+                                  elevation: 0,
+                                  labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+                                  indicatorColor: glass.tint(
+                                    Theme.of(context).colorScheme.onSurface,
+                                    glass.dark ? .28 : .75,
+                                  ),
+                                  indicatorShape: const StadiumBorder(),
+                                  selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 2,
+                                  destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+                                  onDestinationSelected: (index) => _onTap(context, index),
                                 ),
-                                indicatorShape: const StadiumBorder(),
-                                selectedIndex: navigationShell.currentIndex <= 4 ? navigationShell.currentIndex : 2,
-                                destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                                onDestinationSelected: (index) => _onTap(context, index),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    )
-                  : isMobileBreakpoint
-                  ? FocusScope(
-                      node: navScopeNode,
-                      child: DecoratedBox(
-                        decoration: const BoxDecoration(),
-                        // Contrast: three tabs, Statistics, Home and Topology (the branches 1 to 3); Connections come up
-                        // with a long swipe up on the home screen, Settings down with one down (or the cog by the "+")
-                        child: NavigationBar(
-                          // a lower menu, of a piece with the panel over it (white by day, black by night); flat
-                          height: 62,
-                          elevation: 0,
-                          shadowColor: Colors.transparent,
-                          backgroundColor: contrastPanelColor(dark),
-                          // the phone: Connections and Settings (reached by swipes, not in the menu) keep Home lit; a
-                          // computer has no swipes, so every page is in its menu, where it can be seen
-                          selectedIndex: PlatformUtils.isDesktop
-                              ? navigationShell.currentIndex
-                              : switch (navigationShell.currentIndex) {
-                                  1 => 0,
-                                  3 => 2,
-                                  _ => 1,
-                                },
-                          destinations: _navDests(
-                            PlatformUtils.isDesktop
-                                ? _actions(t, showProfilesAction, isMobileBreakpoint)
-                                : _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
+                      )
+                    : isMobileBreakpoint
+                    ? FocusScope(
+                        node: navScopeNode,
+                        child: DecoratedBox(
+                          decoration: const BoxDecoration(),
+                          // Contrast: three tabs, Statistics, Home and Topology (the branches 1 to 3); Connections come up
+                          // with a long swipe up on the home screen, Settings down with one down (or the cog by the "+")
+                          child: NavigationBar(
+                            // a lower menu, of a piece with the panel over it (white by day, black by night); flat
+                            height: 62,
+                            elevation: 0,
+                            shadowColor: Colors.transparent,
+                            backgroundColor: contrastPanelColor(dark),
+                            // the phone: Connections and Settings (reached by swipes, not in the menu) keep Home lit; a
+                            // computer has no swipes, so every page is in its menu, where it can be seen
+                            selectedIndex: PlatformUtils.isDesktop
+                                ? navigationShell.currentIndex
+                                : switch (navigationShell.currentIndex) {
+                                    1 => 0,
+                                    3 => 2,
+                                    _ => 1,
+                                  },
+                            destinations: _navDests(
+                              PlatformUtils.isDesktop
+                                  ? _actions(t, showProfilesAction, isMobileBreakpoint)
+                                  : _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
+                            ),
+                            onDestinationSelected: (index) =>
+                                _onTap(context, PlatformUtils.isDesktop ? index : index + 1),
                           ),
-                          onDestinationSelected: (index) =>
-                              _onTap(context, PlatformUtils.isDesktop ? index : index + 1),
                         ),
-                      ),
-                    )
-                  : null,
+                      )
+                    : null,
+              ),
             ),
           ),
         ),

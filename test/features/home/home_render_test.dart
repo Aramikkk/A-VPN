@@ -27,6 +27,7 @@ import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/connection/notifier/shown_connection.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_path_resolver.dart';
@@ -346,7 +347,10 @@ void main() {
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
               theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
-              builder: (context, child) => ContrastGlow(child: child!),
+              builder: (context, child) => Theme(
+                data: lookTheme(Theme.of(context), HomeLayout.fromName(Platform.environment['HOMELAYOUT'])),
+                child: ContrastGlow(child: child!),
+              ),
               home: Consumer(
                 builder: (context, ref, _) =>
                     !ref.watch(translationsProvider).hasValue || !ref.watch(sharedPreferencesProvider).hasValue

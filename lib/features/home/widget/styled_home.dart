@@ -998,14 +998,26 @@ class _GraphiteDock extends HookConsumerWidget {
     final caption = (theme.contrastLayout ? theme.textTheme.labelLarge : theme.textTheme.labelMedium)?.copyWith(
       fontWeight: FontWeight.w700,
       color: scheme.onSurfaceVariant,
+      // Bento and Dots: their own faces
+      fontFamily: switch (homeLookNow) {
+        HomeLayout.dots => 'JetBrains Mono',
+        _ => null,
+      },
+      letterSpacing: homeLookNow == HomeLayout.dots ? 1.6 : null,
+      fontSize: homeLookNow == HomeLayout.dots ? 12 : null,
     );
+    final figureFace = switch (homeLookNow) {
+      HomeLayout.bento => 'Unbounded',
+      HomeLayout.dots => 'JetBrains Mono',
+      _ => null,
+    };
     final iconSize = (large ? 28.0 : 26.0) * (theme.contrastLayout ? 1.05 : 1);
     // no plates: an icon (or a number) over a small caption, pressed as one
     // on a barely-there plate, as the toggles above
     // Contrast: the ping and the servers' figures in the ping frame's colour (their signs in the text colour), the
     // loss in its frame's grey
     final contrastOn = theme.contrastLayout && on;
-    final gaugeInk = contrastOn ? accent : ink;
+    final gaugeInk = contrastOn ? (homeLookNow == HomeLayout.dots ? _Dots.ink(dark) : accent) : ink;
     final lossInk = dark ? const Color(0xFFA3A9B0) : const Color(0xFF8C939C);
     Widget side({required Widget top, required String label, VoidCallback? onTap, Color? labelColor}) => Material(
       // Contrast: no plate, right on its black panel
@@ -1028,7 +1040,10 @@ class _GraphiteDock extends HookConsumerWidget {
                   child: Center(child: top),
                 ),
                 const Gap(4),
-                Text(label, style: labelColor == null ? caption : caption?.copyWith(color: labelColor)),
+                Text(
+                  homeLookNow == HomeLayout.dots ? label.toUpperCase() : label,
+                  style: labelColor == null ? caption : caption?.copyWith(color: labelColor),
+                ),
               ],
             ),
           ),
@@ -1059,7 +1074,7 @@ class _GraphiteDock extends HookConsumerWidget {
                             fontWeight: FontWeight.w900,
                             height: 1,
                             fontSize: sideFigure,
-                            fontFamily: homeLookNow == HomeLayout.dots ? 'JetBrains Mono' : null,
+                            fontFamily: figureFace,
                             color: contrastOn && measured && !busy ? gaugeInk : null,
                           ),
                         ),
@@ -1106,6 +1121,7 @@ class _GraphiteDock extends HookConsumerWidget {
                           fontWeight: FontWeight.w900,
                           height: 1,
                           fontSize: sideFigure,
+                          fontFamily: figureFace,
                           color: contrastOn ? gaugeInk : null,
                         ),
                       ),
@@ -4068,6 +4084,13 @@ class ContrastPlate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final clarity = ref.watch(Preferences.contrastClarity);
+    // Bento and Dots: their own plates
+    final own = lookPlate(
+      ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout),
+      context,
+      child,
+    );
+    if (own != null) return own;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
       child: _FrostedBackdrop(
@@ -4572,6 +4595,11 @@ class _SitesHeader extends HookConsumerWidget {
     final multiPref = onMobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups;
     final multiOn = ref.watch(multiPref);
     final shown = ref.watch(homeSitesProvider);
+    // Bento and Dots: their own pills
+    final look = ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
+    final delayPill = lookPill(look, context, on: sites.testing);
+    final multiPill = lookPill(look, context, on: multiOn);
+    final upper = look == HomeLayout.dots;
     // a small round button on the left, the block's name beside it; while the sites are asked a ring of the
     // accent fills round it, a site at a time, closes when they have all answered and fades
     return Padding(
@@ -4583,11 +4611,13 @@ class _SitesHeader extends HookConsumerWidget {
           Container(
             height: 30,
             padding: const EdgeInsets.symmetric(horizontal: 9),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
-              border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
-            ),
+            decoration:
+                delayPill?.box ??
+                BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
+                  border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
+                ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -4608,15 +4638,17 @@ class _SitesHeader extends HookConsumerWidget {
                           ),
                         ),
                       )
-                    : Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurfaceVariant),
+                    : Icon(Icons.refresh_rounded, size: 15, color: delayPill?.ink ?? scheme.onSurfaceVariant),
                 const Gap(6),
                 Text(
-                  t.avpn.sitesTitle,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: .3,
-                  ),
+                  upper ? t.avpn.sitesTitle.toUpperCase() : t.avpn.sitesTitle,
+                  style:
+                      delayPill?.text ??
+                      theme.textTheme.labelSmall?.copyWith(
+                        color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: .3,
+                      ),
                 ),
               ],
             ),
@@ -4630,23 +4662,33 @@ class _SitesHeader extends HookConsumerWidget {
             child: Container(
               height: 30,
               padding: const EdgeInsets.symmetric(horizontal: 9),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
-                border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
-              ),
+              decoration:
+                  multiPill?.box ??
+                  BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
+                    border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
+                  ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.alt_route_rounded, size: 15, color: multiOn ? accent : scheme.onSurfaceVariant),
+                  Icon(
+                    Icons.alt_route_rounded,
+                    size: 15,
+                    color: multiPill?.ink ?? (multiOn ? accent : scheme.onSurfaceVariant),
+                  ),
                   const Gap(6),
                   Text(
-                    '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: .3,
-                    ),
+                    upper
+                        ? '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}'.toUpperCase()
+                        : '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
+                    style:
+                        multiPill?.text ??
+                        theme.textTheme.labelSmall?.copyWith(
+                          color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .3,
+                        ),
                   ),
                 ],
               ),

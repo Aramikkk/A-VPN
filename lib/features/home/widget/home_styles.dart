@@ -960,3 +960,127 @@ class _DotsButton extends StatelessWidget {
     );
   }
 }
+
+/// A pill over the sites (the delay check, the multi-server switch) in a look that has its own: Bento's solid chip,
+/// the accent when on; Dots' square-cornered box in small capitals, filled with the ink when on. Null for the others.
+({BoxDecoration box, Color ink, TextStyle? text})? lookPill(HomeLayout look, BuildContext context, {required bool on}) {
+  final theme = Theme.of(context);
+  final dark = theme.brightness == Brightness.dark;
+  switch (look) {
+    case HomeLayout.bento:
+      final ink = on ? ContrastPalette.ink : theme.colorScheme.onSurface;
+      return (
+        box: BoxDecoration(color: on ? theme.araAccent : _Bento.inner(dark), borderRadius: BorderRadius.circular(15)),
+        ink: ink,
+        text: _Bento.label(ink).copyWith(fontSize: 12, fontWeight: FontWeight.w800),
+      );
+    case HomeLayout.dots:
+      final ink = on ? _Dots.paper(dark) : _Dots.ink(dark);
+      return (
+        box: BoxDecoration(
+          color: on ? _Dots.ink(dark) : null,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: _Dots.ink(dark).withValues(alpha: .7)),
+        ),
+        ink: ink,
+        text: _Dots.mono(11, ink, weight: FontWeight.w700),
+      );
+    default:
+      return null;
+  }
+}
+
+/// A round button over the page (the modes, the leaf, the cog) in a look that has its own: Bento's solid tile,
+/// Dots' outlined circle on the paper. Null for the others.
+Widget? lookPlate(HomeLayout look, BuildContext context, Widget child) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return switch (look) {
+    HomeLayout.bento => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: _Bento.tile(dark), borderRadius: BorderRadius.circular(16)),
+        child: child,
+      ),
+    ),
+    HomeLayout.dots => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: _Dots.paper(dark),
+          shape: BoxShape.circle,
+          border: Border.all(color: _Dots.ink(dark).withValues(alpha: .7)),
+        ),
+        child: child,
+      ),
+    ),
+    _ => null,
+  };
+}
+
+/// The whole screen in a look that has its own (the pages, the menu, the panel): Dots in its monospaced face with the
+/// ink for the accent of the text and a square-cornered outlined tab; Bento its heavy round face for the titles and a
+/// solid tab in the accent. The others as they are.
+ThemeData lookTheme(ThemeData theme, HomeLayout look) {
+  final dark = theme.brightness == Brightness.dark;
+  switch (look) {
+    case HomeLayout.dots:
+      final ink = _Dots.ink(dark);
+      final soft = _Dots.soft(dark);
+      return theme.copyWith(
+        textTheme: theme.textTheme.apply(fontFamily: 'JetBrains Mono'),
+        appBarTheme: theme.appBarTheme.copyWith(
+          titleTextStyle: (theme.appBarTheme.titleTextStyle ?? theme.textTheme.titleLarge)?.copyWith(
+            fontFamily: 'JetBrains Mono',
+          ),
+        ),
+        primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: 'JetBrains Mono'),
+        colorScheme: theme.colorScheme.copyWith(primary: ink),
+        navigationBarTheme: theme.navigationBarTheme.copyWith(
+          indicatorColor: ink.withValues(alpha: .08),
+          indicatorShape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+            side: BorderSide(color: ink.withValues(alpha: .7)),
+          ),
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(color: states.contains(WidgetState.selected) ? ink : soft),
+          ),
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => _Dots.mono(
+              11,
+              states.contains(WidgetState.selected) ? ink : soft,
+              weight: FontWeight.w700,
+              spacing: .6,
+            ),
+          ),
+        ),
+      );
+    case HomeLayout.bento:
+      final t = theme.textTheme;
+      TextStyle? heavy(TextStyle? style) => style?.copyWith(fontFamily: 'Unbounded', letterSpacing: -.2);
+      return theme.copyWith(
+        appBarTheme: theme.appBarTheme.copyWith(
+          titleTextStyle: heavy(theme.appBarTheme.titleTextStyle ?? t.titleLarge),
+        ),
+        textTheme: t.copyWith(
+          displayLarge: heavy(t.displayLarge),
+          displayMedium: heavy(t.displayMedium),
+          displaySmall: heavy(t.displaySmall),
+          headlineLarge: heavy(t.headlineLarge),
+          headlineMedium: heavy(t.headlineMedium),
+          headlineSmall: heavy(t.headlineSmall),
+          titleLarge: heavy(t.titleLarge),
+        ),
+        navigationBarTheme: theme.navigationBarTheme.copyWith(
+          indicatorColor: theme.araAccent,
+          indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(
+              color: states.contains(WidgetState.selected) ? ContrastPalette.ink : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    default:
+      return theme;
+  }
+}
