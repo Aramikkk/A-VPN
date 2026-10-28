@@ -1034,7 +1034,45 @@ ThemeData lookTheme(ThemeData theme, HomeLayout look) {
           ),
         ),
         primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: 'JetBrains Mono'),
-        colorScheme: theme.colorScheme.copyWith(primary: ink),
+        colorScheme: theme.colorScheme.copyWith(primary: ink, onPrimary: _Dots.paper(dark)),
+        chipTheme: theme.chipTheme.copyWith(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+            side: BorderSide(color: ink.withValues(alpha: .6)),
+          ),
+          side: BorderSide(color: ink.withValues(alpha: .6)),
+          backgroundColor: Colors.transparent,
+          selectedColor: ink,
+          checkmarkColor: _Dots.paper(dark),
+          labelStyle: _Dots.mono(12, ink, weight: FontWeight.w700, spacing: .6),
+          secondaryLabelStyle: _Dots.mono(12, _Dots.paper(dark), weight: FontWeight.w700, spacing: .6),
+        ),
+        segmentedButtonTheme: SegmentedButtonThemeData(
+          style: ButtonStyle(
+            shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
+            side: WidgetStatePropertyAll(BorderSide(color: ink.withValues(alpha: .6))),
+            backgroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected) ? ink : Colors.transparent,
+            ),
+            foregroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected) ? _Dots.paper(dark) : ink,
+            ),
+          ),
+        ),
+        sliderTheme: theme.sliderTheme.copyWith(
+          activeTrackColor: ink,
+          thumbColor: ink,
+          inactiveTrackColor: soft.withValues(alpha: .4),
+        ),
+        switchTheme: SwitchThemeData(
+          thumbColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? _Dots.paper(dark) : soft,
+          ),
+          trackColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? ink : Colors.transparent,
+          ),
+          trackOutlineColor: WidgetStatePropertyAll(ink.withValues(alpha: .6)),
+        ),
         navigationBarTheme: theme.navigationBarTheme.copyWith(
           indicatorColor: ink.withValues(alpha: .08),
           indicatorShape: RoundedRectangleBorder(
@@ -1069,6 +1107,25 @@ ThemeData lookTheme(ThemeData theme, HomeLayout look) {
           headlineMedium: heavy(t.headlineMedium),
           headlineSmall: heavy(t.headlineSmall),
           titleLarge: heavy(t.titleLarge),
+        ),
+        chipTheme: theme.chipTheme.copyWith(
+          shape: const StadiumBorder(),
+          side: BorderSide.none,
+          backgroundColor: _Bento.tile(dark),
+          selectedColor: theme.araAccent,
+          checkmarkColor: ContrastPalette.ink,
+          secondaryLabelStyle: TextStyle(color: ContrastPalette.ink, fontWeight: FontWeight.w800),
+        ),
+        segmentedButtonTheme: SegmentedButtonThemeData(
+          style: ButtonStyle(
+            side: const WidgetStatePropertyAll(BorderSide.none),
+            backgroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected) ? theme.araAccent : _Bento.tile(dark),
+            ),
+            foregroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected) ? ContrastPalette.ink : theme.colorScheme.onSurface,
+            ),
+          ),
         ),
         navigationBarTheme: theme.navigationBarTheme.copyWith(
           indicatorColor: theme.araAccent,

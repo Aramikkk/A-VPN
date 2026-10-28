@@ -22,6 +22,8 @@ import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_path_resolver.dart';
@@ -255,7 +257,9 @@ void main() {
               final picked = Platform.environment['ACCENTS']?.split(',').map(AraAccent.values.byName).toList();
               for (final accent in picked ?? [AraAccent.oled, AraAccent.neonRed, AraAccent.neonYellow]) {
                 where = '${screen.name} ${style.name} ${accent.name} ${dark ? 'night' : 'day'} $sizeName';
-                SharedPreferences.setMockInitialValues({'ara_style': style.name});
+                // HOMELAYOUT=bento|dots: the pages in that look (its backdrop, cards and faces), as the app's shell has them
+                final look = Platform.environment['HOMELAYOUT'];
+                SharedPreferences.setMockInitialValues({'ara_style': style.name, if (look != null) 'home_layout': look});
                 final prefs = await tester.runAsync(SharedPreferences.getInstance);
                 await tester.binding.setSurfaceSize(size);
                 final theme = AppTheme(AppThemeMode.system, '', accent: accent, style: style);
@@ -278,6 +282,12 @@ void main() {
                     child: MaterialApp.router(
                       debugShowCheckedModeBanner: false,
                       theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
+                      builder: look == null
+                          ? null
+                          : (context, child) => Theme(
+                              data: contrastPageTheme(lookTheme(Theme.of(context), HomeLayout.fromName(look))),
+                              child: ContrastGlow(child: child!),
+                            ),
                       routerConfig: GoRouter(
                         routes: [
                           GoRoute(
