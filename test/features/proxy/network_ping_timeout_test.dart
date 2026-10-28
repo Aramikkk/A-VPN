@@ -72,7 +72,8 @@ void main() {
       priorityProfile: 2, priorityMargin: 150,
     );
     Map<String, dynamic> monitoring(String path) =>
-        (jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>)['experimental']['monitoring'];
+        ((jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>)['experimental'] as Map<String, dynamic>)['monitoring']
+            as Map<String, dynamic>;
     expect(monitoring(wifi)['priority_profile'], 2);
     expect(monitoring(wifi)['priority_margin'], 100);
     expect(monitoring(mobile)['priority_margin'], 150);
