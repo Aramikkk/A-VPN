@@ -510,6 +510,50 @@ class ContrastThemePicker extends ConsumerWidget {
           ),
         ),
         if (!glass) ...[
+          // the size of everything and of the text
+          heading(t.avpn.scaleTitle),
+          card(
+            Column(
+              children: [
+                for (final (title, pref) in [
+                  (t.avpn.uiScaleLabel, Preferences.uiScalePercent),
+                  (t.avpn.fontScaleLabel, Preferences.fontScalePercent),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 5, child: Text(title, style: Theme.of(context).textTheme.bodyMedium)),
+                        Expanded(
+                          flex: 6,
+                          child: Slider(
+                            min: 70,
+                            max: 160,
+                            divisions: 18,
+                            value: ref.watch(pref).clamp(70, 160).toDouble(),
+                            onChanged: (v) => ref.read(pref.notifier).update(v.round()),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 46,
+                          child: Text('${ref.watch(pref)}%', textAlign: TextAlign.end, style: Theme.of(context).textTheme.labelLarge),
+                        ),
+                      ],
+                    ),
+                  ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      ref.read(Preferences.uiScalePercent.notifier).update(100);
+                      ref.read(Preferences.fontScalePercent.notifier).update(100);
+                    },
+                    child: Text(t.avpn.scaleReset),
+                  ),
+                ),
+              ],
+            ),
+          ),
           // how the home screen is laid out: a picture of each, with its name
           heading(t.avpn.homeLayoutTitle),
           card(

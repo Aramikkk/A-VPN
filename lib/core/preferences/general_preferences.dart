@@ -260,6 +260,12 @@ abstract class Preferences {
     mapTo: (value) => value.name,
   );
 
+  /// A-VPN: the size of everything, in percent (Settings → Themes): a screen far from the eyes, or a small one.
+  static final uiScalePercent = PreferencesNotifier.create<int, int>("ui_scale_percent", 100);
+
+  /// A-VPN: the size of the text on top of the system's, in percent.
+  static final fontScalePercent = PreferencesNotifier.create<int, int>("font_scale_percent", 100);
+
   /// A-VPN: how the home screen is laid out (Contrast).
   static final homeLayout = PreferencesNotifier.create<HomeLayout, String>(
     "home_layout",

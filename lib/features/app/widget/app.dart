@@ -4,6 +4,7 @@ import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/widget/ui_scale.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -12,6 +13,7 @@ import 'package:hiddify/core/localization/locale_preferences.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/theme/app_icon.dart';
@@ -63,6 +65,10 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     setupStateListener(ref);
     final router = ref.watch(goRouterNotiferProvider);
     final locale = ref.watch(localePreferencesProvider);
+    // the size of everything and of the text, as set in Settings → Themes
+    final prefsReady = ref.watch(sharedPreferencesProvider).hasValue;
+    final uiScale = prefsReady ? ref.watch(Preferences.uiScalePercent) / 100 : 1.0;
+    final fontScale = prefsReady ? ref.watch(Preferences.fontScalePercent) / 100 : 1.0;
     final themeMode = ref.watch(themePreferencesProvider);
     final style = ref.watch(Preferences.araStyle);
     // the light look's switch, worked out here so the places with no `ref` read it too
@@ -147,6 +153,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                         ],
                       );
                     }
+                    child = UiScale(scale: uiScale, fontScale: fontScale, child: child);
                     if (kDebugMode && _debugAccessibility) {
                       return AccessibilityTools(checkFontOverflows: true, child: child);
                     }

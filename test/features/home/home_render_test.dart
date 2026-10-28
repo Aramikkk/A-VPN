@@ -244,8 +244,12 @@ void main() {
         final pc = Platform.environment['PC'] == '1';
         // LAND=1: the folded phone turned, about 960 x 411
         final land = Platform.environment['LAND'] == '1';
+        // SIZE=<w>x<h>: any phone-like screen in dp (a car's head unit, a short phone)
+        final custom = Platform.environment['SIZE']?.split('x').map(double.parse).toList();
         await tester.binding.setSurfaceSize(
-          pcw
+          custom != null
+              ? Size(custom[0], custom[1])
+              : pcw
               ? const Size(960, 828)
               : pc
               ? const Size(745, 870)
@@ -253,7 +257,9 @@ void main() {
         );
         // the screen size the app reads too (MediaQuery), not only the surface drawn on
         // the folded Fold 7: 1080 x 2520 at 2.625, about 411 x 960
-        tester.view.physicalSize = pcw
+        tester.view.physicalSize = custom != null
+            ? Size(custom[0] * 2.625, custom[1] * 2.625)
+            : pcw
             ? const Size(960, 828)
             : pc
             ? const Size(745, 870)

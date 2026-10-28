@@ -103,6 +103,10 @@ class _StyledHome extends HookConsumerWidget {
             ? const _NoAdminNote()
             : null,
         status: _StatusBlock(status: status, lastServer: currentName, visible: visible, layout: layout),
+        statusSlim: layout == HomeLayout.classic
+            ? null
+            : _StatusBlock(status: status, lastServer: currentName, visible: visible, layout: layout, slim: true),
+        trafficSlim: layout == HomeLayout.pulse && traffic && hasList ? _SiteTiles(visible: visible, compact: true, oneRow: true) : null,
         // the vessel and the pulse keep the sites small
         compactTraffic: layout == HomeLayout.vessel || layout == HomeLayout.pulse,
         servers: hasList
@@ -264,10 +268,14 @@ class _StatusBlock extends HookConsumerWidget {
     required this.lastServer,
     required this.visible,
     this.layout = HomeLayout.classic,
+    this.slim = false,
   });
 
   /// how the top of the home screen is laid out
   final HomeLayout layout;
+
+  /// the smaller form of a layout's top block (for a screen that is not high enough)
+  final bool slim;
 
   final ConnectionStatus status;
   final String? lastServer;
@@ -374,6 +382,7 @@ class _StatusBlock extends HookConsumerWidget {
           direct: direct,
           vpnShare: total == 0 ? 0 : vpnShare,
           speedLevel: speedLevelNow,
+          slim: slim,
         );
       }
       if (layout == HomeLayout.pulse) {
@@ -388,6 +397,7 @@ class _StatusBlock extends HookConsumerWidget {
           direct: direct,
           vpnShare: total == 0 ? 0 : vpnShare,
           speedLevel: speedLevelNow,
+          slim: slim,
         );
       }
       // the two routes in one tile, the time in the middle, the speeds on the right
@@ -1871,7 +1881,13 @@ class _ContrastHome extends StatelessWidget {
     this.notice,
     this.superLight = false,
     this.compactTraffic = false,
+    this.statusSlim,
+    this.trafficSlim,
   });
+
+  /// smaller forms of the top block and of the sites' block, taken in turn when the whole ones don't fit the height
+  final Widget? statusSlim;
+  final Widget? trafficSlim;
 
   /// the traffic block holds only what it needs (the rest of the room is left under it)
   final bool compactTraffic;
@@ -1905,6 +1921,46 @@ class _ContrastHome extends StatelessWidget {
           // the compact layouts: what room is left is shared in equal gaps between the blocks, and the last block's
           // distance from the panel's tab is one of them (the tab's top edge is where the page ends)
           final evenly = compactTraffic && traffic != null;
+          if (evenly) {
+            // the blocks always fit: when they don't all, the connections go, then the sites get down to one row, then the
+            // top block loses its second row, and last the sites go too; the room left is shared in equal gaps
+            final withToggles = toggles != null && !ContrastShellDock.sideways(context);
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+              child: LayoutBuilder(
+                builder: (context, fit) => FitBlocks(
+                  minGap: 10,
+                  steps: const [
+                    (group: 4, rank: -1),
+                    (group: 3, rank: 1),
+                    (group: 1, rank: 1),
+                    (group: 3, rank: 2),
+                    (group: 3, rank: -1),
+                  ],
+                  children: [
+                    FitSlot(
+                      group: 0,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
+                          if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(10)],
+                        ],
+                      ),
+                    ),
+                    FitSlot(group: 1, child: _ContrastBlock(child: status)),
+                    if (statusSlim != null) FitSlot(group: 1, rank: 1, child: _ContrastBlock(child: statusSlim!)),
+                    if (!superLight) FitSlot(group: 2, child: _ContrastBlock(child: servers)),
+                    FitSlot(group: 3, child: _ContrastBlock(child: traffic!)),
+                    if (trafficSlim != null) FitSlot(group: 3, rank: 1, child: _ContrastBlock(child: trafficSlim!)),
+                    if (trafficSlim != null) FitSlot(group: 3, rank: 2, child: const _SiteStrip()),
+                    if (withToggles) FitSlot(group: 4, child: _ContrastBlock(child: toggles!)),
+                  ],
+                ),
+              ),
+            );
+          }
           Widget between() => evenly ? const Spacer() : const Gap(14);
           final content = Padding(
             padding: EdgeInsets.fromLTRB(14, 0, 14, evenly ? 0 : 14),
@@ -3504,7 +3560,10 @@ class _SessionServers extends ConsumerWidget {
 /// its name and the delay large, over water that rises the faster it answers, green up to 150 ms, amber up to 300,
 /// red slower or with no answer. Two rows of three filling the room the traffic had; a tap asks them again.
 class _SiteTiles extends HookConsumerWidget {
-  const _SiteTiles({required this.visible, this.compact = false});
+  const _SiteTiles({required this.visible, this.compact = false, this.oneRow = false});
+
+  /// only the first row of tiles (a smaller block, for a screen that is not high enough)
+  final bool oneRow;
 
   final bool visible;
 
@@ -3808,7 +3867,7 @@ class _SiteTiles extends HookConsumerWidget {
               ),
             )
           else
-            for (var start = 0; start < shown.length; start += 3) ...[
+            for (var start = 0; start < (oneRow ? math.min(shown.length, 3) : shown.length); start += 3) ...[
               if (start > 0) const Gap(8),
               line(shown.skip(start).take(3)),
             ],

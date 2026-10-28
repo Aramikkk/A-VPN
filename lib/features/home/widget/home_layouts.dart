@@ -157,7 +157,11 @@ class _VesselStats extends HookConsumerWidget {
     required this.direct,
     required this.vpnShare,
     required this.speedLevel,
+    this.slim = false,
   });
+
+  /// without the speeds and the traffic (a smaller block, for a screen that is not high enough)
+  final bool slim;
 
   final double speedLevel;
   final bool connected;
@@ -183,7 +187,7 @@ class _VesselStats extends HookConsumerWidget {
     final target = connected && ping != null ? _Orb.pingFill(ping!) : 0.0;
     final prior = heading.value;
     if (prior == null || (target - prior).abs() >= .08 || (target == 0) != (prior == 0)) heading.value = target;
-    const size = 190.0;
+    final size = slim ? 124.0 : 190.0;
     final ink = ContrastPalette.ink;
     final vessel = SizedBox(
       width: size,
@@ -265,8 +269,10 @@ class _VesselStats extends HookConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Center(child: vessel),
-        const Gap(10),
-        _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare, speedLevel: speedLevel),
+        if (!slim) ...[
+          const Gap(10),
+          _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare, speedLevel: speedLevel),
+        ],
       ],
     );
   }
@@ -419,7 +425,11 @@ class _PulseStats extends HookConsumerWidget {
     required this.direct,
     required this.vpnShare,
     required this.speedLevel,
+    this.slim = false,
   });
+
+  /// without the speeds and the traffic (a smaller block, for a screen that is not high enough)
+  final bool slim;
 
   final double speedLevel;
   final bool connected;
@@ -549,8 +559,10 @@ class _PulseStats extends HookConsumerWidget {
           padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
           radius: 22,
         ),
-        const Gap(6),
-        _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare, speedLevel: speedLevel),
+        if (!slim) ...[
+          const Gap(6),
+          _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare, speedLevel: speedLevel),
+        ],
       ],
     );
   }
@@ -651,6 +663,48 @@ class _SiteBars extends ConsumerWidget {
         ],
       ),
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
+    );
+  }
+}
+
+/// The sites in one thin strip: a dot of the delay's colour and the delay for each, no names (the last form of the sites'
+/// block before it goes off a page that is too low).
+class _SiteStrip extends ConsumerWidget {
+  const _SiteStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final entries = _siteEntries(ref, theme.colorScheme);
+    if (entries.isEmpty) return const SizedBox.shrink();
+    return _homeTile(
+      context,
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          for (final e in entries)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(color: e.colour, shape: BoxShape.circle),
+                ),
+                const Gap(4),
+                Text(
+                  !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+      radius: 14,
     );
   }
 }
