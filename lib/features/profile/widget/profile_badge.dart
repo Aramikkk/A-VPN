@@ -8,7 +8,7 @@ import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// A mark of a subscription: a coloured circle with the first letter of its name, on the flag of its servers.
-typedef ProfileBadge = ({String letter, Color colour});
+typedef ProfileBadge = ({String letter, Color colour, String name});
 
 /// The marks of the subscriptions in the work, the active profile first, then the added ones in the order they were
 /// added; the same order the servers are numbered in (see ProfileMerge). Empty with one subscription: nothing to tell
@@ -50,9 +50,9 @@ ProfileBadge badgeOf(int index, String name) {
   final letter = text.isEmpty ? '?' : String.fromCharCode(text.runes.first).toUpperCase();
   final lower = text.toLowerCase();
   for (final e in _providerColours.entries) {
-    if (lower.contains(e.key)) return (letter: letter, colour: e.value);
+    if (lower.contains(e.key)) return (letter: letter, colour: e.value, name: text);
   }
-  return (letter: letter, colour: _otherColours[index % _otherColours.length]);
+  return (letter: letter, colour: _otherColours[index % _otherColours.length], name: text);
 }
 
 /// Which subscription a server of the running config is from: the provider's own `§ N` ending of its name is shifted by

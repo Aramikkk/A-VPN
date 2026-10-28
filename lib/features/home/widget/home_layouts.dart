@@ -87,33 +87,31 @@ class _SpeedTrafficRow extends StatelessWidget {
       ],
     );
     final dark = theme.brightness == Brightness.dark;
-    Widget tile(IconData sign, Widget a, Widget b, double level) => Expanded(
+    // the sign in the middle, a figure on each side; the fill in the accent grows from the left (the speed) or from the
+    // right (the VPN's share) of the tile
+    Widget tile(IconData sign, Widget a, Widget b, double level, {required bool fromRight}) => Expanded(
       child: _homeTile(
         context,
         Stack(
           children: [
-            Positioned.fill(child: RepaintBoundary(child: _Water(level: level, colour: accent, dark: dark))),
+            Positioned.fill(child: RepaintBoundary(child: _SideFill(level: level, colour: accent, dark: dark, fromRight: fromRight))),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               child: Row(
                 children: [
+                  Expanded(
+                    child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: a),
+                  ),
+                  const Gap(6),
                   Container(
                     width: 30,
                     height: 30,
                     decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
                     child: Icon(sign, size: 17, color: ContrastPalette.ink),
                   ),
-                  const Gap(10),
+                  const Gap(6),
                   Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [a, const Gap(3), b],
-                      ),
-                    ),
+                    child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: b),
                   ),
                 ],
               ),
@@ -130,6 +128,7 @@ class _SpeedTrafficRow extends StatelessWidget {
           line(Icons.south_rounded, accent, down),
           line(Icons.north_rounded, scheme.onSurfaceVariant, up),
           speedLevel,
+          fromRight: false,
         ),
         const Gap(6),
         tile(
@@ -137,8 +136,52 @@ class _SpeedTrafficRow extends StatelessWidget {
           line(Icons.shield_rounded, accent, vpn),
           line(Icons.alt_route_rounded, scheme.onSurfaceVariant, direct),
           vpnShare,
+          fromRight: true,
         ),
       ],
+    );
+  }
+}
+
+/// A tile's fill in the accent, sideways: from the left edge (the speed) or from the right (the VPN's share).
+class _SideFill extends HookWidget {
+  const _SideFill({required this.level, required this.colour, required this.dark, required this.fromRight});
+
+  final double level;
+  final Color colour;
+  final bool dark;
+  final bool fromRight;
+
+  @override
+  Widget build(BuildContext context) {
+    final heading = useRef<double?>(null);
+    final next = level.clamp(0.0, 1.0);
+    final now = heading.value;
+    if (now == null || (next - now).abs() >= .08 || (next == 0) != (now == 0)) heading.value = next;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: heading.value),
+      duration: lightDuration(const Duration(milliseconds: 900)),
+      curve: Curves.easeOutCubic,
+      builder: (context, l, _) => l < .005
+          ? const SizedBox.shrink()
+          : Align(
+              alignment: fromRight ? Alignment.centerRight : Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: l,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colour.withValues(alpha: dark ? .42 : .34),
+                    border: l > .97
+                        ? null
+                        : Border(
+                            left: fromRight ? BorderSide(color: colour, width: 1.5) : BorderSide.none,
+                            right: fromRight ? BorderSide.none : BorderSide(color: colour, width: 1.5),
+                          ),
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }

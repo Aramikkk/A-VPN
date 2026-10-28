@@ -106,7 +106,9 @@ class _StyledHome extends HookConsumerWidget {
         statusSlim: layout == HomeLayout.classic
             ? null
             : _StatusBlock(status: status, lastServer: currentName, visible: visible, layout: layout, slim: true),
-        trafficSlim: layout == HomeLayout.pulse && traffic && hasList ? _SiteTiles(visible: visible, compact: true, oneRow: true) : null,
+        trafficSlim: layout == HomeLayout.pulse && traffic && hasList
+            ? _SiteTiles(visible: visible, compact: true, oneRow: true)
+            : null,
         // the vessel and the pulse keep the sites small
         compactTraffic: layout == HomeLayout.vessel || layout == HomeLayout.pulse,
         servers: hasList
@@ -350,7 +352,15 @@ class _StatusBlock extends HookConsumerWidget {
               connected ? sessionLength.inMinutes / (24 * 60) : 0,
               const Color(0xFF8FA8BD),
             ),
-            (Icons.south_rounded, t.avpn.superLightDown, inRate.$1, '${inRate.$2}/${t.avpn.perSecond}', true, 0.0, theme.araAccent),
+            (
+              Icons.south_rounded,
+              t.avpn.superLightDown,
+              inRate.$1,
+              '${inRate.$2}/${t.avpn.perSecond}',
+              true,
+              0.0,
+              theme.araAccent,
+            ),
             (
               Icons.north_rounded,
               t.avpn.superLightUp,
@@ -369,7 +379,9 @@ class _StatusBlock extends HookConsumerWidget {
       final downFigure = amount(connected ? stats?.downlink.toInt() ?? 0 : 0, perSecond: true);
       final upFigure = amount(connected ? stats?.uplink.toInt() ?? 0 : 0, perSecond: true);
       final timeFigure = connected ? time : (waiting ?? '—');
-      final speedLevelNow = connected ? _speedLevel(math.max(stats?.downlink.toInt() ?? 0, stats?.uplink.toInt() ?? 0)) : 0.0;
+      final speedLevelNow = connected
+          ? _speedLevel(math.max(stats?.downlink.toInt() ?? 0, stats?.uplink.toInt() ?? 0))
+          : 0.0;
       if (layout == HomeLayout.vessel) {
         return _VesselStats(
           connected: connected,
@@ -1981,7 +1993,10 @@ class _ContrastHome extends StatelessWidget {
                 else
                   const Spacer(),
                 // a short screen (the phone turned): the toggles are under the connect control at the side
-                if (toggles != null && !ContrastShellDock.sideways(context)) ...[between(), _ContrastBlock(child: toggles!)],
+                if (toggles != null && !ContrastShellDock.sideways(context)) ...[
+                  between(),
+                  _ContrastBlock(child: toggles!),
+                ],
                 if (evenly) const Spacer(),
               ],
             ),
@@ -3625,7 +3640,10 @@ class _SiteTiles extends HookConsumerWidget {
     }, [history]);
     useEffect(() {
       if (!compact || !visible) return null;
-      final timer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(ref.read(siteLatencyProvider.notifier).test()));
+      final timer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => unawaited(ref.read(siteLatencyProvider.notifier).test()),
+      );
       return timer.cancel;
     }, [compact, visible]);
     // the tiles: the apps marked in Settings → Sites (their own icons and names)
@@ -3637,6 +3655,8 @@ class _SiteTiles extends HookConsumerWidget {
     final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const {};
     // the server everything else goes through: a site's flag shows only when its own one is another
     final mainServer = ref.watch(proxiesOverviewNotifierProvider.select((v) => SiteLatency.mainServer(v.valueOrNull)));
+    // the subscriptions' marks: none with a single one
+    final badges = ref.watch(profileBadgesProvider);
 
     Widget tile(LatencySite site) {
       // an app that isn't a known service: its own icon and name
@@ -3648,6 +3668,14 @@ class _SiteTiles extends HookConsumerWidget {
       final sign = !measured ? scheme.onSurfaceVariant : colour;
       // the faster, the fuller; no answer or 450 ms and slower: a sliver
       final level = !measured ? 0.0 : (ms == null ? .08 : (1 - ms / grade.scale).clamp(.08, 1.0));
+      final server = siteServers[site.key];
+      // no flag when the site goes through the main server, or one of the same country (the same flag would read as
+      // the same server)
+      final own = server == null || server == mainServer ? '' : _flagOf(server);
+      final flag = own == _flagOf(mainServer ?? '') ? '' : own;
+      // with several subscriptions: the one the site's server is from
+      final subscription = flag.isEmpty || server == null ? -1 : serverNameOf(server).profile;
+      final badge = subscription >= 0 && subscription < badges.length ? badges[subscription] : null;
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -3658,37 +3686,56 @@ class _SiteTiles extends HookConsumerWidget {
         child: Stack(
           children: [
             if (!compact)
-            Positioned.fill(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(end: level),
-                duration: lightDuration(const Duration(milliseconds: 900)),
-                curve: Curves.easeOutCubic,
-                builder: (context, l, _) => l < .005
-                    ? const SizedBox.shrink()
-                    : Align(
-                        alignment: Alignment.bottomCenter,
-                        child: FractionallySizedBox(
-                          heightFactor: l,
-                          widthFactor: 1,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  colour.withValues(alpha: dark ? .25 : .19),
-                                  colour.withValues(alpha: dark ? .4 : .3),
-                                ],
+              Positioned.fill(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: level),
+                  duration: lightDuration(const Duration(milliseconds: 900)),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, l, _) => l < .005
+                      ? const SizedBox.shrink()
+                      : Align(
+                          alignment: Alignment.bottomCenter,
+                          child: FractionallySizedBox(
+                            heightFactor: l,
+                            widthFactor: 1,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    colour.withValues(alpha: dark ? .25 : .19),
+                                    colour.withValues(alpha: dark ? .4 : .3),
+                                  ],
+                                ),
+                                border: l > .97
+                                    ? null
+                                    : Border(top: BorderSide(color: colour.withValues(alpha: .6), width: 1.5)),
                               ),
-                              border: l > .97
-                                  ? null
-                                  : Border(top: BorderSide(color: colour.withValues(alpha: .6), width: 1.5)),
                             ),
                           ),
                         ),
-                      ),
+                ),
               ),
-            ),
+            // the site's own server's flag over the whole tile, faint (it is not the main server's country)
+            if (flag.isNotEmpty)
+              Positioned.fill(
+                child: ExcludeSemantics(
+                  child: ClipRect(
+                    child: OverflowBox(
+                      maxWidth: double.infinity,
+                      maxHeight: double.infinity,
+                      child: Opacity(
+                        opacity: dark ? .16 : .22,
+                        child: Text(
+                          flag,
+                          style: const TextStyle(fontSize: 120, height: 1, fontFamilyFallback: ['Emoji']),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (compact)
               // the delay's last rounds as a soft curve across the tile's lower part, in the delay's colour
               Positioned.fill(
@@ -3742,35 +3789,31 @@ class _SiteTiles extends HookConsumerWidget {
                     fontSize: 12 * k,
                   ),
                 );
-                final server = siteServers[site.key];
-                // no flag when the site goes through the main server, or one of the same country (the same flag
-                // would read as the same server)
-                final own = server == null || server == mainServer ? '' : _flagOf(server);
-                final flag = own == _flagOf(mainServer ?? '') ? '' : own;
-                // the flag as in the server row: a thin circle the size of the logo's disc, the flag in it at half
-                // the circle's width, with room round it (it can't stick out of the circle)
-                final cornerFlag = flag.isEmpty
+                // the subscription's name, only with more than one: a dot in its colour and the name, small
+                final corner = badge == null
                     ? null
-                    : Container(
-                        width: disc,
-                        height: disc,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: scheme.outline.withValues(alpha: .7), width: 1.3),
-                        ),
-                        child: Text(
-                          flag,
-                          style: TextStyle(fontSize: disc * .5, height: 1, fontFamilyFallback: const ['Emoji']),
-                        ),
-                      );
-                // with several subscriptions: which one the site's server is from
-                final corner = cornerFlag == null
-                    ? null
-                    : FlagBadge(
-                        profile: server == null ? -1 : serverNameOf(server).profile,
-                        size: 11 * k,
-                        child: cornerFlag,
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: badge.colour),
+                          ),
+                          const Gap(3),
+                          Flexible(
+                            child: Text(
+                              badge.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10 * k,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
                       );
                 final unitStyle = TextStyle(
                   fontSize: 12 * k,
@@ -3785,7 +3828,13 @@ class _SiteTiles extends HookConsumerWidget {
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [ring, const Spacer(), if (corner != null) corner],
+                        children: [
+                          ring,
+                          const Gap(6),
+                          Expanded(
+                            child: Align(alignment: Alignment.topRight, child: corner ?? const SizedBox.shrink()),
+                          ),
+                        ],
                       ),
                       // the delay in the middle of the tile, the name at the bottom
                       Expanded(
@@ -4280,7 +4329,9 @@ class _HomeStats extends ConsumerWidget {
       ),
       child: Stack(
         children: [
-          Positioned.fill(child: _Water(level: level, colour: colour, dark: dark)),
+          Positioned.fill(
+            child: _Water(level: level, colour: colour, dark: dark),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 9),
             child: SizedBox(height: 78, child: child),
@@ -4339,10 +4390,7 @@ class _HomeStats extends ConsumerWidget {
     final traffic = shell(
       vpnShare,
       accent,
-      pair(
-        line(Icons.shield_rounded, accent, vpn, lit: true),
-        line(Icons.alt_route_rounded, grey, direct),
-      ),
+      pair(line(Icons.shield_rounded, accent, vpn, lit: true), line(Icons.alt_route_rounded, grey, direct)),
     );
     final time = shell(
       timeLevel,
@@ -4379,10 +4427,7 @@ class _HomeStats extends ConsumerWidget {
     final speed = shell(
       speedLevel,
       accent,
-      pair(
-        line(Icons.south_rounded, accent, down, lit: true),
-        line(Icons.north_rounded, grey, up),
-      ),
+      pair(line(Icons.south_rounded, accent, down, lit: true), line(Icons.north_rounded, grey, up)),
     );
     return Row(
       children: [
@@ -4422,11 +4467,17 @@ class ProfileRefreshButton extends ConsumerWidget {
       child: InkWell(
         key: const ValueKey('profile-refresh'),
         borderRadius: BorderRadius.circular(12),
-        onTap: updating ? null : () => ref.read(updateProfileNotifierProvider(profile.id).notifier).updateProfile(profile),
+        onTap: updating
+            ? null
+            : () => ref.read(updateProfileNotifierProvider(profile.id).notifier).updateProfile(profile),
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: updating
-              ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurfaceVariant))
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurfaceVariant),
+                )
               : Icon(Icons.sync_rounded, size: 20, color: scheme.onSurfaceVariant),
         ),
       ),
@@ -4452,85 +4503,85 @@ class _SitesHeader extends HookConsumerWidget {
     // a small round button on the left, the block's name beside it; while the sites are asked a ring of the
     // accent fills round it, a site at a time, closes when they have all answered and fades
     return Padding(
-          padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
-          child: Row(
-            children: [
-              // the delay check, a pill like the multi-server one beside it: the sign and the name; while the sites are
-              // asked the sign is a small ring of the accent that fills a site at a time
-              Container(
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 9),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
-                  border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    sites.testing
-                        ? TweenAnimationBuilder<double>(
-                            tween: Tween(end: (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0)),
-                            duration: lightDuration(const Duration(milliseconds: 500)),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, fill, _) => SizedBox(
-                              width: 15,
-                              height: 15,
-                              child: CircularProgressIndicator(
-                                value: fill,
-                                strokeWidth: 2,
-                                strokeCap: StrokeCap.round,
-                                color: accent,
-                                backgroundColor: scheme.outlineVariant,
-                              ),
-                            ),
-                          )
-                        : Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurfaceVariant),
-                    const Gap(6),
-                    Text(
-                      t.avpn.sitesTitle,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: .3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
-              GestureDetector(
-                key: const Key('multi-servers'),
-                behavior: HitTestBehavior.opaque,
-                onTap: () => ref.read(multiPref.notifier).update(!multiOn),
-                child: Container(
-                  height: 30,
-                  padding: const EdgeInsets.symmetric(horizontal: 9),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
-                    border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.alt_route_rounded, size: 15, color: multiOn ? accent : scheme.onSurfaceVariant),
-                      const Gap(6),
-                      Text(
-                        '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: .3,
+      padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+      child: Row(
+        children: [
+          // the delay check, a pill like the multi-server one beside it: the sign and the name; while the sites are
+          // asked the sign is a small ring of the accent that fills a site at a time
+          Container(
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 9),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
+              border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                sites.testing
+                    ? TweenAnimationBuilder<double>(
+                        tween: Tween(end: (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0)),
+                        duration: lightDuration(const Duration(milliseconds: 500)),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, fill, _) => SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(
+                            value: fill,
+                            strokeWidth: 2,
+                            strokeCap: StrokeCap.round,
+                            color: accent,
+                            backgroundColor: scheme.outlineVariant,
+                          ),
                         ),
-                      ),
-                    ],
+                      )
+                    : Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurfaceVariant),
+                const Gap(6),
+                Text(
+                  t.avpn.sitesTitle,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .3,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
+          const Spacer(),
+          // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
+          GestureDetector(
+            key: const Key('multi-servers'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => ref.read(multiPref.notifier).update(!multiOn),
+            child: Container(
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 9),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
+                border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.alt_route_rounded, size: 15, color: multiOn ? accent : scheme.onSurfaceVariant),
+                  const Gap(6),
+                  Text(
+                    '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

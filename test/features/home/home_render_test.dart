@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/router/adaptive_layout/nav_icons.dart';
@@ -317,15 +318,18 @@ void main() {
                     testUrl: 'http://www.gstatic.com/generate_204',
                   ),
                 ),
+              // TWOSUBS=1: two subscriptions, so the marks and names show
+              if (Platform.environment['TWOSUBS'] == '1')
+                profileBadgesProvider.overrideWithValue([badgeOf(0, 'Sigma'), badgeOf(1, 'Phantom')]),
               // SITEFLAGS=1: each site through its own server (Settings → Ping → Sites), its flag on the tile
               if (Platform.environment['SITEFLAGS'] == '1')
                 siteServersProvider.overrideWith(
                   (ref) => Stream.value(const {
                     'instagram': '🇫🇮 Финляндия',
                     'whatsapp': '🇵🇱 Польша',
-                    'telegram': '🇱🇻 Латвия',
+                    'telegram': '🇱🇻 Латвия § 1001',
                     'chatgpt': '🇵🇱 Польша 2',
-                    'youtube': '🇫🇮 Финляндия 3',
+                    'youtube': '🇫🇮 Финляндия 3 § 1002',
                     'gdrive': '🇩🇪 Германия',
                   }),
                 ),
