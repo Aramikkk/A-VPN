@@ -12,7 +12,6 @@ import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
-import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';

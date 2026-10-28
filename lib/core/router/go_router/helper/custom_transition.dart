@@ -1,7 +1,6 @@
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';

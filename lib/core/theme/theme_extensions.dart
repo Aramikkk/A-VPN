@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 
 class ConnectionButtonTheme extends ThemeExtension<ConnectionButtonTheme> {

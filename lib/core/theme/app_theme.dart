@@ -7,7 +7,6 @@ import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
-import 'package:hiddify/utils/platform_utils.dart';
 
 class AppTheme {
   AppTheme(

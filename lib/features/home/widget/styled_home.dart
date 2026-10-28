@@ -1389,6 +1389,7 @@ class _WaterButton extends HookWidget {
     final accent = theme.araAccent;
     // connecting: the water rises and falls, back and forth
     final wave = useAnimationController(duration: const Duration(milliseconds: 1300));
+    final heading = useRef<double?>(null);
     useEffect(() {
       if (busy) {
         wave.repeat(reverse: true);
@@ -1418,13 +1419,18 @@ class _WaterButton extends HookWidget {
         ),
       ),
     );
+    // where the water heads: the ping shifts by a hair every few seconds, and each shift set it gliding again for 0.9 s,
+    // so the screen redrew nonstop at rest; it heads for a new level only when that is 8% or more away
+    final target = on ? (level > 0 ? .1 + .85 * level : .5) : 0.0;
+    final prior = heading.value;
+    if (prior == null || (target - prior).abs() >= .08 || (target == 0) != (prior == 0)) heading.value = target;
     final fill = busy
         ? AnimatedBuilder(
             animation: wave,
             builder: (context, _) => water(.22 + .5 * Curves.easeInOut.transform(wave.value)),
           )
         : TweenAnimationBuilder<double>(
-            tween: Tween(end: on ? (level > 0 ? .1 + .85 * level : .5) : 0.0),
+            tween: Tween(end: heading.value),
             duration: lightDuration(const Duration(milliseconds: 900)),
             curve: Curves.easeOutCubic,
             builder: (context, level, _) => level < .005 ? const SizedBox.shrink() : water(level),

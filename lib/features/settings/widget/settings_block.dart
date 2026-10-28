@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hiddify/core/theme/ara_style.dart';
-import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 
 /// Settings in one outlined block, so a page reads as a whole rather than loose lines.

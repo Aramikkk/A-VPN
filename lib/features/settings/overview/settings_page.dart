@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
-import 'package:hiddify/core/theme/theme_extensions.dart';
-import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
