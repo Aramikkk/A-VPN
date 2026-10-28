@@ -594,7 +594,12 @@ class _Quality extends ConnectionQuality {
   @override
   List<int?> build() {
     sinceConnect = ConnectionQuality.length;
-    return [for (var i = 0; i < ConnectionQuality.length; i++) i == 30 ? null : 64];
+    // WAVY=1: a ping that moves, for the graphs
+    final wavy = Platform.environment['WAVY'] == '1';
+    return [
+      for (var i = 0; i < ConnectionQuality.length; i++)
+        i == 30 ? null : (wavy ? 58 + ((i * 37) % 23) + (i % 7 == 3 ? 34 : 0) + (i > 40 ? 12 : 0) : 64),
+    ];
   }
 }
 

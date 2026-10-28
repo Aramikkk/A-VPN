@@ -37,7 +37,8 @@ TextSpan _figureSpan(BuildContext context, (String, String) value, {double? size
   );
 }
 
-/// The speeds and the traffic of the session as two small tiles: in and out, and the share through the VPN.
+/// The speeds and the traffic of the session as two tiles, in the language of the sites' tiles: a sign on a disc, two
+/// figures, and along the bottom edge a bar (the share of the traffic through the VPN).
 class _SpeedTrafficRow extends StatelessWidget {
   const _SpeedTrafficRow({required this.down, required this.up, required this.vpn, required this.direct, required this.vpnShare});
 
@@ -56,73 +57,78 @@ class _SpeedTrafficRow extends StatelessWidget {
       fontWeight: FontWeight.w700,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    return Row(
+    Widget line(IconData icon, Color colour, (String, String) value) => Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: _homeTile(
-            context,
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.south_rounded, size: 18, color: accent),
-                const Gap(3),
-                Flexible(
-                  child: FittedBox(fit: BoxFit.scaleDown, child: Text.rich(_figureSpan(context, down), style: figure)),
-                ),
-                const Gap(8),
-                Icon(Icons.north_rounded, size: 18, color: scheme.onSurfaceVariant),
-                const Gap(3),
-                Flexible(
-                  child: FittedBox(fit: BoxFit.scaleDown, child: Text.rich(_figureSpan(context, up), style: figure)),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          ),
-        ),
-        const Gap(6),
-        Expanded(
-          child: _homeTile(
-            context,
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.shield_rounded, size: 16, color: accent),
-                    const Gap(3),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text.rich(_figureSpan(context, vpn), style: figure),
+        Icon(icon, size: 15, color: colour),
+        const Gap(4),
+        Text.rich(_figureSpan(context, value), style: figure),
+      ],
+    );
+    Widget tile(IconData sign, Widget a, Widget b, {double? bar}) => Expanded(
+      child: _homeTile(
+        context,
+        Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
+                    child: Icon(sign, size: 17, color: ContrastPalette.ink),
+                  ),
+                  const Gap(10),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [a, const Gap(3), b],
                       ),
                     ),
-                    const Gap(8),
-                    Icon(Icons.alt_route_rounded, size: 16, color: scheme.onSurfaceVariant),
-                    const Gap(3),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text.rich(_figureSpan(context, direct), style: figure),
-                      ),
+                  ),
+                ],
+              ),
+            ),
+            if (bar != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 5,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: ColoredBox(color: scheme.onSurface.withValues(alpha: .08))),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(widthFactor: bar.clamp(.03, 1.0), child: Container(color: accent)),
                     ),
                   ],
                 ),
-                const Gap(6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: vpnShare.clamp(0.0, 1.0),
-                    minHeight: 5,
-                    color: accent,
-                    backgroundColor: scheme.onSurface.withValues(alpha: .1),
-                  ),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          ),
+              ),
+          ],
+        ),
+        padding: EdgeInsets.zero,
+      ),
+    );
+    return Row(
+      children: [
+        tile(
+          Icons.swap_vert_rounded,
+          line(Icons.south_rounded, accent, down),
+          line(Icons.north_rounded, scheme.onSurfaceVariant, up),
+        ),
+        const Gap(6),
+        tile(
+          Icons.shield_rounded,
+          line(Icons.shield_rounded, accent, vpn),
+          line(Icons.alt_route_rounded, scheme.onSurfaceVariant, direct),
+          bar: vpnShare,
         ),
       ],
     );
@@ -256,57 +262,130 @@ class _VesselStats extends HookConsumerWidget {
   }
 }
 
-/// The ping's last minute as a line: gaps where a probe was lost.
-class _SparklinePainter extends CustomPainter {
-  _SparklinePainter({required this.samples, required this.line, required this.lost, required this.track});
+/// The ping's last minute as a soft curve over a faint grid, a glow under it and a bright dot on the latest answer; a
+/// lost probe is a dashed red line down to the bottom.
+class _PulsePainter extends CustomPainter {
+  _PulsePainter({
+    required this.samples,
+    required this.line,
+    required this.lost,
+    required this.grid,
+    required this.label,
+    this.labelStyle,
+  });
 
   final List<int?> samples;
   final Color line;
   final Color lost;
-  final Color track;
+  final Color grid;
+  final Color label;
+  final TextStyle? labelStyle;
+
+  static const _labelWidth = 34.0;
 
   @override
   void paint(Canvas canvas, Size size) {
     final answered = [for (final s in samples) if (s != null) s];
-    canvas.drawLine(Offset(0, size.height - 1), Offset(size.width, size.height - 1), Paint()..color = track);
-    if (samples.length < 2 || answered.isEmpty) return;
-    final low = answered.reduce(math.min).toDouble();
-    final high = math.max(answered.reduce(math.max).toDouble(), low + 40);
-    double y(int ms) => size.height - 4 - (ms - low) / (high - low) * (size.height - 10);
-    final step = size.width / (samples.length - 1);
-    final path = Path();
-    var open = false;
+    final chart = Rect.fromLTRB(0, 8, size.width - _labelWidth, size.height - 6);
+    var low = answered.isEmpty ? 0.0 : answered.reduce(math.min).toDouble();
+    var high = answered.isEmpty ? 100.0 : answered.reduce(math.max).toDouble();
+    // room above and below, and never a flat line stretched over the whole height
+    final pad = math.max(8.0, (high - low) * .12);
+    low = math.max(0, low - pad);
+    high = math.max(high + pad, low + 30);
+    double y(num ms) => chart.bottom - (ms - low) / (high - low) * chart.height;
+
+    // the grid: three dashed lines with their values at the right
+    final gridPaint = Paint()
+      ..color = grid
+      ..strokeWidth = 1;
+    for (final v in [high, (high + low) / 2, low]) {
+      final yy = y(v);
+      for (var x = chart.left; x < chart.right; x += 7) {
+        canvas.drawLine(Offset(x, yy), Offset(math.min(x + 3, chart.right), yy), gridPaint);
+      }
+      final text = TextPainter(
+        text: TextSpan(text: v.round().toString(), style: (labelStyle ?? const TextStyle()).copyWith(fontSize: 10, color: label)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      text.paint(canvas, Offset(size.width - text.width, yy - text.height / 2));
+    }
+    if (samples.length < 2) return;
+    final step = chart.width / (samples.length - 1);
+
+    // the runs of answers between the lost probes, each a smooth curve
+    final runs = <List<Offset>>[];
+    var current = <Offset>[];
     for (final (i, s) in samples.indexed) {
-      final x = i * step;
+      final x = chart.left + i * step;
       if (s == null) {
-        open = false;
-        canvas.drawLine(Offset(x, size.height - 8), Offset(x, size.height - 1), Paint()..color = lost..strokeWidth = 2);
+        if (current.isNotEmpty) runs.add(current);
+        current = [];
+        final dash = Paint()
+          ..color = lost.withValues(alpha: .55)
+          ..strokeWidth = 1.5;
+        for (var yy = chart.top; yy < chart.bottom; yy += 6) {
+          canvas.drawLine(Offset(x, yy), Offset(x, math.min(yy + 3, chart.bottom)), dash);
+        }
         continue;
       }
-      if (open) {
-        path.lineTo(x, y(s));
-      } else {
-        path.moveTo(x, y(s));
-        open = true;
-      }
+      current.add(Offset(x, y(s)));
     }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = line
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeJoin = StrokeJoin.round
-        ..strokeCap = StrokeCap.round,
-    );
+    if (current.isNotEmpty) runs.add(current);
+
+    final area = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [line.withValues(alpha: .34), line.withValues(alpha: 0)],
+      ).createShader(chart);
+    final stroke = Paint()
+      ..color = line
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    for (final run in runs) {
+      if (run.length < 2) {
+        canvas.drawCircle(run.first, 2.2, Paint()..color = line);
+        continue;
+      }
+      final path = Path()..moveTo(run.first.dx, run.first.dy);
+      for (var k = 1; k < run.length; k++) {
+        final a = run[k - 1];
+        final b = run[k];
+        final mid = (a.dx + b.dx) / 2;
+        path.cubicTo(mid, a.dy, mid, b.dy, b.dx, b.dy);
+      }
+      final filled = Path.from(path)
+        ..lineTo(run.last.dx, chart.bottom)
+        ..lineTo(run.first.dx, chart.bottom)
+        ..close();
+      canvas.drawPath(filled, area);
+      canvas.drawPath(path, stroke);
+    }
+    // the latest answer: a dot with a halo
+    if (samples.last != null && runs.isNotEmpty) {
+      final last = runs.last.last;
+      canvas.drawCircle(last, 8, Paint()..color = line.withValues(alpha: .22));
+      canvas.drawCircle(last, 4, Paint()..color = line);
+      canvas.drawCircle(
+        last,
+        4,
+        Paint()
+          ..color = Colors.white.withValues(alpha: .9)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(_SparklinePainter old) => !listEquals(old.samples, samples) || old.line != line;
+  bool shouldRepaint(_PulsePainter old) => !listEquals(old.samples, samples) || old.line != line || old.grid != grid;
 }
 
-/// The pulse: the ping as a figure and its last minute as a line, the time and the loss under them; the speeds and the
-/// traffic in two tiles beneath.
+/// The pulse: the ping as a big figure over its last minute drawn as a curve, the time and the loss as small pills; the
+/// speeds and the traffic in two tiles beneath.
 class _PulseStats extends ConsumerWidget {
   const _PulseStats({
     required this.connected,
@@ -338,6 +417,30 @@ class _PulseStats extends ConsumerWidget {
     final accent = theme.araAccent;
     final samples = connected ? ref.watch(connectionQualityProvider) : const <int?>[];
     final line = AraLook.readableOn(accent, scheme.surface);
+    Widget pill(IconData icon, String text, Color colour) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: colour.withValues(alpha: .12),
+        border: Border.all(color: colour.withValues(alpha: .35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: colour),
+          const Gap(5),
+          Text(
+            text,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: scheme.onSurface,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+    final clean = loss == 0;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -345,69 +448,77 @@ class _PulseStats extends ConsumerWidget {
           context,
           Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: connected && ping != null ? '$ping' : '—'),
-                        if (connected && ping != null)
-                          TextSpan(
-                            text: ' ms',
-                            style: TextStyle(fontSize: 12, letterSpacing: 0, color: scheme.onSurfaceVariant),
-                          ),
-                      ],
-                    ),
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -1.5,
-                      color: scheme.onSurface,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const Gap(14),
                   Expanded(
-                    child: SizedBox(
-                      height: 96,
-                      child: RepaintBoundary(
-                        child: CustomPaint(
-                          painter: _SparklinePainter(
-                            samples: samples,
-                            line: line,
-                            lost: scheme.error,
-                            track: scheme.outlineVariant,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: connected && ping != null ? '$ping' : '—'),
+                              if (connected && ping != null)
+                                TextSpan(
+                                  text: ' ms',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    letterSpacing: 0,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontSize: 44,
+                            height: 1.05,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -2,
+                            color: scheme.onSurface,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
-                      ),
+                      ],
                     ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      pill(Icons.access_time_filled_rounded, timeText, scheme.onSurfaceVariant),
+                      const Gap(6),
+                      pill(
+                        clean ? Icons.check_circle_rounded : Icons.error_rounded,
+                        t.avpn.dockLoss(loss: _lossText(loss)),
+                        clean ? accent : scheme.error,
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const Gap(6),
-              Row(
-                children: [
-                  Icon(Icons.access_time_filled_rounded, size: 14, color: scheme.onSurfaceVariant),
-                  const Gap(4),
-                  Text(
-                    timeText,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+              const Gap(4),
+              SizedBox(
+                height: 72,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _PulsePainter(
+                      samples: samples,
+                      line: line,
+                      lost: scheme.error,
+                      grid: scheme.onSurface.withValues(alpha: .14),
+                      label: scheme.onSurfaceVariant,
+                      labelStyle: theme.textTheme.labelSmall,
                     ),
                   ),
-                  const Spacer(),
-                  Text(
-                    connected ? t.avpn.dockLoss(loss: _lossText(loss)) : '',
-                    style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+          radius: 22,
         ),
         const Gap(6),
         _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare),
@@ -461,7 +572,12 @@ class _SiteBars extends ConsumerWidget {
     if (entries.isEmpty) return const SizedBox.shrink();
     return _homeTile(
       context,
-      Row(
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SitesHeader(),
+          Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           for (final e in entries)
@@ -503,53 +619,9 @@ class _SiteBars extends ConsumerWidget {
             ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
-    );
-  }
-}
-
-/// The sites as chips: a dot of the delay's colour, the delay and the name.
-class _SiteChips extends ConsumerWidget {
-  const _SiteChips();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final entries = _siteEntries(ref, scheme);
-    if (entries.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final e in entries)
-          _homeTile(
-            context,
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(color: e.colour, shape: BoxShape.circle),
-                ),
-                const Gap(6),
-                Text(
-                  !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: e.colour,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-                const Gap(5),
-                Text(e.name, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            radius: 14,
-          ),
-      ],
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
     );
   }
 }
@@ -564,15 +636,24 @@ class _RouteMini extends ConsumerWidget {
       for (final c in ref.watch(connectionsProvider).items)
         if (c.active) c,
     ];
-    if (open.isEmpty) return const Center(child: TrafficPlaceholder(height: 60));
-    return LayoutBuilder(
-      builder: (context, box) => TrafficSankey(
-        items: open,
-        height: box.maxHeight.isFinite ? box.maxHeight : 220,
-        unit: 1,
-        weight: (c) => c.count.toDouble(),
-        value: (w) => '${w.round()}',
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SitesHeader(),
+        Expanded(
+          child: open.isEmpty
+              ? const Center(child: TrafficPlaceholder(height: 60))
+              : LayoutBuilder(
+                  builder: (context, box) => TrafficSankey(
+                    items: open,
+                    height: box.maxHeight.isFinite ? box.maxHeight : 220,
+                    unit: 1,
+                    weight: (c) => c.count.toDouble(),
+                    value: (w) => '${w.round()}',
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

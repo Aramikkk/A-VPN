@@ -164,6 +164,7 @@ class SettingsPage extends HookConsumerWidget {
                   (Icons.alt_route_rounded, t.avpn.pingSites, t.avpn.settingsCapSites, context.namedLocation('sitesOptions')),
                   (Icons.block_rounded, t.avpn.adBlock, t.avpn.settingsCapAdBlock, context.namedLocation('adBlockOptions')),
                   (Icons.input_rounded, t.pages.settings.inbound.title, t.avpn.settingsCapInbound, context.namedLocation('inboundOptions')),
+                  (Icons.description_rounded, t.pages.logs.title, t.avpn.settingsCapLogs, context.namedLocation('logs')),
                 ],
               ),
             ),

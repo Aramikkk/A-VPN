@@ -140,6 +140,7 @@
     "homeLayoutVessel": "Vessel",
     "homeLayoutPulse": "Pulse",
     "homeLayoutRoute": "Route",
+    "settingsCapLogs": "Log, level of detail",
     "profilePriorityOff": "Remove priority",
     "modesTitle": "Modes",
     "modesHint": "Sharing, Global, Server",

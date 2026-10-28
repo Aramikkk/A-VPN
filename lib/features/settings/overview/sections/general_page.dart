@@ -107,13 +107,7 @@ class GeneralPage extends HookConsumerWidget {
                   value: ref.watch(Preferences.lightBackground),
                   onChanged: ref.read(Preferences.lightBackground.notifier).update,
                 ),
-                // the logs and About, moved here from the settings list
-                ListTile(
-                  leading: const Icon(Icons.description_rounded),
-                  title: Text(t.pages.logs.title),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.goNamed('logs'),
-                ),
+                // About is here (the logs are on the settings' main page)
                 ListTile(
                   leading: const Icon(Icons.info_rounded),
                   title: Text(t.pages.about.title),

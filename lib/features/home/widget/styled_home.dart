@@ -166,7 +166,7 @@ class _StyledHome extends HookConsumerWidget {
             : (traffic && hasList
                   ? switch (layout) {
                       HomeLayout.vessel => const _SiteBars(),
-                      HomeLayout.pulse => const _SiteChips(),
+                      HomeLayout.pulse => _SiteTiles(visible: visible, compact: true),
                       HomeLayout.route => const _RouteMini(),
                       HomeLayout.classic => _SiteTiles(visible: visible),
                     }
@@ -3485,9 +3485,12 @@ class _SessionServers extends ConsumerWidget {
 /// its name and the delay large, over water that rises the faster it answers, green up to 150 ms, amber up to 300,
 /// red slower or with no answer. Two rows of three filling the room the traffic had; a tap asks them again.
 class _SiteTiles extends HookConsumerWidget {
-  const _SiteTiles({required this.visible});
+  const _SiteTiles({required this.visible, this.compact = false});
 
   final bool visible;
+
+  /// a lower tile with a bar along its bottom edge instead of the water, in a block that is only as tall as its rows
+  final bool compact;
 
   static const _good = Color(0xFF7CC43A);
   static const _slow = Color(0xFFF0B429);
@@ -3566,6 +3569,21 @@ class _SiteTiles extends HookConsumerWidget {
         ),
         child: Stack(
           children: [
+            if (compact)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 5,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: math.max(level, .06),
+                    child: Container(color: colour),
+                  ),
+                ),
+              )
+            else
             Positioned.fill(
               child: TweenAnimationBuilder<double>(
                 tween: Tween(end: level),
@@ -3728,14 +3746,15 @@ class _SiteTiles extends HookConsumerWidget {
       );
     }
 
-    Widget line(Iterable<LatencySite> row) => Expanded(
-      child: Row(
+    Widget line(Iterable<LatencySite> row) {
+      final cells = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final (i, site) in row.indexed) ...[if (i > 0) const Gap(8), Expanded(child: tile(site))],
         ],
-      ),
-    );
+      );
+      return compact ? SizedBox(height: 88, child: cells) : Expanded(child: cells);
+    }
 
     return GestureDetector(
       key: const Key('contrast-sites'),
@@ -3743,94 +3762,13 @@ class _SiteTiles extends HookConsumerWidget {
       onTap: () => unawaited(pingAllServers(ref)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
         children: [
-          // a small round button on the left, the block's name beside it; while the sites are asked a ring of the
-          // accent fills round it, a site at a time, closes when they have all answered and fades
-          Padding(
-            padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
-            child: Row(
-              children: [
-                // the delay check, a pill like the multi-server one beside it: the sign and the name; while the sites are
-                // asked the sign is a small ring of the accent that fills a site at a time
-                Container(
-                  height: 30,
-                  padding: const EdgeInsets.symmetric(horizontal: 9),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
-                    border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      sites.testing
-                          ? TweenAnimationBuilder<double>(
-                              tween: Tween(end: (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0)),
-                              duration: lightDuration(const Duration(milliseconds: 500)),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, fill, _) => SizedBox(
-                                width: 15,
-                                height: 15,
-                                child: CircularProgressIndicator(
-                                  value: fill,
-                                  strokeWidth: 2,
-                                  strokeCap: StrokeCap.round,
-                                  color: accent,
-                                  backgroundColor: scheme.outlineVariant,
-                                ),
-                              ),
-                            )
-                          : Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurfaceVariant),
-                      const Gap(6),
-                      Text(
-                        t.avpn.sitesTitle,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: .3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
-                GestureDetector(
-                  key: const Key('multi-servers'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => ref.read(multiPref.notifier).update(!multiOn),
-                  child: Container(
-                    height: 30,
-                    padding: const EdgeInsets.symmetric(horizontal: 9),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
-                      border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.alt_route_rounded, size: 15, color: multiOn ? accent : scheme.onSurfaceVariant),
-                        const Gap(6),
-                        Text(
-                          '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: .3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const _SitesHeader(),
           // rows of three; none marked: where to mark them
           if (shown.isEmpty)
-            Expanded(
-              child: Center(
+            (compact ? (Widget w) => w : (Widget w) => Expanded(child: w))(
+              Center(
                 child: Text(
                   t.avpn.sitesHomeEmpty,
                   textAlign: TextAlign.center,
@@ -4403,5 +4341,106 @@ class ProfileRefreshButton extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// The sites block's head: the delay check and the multi-server switch of the network in use.
+class _SitesHeader extends HookConsumerWidget {
+  const _SitesHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = theme.araAccent;
+    final sites = ref.watch(siteLatencyProvider);
+    final onMobile = useListenable(_actualNetworkKind).value == NetworkKind.mobile;
+    final multiPref = onMobile ? ConfigOptions.siteGroupsMobile : ConfigOptions.siteGroups;
+    final multiOn = ref.watch(multiPref);
+    final shown = ref.watch(homeSitesProvider);
+    // a small round button on the left, the block's name beside it; while the sites are asked a ring of the
+    // accent fills round it, a site at a time, closes when they have all answered and fades
+    return Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+          child: Row(
+            children: [
+              // the delay check, a pill like the multi-server one beside it: the sign and the name; while the sites are
+              // asked the sign is a small ring of the accent that fills a site at a time
+              Container(
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
+                  border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    sites.testing
+                        ? TweenAnimationBuilder<double>(
+                            tween: Tween(end: (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0)),
+                            duration: lightDuration(const Duration(milliseconds: 500)),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, fill, _) => SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(
+                                value: fill,
+                                strokeWidth: 2,
+                                strokeCap: StrokeCap.round,
+                                color: accent,
+                                backgroundColor: scheme.outlineVariant,
+                              ),
+                            ),
+                          )
+                        : Icon(Icons.refresh_rounded, size: 15, color: scheme.onSurfaceVariant),
+                    const Gap(6),
+                    Text(
+                      t.avpn.sitesTitle,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: .3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
+              GestureDetector(
+                key: const Key('multi-servers'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => ref.read(multiPref.notifier).update(!multiOn),
+                child: Container(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 9),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
+                    border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.alt_route_rounded, size: 15, color: multiOn ? accent : scheme.onSurfaceVariant),
+                      const Gap(6),
+                      Text(
+                        '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
   }
 }
