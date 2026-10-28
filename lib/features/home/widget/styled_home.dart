@@ -1885,8 +1885,12 @@ class _ContrastHome extends StatelessWidget {
         // a short screen: no room for the traffic block (it's on the Statistics tab)
         builder: (context, box) {
           final minimum = box.maxWidth > box.maxHeight ? 380.0 : 440.0;
+          // the compact layouts: what room is left is shared in equal gaps between the blocks, and the last block's
+          // distance from the panel's tab is one of them (the tab's top edge is where the page ends)
+          final evenly = compactTraffic && traffic != null;
+          Widget between() => evenly ? const Spacer() : const Gap(14);
           final content = Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 9),
+            padding: EdgeInsets.fromLTRB(14, 0, 14, evenly ? 0 : 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1894,19 +1898,18 @@ class _ContrastHome extends StatelessWidget {
                 // the blocks a little apart (14, was 8)
                 if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(14)],
                 _ContrastBlock(child: status),
-                const Gap(14),
+                between(),
                 // the super light mode: the servers' list below holds the one in use, so not twice
-                if (!superLight) ...[_ContrastBlock(child: servers), const Gap(14)],
-                if (traffic != null && compactTraffic) ...[
-                  const Spacer(),
-                  _ContrastBlock(child: traffic!),
-                  const Spacer(),
-                ] else if (traffic != null)
+                if (!superLight) ...[_ContrastBlock(child: servers), between()],
+                if (traffic != null && compactTraffic)
+                  _ContrastBlock(child: traffic!)
+                else if (traffic != null)
                   Expanded(child: _ContrastBlock(expand: true, child: traffic!))
                 else
                   const Spacer(),
                 // a short screen (the phone turned): the toggles are under the connect control at the side
-                if (toggles != null && !ContrastShellDock.sideways(context)) ...[const Gap(14), _ContrastBlock(child: toggles!)],
+                if (toggles != null && !ContrastShellDock.sideways(context)) ...[between(), _ContrastBlock(child: toggles!)],
+                if (evenly) const Spacer(),
               ],
             ),
           );

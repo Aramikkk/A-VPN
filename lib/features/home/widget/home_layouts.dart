@@ -484,8 +484,8 @@ class _PulseStats extends ConsumerWidget {
                     ),
                   ),
                   // the time alone (the loss is in the connect panel)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
+                  Transform.translate(
+                    offset: const Offset(0, -4),
                     child: pill(Icons.access_time_filled_rounded, timeText, scheme.onSurfaceVariant),
                   ),
                 ],
