@@ -2645,12 +2645,16 @@ class _ContrastRow extends StatelessWidget {
                           if (delay > 0 && delay <= 65000)
                             TextSpan(
                               text: ' ms',
-                              style: TextStyle(fontSize: 10, letterSpacing: 0, color: ink.withValues(alpha: .65)),
+                              style: TextStyle(
+                                fontSize: selected ? 12 : 10,
+                                letterSpacing: 0,
+                                color: ink.withValues(alpha: .65),
+                              ),
                             ),
                         ],
                       ),
-                      // the same size as the name, in the text's colour
-                      style: titleStyle?.copyWith(fontWeight: FontWeight.w700),
+                      // the server in use: a bigger figure; the others the size of the name, in the text's colour
+                      style: titleStyle?.copyWith(fontWeight: FontWeight.w700, fontSize: selected ? 24 : null),
                     ),
                   const Gap(10),
                   Container(
@@ -4279,32 +4283,33 @@ class _HomeStats extends ConsumerWidget {
     final time = shell(
       timeLevel,
       timeColour,
-      Column(
-        children: [
-          Container(
-            width: 26,
-            height: 26,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: timeColour),
-            child: Icon(Icons.access_time_filled_rounded, size: 15, color: _SiteTiles._ink(timeColour)),
-          ),
-          Expanded(
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  timeText,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: -1,
-                    color: scheme.onSurface,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+      // the sign and the figure together in the middle of the tile
+      Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: timeColour),
+                child: Icon(Icons.access_time_filled_rounded, size: 15, color: _SiteTiles._ink(timeColour)),
+              ),
+              const Gap(10),
+              Text(
+                timeText,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: -1,
+                  color: scheme.onSurface,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
     final speed = shell(
