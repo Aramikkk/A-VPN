@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,34 @@ class TopologyPage extends HookConsumerWidget {
     // a tab out of sight (another one is open) stops following the list, so it isn't worked out again every two
     // seconds for nothing; it catches up when it's back on screen
     final visible = TickerMode.of(context);
-    final state = visible ? ref.watch(connectionsProvider) : ref.read(connectionsProvider);
+    // the day's list taken at most once in five seconds: every poll (two seconds) rebuilt the page from the day's
+    // thousands of connections, 35-55 ms of the UI thread each time, a jerk of whatever moved
+    final shown = useState<ConnectionsState?>(null);
+    final taken = useRef(DateTime.fromMillisecondsSinceEpoch(0));
+    final waiting = useRef<Timer?>(null);
+    void take() {
+      waiting.value = null;
+      taken.value = DateTime.now();
+      if (context.mounted) shown.value = ref.read(connectionsProvider);
+    }
+
+    ref.listen(connectionsProvider, (_, _) {
+      if (!visible || waiting.value != null) return;
+      final since = DateTime.now().difference(taken.value);
+      const every = Duration(seconds: 5);
+      since >= every ? take() : waiting.value = Timer(every - since, take);
+    });
+    useEffect(
+      () =>
+          () => waiting.value?.cancel(),
+      const [],
+    );
+    // shown again (the tab picked): the list as it is now
+    useEffect(() {
+      if (visible) WidgetsBinding.instance.addPostFrameCallback((_) => take());
+      return null;
+    }, [visible]);
+    final ConnectionsState state = shown.value ?? ref.read(connectionsProvider);
     final byTraffic = useState(true);
     final controller = useScrollController();
     // which page: only the title follows it (a state here rebuilt the whole page, the flows' picture laid out and
@@ -81,13 +109,9 @@ class TopologyPage extends HookConsumerWidget {
 
     // what moved since the list started (03:00, or the last clearing) against what the list holds: connections
     // shorter than one poll and the ones while the app was closed aren't in the list
-    if (visible) ref.watch(trafficHistoryProvider);
-    final moved = ref.read(trafficHistoryProvider.notifier).amountFrom(state.since ?? statsDayStart(DateTime.now()));
-    final sessionVpn = moved.vpn;
-    final sessionAll = moved.total;
+    // (the total follows the counters every second in a widget of its own, below: the whole page rebuilt every
+    // second for it)
     final listed = state.items.where((c) => c.route != ConnectionRoute.block).fold<int>(0, (s, c) => s + c.total);
-    final uncounted = sessionAll - listed;
-    final showUncounted = uncounted > smallTraffic && uncounted > sessionAll * .05;
 
     if (!state.available && state.items.isEmpty) {
       return Scaffold(
@@ -143,6 +167,9 @@ class TopologyPage extends HookConsumerWidget {
               return ListView(
                 controller: controller,
                 physics: _PageSnap(pageHeight),
+                // both pages kept built: a fast flick threw the far one away and built it again on the way back (the
+                // flows' picture, its icons, the dotted strips, the rules with their flags), a jerk at every flick
+                cacheExtent: pageHeight * 4,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 children: [
                   SizedBox(
@@ -211,15 +238,28 @@ class TopologyPage extends HookConsumerWidget {
                   ),
                   const Gap(12),
                   // what moved by the core's counters (all of it); the lists below hold only the connections the app saw
-                  if (byTraffic.value && sessionAll > 0) ...[
-                    TopologyDayTotal(
-                      total: formatBytes(sessionAll, units),
-                      vpn: formatBytes(sessionVpn, units),
-                      direct: formatBytes(math.max(0, sessionAll - sessionVpn), units),
-                      listed: showUncounted ? formatBytes(listed, units) : null,
+                  if (byTraffic.value)
+                    Consumer(
+                      builder: (context, ref, _) {
+                        if (visible) ref.watch(trafficHistoryProvider);
+                        final moved = ref
+                            .read(trafficHistoryProvider.notifier)
+                            .amountFrom(state.since ?? statsDayStart(DateTime.now()));
+                        final sessionAll = moved.total;
+                        if (sessionAll <= 0) return const SizedBox.shrink();
+                        final uncounted = sessionAll - listed;
+                        final showUncounted = uncounted > smallTraffic && uncounted > sessionAll * .05;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: TopologyDayTotal(
+                            total: formatBytes(sessionAll, units),
+                            vpn: formatBytes(moved.vpn, units),
+                            direct: formatBytes(math.max(0, sessionAll - moved.vpn), units),
+                            listed: showUncounted ? formatBytes(listed, units) : null,
+                          ),
+                        );
+                      },
                     ),
-                    const Gap(12),
-                  ],
                   _Section(
                     title: t.avpn.topoFlow,
                     // a layer of its own: the page scrolls without drawing the strips again

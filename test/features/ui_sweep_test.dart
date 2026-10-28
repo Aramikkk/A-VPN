@@ -259,7 +259,7 @@ void main() {
                 where = '${screen.name} ${style.name} ${accent.name} ${dark ? 'night' : 'day'} $sizeName';
                 // HOMELAYOUT=bento|dots: the pages in that look (its backdrop, cards and faces), as the app's shell has them
                 final look = Platform.environment['HOMELAYOUT'];
-                SharedPreferences.setMockInitialValues({'ara_style': style.name, if (look != null) 'home_layout': look});
+                SharedPreferences.setMockInitialValues({'ara_style': style.name, 'home_layout': look ?? 'classic'});
                 final prefs = await tester.runAsync(SharedPreferences.getInstance);
                 await tester.binding.setSurfaceSize(size);
                 final theme = AppTheme(AppThemeMode.system, '', accent: accent, style: style);

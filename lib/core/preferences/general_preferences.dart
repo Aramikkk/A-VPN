@@ -269,7 +269,8 @@ abstract class Preferences {
   /// A-VPN: how the home screen is laid out (Contrast).
   static final homeLayout = PreferencesNotifier.create<HomeLayout, String>(
     "home_layout",
-    HomeLayout.classic,
+    // Dots for a new install (1.0.71); a choice made stays
+    HomeLayout.dots,
     mapFrom: HomeLayout.fromName,
     mapTo: (value) => value.name,
   );

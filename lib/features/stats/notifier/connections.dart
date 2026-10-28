@@ -3,6 +3,7 @@ import 'package:hiddify/core/preferences/light_mode.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:flutter/widgets.dart';
@@ -327,7 +328,7 @@ void _extendRouteUsage(List<(int, int)> stretches, int start, int to) {
 final connectionsProvider = NotifierProvider<Connections, ConnectionsState>(Connections.new);
 
 class Connections extends Notifier<ConnectionsState> {
-  static const interval = Duration(seconds: 2);
+  static const interval = Duration(seconds: 3);
 
   /// while A-VPN is in the background (or the screen is off): fewer wake-ups, the battery lasts longer; the
   /// traffic still adds up from the core's own totals
@@ -435,6 +436,7 @@ class Connections extends Notifier<ConnectionsState> {
 
   /// Picks up the saved list once, and starts a new one when a new statistics day has begun (03:00).
   void _rollDay([DateTime? now]) {
+    _closedVersion++;
     final day = statsDayStart(now ?? DateTime.now());
     if (_day == null && _file != null) {
       _day = day;
@@ -455,6 +457,7 @@ class Connections extends Notifier<ConnectionsState> {
   }
 
   void _restore(DateTime day) {
+    _closedVersion++;
     try {
       final file = _file;
       if (file == null || !file.existsSync()) return;
@@ -497,40 +500,81 @@ class Connections extends Notifier<ConnectionsState> {
     }
   }
 
+  bool _writing = false;
+
+  /// polls so far: the closed ones are folded once in 15 (half a minute), not at every poll
+  int _polls = 0;
+
+  /// The day's list on disk, encoded and written off the UI thread: with the day's thousands of connections the
+  /// encoding took 130-160 ms of it every ten seconds (a stall of every animation and scroll).
   void _save() {
     final file = _file;
     final day = _day;
-    if (file == null || day == null) return;
+    if (file == null || day == null || _writing) return;
     _saved = DateTime.now();
-    final json = jsonEncode({
-      'day': day.millisecondsSinceEpoch,
-      'since': _since?.millisecondsSinceEpoch,
-      'items': [for (final c in _seen.values) c.toJson()],
-      'dayBaselines': {
-        for (final e in _dayBaselines.entries) e.key: [e.value.$1, e.value.$2],
-      },
-      'usage': {
-        for (final e in _usage.entries)
-          e.key: [
-            for (final (a, b) in e.value) [a, b],
-          ],
-      },
-      'routeUsage': {
-        for (final route in ConnectionRoute.values)
-          route.name: {
-            for (final e in _routeUsage[route]!.entries)
+    _writing = true;
+    unawaited(
+      _writeDay(
+        path: file.path,
+        day: day.millisecondsSinceEpoch,
+        since: _since?.millisecondsSinceEpoch,
+        items: _seen.values.toList(),
+        baselines: Map.of(_dayBaselines),
+        usage: {for (final e in _usage.entries) e.key: List.of(e.value)},
+        routeUsage: {
+          for (final route in ConnectionRoute.values)
+            route: {for (final e in _routeUsage[route]!.entries) e.key: List.of(e.value)},
+        },
+      ).whenComplete(() => _writing = false),
+    );
+  }
+
+  /// (a static function: what the isolate is given holds only the list, not the notifier)
+  static Future<void> _writeDay({
+    required String path,
+    required int day,
+    required int? since,
+    required List<SeenConnection> items,
+    required Map<String, (int, int)> baselines,
+    required Map<String, List<(int, int)>> usage,
+    required Map<ConnectionRoute, Map<String, List<(int, int)>>> routeUsage,
+  }) async {
+    try {
+      await Isolate.run(() {
+        final json = jsonEncode({
+          'day': day,
+          'since': since,
+          'items': [for (final c in items) c.toJson()],
+          'dayBaselines': {
+            for (final e in baselines.entries) e.key: [e.value.$1, e.value.$2],
+          },
+          'usage': {
+            for (final e in usage.entries)
               e.key: [
                 for (final (a, b) in e.value) [a, b],
               ],
           },
-      },
-    });
-    unawaited(file.writeAsString(json).then((_) {}, onError: (_) {}));
+          'routeUsage': {
+            for (final route in ConnectionRoute.values)
+              route.name: {
+                for (final e in routeUsage[route]!.entries)
+                  e.key: [
+                    for (final (a, b) in e.value) [a, b],
+                  ],
+              },
+          },
+        });
+        File(path).writeAsStringSync(json);
+      });
+    } catch (_) {
+      // not written this time; the next save tries again
+    }
   }
 
   /// Forget the closed ones: the list (and the Topology tab) starts over from now.
   void clearClosed() {
     _seen.removeWhere((_, c) => !c.active);
+    _closedVersion++;
     _since = DateTime.now();
     _dropUsageBefore(_since!);
     state = ConnectionsState(
@@ -547,13 +591,17 @@ class Connections extends Notifier<ConnectionsState> {
   final _rates = <String, ({int total, int at, double bps})>{};
 
   Future<void> _poll(HttpClient client, Uri url, String secret) async {
+    final timer = Stopwatch();
     List<dynamic>? list;
     try {
       final request = await client.getUrl(url).timeout(const Duration(seconds: 3));
       if (secret.isNotEmpty) request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $secret');
       final response = await request.close().timeout(const Duration(seconds: 3));
       final body = await response.transform(utf8.decoder).join();
+      timer.start();
       if (response.statusCode == 200) list = (jsonDecode(body) as Map<String, dynamic>)['connections'] as List?;
+      // ignore: avoid_print
+      print('AVPNPERF poll decode ${timer.elapsedMilliseconds} ms, ${body.length} chars, ${list?.length} open');
     } catch (_) {
       list = null;
     }
@@ -589,12 +637,15 @@ class Connections extends Notifier<ConnectionsState> {
     if (list != null) _rates.removeWhere((id, _) => !open.contains(id));
     if (list != null) {
       for (final id in _seen.keys.toList()) {
-        if (!open.contains(id) && _seen[id]!.active) _seen[id] = _seen[id]!.closed();
+        if (!open.contains(id) && _seen[id]!.active) {
+          _seen[id] = _seen[id]!.closed();
+          _closedVersion++;
+        }
       }
     }
     if (list != null) _track(open.map((id) => _seen[id]!), DateTime.now());
     _logCounts(list?.length);
-    _fold();
+    if (_polls++ % 15 == 0) _fold();
     state = ConnectionsState(
       items: _sorted(),
       sessionItems: _sessionItems(),
@@ -603,7 +654,14 @@ class Connections extends Notifier<ConnectionsState> {
       routeUsage: _routeUsage,
       rates: {for (final e in _rates.entries) e.key: e.value.bps},
     );
-    if (DateTime.now().difference(_saved) > saveEvery) _save();
+    // ignore: avoid_print
+    print('AVPNPERF poll total ${timer.elapsedMilliseconds} ms, kept ${_seen.length}');
+    if (DateTime.now().difference(_saved) > saveEvery) {
+      final saving = Stopwatch()..start();
+      _save();
+      // ignore: avoid_print
+      print('AVPNPERF save ${saving.elapsedMilliseconds} ms');
+    }
   }
 
   /// Each app with a connection open now: its stretch goes on to now, or a new one starts with the earliest of
@@ -652,6 +710,7 @@ class Connections extends Notifier<ConnectionsState> {
             .where((c) => !c.active && !c.id.startsWith(summaryPrefix) && !_dayBaselines.containsKey(c.id))
             .toList()
           ..sort((a, b) => b.start.compareTo(a.start));
+    if (closed.length > keepClosed) _closedVersion++;
     for (final c in closed.skip(keepClosed)) {
       _seen.remove(c.id);
       final key = connectionSummaryKey(c);
@@ -692,14 +751,47 @@ class Connections extends Notifier<ConnectionsState> {
     appLogger('connections').info('listed=${listed ?? -1} kept=${_seen.length} stamped=$stamped session=$start');
   }
 
-  List<SeenConnection> _sorted() => [
-    for (final c in _seen.values)
-      if (_dayBaselines.containsKey(c.id) &&
-          (c.active || c.up > _dayBaselines[c.id]!.$1 || c.down > _dayBaselines[c.id]!.$2))
-        dailyConnection(c, _dayBaselines[c.id]!, _since!)
-      else if (c.active || _since == null || !c.start.isBefore(_since!))
-        c,
-  ]..sort((a, b) => b.start.compareTo(a.start));
+  SeenConnection? _listed(SeenConnection c) {
+    if (_dayBaselines.containsKey(c.id) &&
+        (c.active || c.up > _dayBaselines[c.id]!.$1 || c.down > _dayBaselines[c.id]!.$2)) {
+      return dailyConnection(c, _dayBaselines[c.id]!, _since!);
+    }
+    if (c.active || _since == null || !c.start.isBefore(_since!)) return c;
+    return null;
+  }
+
+  /// the closed ones as listed, the newest first: kept until one more closes or the list changes otherwise (the
+  /// day's thousands were sorted again at every poll, 15-35 ms of the UI thread every two seconds)
+  List<SeenConnection> _closedListed = const [];
+  int _closedVersion = 0;
+  int _closedListedVersion = -1;
+  DateTime? _closedListedSince;
+
+  List<SeenConnection> _sorted() {
+    if (_closedListedVersion != _closedVersion || _closedListedSince != _since) {
+      _closedListed = [
+        for (final c in _seen.values)
+          if (!c.active) ?_listed(c),
+      ]..sort((a, b) => b.start.compareTo(a.start));
+      _closedListedVersion = _closedVersion;
+      _closedListedSince = _since;
+    }
+    final open = [
+      for (final c in _seen.values)
+        if (c.active) ?_listed(c),
+    ]..sort((a, b) => b.start.compareTo(a.start));
+    // the two merged, the newest first
+    final out = <SeenConnection>[];
+    var i = 0, j = 0;
+    while (i < open.length || j < _closedListed.length) {
+      if (j >= _closedListed.length || (i < open.length && !open[i].start.isBefore(_closedListed[j].start))) {
+        out.add(open[i++]);
+      } else {
+        out.add(_closedListed[j++]);
+      }
+    }
+    return out;
+  }
 }
 
 /// The connections of the VPN session on screen: from its switch-on (the core's session start) to its switch-off,

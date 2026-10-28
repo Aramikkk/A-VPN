@@ -235,7 +235,8 @@ void main() {
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
           if (Platform.environment['LIGHT'] == '1') 'light_look': true,
-          if ((Platform.environment['HOMELAYOUT'] ?? '').isNotEmpty) 'home_layout': Platform.environment['HOMELAYOUT']!,
+          // HOMELAYOUT=<name>: that look; the tiles (classic) when not given (a new install has Dots)
+          'home_layout': (Platform.environment['HOMELAYOUT'] ?? '').isNotEmpty ? Platform.environment['HOMELAYOUT']! : 'classic',
           if (Platform.environment['SUPERLIGHT'] == '1') 'super_light': true,
           if (Platform.environment['BADGES'] == '1') 'extra_profiles': 'chill;third',
         });
