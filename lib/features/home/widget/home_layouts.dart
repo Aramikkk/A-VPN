@@ -683,11 +683,10 @@ class _TilePulsePainter extends CustomPainter {
       if (h == null) continue;
       points.add(Offset(size.width - (history.length - 1 - i) * step + shift * step, y(h)));
     }
-    if (points.length == 1) {
-      points
-        ..clear()
-        ..addAll([Offset(0, y(answered.first)), Offset(size.width, y(answered.first))]);
-    }
+    // before the first round the line is taken as flat at its first value (so a few rounds don't stand as a spike at
+    // the right edge, and a lone answer is a flat line)
+    if (points.length == 1) points.add(Offset(size.width, points.first.dy));
+    if (points.first.dx > 0) points.insert(0, Offset(0, points.first.dy));
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     final fill = Paint()
