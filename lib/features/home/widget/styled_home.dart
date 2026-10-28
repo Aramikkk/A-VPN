@@ -286,9 +286,10 @@ class _StatusBlock extends HookConsumerWidget {
       final totals = ref.watch(sessionTotalsProvider);
       final total = connected ? totals.up + totals.down : 0;
       final viaVpn = connected ? ((totals.vpnUp ?? 0) + (totals.vpnDown ?? 0)).clamp(0, total) : 0;
-      (String, String) amount(int bytes) {
+      (String, String) amount(int bytes, {bool perSecond = false}) {
         final parts = formatBytes(bytes, units).split(' ');
-        return (parts.first, parts.length > 1 ? parts.last : '');
+        final unit = parts.length > 1 ? parts.last : '';
+        return (parts.first, perSecond ? '$unit/${t.avpn.perSecond}' : unit);
       }
 
       final vpn = amount(viaVpn);
@@ -324,38 +325,17 @@ class _StatusBlock extends HookConsumerWidget {
       }
       final routed = total == 0 ? 1 : total;
       final vpnShare = viaVpn / routed;
-      return _ContrastStats(
-        items: [
-          // the time by the day, the two routes by each other
-          (
-            Icons.access_time_filled_rounded,
-            t.avpn.contrastTime,
-            connected ? time : (waiting ?? '—'),
-            '',
-            false,
-            connected ? sessionLength.inMinutes / (24 * 60) : 0,
-            const Color(0xFF8FA8BD),
-          ),
-          (
-            Icons.shield_rounded,
-            t.avpn.statsViaVpn,
-            vpn.$1,
-            vpn.$2,
-            true,
-            total == 0 ? 0 : vpnShare,
-            // the water in the palette's own colour (the primary is graphite by day)
-            theme.araAccent,
-          ),
-          (
-            Icons.alt_route_rounded,
-            t.avpn.homeBypass,
-            direct.$1,
-            direct.$2,
-            false,
-            total == 0 ? 0 : 1 - vpnShare,
-            const Color(0xFF9AA0A6),
-          ),
-        ],
+      // the two routes in one tile, the time in the middle, the speeds on the right
+      return _HomeStats(
+        timeText: connected ? time : (waiting ?? '—'),
+        timeLevel: connected ? sessionLength.inMinutes / (24 * 60) : 0,
+        vpn: vpn,
+        direct: direct,
+        vpnShare: total == 0 ? 0 : vpnShare,
+        down: amount(connected ? stats?.downlink.toInt() ?? 0 : 0, perSecond: true),
+        up: amount(connected ? stats?.uplink.toInt() ?? 0 : 0, perSecond: true),
+        // the water of the speeds: from nothing at a trickle (100 КБ/с) to the top at 10 МБ/с, on a log scale
+        speedLevel: connected ? _speedLevel(math.max(stats?.downlink.toInt() ?? 0, stats?.uplink.toInt() ?? 0)) : 0,
       );
     }
     if (!connected) {
@@ -4188,4 +4168,171 @@ class _ConnectionsDetails extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The home screen's top row in three tiles: what went through the VPN and what bypassed it (one tile), the time
+/// of the session in the middle, and the speeds (in and out) on the right.
+class _HomeStats extends ConsumerWidget {
+  const _HomeStats({
+    required this.timeText,
+    required this.timeLevel,
+    required this.vpn,
+    required this.direct,
+    required this.vpnShare,
+    required this.down,
+    required this.up,
+    required this.speedLevel,
+  });
+
+  /// how good the speed is, 0 to 1 (the water of its tile)
+  final double speedLevel;
+
+  final String timeText;
+  final double timeLevel;
+
+  /// (figure, unit)
+  final (String, String) vpn;
+  final (String, String) direct;
+  final double vpnShare;
+  final (String, String) down;
+  final (String, String) up;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.araAccent;
+    const grey = Color(0xFF9AA0A6);
+    const timeColour = Color(0xFF8FA8BD);
+
+    Widget shell(double level, Color colour, Widget child) => Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(child: _Water(level: level, colour: colour, dark: dark)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 8, 6, 9),
+            child: SizedBox(height: 78, child: child),
+          ),
+        ],
+      ),
+    );
+
+    TextSpan figure((String, String) value) => TextSpan(
+      children: [
+        TextSpan(text: value.$1),
+        if (value.$2.isNotEmpty)
+          TextSpan(
+            text: ' ${value.$2}',
+            style: TextStyle(
+              fontSize: 10,
+              letterSpacing: 0,
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+      ],
+    );
+
+    Widget line(IconData icon, Color colour, (String, String) value, {bool lit = false}) => Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: colour),
+        const Gap(4),
+        Text.rich(
+          figure(value),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -.5,
+            color: lit ? scheme.primary : scheme.onSurface,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+
+    // two figures one above the other, in the middle
+    Widget pair(Widget a, Widget b) => Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [a, const Gap(12), b]),
+      ),
+    );
+
+    final traffic = shell(
+      vpnShare,
+      accent,
+      pair(
+        line(Icons.shield_rounded, accent, vpn, lit: true),
+        line(Icons.alt_route_rounded, grey, direct),
+      ),
+    );
+    final time = shell(
+      timeLevel,
+      timeColour,
+      Column(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: timeColour),
+            child: Icon(Icons.access_time_filled_rounded, size: 15, color: _SiteTiles._ink(timeColour)),
+          ),
+          Expanded(
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  timeText,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -1,
+                    color: scheme.onSurface,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    final speed = shell(
+      speedLevel,
+      accent,
+      pair(
+        line(Icons.south_rounded, accent, down, lit: true),
+        line(Icons.north_rounded, grey, up),
+      ),
+    );
+    return Row(
+      children: [
+        Expanded(child: RepaintBoundary(child: traffic)),
+        const Gap(6),
+        // the time is the one that ticks: in the middle, in a layer of its own
+        Expanded(child: RepaintBoundary(child: time)),
+        const Gap(6),
+        Expanded(child: RepaintBoundary(child: speed)),
+      ],
+    );
+  }
+}
+
+/// How good a speed is as the water of a tile: nothing at 100 КБ/с or less, full at 10 МБ/с or more, between on a
+/// log scale.
+double _speedLevel(int bytesPerSecond) {
+  const low = 100 * 1024;
+  const high = 10 * 1024 * 1024;
+  if (bytesPerSecond <= low) return 0;
+  return (math.log(bytesPerSecond / low) / math.log(high / low)).clamp(0.0, 1.0);
 }
