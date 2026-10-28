@@ -1073,6 +1073,15 @@ ThemeData lookTheme(ThemeData theme, HomeLayout look) {
           ),
           trackOutlineColor: WidgetStatePropertyAll(ink.withValues(alpha: .6)),
         ),
+        bottomSheetTheme: theme.bottomSheetTheme.copyWith(
+          backgroundColor: _Dots.paper(dark),
+          modalBackgroundColor: _Dots.paper(dark),
+          shape: lookPopupShape(HomeLayout.dots, dark),
+        ),
+        dialogTheme: theme.dialogTheme.copyWith(
+          backgroundColor: _Dots.paper(dark),
+          shape: lookPopupShape(HomeLayout.dots, dark),
+        ),
         navigationBarTheme: theme.navigationBarTheme.copyWith(
           indicatorColor: ink.withValues(alpha: .08),
           indicatorShape: RoundedRectangleBorder(
@@ -1127,6 +1136,15 @@ ThemeData lookTheme(ThemeData theme, HomeLayout look) {
             ),
           ),
         ),
+        bottomSheetTheme: theme.bottomSheetTheme.copyWith(
+          backgroundColor: _Bento.tile(dark),
+          modalBackgroundColor: _Bento.tile(dark),
+          shape: lookPopupShape(HomeLayout.bento, dark),
+        ),
+        dialogTheme: theme.dialogTheme.copyWith(
+          backgroundColor: _Bento.tile(dark),
+          shape: lookPopupShape(HomeLayout.bento, dark),
+        ),
         navigationBarTheme: theme.navigationBarTheme.copyWith(
           indicatorColor: theme.araAccent,
           indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1141,3 +1159,19 @@ ThemeData lookTheme(ThemeData theme, HomeLayout look) {
       return theme;
   }
 }
+
+/// A popup's card in a look that has its own: Bento's solid tile, Dots' paper with an inked edge. Null for the others.
+Color? lookPopupColour(HomeLayout look, bool dark) => switch (look) {
+  HomeLayout.bento => _Bento.tile(dark),
+  HomeLayout.dots => _Dots.paper(dark),
+  _ => null,
+};
+
+ShapeBorder? lookPopupShape(HomeLayout look, bool dark) => switch (look) {
+  HomeLayout.bento => RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+  HomeLayout.dots => RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(10),
+    side: BorderSide(color: _Dots.ink(dark).withValues(alpha: .7)),
+  ),
+  _ => null,
+};

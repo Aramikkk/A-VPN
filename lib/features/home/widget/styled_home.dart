@@ -3412,6 +3412,8 @@ Future<void> showGlassPopup(BuildContext context, Widget child) async {
     if (frozen) FreezeFrame.thawSoon();
     return;
   }
+  // the page's themes (Bento's and Dots' faces and colours) carried into the popup
+  final themes = InheritedTheme.capture(from: context, to: Navigator.of(context, rootNavigator: true).context);
   try {
     await showGeneralDialog<void>(
       context: context,
@@ -3419,7 +3421,7 @@ Future<void> showGlassPopup(BuildContext context, Widget child) async {
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       barrierColor: Colors.black26,
       transitionDuration: lightDuration(const Duration(milliseconds: 300)),
-      pageBuilder: (_, _, _) => _GlassPopup(child: child),
+      pageBuilder: (_, _, _) => themes.wrap(_GlassPopup(child: child)),
       transitionBuilder: (context, animation, _, child) =>
           HomePopupTransition(animation: animation, alignment: const Alignment(0, .9), child: child),
     );
@@ -3446,12 +3448,16 @@ class _GlassPopup extends ConsumerWidget {
         ),
         // solid: the see-through glass still stuttered as it opened
         child: Material(
-          color: dark ? const Color(0xFF1C1C1F) : const Color(0xFFF7F5F1),
+          color: lookPopupColour(homeLookNow, dark) ?? (dark ? const Color(0xFF1C1C1F) : const Color(0xFFF7F5F1)),
           clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(26),
-            side: BorderSide(color: dark ? Colors.white.withValues(alpha: .1) : Colors.black.withValues(alpha: .06)),
-          ),
+          shape:
+              lookPopupShape(homeLookNow, dark) ??
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(26),
+                side: BorderSide(
+                  color: dark ? Colors.white.withValues(alpha: .1) : Colors.black.withValues(alpha: .06),
+                ),
+              ),
           child: child,
         ),
       ),

@@ -231,9 +231,44 @@ class StylePicker extends ConsumerWidget {
     final theme = Theme.of(context);
     final brightness = theme.brightness;
     final accentColour = ref.watch(Preferences.contrastPalette).accent(brightness);
-    (String, String) names(AraStyle style) => switch (style) {
-      AraStyle.contrast => (t.avpn.styleContrast, t.avpn.styleContrastHint),
-      AraStyle.glass => (t.avpn.styleGlass, t.avpn.styleGlassHint),
+    // Bento and Dots are Contrast underneath with a look of their own over it
+    final layout = ref.watch(Preferences.homeLayout);
+    final chosen = selected == AraStyle.glass ? 'glass' : (layout.ownStyle ? layout.name : 'contrast');
+    (String, String) names(String style) => switch (style) {
+      'glass' => (t.avpn.styleGlass, t.avpn.styleGlassHint),
+      'bento' => (t.avpn.styleBento, t.avpn.styleBentoHint),
+      'dots' => (t.avpn.styleDots, t.avpn.styleDotsHint),
+      _ => (t.avpn.styleContrast, t.avpn.styleContrastHint),
+    };
+    void pick(String style) {
+      ref.read(Preferences.araStyle.notifier).update(style == 'glass' ? AraStyle.glass : AraStyle.contrast);
+      if (style == 'bento') ref.read(Preferences.homeLayout.notifier).update(HomeLayout.bento);
+      if (style == 'dots') ref.read(Preferences.homeLayout.notifier).update(HomeLayout.dots);
+      // back to Contrast from Bento or Dots: its tiles
+      if (style == 'contrast' && layout.ownStyle) ref.read(Preferences.homeLayout.notifier).update(HomeLayout.classic);
+    }
+
+    Widget preview(String style) => switch (style) {
+      'glass' => _GlassStylePreview(look: ref.watch(Preferences.glassScheme).look(brightness)),
+      'bento' || 'dots' => Container(
+        height: 86,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .4),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: AspectRatio(
+          aspectRatio: .56,
+          child: CustomPaint(
+            painter: _HomeLayoutThumb(
+              style == 'bento' ? HomeLayout.bento : HomeLayout.dots,
+              accent: accentColour,
+              dark: brightness == Brightness.dark,
+            ),
+          ),
+        ),
+      ),
+      _ => _StylePreview(brightness: brightness, accent: accentColour),
     };
     return ListTile(
       leading: const Icon(Icons.style_rounded),
@@ -244,10 +279,10 @@ class StylePicker extends ConsumerWidget {
           spacing: 12,
           runSpacing: 12,
           children: [
-            for (final style in AraStyle.values)
+            for (final style in const ['contrast', 'glass', 'bento', 'dots'])
               InkWell(
                 borderRadius: BorderRadius.circular(16),
-                onTap: () => ref.read(Preferences.araStyle.notifier).update(style),
+                onTap: () => pick(style),
                 child: SizedBox(
                   width: 132,
                   child: Column(
@@ -259,13 +294,11 @@ class StylePicker extends ConsumerWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: style == selected ? theme.colorScheme.primary : Colors.transparent,
+                            color: style == chosen ? theme.colorScheme.primary : Colors.transparent,
                             width: 2,
                           ),
                         ),
-                        child: style == AraStyle.glass
-                            ? _GlassStylePreview(look: ref.watch(Preferences.glassScheme).look(brightness))
-                            : _StylePreview(brightness: brightness, accent: accentColour),
+                        child: preview(style),
                       ),
                       const SizedBox(height: 6),
                       Text(names(style).$1, style: theme.textTheme.titleSmall),
@@ -409,6 +442,8 @@ class ContrastThemePicker extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final ru = t.$meta.locale.languageCode == 'ru';
     final clarity = ref.watch(Preferences.contrastClarity);
+    // Bento and Dots: no see-through blocks and no backdrop of lines to pick
+    final ownLook = ref.watch(Preferences.homeLayout).ownStyle;
     final backdrop = ref.watch(Preferences.contrastBackdrop);
     final palette = ref.watch(Preferences.contrastPalette);
     final (warm, cool) = ref.watch(contrastColoursProvider).backdrop(theme.brightness);
@@ -454,14 +489,17 @@ class ContrastThemePicker extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // how the home screen looks: right under the style
-        if (!glass) ...[
+        if (!glass && !ownLook) ...[
           // how the home screen is laid out: a picture of each, with its name
           heading(t.avpn.homeLayoutTitle),
           card(
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // two pictures the size four had (they were half the card each)
                 for (final l in HomeLayout.shown)
-                  Expanded(
+                  SizedBox(
+                    width: 92,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: InkWell(
@@ -502,62 +540,63 @@ class ContrastThemePicker extends ConsumerWidget {
             ),
           ),
         ],
-        heading(t.avpn.contrastClarityTitle),
-        card(
-          Row(
-            children: [
-              for (final c in ContrastClarity.values) ...[
-                if (c != ContrastClarity.values.first) const SizedBox(width: 6),
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => ref.read(Preferences.contrastClarity.notifier).update(c),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: c == clarity ? accent.withValues(alpha: .13) : null,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: c == clarity ? accent : scheme.outlineVariant, width: 1.4),
-                      ),
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            height: 40,
-                            child: Stack(
-                              children: [
-                                Positioned.fill(child: backdropOf(ContrastBackdrop.stripes, radius: 10)),
-                                // a pane at this clarity over it
-                                Positioned.fill(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: BackdropFilter(
-                                        filter: ImageFilter.blur(sigmaX: c.blur / 3, sigmaY: c.blur / 3),
-                                        child: ColoredBox(
-                                          color: dark
-                                              ? const Color(0xFF1E1E22).withValues(alpha: c.night)
-                                              : Colors.white.withValues(alpha: c.day),
+        if (!ownLook) heading(t.avpn.contrastClarityTitle),
+        if (!ownLook)
+          card(
+            Row(
+              children: [
+                for (final c in ContrastClarity.values) ...[
+                  if (c != ContrastClarity.values.first) const SizedBox(width: 6),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => ref.read(Preferences.contrastClarity.notifier).update(c),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: c == clarity ? accent.withValues(alpha: .13) : null,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: c == clarity ? accent : scheme.outlineVariant, width: 1.4),
+                        ),
+                        child: Column(
+                          children: [
+                            SizedBox(
+                              height: 40,
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(child: backdropOf(ContrastBackdrop.stripes, radius: 10)),
+                                  // a pane at this clarity over it
+                                  Positioned.fill(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: BackdropFilter(
+                                          filter: ImageFilter.blur(sigmaX: c.blur / 3, sigmaY: c.blur / 3),
+                                          child: ColoredBox(
+                                            color: dark
+                                                ? const Color(0xFF1E1E22).withValues(alpha: c.night)
+                                                : Colors.white.withValues(alpha: c.day),
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          label(ru ? c.ru : c.en, c == clarity),
-                        ],
+                            const SizedBox(height: 6),
+                            label(ru ? c.ru : c.en, c == clarity),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
         if (!glass) ...[
           // the size of everything and of the text
           heading(t.avpn.scaleTitle),
@@ -607,41 +646,43 @@ class ContrastThemePicker extends ConsumerWidget {
               ],
             ),
           ),
-          heading(t.avpn.contrastBackdropTitle),
-          card(
-            GridView.count(
-              crossAxisCount: 5,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 8,
-              childAspectRatio: .58,
-              children: [
-                for (final k in ContrastBackdrop.values)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => ref.read(Preferences.contrastBackdrop.notifier).update(k),
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.all(2.5),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: k == backdrop ? accent : Colors.transparent, width: 2),
+          if (!ownLook) ...[
+            heading(t.avpn.contrastBackdropTitle),
+            card(
+              GridView.count(
+                crossAxisCount: 5,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 8,
+                childAspectRatio: .58,
+                children: [
+                  for (final k in ContrastBackdrop.values)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => ref.read(Preferences.contrastBackdrop.notifier).update(k),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.all(2.5),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: k == backdrop ? accent : Colors.transparent, width: 2),
+                              ),
+                              child: backdropOf(k),
                             ),
-                            child: backdropOf(k),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        label(ru ? k.ru : k.en, k == backdrop),
-                      ],
+                          const SizedBox(height: 4),
+                          label(ru ? k.ru : k.en, k == backdrop),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
           heading(t.avpn.contrastPaletteTitle),
           card(
             GridView(

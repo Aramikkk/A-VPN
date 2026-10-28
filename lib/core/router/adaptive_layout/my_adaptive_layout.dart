@@ -378,11 +378,15 @@ ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = Contrast
       surfaceContainerHighest: pane(1.15),
     ),
     // what opens over the page stays solid
-    dialogTheme: theme.dialogTheme.copyWith(backgroundColor: scheme.surfaceContainerHigh),
-    bottomSheetTheme: theme.bottomSheetTheme.copyWith(
-      backgroundColor: scheme.surfaceContainerLow,
-      modalBackgroundColor: scheme.surfaceContainerLow,
-    ),
+    dialogTheme: homeLookNow.ownStyle
+        ? theme.dialogTheme
+        : theme.dialogTheme.copyWith(backgroundColor: scheme.surfaceContainerHigh),
+    bottomSheetTheme: homeLookNow.ownStyle
+        ? theme.bottomSheetTheme
+        : theme.bottomSheetTheme.copyWith(
+            backgroundColor: scheme.surfaceContainerLow,
+            modalBackgroundColor: scheme.surfaceContainerLow,
+          ),
     popupMenuTheme: theme.popupMenuTheme.copyWith(color: scheme.surfaceContainer),
     menuTheme: MenuThemeData(
       style: (theme.menuTheme.style ?? const MenuStyle()).copyWith(

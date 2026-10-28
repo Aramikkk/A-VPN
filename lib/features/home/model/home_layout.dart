@@ -12,8 +12,11 @@ enum HomeLayout {
   /// dotted paper, figures of dots, a monospaced face, black with one red
   dots;
 
-  /// in the order the picker shows them
-  static const shown = [bento, dots, classic, pulse];
+  /// Contrast's own layouts, in the order the picker shows them (Bento and Dots are styles of their own)
+  static const shown = [classic, pulse];
+
+  /// a look with its own backdrop, cards and faces: picked as a style, not as a layout
+  bool get ownStyle => this == bento || this == dots;
 
   // the vessel (1.0.4x–1.0.57) is gone: Bento in its place
   static HomeLayout fromName(String? name) =>
