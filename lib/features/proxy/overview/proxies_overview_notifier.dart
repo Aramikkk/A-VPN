@@ -218,7 +218,7 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
     if (state case AsyncData()) {
       if (!quiet) await ref.read(hapticServiceProvider.notifier).lightImpact();
       // the sites the home screen shows are asked with every ping of the servers
-      unawaited(ref.read(siteLatencyProvider.notifier).test());
+      unawaited(ref.read(siteLatencyProvider.notifier).test(quiet: quiet));
       await ref.read(proxyRepositoryProvider).urlTest(groupTag).getOrElse((err) {
         loggy.error("error testing group", err);
         throw err;

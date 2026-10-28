@@ -652,5 +652,5 @@ class _Sites extends SiteLatency {
   }
 
   @override
-  Future<void> test() async {}
+  Future<void> test({bool quiet = false}) async {}
 }

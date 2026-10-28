@@ -11,6 +11,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 Future<void> refreshHomeIndicators({required T Function<T>(ProviderListenable<T> provider) read, bool quiet = false}) async {
   read(connectionQualityProvider.notifier).probeNow();
   // (the super light mode has no site tiles: the notifier does nothing there)
-  unawaited(read(siteLatencyProvider.notifier).test());
+  unawaited(read(siteLatencyProvider.notifier).test(quiet: quiet));
   await read(proxiesOverviewNotifierProvider.notifier).urlTest("select", quiet: quiet);
 }

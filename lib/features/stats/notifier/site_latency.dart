@@ -86,7 +86,13 @@ List<LatencySite> homeSitesFor({
     final service = appServices[package];
     final site = service != null
         ? latencySites.firstWhere((s) => s.key == service)
-        : (key: 'app:$package', name: _appName(package), letter: _appName(package).substring(0, 1).toUpperCase(), url: testUrl, get: false);
+        : (
+            key: 'app:$package',
+            name: _appName(package),
+            letter: _appName(package).substring(0, 1).toUpperCase(),
+            url: testUrl,
+            get: false,
+          );
     if (seen.add(site.key)) sites.add(site);
   }
   return sites.take(maxHomeSites).toList();
@@ -187,13 +193,17 @@ class SiteLatency extends Notifier<SiteLatencyState> {
     return selected.isGroup ? selected.groupSelectedTag : selected.tag;
   }
 
-  /// One round over every site, unless one runs or one ran a moment ago.
-  Future<void> test() async {
-    if (state.testing || ref.read(superLightProvider)) return;
+  bool _running = false;
+
+  /// One round over every site, unless one runs or one ran a moment ago. [quiet]: a round nobody asked for (the timer's,
+  /// the minute's refresh): the delay button doesn't light up and fill its ring, only the figures change.
+  Future<void> test({bool quiet = false}) async {
+    if (_running || state.testing || ref.read(superLightProvider)) return;
     if (state.at != null && DateTime.now().difference(state.at!) < const Duration(seconds: 3)) return;
     if (!(ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false)) return;
     if (!ref.read(ConfigOptions.enableMixedPort)) return;
-    state = (ms: state.ms, at: state.at, testing: true, done: 0);
+    _running = true;
+    if (!quiet) state = (ms: state.ms, at: state.at, testing: true, done: 0);
     final port = ref.read(ConfigOptions.mixedPort);
     final https = ref.read(ConfigOptions.pingHttps);
     // a client of its own each round, so a round starts from fresh connections
@@ -236,11 +246,12 @@ class SiteLatency extends Notifier<SiteLatencyState> {
             } catch (_) {
               results[site.key] = null;
             }
-            state = (ms: state.ms, at: state.at, testing: true, done: results.length);
+            if (!quiet) state = (ms: state.ms, at: state.at, testing: true, done: results.length);
           }(),
       ]);
     } finally {
       client.close(force: true);
+      _running = false;
     }
     state = (ms: results, at: DateTime.now(), testing: false, done: shown.length);
   }

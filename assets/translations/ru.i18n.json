@@ -144,6 +144,7 @@
     "uiScaleLabel": "Масштаб интерфейса",
     "fontScaleLabel": "Размер шрифта",
     "scaleReset": "Сбросить",
+    "dockLossLabel": "потери",
     "profilePriorityOff": "Снять приоритет",
     "modesTitle": "Режимы",
     "modesHint": "Раздача, Глобально, Сервер",

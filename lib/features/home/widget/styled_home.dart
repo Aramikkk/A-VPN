@@ -1035,23 +1035,15 @@ class _GraphiteDock extends HookConsumerWidget {
               top: on && testing
                   ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: ink))
                   : theme.contrastLayout
-                  // Contrast: the ping here, as the servers answering are on the right: the sign and the figure
+                  // Contrast: the loss here, as the servers answering are on the right: the sign and the figure (the ping is
+                  // in the top block; a tap here still pings)
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.network_ping_rounded, size: iconSize, color: contrastOn ? scheme.onSurface : ink),
+                        Icon(Icons.trending_down_rounded, size: iconSize, color: contrastOn ? scheme.onSurface : ink),
                         const Gap(6),
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: on && measured && !busy ? '$ping' : '—'),
-                              if (on && measured && !busy)
-                                TextSpan(
-                                  text: ' ms',
-                                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-                                ),
-                            ],
-                          ),
+                        Text(
+                          on && measured && !busy ? lossText : '—',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w900,
                             height: 1,
@@ -1062,10 +1054,8 @@ class _GraphiteDock extends HookConsumerWidget {
                       ],
                     )
                   : Icon(Icons.network_ping_rounded, size: iconSize, color: ink),
-              // Contrast: the loss under it while measured
-              label: theme.contrastLayout && on && measured && !busy
-                  ? t.avpn.dockLoss(loss: lossText)
-                  : t.avpn.stPingButton,
+              // Contrast: the loss's name under it
+              label: theme.contrastLayout ? t.avpn.dockLossLabel : t.avpn.stPingButton,
               labelColor: theme.contrastLayout && on && measured && !busy ? lossInk : null,
               onTap: on && !busy && !testing ? onCheck : null,
             ),
@@ -3642,7 +3632,7 @@ class _SiteTiles extends HookConsumerWidget {
       if (!compact || !visible) return null;
       final timer = Timer.periodic(
         const Duration(seconds: 30),
-        (_) => unawaited(ref.read(siteLatencyProvider.notifier).test()),
+        (_) => unawaited(ref.read(siteLatencyProvider.notifier).test(quiet: true)),
       );
       return timer.cancel;
     }, [compact, visible]);
@@ -3791,7 +3781,7 @@ class _SiteTiles extends HookConsumerWidget {
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
-                    fontSize: 12 * k,
+                    fontSize: 13.8 * k,
                   ),
                 );
                 // the country of the site's server, small, top right
@@ -3804,7 +3794,7 @@ class _SiteTiles extends HookConsumerWidget {
                         style: TextStyle(fontSize: 10 * k, fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant),
                       );
                 final unitStyle = TextStyle(
-                  fontSize: 12 * k,
+                  fontSize: 13.8 * k,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w600,
                   color: scheme.onSurfaceVariant,
@@ -3836,7 +3826,7 @@ class _SiteTiles extends HookConsumerWidget {
                                     ? _textWidth(
                                         ' ms',
                                         (theme.textTheme.headlineMedium ?? const TextStyle()).copyWith(
-                                          fontSize: 12 * k,
+                                          fontSize: 13.8 * k,
                                           letterSpacing: 0,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -3851,7 +3841,7 @@ class _SiteTiles extends HookConsumerWidget {
                                   ],
                                 ),
                                 style: theme.textTheme.headlineMedium?.copyWith(
-                                  fontSize: 32 * k,
+                                  fontSize: 36.8 * k,
                                   fontWeight: FontWeight.w500,
                                   letterSpacing: -1.5 * k,
                                   color: scheme.onSurface,
