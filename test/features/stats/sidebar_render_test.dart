@@ -21,6 +21,11 @@ import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/features/stats/widget/speed_page.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _Stats extends StatsNotifier {
   @override
@@ -205,6 +210,11 @@ void main() {
         accent: AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed'),
         style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'contrast'),
       );
+      // HOMELAYOUT=bento|dots: the page in that look, as the app's shell has it; DARK=1: by night
+      final look = Platform.environment['HOMELAYOUT'];
+      final dark = Platform.environment['DARK'] == '1';
+      SharedPreferences.setMockInitialValues({if (look != null) 'home_layout': look});
+      final prefs = await tester.runAsync(SharedPreferences.getInstance);
       await tester.binding.setSurfaceSize(size);
       await tester.pumpWidget(
         ProviderScope(
@@ -213,9 +223,16 @@ void main() {
             statsNotifierProvider.overrideWith(_Stats.new),
             connectionQualityProvider.overrideWith(_Quality.new),
             speedHistoryProvider.overrideWith(_History.new),
+            if (look != null) sharedPreferencesProvider.overrideWith((ref) async => prefs!),
           ],
           child: MaterialApp(
-            theme: theme.lightTheme(null),
+            theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
+            builder: look == null
+                ? null
+                : (context, child) => Theme(
+                    data: contrastPageTheme(lookTheme(Theme.of(context), HomeLayout.fromName(look))),
+                    child: ContrastGlow(child: child!),
+                  ),
             home: Consumer(
               builder: (context, ref, _) =>
                   !ref.watch(translationsProvider).hasValue ? const SizedBox() : const SpeedPage(),

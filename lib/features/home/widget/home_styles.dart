@@ -998,8 +998,11 @@ Widget? lookPlate(HomeLayout look, BuildContext context, Widget child) {
     HomeLayout.bento => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
       child: DecoratedBox(
-        decoration: BoxDecoration(color: _Bento.tile(dark), borderRadius: BorderRadius.circular(16)),
-        child: child,
+        decoration: BoxDecoration(color: _Bento.tile(dark), borderRadius: BorderRadius.circular(15)),
+        child: IconTheme.merge(
+          data: IconThemeData(color: Theme.of(context).colorScheme.onSurface),
+          child: child,
+        ),
       ),
     ),
     HomeLayout.dots => Padding(
@@ -1007,7 +1010,7 @@ Widget? lookPlate(HomeLayout look, BuildContext context, Widget child) {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: _Dots.paper(dark),
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(4),
           border: Border.all(color: _Dots.ink(dark).withValues(alpha: .7)),
         ),
         child: child,
@@ -1196,4 +1199,102 @@ ShapeBorder? lookPopupShape(HomeLayout look, bool dark) => switch (look) {
     ),
     _ => null,
   };
+}
+
+/// The menu under the panel in a look that has its own. Bento: a row on the panel, the page in use a pill in the accent
+/// with its sign and name, the others their sign over a small name. Dots: small capitals, the page in use its sign on
+/// an inked square.
+class LookNavBar extends StatelessWidget {
+  const LookNavBar({
+    super.key,
+    required this.look,
+    required this.destinations,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final HomeLayout look;
+  final List<NavigationDestination> destinations;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final bento = look == HomeLayout.bento;
+    final soft = bento ? theme.colorScheme.onSurfaceVariant : _Dots.soft(dark);
+    Widget item(int i) {
+      final d = destinations[i];
+      final on = i == selected;
+      final ink = bento ? (on ? ContrastPalette.ink : soft) : (on ? _Dots.paper(dark) : _Dots.ink(dark));
+      final sign = IconTheme(
+        data: IconThemeData(color: ink, size: 22),
+        child: on ? (d.selectedIcon ?? d.icon) : d.icon,
+      );
+      final label = bento
+          ? _Bento.label(on ? ContrastPalette.ink : soft).copyWith(fontSize: 12, fontWeight: FontWeight.w800)
+          : _Dots.mono(10, on ? _Dots.ink(dark) : soft, weight: FontWeight.w700, spacing: 1.2);
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onSelect(i),
+          child: Center(
+            child: bento
+                ? AnimatedContainer(
+                    duration: lightDuration(const Duration(milliseconds: 220)),
+                    padding: EdgeInsets.symmetric(horizontal: on ? 14 : 6, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: on ? theme.araAccent : Colors.transparent,
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: on
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              sign,
+                              const Gap(6),
+                              Text(d.label, style: label),
+                            ],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              sign,
+                              const Gap(2),
+                              Text(d.label, style: label.copyWith(fontSize: 10)),
+                            ],
+                          ),
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 30,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: on ? _Dots.ink(dark) : null,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: sign,
+                      ),
+                      const Gap(4),
+                      Text(d.label.toUpperCase(), style: label),
+                    ],
+                  ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 64,
+      decoration: BoxDecoration(
+        color: contrastPanelColor(dark),
+        border: bento ? null : Border(top: BorderSide(color: _Dots.ink(dark).withValues(alpha: .25))),
+      ),
+      child: SafeArea(top: false, child: Row(children: [for (var i = 0; i < destinations.length; i++) item(i)])),
+    );
+  }
 }

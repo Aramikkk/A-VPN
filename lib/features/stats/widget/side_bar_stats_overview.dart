@@ -5,6 +5,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
@@ -1431,7 +1432,8 @@ class _PingBlock extends ConsumerWidget {
                 period.bars,
                 slots: period.slots,
                 colour: theme.araAccent,
-                slow: const Color(0xFF8C939C),
+                // Dots: a slow answer in its red, as the home screen's bars
+                slow: homeLookNow == HomeLayout.dots ? const Color(0xFFE8231C) : const Color(0xFF8C939C),
                 grid: scheme.onSurface.withValues(alpha: .06),
               ),
               child: const SizedBox.expand(),

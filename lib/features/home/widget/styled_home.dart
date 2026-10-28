@@ -1128,17 +1128,8 @@ class _GraphiteDock extends HookConsumerWidget {
                     ],
                   ),
                   label: t.avpn.dockActive,
-                  // the answering servers in a compact list, the fastest first; one tapped is chosen
-                  onTap: on && answering > 0
-                      ? () => showModalBottomSheet<void>(
-                          context: context,
-                          showDragHandle: true,
-                          isScrollControlled: true,
-                          // 30% lower than it was
-                          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .42),
-                          builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
-                        )
-                      : null,
+                  // the servers of this session (what the "Servers VPN" tab over the panel opened)
+                  onTap: on ? () => showGlassPopup(context, const _SessionServers()) : null,
                 ),
               ),
             ),
@@ -1827,84 +1818,6 @@ class _HomeTraffic extends ConsumerWidget {
   }
 }
 
-/// The servers answering their ping, the fastest first, compact: a flag, the name and the ping on one line each.
-/// Tapping one chooses it (the Auto group stops choosing for you) and closes the list.
-class _AnsweringSheet extends ConsumerWidget {
-  const _AnsweringSheet({required this.servers, required this.selected});
-
-  final List<OutboundInfo> servers;
-  final String? selected;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-          child: Text(
-            t.avpn.dockServersAnswering(count: servers.length),
-            style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-        ),
-        Flexible(
-          // at the top of the list, a pull down anywhere on it closes the sheet
-          child: NotificationListener<OverscrollNotification>(
-            onNotification: (n) {
-              if (n.overscroll < -4 && n.dragDetails != null && n.metrics.pixels <= n.metrics.minScrollExtent) {
-                Navigator.of(context).maybePop();
-                return true;
-              }
-              return false;
-            },
-            child: ListView.builder(
-              shrinkWrap: true,
-              // the pull down at its top reaches the listener above (no bouncing on any platform)
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-              itemCount: servers.length,
-              itemBuilder: (context, i) {
-                final server = servers[i];
-                final name = serverName(server);
-                final chosen = server.tag == selected;
-                return ListTile(
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  selected: chosen,
-                  selectedTileColor: scheme.primary.withValues(alpha: .12),
-                  leading: FlagBadge(
-                    profile: name.profile,
-                    child: Text(name.flag ?? '🌐', style: const TextStyle(fontSize: 22, fontFamilyFallback: ['Emoji'])),
-                  ),
-                  title: Text(
-                    _marked(name.title.contains(' - ') ? name.title.split(' - ').last.trim() : name.title, name.title),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: chosen ? FontWeight.w800 : FontWeight.w600,
-                      color: chosen ? scheme.primary : null,
-                    ),
-                  ),
-                  trailing: _Delay(delay: server.urlTestDelay, testing: false),
-                  onTap: () {
-                    ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
-                    Navigator.of(context).pop();
-                  },
-                );
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Contrast's home: on the upper zone (its light behind the app bar too: [ContrastGlow]) the session, the servers,
 /// the traffic and the toggles, each a block of its own; then a black panel holding the connect control only, with
 /// a tab on its top edge that brings the connections in.
@@ -2110,7 +2023,6 @@ class ContrastShellDock extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final testing = useValueListenable(homePingTesting);
@@ -2142,7 +2054,6 @@ class ContrastShellDock extends HookConsumerWidget {
           ),
           child: Column(
             children: [
-              _SeamTab(label: t.avpn.contrastServersTab),
               Expanded(child: Center(child: dock)),
               // the home screen's toggles, here where there's room
               Padding(
@@ -2159,8 +2070,7 @@ class ContrastShellDock extends HookConsumerWidget {
       child: Stack(
         children: [
           Container(
-            margin: const EdgeInsets.only(top: _SeamTab.overhang),
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             decoration: BoxDecoration(
               color: contrastPanelColor(dark),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
@@ -2178,12 +2088,6 @@ class ContrastShellDock extends HookConsumerWidget {
                     ],
             ),
             child: dock,
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            child: Center(child: _SeamTab(label: t.avpn.contrastServersTab)),
           ),
         ],
       ),
@@ -2581,45 +2485,6 @@ class _RenderFrostPart extends RenderProxyBox {
     );
     canvas.restore();
     super.paint(context, offset);
-  }
-}
-
-/// The tab on the panel's top edge: "Серверы VPN"; a tap shows the servers this session went through.
-class _SeamTab extends StatelessWidget {
-  const _SeamTab({required this.label});
-
-  final String label;
-
-  /// how far the tab stands up over the panel's edge
-  static const overhang = 15.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final ink = dark ? Colors.white.withValues(alpha: .75) : const Color(0xFF4A4743);
-    return Material(
-      color: contrastPanelColor(dark),
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      child: InkWell(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        onTap: () => showGlassPopup(context, const _SessionServers()),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 7, 22, 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.dns_rounded, size: 14, color: theme.araIcon),
-              const Gap(5),
-              Text(
-                label,
-                style: TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

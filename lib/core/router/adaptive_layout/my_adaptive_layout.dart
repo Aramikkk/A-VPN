@@ -259,29 +259,46 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                           decoration: const BoxDecoration(),
                           // Contrast: three tabs, Statistics, Home and Topology (the branches 1 to 3); Connections come up
                           // with a long swipe up on the home screen, Settings down with one down (or the cog by the "+")
-                          child: NavigationBar(
-                            // a lower menu, of a piece with the panel over it (white by day, black by night); flat
-                            height: 62,
-                            elevation: 0,
-                            shadowColor: Colors.transparent,
-                            backgroundColor: contrastPanelColor(dark),
-                            // the phone: Connections and Settings (reached by swipes, not in the menu) keep Home lit; a
-                            // computer has no swipes, so every page is in its menu, where it can be seen
-                            selectedIndex: PlatformUtils.isDesktop
-                                ? navigationShell.currentIndex
-                                : switch (navigationShell.currentIndex) {
-                                    1 => 0,
-                                    3 => 2,
-                                    _ => 1,
-                                  },
-                            destinations: _navDests(
-                              PlatformUtils.isDesktop
-                                  ? _actions(t, showProfilesAction, isMobileBreakpoint)
-                                  : _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
-                            ),
-                            onDestinationSelected: (index) =>
-                                _onTap(context, PlatformUtils.isDesktop ? index : index + 1),
-                          ),
+                          child: look.ownStyle
+                              ? LookNavBar(
+                                  look: look,
+                                  selected: PlatformUtils.isDesktop
+                                      ? navigationShell.currentIndex
+                                      : switch (navigationShell.currentIndex) {
+                                          1 => 0,
+                                          3 => 2,
+                                          _ => 1,
+                                        },
+                                  destinations: _navDests(
+                                    PlatformUtils.isDesktop
+                                        ? _actions(t, showProfilesAction, isMobileBreakpoint)
+                                        : _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
+                                  ),
+                                  onSelect: (index) => _onTap(context, PlatformUtils.isDesktop ? index : index + 1),
+                                )
+                              : NavigationBar(
+                                  // a lower menu, of a piece with the panel over it (white by day, black by night); flat
+                                  height: 62,
+                                  elevation: 0,
+                                  shadowColor: Colors.transparent,
+                                  backgroundColor: contrastPanelColor(dark),
+                                  // the phone: Connections and Settings (reached by swipes, not in the menu) keep Home lit; a
+                                  // computer has no swipes, so every page is in its menu, where it can be seen
+                                  selectedIndex: PlatformUtils.isDesktop
+                                      ? navigationShell.currentIndex
+                                      : switch (navigationShell.currentIndex) {
+                                          1 => 0,
+                                          3 => 2,
+                                          _ => 1,
+                                        },
+                                  destinations: _navDests(
+                                    PlatformUtils.isDesktop
+                                        ? _actions(t, showProfilesAction, isMobileBreakpoint)
+                                        : _actions(t, showProfilesAction, isMobileBreakpoint).sublist(1, 4),
+                                  ),
+                                  onDestinationSelected: (index) =>
+                                      _onTap(context, PlatformUtils.isDesktop ? index : index + 1),
+                                ),
                         ),
                       )
                     : null,

@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart' show homeLookNow;
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
@@ -152,19 +154,74 @@ class SettingsPage extends HookConsumerWidget {
               padding: const EdgeInsets.all(10),
               child: _SectionGrid(
                 items: [
-                  (Icons.view_list_rounded, t.pages.profiles.title, t.avpn.settingsCapProfiles, context.namedLocation('profiles')),
-                  (Icons.tune_rounded, t.avpn.profileManagement, t.avpn.settingsCapManagement, context.namedLocation('profileManagement')),
-                  (Icons.layers_rounded, t.pages.settings.general.title, t.avpn.settingsCapGeneral, context.namedLocation('general')),
-                  (Icons.power_settings_new_rounded, t.avpn.settingsConnection, t.avpn.settingsCapConnection, context.namedLocation('connectionOptions')),
+                  (
+                    Icons.view_list_rounded,
+                    t.pages.profiles.title,
+                    t.avpn.settingsCapProfiles,
+                    context.namedLocation('profiles'),
+                  ),
+                  (
+                    Icons.tune_rounded,
+                    t.avpn.profileManagement,
+                    t.avpn.settingsCapManagement,
+                    context.namedLocation('profileManagement'),
+                  ),
+                  (
+                    Icons.layers_rounded,
+                    t.pages.settings.general.title,
+                    t.avpn.settingsCapGeneral,
+                    context.namedLocation('general'),
+                  ),
+                  (
+                    Icons.power_settings_new_rounded,
+                    t.avpn.settingsConnection,
+                    t.avpn.settingsCapConnection,
+                    context.namedLocation('connectionOptions'),
+                  ),
                   (Icons.palette_rounded, t.avpn.themes, t.avpn.settingsCapThemes, context.namedLocation('themes')),
-                  (Icons.route_rounded, t.pages.settings.routing.title, t.avpn.settingsCapRouting, context.namedLocation('routingOptions')),
-                  (Icons.dns_outlined, t.avpn.settingsServers, t.avpn.settingsCapServers, context.namedLocation('serversOptions')),
-                  (Icons.network_ping_rounded, t.avpn.pingSettings, t.avpn.settingsCapPing, context.namedLocation('pingOptions')),
+                  (
+                    Icons.route_rounded,
+                    t.pages.settings.routing.title,
+                    t.avpn.settingsCapRouting,
+                    context.namedLocation('routingOptions'),
+                  ),
+                  (
+                    Icons.dns_outlined,
+                    t.avpn.settingsServers,
+                    t.avpn.settingsCapServers,
+                    context.namedLocation('serversOptions'),
+                  ),
+                  (
+                    Icons.network_ping_rounded,
+                    t.avpn.pingSettings,
+                    t.avpn.settingsCapPing,
+                    context.namedLocation('pingOptions'),
+                  ),
                   // each site and chosen app through its own server (beta); DNS is under Inbound now
-                  (Icons.alt_route_rounded, t.avpn.pingSites, t.avpn.settingsCapSites, context.namedLocation('sitesOptions')),
-                  (Icons.block_rounded, t.avpn.adBlock, t.avpn.settingsCapAdBlock, context.namedLocation('adBlockOptions')),
-                  (Icons.input_rounded, t.pages.settings.inbound.title, t.avpn.settingsCapInbound, context.namedLocation('inboundOptions')),
-                  (Icons.description_rounded, t.pages.logs.title, t.avpn.settingsCapLogs, context.namedLocation('logs')),
+                  (
+                    Icons.alt_route_rounded,
+                    t.avpn.pingSites,
+                    t.avpn.settingsCapSites,
+                    context.namedLocation('sitesOptions'),
+                  ),
+                  (
+                    Icons.block_rounded,
+                    t.avpn.adBlock,
+                    t.avpn.settingsCapAdBlock,
+                    context.namedLocation('adBlockOptions'),
+                  ),
+                  (
+                    Icons.input_rounded,
+                    t.pages.settings.inbound.title,
+                    t.avpn.settingsCapInbound,
+                    context.namedLocation('inboundOptions'),
+                  ),
+                  (
+                    Icons.description_rounded,
+                    t.pages.logs.title,
+                    t.avpn.settingsCapLogs,
+                    context.namedLocation('logs'),
+                  ),
                 ],
               ),
             ),
@@ -213,10 +270,23 @@ class _SectionGrid extends StatelessWidget {
             // enough for the sign, two lines of the name and two of the caption on a narrow screen
             height: math.max(side * .7, 128.0),
             child: Material(
-              color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
+              // Bento: a solid tile; Dots: the paper with an inked edge
+              color: switch (homeLookNow) {
+                HomeLayout.bento => dark ? const Color(0xFF3A3A40) : const Color(0xFFF0F0F2),
+                HomeLayout.dots => dark ? const Color(0xFF151515) : const Color(0xFFEAE9E5),
+                _ => scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
+              },
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+                borderRadius: BorderRadius.circular(switch (homeLookNow) {
+                  HomeLayout.bento => 24,
+                  HomeLayout.dots => 8,
+                  _ => 20,
+                }),
+                side: switch (homeLookNow) {
+                  HomeLayout.bento => BorderSide.none,
+                  HomeLayout.dots => BorderSide(color: scheme.onSurface.withValues(alpha: .5)),
+                  _ => BorderSide(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
+                },
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
@@ -229,8 +299,17 @@ class _SectionGrid extends StatelessWidget {
                       Container(
                         width: 34,
                         height: 34,
-                        decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
-                        child: Icon(icon, size: 19, color: ContrastPalette.ink),
+                        // Dots: an inked square with the sign on the paper's colour
+                        decoration: homeLookNow == HomeLayout.dots
+                            ? BoxDecoration(color: scheme.onSurface, borderRadius: BorderRadius.circular(4))
+                            : BoxDecoration(shape: BoxShape.circle, color: accent),
+                        child: Icon(
+                          icon,
+                          size: 19,
+                          color: homeLookNow == HomeLayout.dots
+                              ? (dark ? const Color(0xFF151515) : const Color(0xFFEAE9E5))
+                              : ContrastPalette.ink,
+                        ),
                       ),
                       const Spacer(),
                       Text(

@@ -9,6 +9,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/stats/widget/traffic_panel.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -85,7 +86,10 @@ class HomePage extends HookConsumerWidget {
                     isLabelVisible: anyHomeModeOn(ref),
                     smallSize: 8,
                     backgroundColor: theme.araAccent,
-                    child: Icon(Icons.tune_rounded, color: theme.colorScheme.primary),
+                    child: Icon(
+                      Icons.tune_rounded,
+                      color: homeLookNow == HomeLayout.bento ? theme.colorScheme.onSurface : theme.colorScheme.primary,
+                    ),
                   ),
                   onPressed: () => showGlassPopup(context, const HomeModesPanel()),
                 ),
@@ -100,7 +104,10 @@ class HomePage extends HookConsumerWidget {
               IconButton(
                 tooltip: superLight ? t.avpn.superLightOn : t.avpn.superLightHint,
                 isSelected: superLight,
-                icon: Icon(Icons.eco_outlined, color: theme.colorScheme.primary),
+                icon: Icon(
+                  Icons.eco_outlined,
+                  color: homeLookNow == HomeLayout.bento ? theme.colorScheme.onSurface : theme.colorScheme.primary,
+                ),
                 selectedIcon: Icon(Icons.eco_rounded, color: theme.araAccent),
                 onPressed: () => ref.read(Preferences.superLight.notifier).update(!superLight),
               ),
@@ -112,7 +119,10 @@ class HomePage extends HookConsumerWidget {
             plate(
               IconButton(
                 tooltip: t.pages.settings.title,
-                icon: Icon(Icons.settings_outlined, color: theme.colorScheme.primary),
+                icon: Icon(
+                  Icons.settings_outlined,
+                  color: homeLookNow == HomeLayout.bento ? theme.colorScheme.onSurface : theme.colorScheme.primary,
+                ),
                 onPressed: () => context.goNamed('settings'),
               ),
             ),
