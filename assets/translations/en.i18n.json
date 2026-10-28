@@ -145,6 +145,8 @@
     "fontScaleLabel": "Font size",
     "scaleReset": "Reset",
     "dockLossLabel": "loss",
+    "homeLayoutBento": "Bento",
+    "homeLayoutDots": "Dots",
     "profilePriorityOff": "Remove priority",
     "modesTitle": "Modes",
     "modesHint": "Sharing, Global, Server",

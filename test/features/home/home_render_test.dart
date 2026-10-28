@@ -482,7 +482,10 @@ void main() {
         expect(find.byType(AraHomeBody), findsOneWidget);
         expect(find.textContaining('Обычные'), findsNothing);
         expect(t.avpn.autoBestHint, 'Сервер с наименьшим пингом');
-        if (connected && contrast && Platform.environment['SUPERLIGHT'] != '1') {
+        if (connected &&
+            contrast &&
+            Platform.environment['SUPERLIGHT'] != '1' &&
+            !const ['vessel', 'bento', 'dots'].contains(Platform.environment['HOMELAYOUT'] ?? '')) {
           for (final amount in ['8 МБ', '2 МБ']) {
             expect(
               find.byWidgetPredicate((w) => w is Text && w.textSpan?.toPlainText() == amount),
@@ -492,7 +495,10 @@ void main() {
           }
         }
         // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
-        if (connected && contrast && Platform.environment['SUPERLIGHT'] != '1' && (Platform.environment['HOMELAYOUT'] ?? '').isEmpty) {
+        if (connected &&
+            contrast &&
+            Platform.environment['SUPERLIGHT'] != '1' &&
+            (Platform.environment['HOMELAYOUT'] ?? '').isEmpty) {
           final sites = find.byKey(const Key('contrast-sites'));
           expect(sites, findsOneWidget);
           expect(find.byKey(const Key('contrast-traffic')), findsNothing);

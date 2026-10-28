@@ -12,7 +12,12 @@ double _niceMax(double value, {double least = 50}) {
 }
 
 /// A tile of the home screen's blocks: the same frosted pane as the sites' tiles.
-Widget _homeTile(BuildContext context, Widget child, {EdgeInsets padding = const EdgeInsets.all(10), double radius = 18}) {
+Widget _homeTile(
+  BuildContext context,
+  Widget child, {
+  EdgeInsets padding = const EdgeInsets.all(10),
+  double radius = 18,
+}) {
   final theme = Theme.of(context);
   final dark = theme.brightness == Brightness.dark;
   return Container(
@@ -94,7 +99,11 @@ class _SpeedTrafficRow extends StatelessWidget {
         context,
         Stack(
           children: [
-            Positioned.fill(child: RepaintBoundary(child: _SideFill(level: level, colour: accent, dark: dark, fromRight: fromRight))),
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: _SideFill(level: level, colour: accent, dark: dark, fromRight: fromRight),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               child: Row(
@@ -186,141 +195,6 @@ class _SideFill extends HookWidget {
   }
 }
 
-/// The vessel: a big circle of water for the connection's quality (the ping, the faster the fuller), the time and the
-/// loss written in it; the speeds and the traffic under it.
-class _VesselStats extends HookConsumerWidget {
-  const _VesselStats({
-    required this.connected,
-    required this.timeText,
-    required this.ping,
-    required this.loss,
-    required this.down,
-    required this.up,
-    required this.vpn,
-    required this.direct,
-    required this.vpnShare,
-    required this.speedLevel,
-    this.slim = false,
-  });
-
-  /// without the speeds and the traffic (a smaller block, for a screen that is not high enough)
-  final bool slim;
-
-  final double speedLevel;
-  final bool connected;
-  final String timeText;
-  final int? ping;
-  final double loss;
-  final (String, String) down;
-  final (String, String) up;
-  final (String, String) vpn;
-  final (String, String) direct;
-  final double vpnShare;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final accent = theme.araAccent;
-    final dark = theme.brightness == Brightness.dark;
-    // the water heads for a new level only when it is 8% or more away (a ping's hair of a change doesn't set it
-    // gliding again)
-    final heading = useRef<double?>(null);
-    final target = connected && ping != null ? _Orb.pingFill(ping!) : 0.0;
-    final prior = heading.value;
-    if (prior == null || (target - prior).abs() >= .08 || (target == 0) != (prior == 0)) heading.value = target;
-    final size = slim ? 124.0 : 190.0;
-    final ink = ContrastPalette.ink;
-    final vessel = SizedBox(
-      width: size,
-      height: size,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: scheme.surfaceContainerLow.withValues(alpha: ContrastClarity.of(context).tile),
-          border: Border.all(color: accent, width: 2),
-        ),
-        child: ClipOval(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned.fill(
-                child: RepaintBoundary(
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(end: heading.value),
-                    duration: lightDuration(const Duration(milliseconds: 900)),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, level, _) => level < .005
-                        ? const SizedBox.shrink()
-                        : Align(
-                            alignment: Alignment.bottomCenter,
-                            child: FractionallySizedBox(
-                              heightFactor: level,
-                              widthFactor: 1,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: accent.withValues(alpha: dark ? .62 : .78),
-                                  border: Border(top: BorderSide(color: accent, width: 1.5)),
-                                ),
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    timeText,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: connected && (ping != null && heading.value! > .5) ? ink : scheme.onSurface,
-                    ),
-                  ),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: connected && ping != null ? '$ping' : '—'),
-                        if (connected && ping != null)
-                          const TextSpan(text: ' ms', style: TextStyle(fontSize: 12, letterSpacing: 0)),
-                      ],
-                    ),
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -1.5,
-                      color: connected && (ping != null && heading.value! > .38) ? ink : scheme.onSurface,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  Text(
-                    connected ? t.avpn.dockLoss(loss: _lossText(loss)) : '',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: connected && (ping != null && heading.value! > .22) ? ink : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Center(child: vessel),
-        if (!slim) ...[
-          const Gap(10),
-          _SpeedTrafficRow(down: down, up: up, vpn: vpn, direct: direct, vpnShare: vpnShare, speedLevel: speedLevel),
-        ],
-      ],
-    );
-  }
-}
-
 /// The ping's last minute as a soft curve over a faint grid, a glow under it and a bright dot on the latest answer; a
 /// lost probe is a dashed red line down to the bottom.
 class _PulsePainter extends CustomPainter {
@@ -353,7 +227,10 @@ class _PulsePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final answered = [for (final s in samples) if (s != null) s];
+    final answered = [
+      for (final s in samples)
+        if (s != null) s,
+    ];
     final chart = Rect.fromLTRB(0, 8, size.width - _labelWidth, size.height - 6);
     // the scale runs from 0 to a round number over the highest answer (and holds while the line moves), as the router's
     // panel draws its charts
@@ -371,7 +248,10 @@ class _PulsePainter extends CustomPainter {
         canvas.drawLine(Offset(x, yy), Offset(math.min(x + 3, chart.right), yy), gridPaint);
       }
       final text = TextPainter(
-        text: TextSpan(text: v.round().toString(), style: (labelStyle ?? const TextStyle()).copyWith(fontSize: 10, color: label)),
+        text: TextSpan(
+          text: v.round().toString(),
+          style: (labelStyle ?? const TextStyle()).copyWith(fontSize: 10, color: label),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       text.paint(canvas, Offset(size.width - text.width, yy - text.height / 2));
@@ -580,20 +460,20 @@ class _PulseStats extends HookConsumerWidget {
                   child: Opacity(
                     opacity: connected ? 1 : .35,
                     child: AnimatedBuilder(
-                    animation: slide,
-                    builder: (context, _) => CustomPaint(
-                      painter: _PulsePainter(
-                        samples: samples,
-                        line: line,
-                        lost: scheme.error,
-                        grid: scheme.onSurface.withValues(alpha: .14),
-                        label: scheme.onSurfaceVariant,
-                        labelStyle: theme.textTheme.labelSmall,
-                        shift: 1 - Curves.easeOutCubic.transform(slide.value),
-                        slots: ConnectionQuality.length,
+                      animation: slide,
+                      builder: (context, _) => CustomPaint(
+                        painter: _PulsePainter(
+                          samples: samples,
+                          line: line,
+                          lost: scheme.error,
+                          grid: scheme.onSurface.withValues(alpha: .14),
+                          label: scheme.onSurfaceVariant,
+                          labelStyle: theme.textTheme.labelSmall,
+                          shift: 1 - Curves.easeOutCubic.transform(slide.value),
+                          slots: ConnectionQuality.length,
+                        ),
                       ),
                     ),
-                  ),
                   ),
                 ),
               ),
@@ -642,72 +522,6 @@ List<_SiteEntry> _siteEntries(WidgetRef ref, ColorScheme scheme) {
         );
       }(),
   ];
-}
-
-/// The sites as a row of bars: the faster, the taller; the delay over each, the name under it.
-class _SiteBars extends ConsumerWidget {
-  const _SiteBars();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final entries = _siteEntries(ref, scheme);
-    if (entries.isEmpty) return const SizedBox.shrink();
-    return _homeTile(
-      context,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SitesHeader(),
-          Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          for (final e in entries)
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: e.colour,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const Gap(4),
-                  SizedBox(
-                    height: 84,
-                    width: 18,
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: FractionallySizedBox(
-                        heightFactor: math.max(e.level, .08),
-                        child: Container(
-                          decoration: BoxDecoration(color: e.colour, borderRadius: BorderRadius.circular(5)),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const Gap(4),
-                  Text(
-                    e.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
-    );
-  }
 }
 
 /// The sites in one thin strip: a dot of the delay's colour and the delay for each, no names (the last form of the sites'
@@ -766,7 +580,10 @@ class _TilePulsePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final answered = [for (final h in history) if (h != null) h];
+    final answered = [
+      for (final h in history)
+        if (h != null) h,
+    ];
     if (answered.isEmpty) return;
     // from zero to a round number over the highest answer: a steady site is a low even line, a slow one climbs
     const low = 0.0;

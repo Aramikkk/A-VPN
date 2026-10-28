@@ -453,6 +453,55 @@ class ContrastThemePicker extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // how the home screen looks: right under the style
+        if (!glass) ...[
+          // how the home screen is laid out: a picture of each, with its name
+          heading(t.avpn.homeLayoutTitle),
+          card(
+            Row(
+              children: [
+                for (final l in HomeLayout.shown)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => ref.read(Preferences.homeLayout.notifier).update(l),
+                        child: Column(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: l == ref.watch(Preferences.homeLayout) ? accent : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                              child: AspectRatio(
+                                aspectRatio: .56,
+                                child: CustomPaint(
+                                  painter: _HomeLayoutThumb(l, accent: accent, dark: dark),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            label(switch (l) {
+                              HomeLayout.classic => t.avpn.homeLayoutClassic,
+                              HomeLayout.pulse => t.avpn.homeLayoutPulse,
+                              HomeLayout.bento => t.avpn.homeLayoutBento,
+                              HomeLayout.dots => t.avpn.homeLayoutDots,
+                            }, l == ref.watch(Preferences.homeLayout)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
         heading(t.avpn.contrastClarityTitle),
         card(
           Row(
@@ -536,7 +585,11 @@ class ContrastThemePicker extends ConsumerWidget {
                         ),
                         SizedBox(
                           width: 46,
-                          child: Text('${ref.watch(pref)}%', textAlign: TextAlign.end, style: Theme.of(context).textTheme.labelLarge),
+                          child: Text(
+                            '${ref.watch(pref)}%',
+                            textAlign: TextAlign.end,
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
                         ),
                       ],
                     ),
@@ -551,52 +604,6 @@ class ContrastThemePicker extends ConsumerWidget {
                     child: Text(t.avpn.scaleReset),
                   ),
                 ),
-              ],
-            ),
-          ),
-          // how the home screen is laid out: a picture of each, with its name
-          heading(t.avpn.homeLayoutTitle),
-          card(
-            Row(
-              children: [
-                for (final l in HomeLayout.values)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => ref.read(Preferences.homeLayout.notifier).update(l),
-                        child: Column(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: l == ref.watch(Preferences.homeLayout) ? accent : Colors.transparent,
-                                  width: 2,
-                                ),
-                              ),
-                              child: AspectRatio(
-                                aspectRatio: .56,
-                                child: CustomPaint(painter: _HomeLayoutThumb(l, accent: accent, dark: dark)),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            label(
-                              switch (l) {
-                                HomeLayout.classic => t.avpn.homeLayoutClassic,
-                                HomeLayout.vessel => t.avpn.homeLayoutVessel,
-                                HomeLayout.pulse => t.avpn.homeLayoutPulse,
-                              },
-                              l == ref.watch(Preferences.homeLayout),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -713,6 +720,10 @@ class _HomeLayoutThumb extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     final pad = w * .07;
     final r = Radius.circular(w * .045);
+    if (layout == HomeLayout.bento || layout == HomeLayout.dots) {
+      _paintOwn(canvas, size);
+      return;
+    }
     void box(Rect rect, Paint paint) => canvas.drawRRect(RRect.fromRectAndRadius(rect, r), paint);
     var y = h * .05;
 
@@ -726,19 +737,9 @@ class _HomeLayoutThumb extends CustomPainter {
           if (i != 1) box(Rect.fromLTWH(x, y + h * .06, tw, h * .05), soft);
         }
         y += h * .14;
-      case HomeLayout.vessel:
-        final d = w * .5;
-        final c = Offset(w / 2, y + d / 2);
-        canvas.drawCircle(c, d / 2, tile);
-        canvas.save();
-        canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: d / 2)));
-        canvas.drawRect(Rect.fromLTWH(c.dx - d / 2, c.dy - d * .1, d, d * .6), water);
-        canvas.restore();
-        y += d + h * .02;
-        box(Rect.fromLTWH(pad, y, (w - pad * 2) * .48, h * .045), tile);
-        box(Rect.fromLTWH(pad + (w - pad * 2) * .52, y, (w - pad * 2) * .48, h * .045), tile);
-        y += h * .065;
       case HomeLayout.pulse:
+      case HomeLayout.bento:
+      case HomeLayout.dots:
         box(Rect.fromLTWH(pad, y, w - pad * 2, h * .15), tile);
         final p = Path()..moveTo(pad * 1.6, y + h * .1);
         for (var i = 1; i <= 8; i++) {
@@ -765,19 +766,21 @@ class _HomeLayoutThumb extends CustomPainter {
             final x = pad + i * (tw + w * .02);
             final top = y + row * (h * .15 + h * .02);
             box(Rect.fromLTWH(x, top, tw, h * .15), tile);
-            box(Rect.fromLTWH(x, top + h * .15 * (row == 1 && i == 2 ? .6 : .35), tw, h * .15 * (row == 1 && i == 2 ? .4 : .65)), soft);
+            box(
+              Rect.fromLTWH(
+                x,
+                top + h * .15 * (row == 1 && i == 2 ? .6 : .35),
+                tw,
+                h * .15 * (row == 1 && i == 2 ? .4 : .65),
+              ),
+              soft,
+            );
           }
         }
         y += h * .32;
-      case HomeLayout.vessel:
-        box(Rect.fromLTWH(pad, y, w - pad * 2, h * .17), tile);
-        for (var i = 0; i < 6; i++) {
-          final bh = h * (.05 + ((i * 5) % 7) * .012);
-          final x = pad * 1.6 + i * ((w - pad * 3.2) / 6) + w * .012;
-          box(Rect.fromLTWH(x, y + h * .15 - bh, w * .035, bh), water);
-        }
-        y += h * .19;
       case HomeLayout.pulse:
+      case HomeLayout.bento:
+      case HomeLayout.dots:
         final tw = (w - pad * 2 - w * .04) / 3;
         for (var row = 0; row < 2; row++) {
           for (var i = 0; i < 3; i++) {
@@ -804,6 +807,102 @@ class _HomeLayoutThumb extends CustomPainter {
     );
     canvas.drawRRect(panel, Paint()..color = dark ? const Color(0xFF0B0C0E) : Colors.white);
     box(Rect.fromCenter(center: Offset(w / 2, h * .905), width: w * .2, height: h * .06), water);
+  }
+
+  /// Bento: a bright hero tile, two tiles under it (one orange), the server, the sites' grid, the connect tile.
+  /// Dots: dotted paper, a matrix figure, bars, ruled lines and the black disc with its red dot.
+  void _paintOwn(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final pad = w * .07;
+    final screen = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(w * .1));
+    if (layout == HomeLayout.bento) {
+      canvas.drawRRect(screen, Paint()..color = dark ? const Color(0xFF0E0E10) : const Color(0xFFF2F2F5));
+      final tile = Paint()..color = dark ? const Color(0xFF2A2A2F) : Colors.white;
+      void box(Rect rect, Paint paint, [double k = .07]) =>
+          canvas.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(w * k)), paint);
+      final inner = w - pad * 2;
+      box(Rect.fromLTWH(pad, h * .05, inner, h * .2), Paint()..color = accent);
+      box(Rect.fromLTWH(pad, h * .27, inner * .48, h * .11), tile);
+      box(Rect.fromLTWH(pad + inner * .52, h * .27, inner * .48, h * .11), Paint()..color = const Color(0xFFFF6B3D));
+      box(Rect.fromLTWH(pad, h * .4, inner, h * .07), tile);
+      box(Rect.fromLTWH(pad, h * .49, inner, h * .2), tile);
+      final cw = (inner - w * .08) / 3;
+      for (var row = 0; row < 2; row++) {
+        for (var i = 0; i < 3; i++) {
+          box(
+            Rect.fromLTWH(pad + w * .02 + i * (cw + w * .02), h * (.51 + row * .085), cw, h * .075),
+            Paint()..color = dark ? const Color(0xFF3A3A40) : const Color(0xFFF0F0F2),
+            .04,
+          );
+        }
+      }
+      box(Rect.fromLTWH(pad, h * .71, inner, h * .07), tile);
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(0, h * .86, w, h * .14),
+          topLeft: Radius.circular(w * .1),
+          topRight: Radius.circular(w * .1),
+        ),
+        Paint()..color = dark ? const Color(0xFF1A1A1E) : Colors.white,
+      );
+      box(
+        Rect.fromCenter(center: Offset(w / 2, h * .91), width: w * .26, height: h * .065),
+        Paint()..color = accent,
+        .05,
+      );
+      return;
+    }
+    final paper = dark ? const Color(0xFF151515) : const Color(0xFFEAE9E5);
+    final ink = dark ? const Color(0xFFEDEDE8) : const Color(0xFF111111);
+    final faint = dark ? const Color(0xFF2C2C2C) : const Color(0xFFCDCCC7);
+    canvas.drawRRect(screen, Paint()..color = paper);
+    canvas.save();
+    canvas.clipRRect(screen);
+    final dot = Paint()..color = faint;
+    for (var y = w * .04; y < h; y += w * .05) {
+      for (var x = w * .04; x < w; x += w * .05) {
+        canvas.drawCircle(Offset(x, y), w * .006, dot);
+      }
+    }
+    canvas.restore();
+    // the figure as a matrix of dots
+    final lit = Paint()..color = ink;
+    const glyph = ['111', '001', '111', '100', '111'];
+    for (var d = 0; d < 3; d++) {
+      for (var y = 0; y < 5; y++) {
+        for (var x = 0; x < 3; x++) {
+          if (glyph[y][x] == '1') {
+            canvas.drawCircle(Offset(w * (.27 + d * .17 + x * .045), h * (.08 + y * .025)), w * .018, lit);
+          }
+        }
+      }
+    }
+    for (var i = 0; i < 12; i++) {
+      final bh = h * (.03 + ((i * 5) % 7) * .006 + (i == 7 ? .03 : 0));
+      canvas.drawRect(
+        Rect.fromLTWH(pad + i * (w - pad * 2) / 12, h * .3 - bh, w * .05, bh),
+        Paint()..color = i == 7 ? const Color(0xFFE8231C) : ink,
+      );
+    }
+    final rule = Paint()
+      ..color = ink
+      ..strokeWidth = w * .008;
+    for (final y in [.33, .5, .72]) {
+      canvas.drawLine(Offset(pad, h * y), Offset(w - pad, h * y), rule);
+    }
+    final text = Paint()..color = ink.withValues(alpha: .55);
+    for (var i = 0; i < 6; i++) {
+      final y = h * (.37 + i * .055);
+      canvas.drawRect(Rect.fromLTWH(pad, y, w * .35, h * .012), text);
+      canvas.drawRect(
+        Rect.fromLTWH(w - pad - w * .12, y, w * .12, h * .012),
+        i == 2 ? (Paint()..color = const Color(0xFFE8231C)) : lit,
+      );
+    }
+    canvas.drawLine(Offset(0, h * .86), Offset(w, h * .86), rule);
+    canvas.drawCircle(Offset(w / 2, h * .925), w * .09, lit);
+    canvas.drawCircle(Offset(w / 2, h * .925), w * .022, Paint()..color = const Color(0xFFE8231C));
   }
 
   @override

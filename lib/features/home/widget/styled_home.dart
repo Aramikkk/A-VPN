@@ -110,7 +110,7 @@ class _StyledHome extends HookConsumerWidget {
             ? _SiteTiles(visible: visible, compact: true, oneRow: true)
             : null,
         // the vessel and the pulse keep the sites small
-        compactTraffic: layout == HomeLayout.vessel || layout == HomeLayout.pulse,
+        compactTraffic: layout != HomeLayout.classic,
         servers: hasList
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -185,9 +185,10 @@ class _StyledHome extends HookConsumerWidget {
                   : null)
             : (traffic && hasList
                   ? switch (layout) {
-                      HomeLayout.vessel => const _SiteBars(),
                       HomeLayout.pulse => _SiteTiles(visible: visible, compact: true),
                       HomeLayout.classic => _SiteTiles(visible: visible),
+                      HomeLayout.bento => const _SiteBento(),
+                      HomeLayout.dots => const _SiteDots(),
                     }
                   : null),
         toggles: superLight ? null : const _ConnectionsBlock(),
@@ -382,18 +383,28 @@ class _StatusBlock extends HookConsumerWidget {
       final speedLevelNow = connected
           ? _speedLevel(math.max(stats?.downlink.toInt() ?? 0, stats?.uplink.toInt() ?? 0))
           : 0.0;
-      if (layout == HomeLayout.vessel) {
-        return _VesselStats(
+      if (layout == HomeLayout.bento) {
+        return _BentoStats(
           connected: connected,
           timeText: timeFigure,
           ping: quality.ping,
-          loss: quality.loss,
           down: downFigure,
           up: upFigure,
           vpn: vpn,
           direct: direct,
           vpnShare: total == 0 ? 0 : vpnShare,
-          speedLevel: speedLevelNow,
+          slim: slim,
+        );
+      }
+      if (layout == HomeLayout.dots) {
+        return _DotsStats(
+          connected: connected,
+          timeText: timeFigure,
+          ping: quality.ping,
+          down: downFigure,
+          up: upFigure,
+          vpn: vpn,
+          direct: direct,
           slim: slim,
         );
       }
@@ -1048,6 +1059,7 @@ class _GraphiteDock extends HookConsumerWidget {
                             fontWeight: FontWeight.w900,
                             height: 1,
                             fontSize: sideFigure,
+                            fontFamily: homeLookNow == HomeLayout.dots ? 'JetBrains Mono' : null,
                             color: contrastOn && measured && !busy ? gaugeInk : null,
                           ),
                         ),
@@ -1424,6 +1436,13 @@ class _Orb extends StatelessWidget {
         networkLabel: networkLabel,
         actualMobile: actualMobile,
       );
+    }
+    // Bento and Dots: their own connect control
+    if (homeLookNow == HomeLayout.bento) {
+      return _BentoButton(on: on, busy: busy, size: size, label: networkLabel, onTap: onTap);
+    }
+    if (homeLookNow == HomeLayout.dots) {
+      return _DotsButton(on: on, busy: busy, size: size, label: networkLabel, onTap: onTap);
     }
     return _WaterButton(
       on: on,
@@ -2129,8 +2148,10 @@ class ContrastShellDock extends HookConsumerWidget {
             decoration: BoxDecoration(
               color: contrastPanelColor(dark),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              border: dark ? Border(top: BorderSide(color: Colors.white.withValues(alpha: .08))) : null,
-              boxShadow: dark
+              border: homeLookNow == HomeLayout.dots
+                  ? Border(top: BorderSide(color: _Dots.ink(dark).withValues(alpha: .7)))
+                  : (dark ? Border(top: BorderSide(color: Colors.white.withValues(alpha: .08))) : null),
+              boxShadow: dark || homeLookNow == HomeLayout.dots
                   ? null
                   : [
                       BoxShadow(
@@ -2198,9 +2219,24 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
         ),
       );
     }
-    final layout = ref.watch(contrastBackdropLayoutProvider);
     // the settings not read yet (the first frames): the defaults
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
+    // Bento and Dots: a backdrop of their own (a plain page, dotted paper)
+    final look = ready && !ref.watch(superLightProvider) ? ref.watch(Preferences.homeLayout) : HomeLayout.classic;
+    homeLookNow = look;
+    final own = lookBackdrop(look, brightness == Brightness.dark);
+    if (own != null) {
+      return _GlowAnchor(
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Positioned.fill(child: RepaintBoundary(child: own)),
+            widget.child,
+          ],
+        ),
+      );
+    }
+    final layout = ref.watch(contrastBackdropLayoutProvider);
     final (warm, cool) = palette.backdrop(brightness);
     final area = contrastImageArea(MediaQuery.sizeOf(context));
     // the picture at the screen's sharpness, two pixels a point at most (blurrier lines aren't seen, memory is)
@@ -2251,7 +2287,8 @@ class _ContrastBlock extends StatelessWidget {
   final bool expand;
 
   @override
-  Widget build(BuildContext context) => ContrastFrost(child: child);
+  // Bento and Dots draw their own tiles and paper: no frosted pane round them
+  Widget build(BuildContext context) => _bareLayout(_homeLayoutOf(context)) ? child : ContrastFrost(child: child);
 }
 
 /// Contrast's frosted glass: the backdrop behind it blurred, a light tint and a bright edge. The blur is the
@@ -2276,6 +2313,16 @@ class ContrastFrost extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    // Bento and Dots: their own cards (a solid tile, an outlined box on the paper)
+    final lookReady = ref.watch(sharedPreferencesProvider).hasValue && !ref.watch(superLightProvider);
+    final card = lookCard(
+      lookReady ? ref.watch(Preferences.homeLayout) : HomeLayout.classic,
+      dark,
+      child: child,
+      padding: padding,
+      radius: radius,
+    );
+    if (card != null) return card;
     // how see-through, as chosen in Settings → Themes
     final clarity = ref.watch(sharedPreferencesProvider).hasValue
         ? ref.watch(Preferences.contrastClarity)
@@ -2561,7 +2608,11 @@ class _SeamTab extends StatelessWidget {
 }
 
 /// Contrast's panel: pure white by day, pure black by night.
-Color contrastPanelColor(bool dark) => dark ? Colors.black : Colors.white;
+Color contrastPanelColor(bool dark) => switch (homeLookNow) {
+  HomeLayout.bento => dark ? const Color(0xFF1A1A1E) : Colors.white,
+  HomeLayout.dots => _Dots.paper(dark),
+  _ => dark ? Colors.black : Colors.white,
+};
 
 /// The look Contrast's panel is drawn in: by night light text on black, the accent lifted to read on it; by day
 /// the page's own look on white.
@@ -2669,6 +2720,34 @@ class _ContrastRow extends StatelessWidget {
     final note = nowOn == null ? null : RegExp(r'\s*\(([^()]*)\)').firstMatch(nowOn);
     final country = note == null ? nowOn : nowOn!.replaceRange(note.start, note.end, '').trim();
     final titleStyle = theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, color: ink);
+    final look = _homeLayoutOf(context);
+    if (look == HomeLayout.bento || look == HomeLayout.dots) {
+      final nameText = group ? (country ?? subtitle) : title;
+      final caption = group ? title : subtitle;
+      return look == HomeLayout.bento
+          ? _bentoServerRow(
+              context,
+              flag: flag,
+              group: group,
+              name: nameText,
+              caption: caption,
+              ms: ms,
+              measured: delay > 0 && delay <= 65000,
+              selected: selected,
+              testing: testing,
+              onTap: onTap,
+            )
+          : _dotsServerRow(
+              context,
+              flag: flag,
+              group: group,
+              name: nameText,
+              caption: caption,
+              ms: ms,
+              testing: testing,
+              onTap: onTap,
+            );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
@@ -4061,6 +4140,21 @@ class _ConnectionsBlock extends ConsumerWidget {
         case ConnectionRoute.block:
           blocked += c.count;
       }
+    }
+    // the flask's look: the figure large and thin, the VPN's share against the bypass as a split line
+    final look = ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
+    if (look == HomeLayout.bento || look == HomeLayout.dots) {
+      return Semantics(
+        key: const ValueKey('connections-block'),
+        button: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => showGlassPopup(context, const _ConnectionsDetails()),
+          child: look == HomeLayout.bento
+              ? _bentoConnections(context, t, open: open.length, vpn: vpn, direct: direct)
+              : _dotsConnections(context, t, open: open.length, vpn: vpn, direct: direct),
+        ),
+      );
     }
     Widget part(Color color, int n, String label) => Padding(
       padding: const EdgeInsets.only(right: 12),

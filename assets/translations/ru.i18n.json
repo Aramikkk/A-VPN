@@ -145,6 +145,8 @@
     "fontScaleLabel": "Размер шрифта",
     "scaleReset": "Сбросить",
     "dockLossLabel": "потери",
+    "homeLayoutBento": "Бенто",
+    "homeLayoutDots": "Точки",
     "profilePriorityOff": "Снять приоритет",
     "modesTitle": "Режимы",
     "modesHint": "Раздача, Глобально, Сервер",

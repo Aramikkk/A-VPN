@@ -63,6 +63,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 part 'styled_home.dart';
 part 'home_layouts.dart';
+part 'home_styles.dart';
 
 final _actualNetworkKind = ValueNotifier<NetworkKind>(NetworkKind.unknown);
 

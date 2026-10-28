@@ -3,11 +3,19 @@ enum HomeLayout {
   /// the three tiles on top, the servers, the sites' tiles
   classic,
 
-  /// a big vessel of water for the connection's quality, the sites as a row of bars
-  vessel,
-
   /// the ping's live graph, the sites' tiles with a pulse of their own behind them
-  pulse;
+  pulse,
 
-  static HomeLayout fromName(String? name) => values.firstWhere((e) => e.name == name, orElse: () => classic);
+  /// solid tiles of different sizes, as a phone's widgets, one bright hero tile
+  bento,
+
+  /// dotted paper, figures of dots, a monospaced face, black with one red
+  dots;
+
+  /// in the order the picker shows them
+  static const shown = [bento, dots, classic, pulse];
+
+  // the vessel (1.0.4x–1.0.57) is gone: Bento in its place
+  static HomeLayout fromName(String? name) =>
+      name == 'vessel' ? bento : values.firstWhere((e) => e.name == name, orElse: () => classic);
 }
