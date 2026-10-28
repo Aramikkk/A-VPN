@@ -4015,15 +4015,18 @@ class _ConnectionsBlock extends ConsumerWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: () => showGlassPopup(context, const _ConnectionsDetails()),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          // in the middle of the block: the sign, the number, then the description a good way off it
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.swap_vert_rounded, size: 26, color: theme.araIcon),
-              const Gap(10),
+              const Gap(12),
               Text('${open.length}', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-              const Gap(8),
-              Expanded(
+              const Gap(20),
+              Flexible(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -4043,7 +4046,6 @@ class _ConnectionsBlock extends ConsumerWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
             ],
           ),
         ),
