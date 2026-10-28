@@ -1856,11 +1856,15 @@ bool _lookLine(
 }) {
   switch (homeLookNow) {
     case HomeLayout.dots:
-      final dot = Paint()..color = colour.withValues(alpha: (live ? 1 : .45) * alpha);
-      final r = live ? 1.6 : 1.1;
-      for (var d = 0.0; d < metric.length; d += 6) {
-        canvas.drawCircle(metric.getTangentForOffset(d)!.position, r, dot);
-      }
+      // the dots in one call, their places kept for the line (it is drawn at every frame while the dots run)
+      canvas.drawPoints(
+        ui.PointMode.points,
+        _dotsAlong(metric),
+        Paint()
+          ..color = colour.withValues(alpha: (live ? 1 : .45) * alpha)
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = live ? 3.2 : 2.2,
+      );
       final head = metric.getTangentForOffset(metric.length * at)!.position;
       canvas.drawRect(
         Rect.fromCenter(center: head, width: 7, height: 7),
@@ -1885,6 +1889,20 @@ bool _lookLine(
     default:
       return false;
   }
+}
+
+/// The places of the dots along a line, every 6 points; kept by the line's ends and length (the same line at every
+/// frame gives the same list instead of sampling it again).
+final _dotPlaces = <String, List<Offset>>{};
+
+List<Offset> _dotsAlong(ui.PathMetric metric) {
+  final a = metric.getTangentForOffset(0)!.position;
+  final b = metric.getTangentForOffset(metric.length)!.position;
+  final key = '${a.dx.round()},${a.dy.round()},${b.dx.round()},${b.dy.round()},${metric.length.round()}';
+  final kept = _dotPlaces[key];
+  if (kept != null) return kept;
+  if (_dotPlaces.length > 600) _dotPlaces.clear();
+  return _dotPlaces[key] = [for (var d = 0.0; d < metric.length; d += 6) metric.getTangentForOffset(d)!.position];
 }
 
 class _TopDownPainter extends CustomPainter {

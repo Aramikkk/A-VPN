@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -275,10 +276,8 @@ class SideBarStatsOverview extends ConsumerWidget {
       final dark = theme.brightness == Brightness.dark;
       final ink = scheme.onSurface;
       final muted = scheme.onSurfaceVariant;
-      Widget pane({required Widget child, EdgeInsets padding = const EdgeInsets.all(10)}) => Container(
-        padding: padding,
-        child: child,
-      );
+      Widget pane({required Widget child, EdgeInsets padding = const EdgeInsets.all(10)}) =>
+          Container(padding: padding, child: child);
       // as dense as the other pages' cards (solo), not the lighter home block that has tiles of its own inside
       Widget block(Widget child) => ContrastFrost(solo: true, child: child);
       final contrastGraph = _SlidingGraph(
@@ -289,7 +288,10 @@ class SideBarStatsOverview extends ConsumerWidget {
           slide: slide,
           color: ink,
           downColor: accent,
-          upColor: dark ? const Color(0xFF9FB4C7) : const Color(0xFF6F8BA3),
+          // Dots: the upload in the paper's grey, not blue
+          upColor: homeLookNow == HomeLayout.dots
+              ? (dark ? const Color(0xFF9A9A95) : const Color(0xFF6A6A66))
+              : (dark ? const Color(0xFF9FB4C7) : const Color(0xFF6F8BA3)),
           label: (value, top) => size(value) + t.avpn.perSecond,
           detailed: true,
           textStyle: theme.textTheme.labelSmall!.copyWith(color: muted, fontSize: 10),
@@ -841,6 +843,40 @@ class _SpeedGraph extends CustomPainter {
     void series(List<int> values, Color c, double width, double fill) {
       final points = [for (var i = 0; i < values.length; i++) point(i, values[i])];
       final line = _smooth(points);
+      // Dots: the line as a row of dots, no fill under it
+      if (homeLookNow == HomeLayout.dots) {
+        for (final metric in line.computeMetrics()) {
+          canvas.drawPoints(
+            ui.PointMode.points,
+            [for (var d = 0.0; d < metric.length; d += 5) metric.getTangentForOffset(d)!.position],
+            Paint()
+              ..color = c
+              ..strokeCap = StrokeCap.round
+              ..strokeWidth = width + 1.2,
+          );
+        }
+        return;
+      }
+      // Bento: a solid area under a thick line
+      if (homeLookNow == HomeLayout.bento) {
+        canvas.drawPath(
+          Path.from(line)
+            ..lineTo(points.last.dx, chart.height)
+            ..lineTo(points.first.dx, chart.height)
+            ..close(),
+          Paint()..color = c.withValues(alpha: fill * .55),
+        );
+        canvas.drawPath(
+          line,
+          Paint()
+            ..color = c
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = width * 1.8
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round,
+        );
+        return;
+      }
       final area = Path.from(line)
         ..lineTo(points.last.dx, chart.height)
         ..lineTo(points.first.dx, chart.height)
@@ -873,8 +909,22 @@ class _SpeedGraph extends CustomPainter {
     series([for (final s in samples) s.down], downColor, 2.2, .6);
 
     // now: both values marked
-    canvas.drawCircle(point(samples.length - 1, samples.last.up), 3, Paint()..color = upColor);
-    canvas.drawCircle(point(samples.length - 1, samples.last.down), 3.8, Paint()..color = downColor);
+    final upNow = point(samples.length - 1, samples.last.up);
+    final downNow = point(samples.length - 1, samples.last.down);
+    switch (homeLookNow) {
+      // Dots: square marks
+      case HomeLayout.dots:
+        canvas.drawRect(Rect.fromCenter(center: upNow, width: 6, height: 6), Paint()..color = upColor);
+        canvas.drawRect(Rect.fromCenter(center: downNow, width: 8, height: 8), Paint()..color = downColor);
+      // Bento: big round marks with a white middle
+      case HomeLayout.bento:
+        canvas.drawCircle(upNow, 4.5, Paint()..color = upColor);
+        canvas.drawCircle(downNow, 6, Paint()..color = downColor);
+        canvas.drawCircle(downNow, 2.2, Paint()..color = Colors.white);
+      default:
+        canvas.drawCircle(upNow, 3, Paint()..color = upColor);
+        canvas.drawCircle(downNow, 3.8, Paint()..color = downColor);
+    }
   }
 
   @override
@@ -1168,17 +1218,20 @@ class _RangePicker extends ConsumerWidget {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => ref.read(statsRangeProvider.notifier).range = r,
+              // Bento and Dots: their own pills (a solid chip, an inked box)
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                decoration: BoxDecoration(
-                  color: r == range ? color.withValues(alpha: .16) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(99),
-                  border: Border.all(
-                    color: color.withValues(alpha: r == range ? .5 : (theme.araLook.neonFill != null ? .4 : .18)),
-                  ),
-                ),
+                decoration:
+                    lookPill(homeLookNow, context, on: r == range)?.box ??
+                    BoxDecoration(
+                      color: r == range ? color.withValues(alpha: .16) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(
+                        color: color.withValues(alpha: r == range ? .5 : (theme.araLook.neonFill != null ? .4 : .18)),
+                      ),
+                    ),
                 child: Text(
                   short
                       ? labels[r]!
@@ -1190,7 +1243,9 @@ class _RangePicker extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.araLook.neonFill != null ? color : color.withValues(alpha: r == range ? 1 : .7),
+                    color:
+                        lookPill(homeLookNow, context, on: r == range)?.ink ??
+                        (theme.araLook.neonFill != null ? color : color.withValues(alpha: r == range ? 1 : .7)),
                     fontWeight: r == range ? FontWeight.w800 : FontWeight.w600,
                   ),
                 ),

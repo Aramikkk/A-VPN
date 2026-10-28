@@ -38,18 +38,29 @@ Widget? lookCard(
 }) => switch (look) {
   HomeLayout.bento => Container(
     padding: padding,
-    decoration: BoxDecoration(color: _Bento.tile(dark), borderRadius: BorderRadius.circular(radius)),
+    decoration: BoxDecoration(color: _Bento.tile(dark), borderRadius: BorderRadius.circular(bentoRadius)),
     child: child,
   ),
   HomeLayout.dots => Container(
     padding: padding,
     decoration: BoxDecoration(
       color: _Dots.paper(dark),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(dotsRadius),
       border: Border.all(color: _Dots.ink(dark).withValues(alpha: .28)),
     ),
     child: child,
   ),
+  _ => null,
+};
+
+/// The corner every pane of a look has: Bento's round tiles, Dots' nearly square boxes.
+const bentoRadius = 26.0;
+const dotsRadius = 6.0;
+
+/// the corner of a pane in [look] (null: the look's own as the caller has it)
+double? lookRadius(HomeLayout look) => switch (look) {
+  HomeLayout.bento => bentoRadius,
+  HomeLayout.dots => dotsRadius,
   _ => null,
 };
 
@@ -65,7 +76,7 @@ abstract final class _Bento {
   static Color inner(bool dark) => dark ? const Color(0xFF3A3A40) : const Color(0xFFF0F0F2);
   static const orange = Color(0xFFFF6B3D);
   static const orangeInk = Color(0xFF3B1608);
-  static const radius = 26.0;
+  static const radius = bentoRadius;
 
   static TextStyle figure(double size, Color colour) => TextStyle(
     fontFamily: 'Unbounded',
@@ -531,7 +542,7 @@ Widget _dotPaper(BuildContext context, Widget child, {EdgeInsets padding = const
     padding: padding,
     decoration: BoxDecoration(
       color: _Dots.paper(dark),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(dotsRadius),
       border: Border.all(color: _Dots.ink(dark).withValues(alpha: .28)),
     ),
     child: child,
@@ -547,12 +558,18 @@ class _DotGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = paper);
-    final p = Paint()..color = dot;
-    for (var y = 6.0; y < size.height; y += 10) {
-      for (var x = 6.0; x < size.width; x += 10) {
-        canvas.drawCircle(Offset(x, y), .9, p);
-      }
-    }
+    // the whole screen's dots in one call (thousands of separate circles were slow to draw)
+    canvas.drawPoints(
+      ui.PointMode.points,
+      [
+        for (var y = 6.0; y < size.height; y += 10)
+          for (var x = 6.0; x < size.width; x += 10) Offset(x, y),
+      ],
+      Paint()
+        ..color = dot
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 1.8,
+    );
   }
 
   @override
@@ -1056,6 +1073,9 @@ ThemeData lookTheme(ThemeData theme, HomeLayout look) {
         ),
         primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: 'JetBrains Mono'),
         colorScheme: theme.colorScheme.copyWith(primary: ink, onPrimary: _Dots.paper(dark)),
+        // the settings' signs and every other icon in the ink
+        iconTheme: theme.iconTheme.copyWith(color: ink),
+        listTileTheme: theme.listTileTheme.copyWith(iconColor: ink),
         chipTheme: theme.chipTheme.copyWith(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4),
@@ -1189,9 +1209,9 @@ Color? lookPopupColour(HomeLayout look, bool dark) => switch (look) {
 };
 
 ShapeBorder? lookPopupShape(HomeLayout look, bool dark) => switch (look) {
-  HomeLayout.bento => RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+  HomeLayout.bento => RoundedRectangleBorder(borderRadius: BorderRadius.circular(bentoRadius)),
   HomeLayout.dots => RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(10),
+    borderRadius: BorderRadius.circular(dotsRadius),
     side: BorderSide(color: _Dots.ink(dark).withValues(alpha: .7)),
   ),
   _ => null,
@@ -1308,10 +1328,8 @@ class LookNavBar extends StatelessWidget {
 
     return Container(
       height: 64,
-      decoration: BoxDecoration(
-        color: contrastPanelColor(dark),
-        border: bento ? null : Border(top: BorderSide(color: _Dots.ink(dark).withValues(alpha: .25))),
-      ),
+      // of a piece with the panel over it: no line between them
+      decoration: BoxDecoration(color: contrastPanelColor(dark)),
       child: SafeArea(top: false, child: Row(children: [for (var i = 0; i < destinations.length; i++) item(i)])),
     );
   }

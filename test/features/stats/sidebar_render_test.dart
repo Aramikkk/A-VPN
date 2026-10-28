@@ -241,6 +241,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      // STATSCROLL=1: the page under (the speed graph)
+      if (Platform.environment['STATSCROLL'] == '1') {
+        await tester.drag(find.byType(Scrollable).first, Offset(0, -size.height * .9));
+        await tester.pumpAndSettle();
+      }
       // (the pages go down to the graph: scrolling is allowed)
       if (Platform.environment['RENDER'] == '1') {
         await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/speed_$name.png'));

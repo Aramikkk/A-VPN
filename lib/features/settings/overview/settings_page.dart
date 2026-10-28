@@ -278,8 +278,8 @@ class _SectionGrid extends StatelessWidget {
               },
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(switch (homeLookNow) {
-                  HomeLayout.bento => 24,
-                  HomeLayout.dots => 8,
+                  HomeLayout.bento => 22,
+                  HomeLayout.dots => 6,
                   _ => 20,
                 }),
                 side: switch (homeLookNow) {

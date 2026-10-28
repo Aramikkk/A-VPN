@@ -382,7 +382,8 @@ ThemeData contrastPageTheme(ThemeData theme, [ContrastClarity clarity = Contrast
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        // Bento and Dots: their own corner
+        borderRadius: BorderRadius.circular(lookRadius(homeLookNow) ?? 20),
         side: BorderSide(color: Colors.white.withValues(alpha: dark ? .1 : .8)),
       ),
     ),
