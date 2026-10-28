@@ -57,6 +57,9 @@ class HomePage extends HookConsumerWidget {
                 ],
               ),
             ),
+            // the subscription's refresh, by the name
+            const Gap(2),
+            const ProfileRefreshButton(),
           ],
         ),
         actions: [

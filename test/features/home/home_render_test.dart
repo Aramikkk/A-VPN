@@ -343,7 +343,7 @@ void main() {
                         // Contrast: the page on its light, as the home page draws it
                         backgroundColor: contrast ? Colors.transparent : null,
                         appBar: AppBar(
-                          title: const Text('A-VPN'),
+                          title: const Row(children: [Text('A-VPN'), SizedBox(width: 2), ProfileRefreshButton()]),
                           backgroundColor: contrast ? Colors.transparent : null,
                           actions: [
                             // the modes (Sharing, Global, Server): a popup from here

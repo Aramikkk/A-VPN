@@ -421,7 +421,6 @@ class _ServersHeader extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final remote = profile is RemoteProfileEntity ? profile! as RemoteProfileEntity : null;
     final sub = remote?.subInfo;
-    final updating = remote != null && ref.watch(updateProfileNotifierProvider(remote.id)).isLoading;
     final info = [
       if (profile != null) sigmaName(profile!.name),
       if (sub != null) sub.isExpired ? t.avpn.expired : t.avpn.daysShort(days: sub.remaining.inDays),
@@ -439,38 +438,6 @@ class _ServersHeader extends ConsumerWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: label?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ),
-        // the subscription refresh, with a word so it's clear what it does
-        if (remote != null)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 6),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: updating
-                  ? null
-                  : () => ref.read(updateProfileNotifierProvider(remote.id).notifier).updateProfile(remote),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (updating)
-                      SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 1.6, color: scheme.onSurfaceVariant),
-                      )
-                    else
-                      Icon(Icons.sync_rounded, size: 15, color: scheme.onSurfaceVariant),
-                    const Gap(4),
-                    Text(
-                      t.avpn.stUpdateServers.toUpperCase(),
-                      style: label?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         const Spacer(),
@@ -4246,10 +4213,10 @@ class _HomeStats extends ConsumerWidget {
     );
 
     Widget line(IconData icon, Color colour, (String, String) value, {bool lit = false}) => Row(
-      mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: colour),
+        // the same width for every sign, so the two stand in one column
+        SizedBox(width: 24, child: Icon(icon, size: 20, color: colour)),
         const Gap(4),
         Text.rich(
           figure(value),
@@ -4268,7 +4235,11 @@ class _HomeStats extends ConsumerWidget {
     Widget pair(Widget a, Widget b) => Center(
       child: FittedBox(
         fit: BoxFit.scaleDown,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [a, const Gap(12), b]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [a, const Gap(12), b],
+        ),
       ),
     );
 
@@ -4340,4 +4311,32 @@ double _speedLevel(int bytesPerSecond) {
   const high = 10 * 1024 * 1024;
   if (bytesPerSecond <= low) return 0;
   return (math.log(bytesPerSecond / low) / math.log(high / low)).clamp(0.0, 1.0);
+}
+
+/// The subscription's refresh, by the app's name in the title bar: a sign that turns while the servers are fetched.
+class ProfileRefreshButton extends ConsumerWidget {
+  const ProfileRefreshButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final scheme = Theme.of(context).colorScheme;
+    final profile = ref.watch(activeProfileProvider).valueOrNull;
+    if (profile is! RemoteProfileEntity) return const SizedBox.shrink();
+    final updating = ref.watch(updateProfileNotifierProvider(profile.id)).isLoading;
+    return Tooltip(
+      message: t.avpn.stUpdateServers,
+      child: InkWell(
+        key: const ValueKey('profile-refresh'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: updating ? null : () => ref.read(updateProfileNotifierProvider(profile.id).notifier).updateProfile(profile),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: updating
+              ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onSurfaceVariant))
+              : Icon(Icons.sync_rounded, size: 20, color: scheme.onSurfaceVariant),
+        ),
+      ),
+    );
+  }
 }
