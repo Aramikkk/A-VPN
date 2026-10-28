@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -469,14 +470,21 @@ class _DotField extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const step = 5.0;
     final r = math.min(1.8, size.height / 2 - .4);
-    final on = Paint()..color = colour;
-    final off = Paint()..color = faint ?? Colors.transparent;
-    for (var y = step / 2; y < size.height; y += step) {
+    final lit = <Offset>[];
+    final unlit = <Offset>[];
+    final rows = size.height < step ? [size.height / 2] : [for (var y = step / 2; y < size.height; y += step) y];
+    for (final y in rows) {
       for (var x = step / 2; x < size.width; x += step) {
-        canvas.drawCircle(Offset(x, size.height < step ? size.height / 2 : y), r, x <= size.width * lit ? on : off);
+        (x <= size.width * this.lit ? lit : unlit).add(Offset(x, y));
       }
-      if (size.height < step) break;
     }
+    // the dots in two calls (one circle at a time was slow while the page scrolled)
+    Paint dots(Color c) => Paint()
+      ..color = c
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = r * 2;
+    canvas.drawPoints(ui.PointMode.points, lit, dots(colour));
+    if (faint != null && unlit.isNotEmpty) canvas.drawPoints(ui.PointMode.points, unlit, dots(faint!));
   }
 
   @override

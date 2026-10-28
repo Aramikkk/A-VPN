@@ -892,19 +892,30 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
             child: SizedBox(
               height: height,
               width: double.infinity,
-              child: CustomPaint(
-                painter: _TopDownPainter(
-                  model: _model,
-                  accent: accent,
-                  ink: scheme.onSurface,
-                  error: scheme.error,
-                  family: theme.textTheme.labelSmall?.fontFamily,
-                  pulse: _slowPulse,
-                  icons: _images,
-                  lit: _lit,
-                  halo: scheme.surfaceContainerLow,
-                  names: names,
-                ),
+              // the still picture and the running dots in two layers: the still one is drawn once and kept, only the
+              // dots' layer is drawn at every frame
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  for (final dots in const [false, true])
+                    RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _TopDownPainter(
+                          model: _model,
+                          accent: accent,
+                          ink: scheme.onSurface,
+                          error: scheme.error,
+                          family: theme.textTheme.labelSmall?.fontFamily,
+                          pulse: _slowPulse,
+                          icons: _images,
+                          lit: _lit,
+                          halo: scheme.surfaceContainerLow,
+                          names: names,
+                          dots: dots,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           );
@@ -1917,7 +1928,11 @@ class _TopDownPainter extends CustomPainter {
     required this.lit,
     required this.halo,
     required this.names,
-  }) : super(repaint: pulse);
+    this.dots = false,
+  }) : super(repaint: dots ? pulse : null);
+
+  /// only the running dots (the layer drawn at every frame); else only the still picture under them
+  final bool dots;
 
   final SankeyModel model;
   final Color accent;
@@ -2032,23 +2047,14 @@ class _TopDownPainter extends CustomPainter {
     return [Offset(x0, y0), Offset(x0, (y0 + y1) / 2), Offset(x1, (y0 + y1) / 2), Offset(x1, y1)];
   }
 
-  /// everything but the running dots, recorded once for a size: the lines, the bars, the names and the icons were
-  /// drawn again at every frame the dots moved (the page stuttered)
-  ui.Picture? _still;
-  Size? _stillSize;
-
   @override
   void paint(Canvas canvas, Size size) {
     final rowY = rows(size.height);
     if (_geoSize != size || _geo == null) _prepare(size, rowY);
-    if (_still == null || _stillSize != size) {
-      final recorder = ui.PictureRecorder();
-      _paintStill(Canvas(recorder), size, rowY);
-      _still?.dispose();
-      _still = recorder.endRecording();
-      _stillSize = size;
+    if (!dots) {
+      _paintStill(canvas, size, rowY);
+      return;
     }
-    canvas.drawPicture(_still!);
     // the dots running down the ones in use
     final picking = lit.isNotEmpty;
     for (final g in _geo!) {

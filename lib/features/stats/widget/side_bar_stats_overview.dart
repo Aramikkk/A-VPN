@@ -1284,7 +1284,8 @@ class _SlidingGraph extends HookWidget {
       if (live && samples.length > 1) controller.forward(from: 0);
       return null;
     }, [samples, live]);
-    return CustomPaint(painter: painter(live ? controller : null));
+    // the sliding lines in a layer of their own: each slide repainted the whole page
+    return RepaintBoundary(child: CustomPaint(painter: painter(live ? controller : null)));
   }
 }
 

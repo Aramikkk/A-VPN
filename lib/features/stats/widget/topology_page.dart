@@ -182,15 +182,18 @@ class TopologyPage extends HookConsumerWidget {
                                     ),
                                   )
                                 : LayoutBuilder(
-                                    builder: (context, box) => TrafficSankey(
-                                      items: openNow,
-                                      height: box.maxHeight,
-                                      // who goes where, as thick as every other route and in a fixed order; the traffic and
-                                      // the speed are written
-                                      weight: (c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble(),
-                                      value: value,
-                                      speed: byTraffic.value ? (c) => rates[c.id] ?? 0 : null,
-                                      speedValue: byTraffic.value ? speedValue : null,
+                                    // its running dots in a layer of their own: they repainted the whole page
+                                    builder: (context, box) => RepaintBoundary(
+                                      child: TrafficSankey(
+                                        items: openNow,
+                                        height: box.maxHeight,
+                                        // who goes where, as thick as every other route and in a fixed order; the traffic and
+                                        // the speed are written
+                                        weight: (c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble(),
+                                        value: value,
+                                        speed: byTraffic.value ? (c) => rates[c.id] ?? 0 : null,
+                                        speedValue: byTraffic.value ? speedValue : null,
+                                      ),
                                     ),
                                   ),
                           ),
@@ -214,7 +217,10 @@ class TopologyPage extends HookConsumerWidget {
                   ],
                   _Section(
                     title: t.avpn.topoFlow,
-                    child: TrafficStrips(items: items, weight: weight, value: value),
+                    // a layer of its own: the page scrolls without drawing the strips again
+                    child: RepaintBoundary(
+                      child: TrafficStrips(items: items, weight: weight, value: value),
+                    ),
                   ),
                   if (rules.isNotEmpty) ...[
                     const Gap(12),
