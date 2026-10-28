@@ -2070,7 +2070,7 @@ class ContrastShellDock extends HookConsumerWidget {
       child: Stack(
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             decoration: BoxDecoration(
               color: contrastPanelColor(dark),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),

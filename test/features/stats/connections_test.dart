@@ -3,6 +3,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/directories/directories_provider.dart';
+import 'package:hiddify/core/model/directories.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
+import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
@@ -372,10 +379,16 @@ void main() {
         accent: accent,
         style: AraStyle.values.byName(Platform.environment['STYLE'] ?? 'contrast'),
       );
+      // HOMELAYOUT=bento|dots: the page in that look, as the app's shell has it
+      final look = Platform.environment['HOMELAYOUT'];
+      SharedPreferences.setMockInitialValues({if (look != null) 'home_layout': look});
+      final prefs = await tester.runAsync(SharedPreferences.getInstance);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             translationsProvider.overrideWith((ref) async => t),
+            if (look != null) sharedPreferencesProvider.overrideWith((ref) async => prefs!),
+            if (look != null) appDirectoriesProvider.overrideWith(_Dirs.new),
             connectionsProvider.overrideWith(one ? _FakeOne.new : _Fake.new),
             installedAppsProvider.overrideWith((ref) async => const {}),
             shownConnectionProvider.overrideWith(_On.new),
@@ -385,6 +398,12 @@ void main() {
           ],
           child: MaterialApp(
             theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
+            builder: look == null
+                ? null
+                : (context, child) => Theme(
+                    data: contrastPageTheme(lookTheme(Theme.of(context), HomeLayout.fromName(look))),
+                    child: ContrastGlow(child: child!),
+                  ),
             home: Consumer(
               builder: (context, ref, _) =>
                   !ref.watch(translationsProvider).hasValue ? const SizedBox() : const TopologyPage(),
@@ -394,6 +413,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(CustomPaint), findsWidgets);
+      // TOPOSCROLL=1: the page under the flows (the day: the totals, the strips, the rules)
+      if (Platform.environment['TOPOSCROLL'] == '1') {
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -760));
+        await tester.pumpAndSettle();
+      }
       if (Platform.environment['RENDER'] == '1') {
         await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/$name.png'));
       }
@@ -413,4 +437,12 @@ void main() {
     expect(SeenConnection.serverName('🇸🇪 Доступ - Швеция 2'), '🇸🇪 Швеция 2');
     expect(serverFlags(['🇸🇪 Швеция · БС', '🇸🇪 Швеция 2', '🇫🇮 Финляндия']), '🇸🇪БС 🇸🇪 🇫🇮');
   });
+}
+
+class _Dirs extends AppDirectories {
+  @override
+  Future<Directories> build() async {
+    final dir = Directory.systemTemp.createTempSync('ara_topology');
+    return (baseDir: dir, workingDir: dir, tempDir: dir);
+  }
 }

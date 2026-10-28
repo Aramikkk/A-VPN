@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
@@ -207,7 +208,11 @@ class SankeyModel {
     final apps = keep((f) => f.app);
     final rules = keep(ruleKey);
     // "direct" and "blocked" are one destination each, always shown; the servers are ranked
-    final outs = keep(outKey)..addAll([for (final f in list) if (f.route != ConnectionRoute.vpn) outKey(f)]);
+    final outs = keep(outKey)
+      ..addAll([
+        for (final f in list)
+          if (f.route != ConnectionRoute.vpn) outKey(f),
+      ]);
 
     final nodes = <String, SankeyNode>{};
     SankeyNode node(String key, String label, ConnectionRoute? route, int column) =>
@@ -244,20 +249,26 @@ class SankeyModel {
       );
     }
 
-    List<SankeyNode> column(int index) =>
-        nodes.values.where((n) => n.column == index).toList()..sort((a, b) {
-          if (index > 0) {
-            final r = a.route!.index.compareTo(b.route!.index);
-            if (r != 0) return r;
-          }
-          // "other" last within its group
-          final aOther = a.key.endsWith('|');
-          final bOther = b.key.endsWith('|');
-          if (aOther != bOther) return aOther ? 1 : -1;
-          if (even) return a.label.toLowerCase().compareTo(b.label.toLowerCase());
-          return b.weight.compareTo(a.weight);
-        });
-    return SankeyModel._([column(0), column(1), column(2)], links.values.toList(), total, even ? (calm ? 22 : 44) : null, calm: calm);
+    List<SankeyNode> column(int index) => nodes.values.where((n) => n.column == index).toList()
+      ..sort((a, b) {
+        if (index > 0) {
+          final r = a.route!.index.compareTo(b.route!.index);
+          if (r != 0) return r;
+        }
+        // "other" last within its group
+        final aOther = a.key.endsWith('|');
+        final bOther = b.key.endsWith('|');
+        if (aOther != bOther) return aOther ? 1 : -1;
+        if (even) return a.label.toLowerCase().compareTo(b.label.toLowerCase());
+        return b.weight.compareTo(a.weight);
+      });
+    return SankeyModel._(
+      [column(0), column(1), column(2)],
+      links.values.toList(),
+      total,
+      even ? (calm ? 22 : 44) : null,
+      calm: calm,
+    );
   }
 
   /// Places the nodes in [height] (each column fills it, the room not taken by nodes shared between them as gaps)
@@ -481,10 +492,8 @@ class TrafficSankey extends ConsumerWidget {
       otherApp: t.avpn.connOther,
       otherRule: t.avpn.connOther,
       otherOut: t.avpn.connOther,
-      onSelect: (selection) async => showGlassPopup(
-        context,
-        SankeyDetails(selection: selection, value: value, speedValue: speedValue),
-      ),
+      onSelect: (selection) async =>
+          showGlassPopup(context, SankeyDetails(selection: selection, value: value, speedValue: speedValue)),
     );
   }
 }
@@ -609,7 +618,10 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
 
   /// 0..1 round and round: a light runs along the ribbons where traffic moves, and they breathe (stopped while
   /// nothing moves, so an idle diagram costs nothing)
-  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  );
 
   void _syncPulse() {
     final moving = _model.links.any(_movingLink);
@@ -743,7 +755,14 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
       if (best != null) {
         final l = best;
         unawaited(
-          _select(SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal)),
+          _select(
+            SankeySelection(
+              title: '${l.from.label} → ${l.to.label}',
+              route: l.route,
+              flows: l.flows,
+              total: _realTotal,
+            ),
+          ),
         );
       }
       return;
@@ -754,7 +773,12 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
       if (geometry.ribbon(_model, l).contains(at)) {
         unawaited(
           _select(
-            SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal),
+            SankeySelection(
+              title: '${l.from.label} → ${l.to.label}',
+              route: l.route,
+              flows: l.flows,
+              total: _realTotal,
+            ),
           ),
         );
         return;
@@ -808,7 +832,11 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
     }
     if (best != null) {
       final l = best;
-      unawaited(_select(SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal)));
+      unawaited(
+        _select(
+          SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal),
+        ),
+      );
     }
   }
 
@@ -834,12 +862,19 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
         headers: widget.headers,
         onNode: widget.onSelect == null
             ? null
-            : (n) => unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _realTotal))),
+            : (n) => unawaited(
+                _select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _realTotal)),
+              ),
         onLink: widget.onSelect == null
             ? null
             : (l) => unawaited(
                 _select(
-                  SankeySelection(title: '${l.from.label} → ${l.to.label}', route: l.route, flows: l.flows, total: _realTotal),
+                  SankeySelection(
+                    title: '${l.from.label} → ${l.to.label}',
+                    route: l.route,
+                    flows: l.flows,
+                    total: _realTotal,
+                  ),
                 ),
               ),
       );
@@ -922,8 +957,18 @@ bool _movingLink(SankeyLink l) => l.flows.fold<double>(0, (s, f) => s + f.speed)
 typedef _Colours = ({Color vpn, Color direct, Color block, Color app, Color ink, Color soft, Color halo});
 
 class _SankeyPainter extends CustomPainter {
-  _SankeyPainter(this.model, this.c, this.value, this.family, this.brightness, this.lit, this.headers, this.speedValue, this.pulse, this.look)
-      : super(repaint: pulse);
+  _SankeyPainter(
+    this.model,
+    this.c,
+    this.value,
+    this.family,
+    this.brightness,
+    this.lit,
+    this.headers,
+    this.speedValue,
+    this.pulse,
+    this.look,
+  ) : super(repaint: pulse);
 
   final SankeyLook look;
 
@@ -976,7 +1021,16 @@ class _SankeyPainter extends CustomPainter {
     if (kept != null) return kept;
     // a long session shows many names: start the keeping over rather than let it grow
     if (_labels.length > 600) _labels.clear();
-    return _labels[key] = _build(text, width, strong: strong, size: size, color: color, lines: lines, foreground: foreground, right: right);
+    return _labels[key] = _build(
+      text,
+      width,
+      strong: strong,
+      size: size,
+      color: color,
+      lines: lines,
+      foreground: foreground,
+      right: right,
+    );
   }
 
   TextPainter _build(
@@ -1028,7 +1082,15 @@ class _SankeyPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..color = c.halo.withValues(alpha: .9 * alpha);
     final back = _text(text, width, strong: strong, size: size, lines: lines, foreground: halo, right: right);
-    final front = _text(text, width, strong: strong, size: size, color: (color ?? c.ink).withValues(alpha: alpha), lines: lines, right: right);
+    final front = _text(
+      text,
+      width,
+      strong: strong,
+      size: size,
+      color: (color ?? c.ink).withValues(alpha: alpha),
+      lines: lines,
+      right: right,
+    );
     final dx = (right ? at.dx - front.width : at.dx).roundToDouble();
     final dy = at.dy.roundToDouble();
     back.paint(canvas, Offset(dx, dy));
@@ -1088,10 +1150,15 @@ class _SankeyPainter extends CustomPainter {
         ..moveTo(xa, l.fromY + th / 2)
         ..cubicTo((xa + xb) / 2, l.fromY + th / 2, (xa + xb) / 2, l.toY + th / 2, xb, l.toY + th / 2);
       final shaderBox = Rect.fromLTRB(xa, 0, xb, size.height);
+      // Bento and Dots: their own line and head, whatever the picture's look
+      if (_lookLine(canvas, centre.computeMetrics().first, colour, live: live, alpha: bright ? 1 : .3)) continue;
       final fill = Paint()
         ..isAntiAlias = true
         ..shader = LinearGradient(
-          colors: [from.withValues(alpha: (day ? .2 : .26) * k), colour.withValues(alpha: (day ? .5 : .58) * k)],
+          colors: [
+            from.withValues(alpha: (day ? .2 : .26) * k),
+            colour.withValues(alpha: (day ? .5 : .58) * k),
+          ],
         ).createShader(shaderBox);
       final edge = Paint()
         ..isAntiAlias = true
@@ -1144,7 +1211,10 @@ class _SankeyPainter extends CustomPainter {
               ..strokeCap = StrokeCap.round
               ..strokeWidth = live ? 2.6 : 1.6
               ..shader = LinearGradient(
-                colors: [from.withValues(alpha: (live ? .95 : .35) * (bright ? 1 : .3)), colour.withValues(alpha: (live ? 1 : .35) * (bright ? 1 : .3))],
+                colors: [
+                  from.withValues(alpha: (live ? .95 : .35) * (bright ? 1 : .3)),
+                  colour.withValues(alpha: (live ? 1 : .35) * (bright ? 1 : .3)),
+                ],
               ).createShader(shaderBox),
           );
           final metric = centre.computeMetrics().first;
@@ -1227,15 +1297,19 @@ class _SankeyPainter extends CustomPainter {
         final nameW = width - (badge == null ? 0 : 15);
         // a server: its flag alone; the direct way and a block: an icon
         final flag = ci == 2 ? flagOnly(mark.text) : null;
-        final icon = ci == 2 ? switch (n.route) {
-          ConnectionRoute.direct => Icons.trending_flat_rounded,
-          ConnectionRoute.block => Icons.block_rounded,
-          _ => null,
-        } : null;
+        final icon = ci == 2
+            ? switch (n.route) {
+                ConnectionRoute.direct => Icons.trending_flat_rounded,
+                ConnectionRoute.block => Icons.block_rounded,
+                _ => null,
+              }
+            : null;
         final shownName = flag ?? mark.text;
         final shownSize = flag != null ? 17.0 : nameSize;
         final shownLines = flag != null || icon != null ? 1 : nameLines;
-        final nameH = icon != null ? 20.0 : _text(shownName, nameW, strong: nameStrong, size: shownSize, lines: shownLines, right: ci == 0).height;
+        final nameH = icon != null
+            ? 20.0
+            : _text(shownName, nameW, strong: nameStrong, size: shownSize, lines: shownLines, right: ci == 0).height;
         final blockH = nameH + (tall ? 13 * lines : 0);
         final labelTop = n.y + n.h / 2 - blockH / 2;
         if (labelTop < lastBottom[ci] + 1) continue;
@@ -1256,18 +1330,53 @@ class _SankeyPainter extends CustomPainter {
           final glyph = TextPainter(
             text: TextSpan(
               text: String.fromCharCode(icon.codePoint),
-              style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 19, color: _route(n.route).withValues(alpha: alpha)),
+              style: TextStyle(
+                fontFamily: icon.fontFamily,
+                package: icon.fontPackage,
+                fontSize: 19,
+                color: _route(n.route).withValues(alpha: alpha),
+              ),
             ),
             textDirection: TextDirection.ltr,
           )..layout();
           glyph.paint(canvas, Offset(x, labelTop));
         } else {
-          _label(canvas, shownName, Offset(x, labelTop), nameW, right: ci == 0, strong: nameStrong, size: shownSize, lines: shownLines, alpha: alpha);
+          _label(
+            canvas,
+            shownName,
+            Offset(x, labelTop),
+            nameW,
+            right: ci == 0,
+            strong: nameStrong,
+            size: shownSize,
+            lines: shownLines,
+            alpha: alpha,
+          );
         }
         if (tall) {
-          _label(canvas, amount, Offset(x, labelTop + nameH), width, right: ci == 0, strong: false, size: 10.5, color: c.soft, alpha: alpha);
+          _label(
+            canvas,
+            amount,
+            Offset(x, labelTop + nameH),
+            width,
+            right: ci == 0,
+            strong: false,
+            size: 10.5,
+            color: c.soft,
+            alpha: alpha,
+          );
           if (lines == 2) {
-            _label(canvas, speedText!, Offset(x, labelTop + nameH + 13), width, right: ci == 0, strong: false, size: 10.5, color: c.soft, alpha: alpha);
+            _label(
+              canvas,
+              speedText!,
+              Offset(x, labelTop + nameH + 13),
+              width,
+              right: ci == 0,
+              strong: false,
+              size: 10.5,
+              color: c.soft,
+              alpha: alpha,
+            );
           }
         }
       }
@@ -1321,9 +1430,10 @@ class SankeyDetails extends ConsumerWidget {
       (t.avpn.sankeyApps, by((f) => f.app)),
       (t.avpn.sankeySites, by((f) => f.host)),
       (t.avpn.sankeyRules, by((f) => f.rule)),
-      (t.avpn.sankeyServers, {
-        for (final e in by((f) => f.route == ConnectionRoute.vpn ? f.out : '').entries) e.key: e.value,
-      }),
+      (
+        t.avpn.sankeyServers,
+        {for (final e in by((f) => f.route == ConnectionRoute.vpn ? f.out : '').entries) e.key: e.value},
+      ),
     ].where((s) => s.$2.length > 1 || (s.$2.length == 1 && s.$1 == t.avpn.sankeySites)).toList();
 
     return Padding(
@@ -1529,7 +1639,10 @@ class _ChipsView extends StatelessWidget {
           for (final l in model.links)
             (
               link: l,
-              from: Offset(xs[l.from.column] + colW[l.from.column], top(model.columns[l.from.column].indexOf(l.from)) + _ChipsLayout.chipH / 2),
+              from: Offset(
+                xs[l.from.column] + colW[l.from.column],
+                top(model.columns[l.from.column].indexOf(l.from)) + _ChipsLayout.chipH / 2,
+              ),
               to: Offset(xs[l.to.column], top(model.columns[l.to.column].indexOf(l.to)) + _ChipsLayout.chipH / 2),
               moving: l.flows.fold<double>(0, (s, f) => s + f.speed) > 512,
               on: !picking || l.flows.any(lit.contains),
@@ -1559,7 +1672,9 @@ class _ChipsView extends StatelessWidget {
                     color: scheme.surfaceContainerHighest.withValues(alpha: .55),
                     borderRadius: BorderRadius.circular(13),
                     border: Border.all(
-                      color: picking && on ? routeColour(n.route ?? ConnectionRoute.vpn).withValues(alpha: .9) : scheme.onSurface.withValues(alpha: .08),
+                      color: picking && on
+                          ? routeColour(n.route ?? ConnectionRoute.vpn).withValues(alpha: .9)
+                          : scheme.onSurface.withValues(alpha: .08),
                     ),
                   ),
                   child: Row(
@@ -1587,7 +1702,10 @@ class _ChipsView extends StatelessWidget {
                               second,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 9.5),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontSize: 9.5,
+                              ),
                             ),
                           ],
                         ),
@@ -1625,7 +1743,16 @@ class _ChipsView extends StatelessWidget {
                 Positioned.fill(
                   child: CustomPaint(
                     painter: _ChipLines(
-                      [for (final line in lines) (from: line.from, to: line.to, colour: routeColour(line.link.route), moving: line.moving, on: line.on)],
+                      [
+                        for (final line in lines)
+                          (
+                            from: line.from,
+                            to: line.to,
+                            colour: routeColour(line.link.route),
+                            moving: line.moving,
+                            on: line.on,
+                          ),
+                      ],
                       scheme.onSurface,
                       accent,
                     ),
@@ -1716,6 +1843,50 @@ class _ChipLines extends CustomPainter {
 /// The picture from the top to the bottom, for a narrow screen (the folded phone): the apps in a row at the top (their
 /// icons), the sites in a row in the middle (their names written upright), the servers in a row at the bottom (their
 /// flags); a thin line for each route with an arrowhead pointing down, and dots running down the ones in use.
+/// A flow's line in a look that has its own, with its head [at] the share of the way: Dots a row of dots (bigger ones
+/// for a flow in use) and a small square head; Bento a thick round line and a round head. False for the other looks
+/// (the caller draws its own line).
+bool _lookLine(
+  Canvas canvas,
+  ui.PathMetric metric,
+  Color colour, {
+  required bool live,
+  required double alpha,
+  double at = .62,
+}) {
+  switch (homeLookNow) {
+    case HomeLayout.dots:
+      final dot = Paint()..color = colour.withValues(alpha: (live ? 1 : .45) * alpha);
+      final r = live ? 1.6 : 1.1;
+      for (var d = 0.0; d < metric.length; d += 6) {
+        canvas.drawCircle(metric.getTangentForOffset(d)!.position, r, dot);
+      }
+      final head = metric.getTangentForOffset(metric.length * at)!.position;
+      canvas.drawRect(
+        Rect.fromCenter(center: head, width: 7, height: 7),
+        Paint()..color = colour.withValues(alpha: (live ? 1 : .55) * alpha),
+      );
+      return true;
+    case HomeLayout.bento:
+      final path = metric.extractPath(0, metric.length);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = live ? 5 : 2.6
+          ..color = colour.withValues(alpha: (live ? 1 : .35) * alpha),
+      );
+      final head = metric.getTangentForOffset(metric.length * at)!.position;
+      canvas.drawCircle(head, live ? 5.5 : 4, Paint()..color = colour.withValues(alpha: (live ? 1 : .55) * alpha));
+      if (live) canvas.drawCircle(head, 2, Paint()..color = Colors.white.withValues(alpha: .9 * alpha));
+      return true;
+    default:
+      return false;
+  }
+}
+
 class _TopDownPainter extends CustomPainter {
   _TopDownPainter({
     required this.model,
@@ -1815,7 +1986,14 @@ class _TopDownPainter extends CustomPainter {
             ..lineTo(p2.dx + 6 * math.cos(ang + 2.5), p2.dy + 6 * math.sin(ang + 2.5))
             ..lineTo(p2.dx + 6 * math.cos(ang - 2.5), p2.dy + 6 * math.sin(ang - 2.5))
             ..close();
-          return (link: l, live: l.flows.any((f) => f.live), path: path, metric: metric, head: head, colour: colourOf(l.route));
+          return (
+            link: l,
+            live: l.flows.any((f) => f.live),
+            path: path,
+            metric: metric,
+            head: head,
+            colour: colourOf(l.route),
+          );
         }(),
     ];
     _geoSize = size;
@@ -1856,6 +2034,20 @@ class _TopDownPainter extends CustomPainter {
       final bright = on(l.flows);
       final colour = g.colour;
       final k = bright ? 1.0 : .25;
+      // Bento and Dots: their own line and head
+      if (_lookLine(canvas, g.metric, colour, live: live, alpha: k)) {
+        if (live && bright && _moving(l)) {
+          final dot = Paint()..color = colour;
+          for (var d = 0; d < 3; d++) {
+            final at = ((pulse.value + d / 3) % 1.0) * g.metric.length;
+            final p = g.metric.getTangentForOffset(at)!.position;
+            homeLookNow == HomeLayout.dots
+                ? canvas.drawRect(Rect.fromCenter(center: p, width: 6, height: 6), dot)
+                : canvas.drawCircle(p, 3.5, dot);
+          }
+        }
+        continue;
+      }
       canvas.drawPath(
         g.path,
         Paint()
@@ -1920,7 +2112,12 @@ class _TopDownPainter extends CustomPainter {
           final p = TextPainter(
             text: TextSpan(
               text: name,
-              style: TextStyle(fontFamily: family, fontSize: 11.5, fontWeight: FontWeight.w600, color: ink.withValues(alpha: math.max(alpha, .5))),
+              style: TextStyle(
+                fontFamily: family,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: ink.withValues(alpha: math.max(alpha, .5)),
+              ),
             ),
             textDirection: TextDirection.ltr,
             maxLines: 1,
@@ -1945,13 +2142,24 @@ class _TopDownPainter extends CustomPainter {
             final glyph = TextPainter(
               text: TextSpan(
                 text: String.fromCharCode(icon.codePoint),
-                style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 20, color: colourOf(n.route).withValues(alpha: alpha)),
+                style: TextStyle(
+                  fontFamily: icon.fontFamily,
+                  package: icon.fontPackage,
+                  fontSize: 20,
+                  color: colourOf(n.route).withValues(alpha: alpha),
+                ),
               ),
               textDirection: TextDirection.ltr,
             )..layout();
             glyph.paint(canvas, Offset(cx - glyph.width / 2, top));
           } else {
-            final p = _text(flag ?? label, flag != null ? 20 : 11, ink.withValues(alpha: alpha), bold: flag == null, width: 70);
+            final p = _text(
+              flag ?? label,
+              flag != null ? 20 : 11,
+              ink.withValues(alpha: alpha),
+              bold: flag == null,
+              width: 70,
+            );
             p.paint(canvas, Offset(cx - p.width / 2, top));
             // a whitelist ("БС", LTE only) server: a faint square frame round its flag, to tell it from the others
             if (flag != null && ServerRegionFilter.isMobileOnly(label)) {
@@ -2004,7 +2212,13 @@ class _TopDownPainter extends CustomPainter {
       ),
     );
     final front = make(
-      TextStyle(fontFamily: family, fontSize: 12, fontWeight: FontWeight.w800, height: 1.1, color: ink.withValues(alpha: math.max(alpha, .5))),
+      TextStyle(
+        fontFamily: family,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        height: 1.1,
+        color: ink.withValues(alpha: math.max(alpha, .5)),
+      ),
     );
     // kept inside the picture: a name at either end doesn't run out of it
     final at = Offset((cx - w / 2).clamp(0.0, math.max(0.0, canvasWidth - w)), bottom - front.height);

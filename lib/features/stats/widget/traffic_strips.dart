@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart' show homeLookNow;
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -182,14 +186,21 @@ class _StripMap extends ConsumerWidget {
         if (headers) ...[header, Gap(compact ? 4 : 6)],
         // the strip itself: each app as wide as its traffic, its name inside when there is room
         ClipRRect(
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(switch (homeLookNow) {
+            HomeLayout.dots => 2,
+            HomeLayout.bento => 14,
+            _ => 9,
+          }),
           child: Container(
             // the strip's track: an empty strip keeps its place on the home screen
-            color: base.withValues(alpha: .12),
-            height: compact ? 24 : 34,
+            color: homeLookNow == HomeLayout.dots
+                ? null
+                : base.withValues(alpha: homeLookNow == HomeLayout.bento ? .08 : .12),
+            height: compact ? 24 : (homeLookNow == HomeLayout.bento ? 40 : 34),
             child: LayoutBuilder(
               builder: (context, box) {
-                final gaps = (pieces.length - 1) * 2.0;
+                final gap = homeLookNow == HomeLayout.bento ? 4.0 : 2.0;
+                final gaps = (pieces.length - 1) * gap;
                 final room = box.maxWidth - gaps;
                 // every piece at least a sliver, the rest shared by traffic
                 const least = 4.0;
@@ -197,24 +208,33 @@ class _StripMap extends ConsumerWidget {
                 return Row(
                   children: [
                     for (final (i, piece) in pieces.indexed) ...[
-                      if (i > 0) const SizedBox(width: 2),
-                      Container(
-                        width: least + (strip.weight == 0 ? 0 : spare * piece.weight / strip.weight),
-                        color: shade(i),
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: least + spare * piece.weight / (strip.weight == 0 ? 1 : strip.weight) > 56
-                            ? Text(
-                                appName(piece.app),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: ink(shade(i)),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              )
-                            : null,
-                      ),
+                      if (i > 0) SizedBox(width: gap),
+                      if (homeLookNow == HomeLayout.dots)
+                        SizedBox(
+                          width: least + (strip.weight == 0 ? 0 : spare * piece.weight / strip.weight),
+                          child: CustomPaint(painter: _DotField(shade(i)), child: const SizedBox.expand()),
+                        )
+                      else
+                        Container(
+                          width: least + (strip.weight == 0 ? 0 : spare * piece.weight / strip.weight),
+                          decoration: BoxDecoration(
+                            color: shade(i),
+                            borderRadius: homeLookNow == HomeLayout.bento ? BorderRadius.circular(10) : null,
+                          ),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: least + spare * piece.weight / (strip.weight == 0 ? 1 : strip.weight) > 56
+                              ? Text(
+                                  appName(piece.app),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: ink(shade(i)),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                )
+                              : null,
+                        ),
                     ],
                   ],
                 );
@@ -242,7 +262,10 @@ class _StripMap extends ConsumerWidget {
                                 Container(
                                   width: 10,
                                   height: 10,
-                                  decoration: BoxDecoration(color: shade(i), borderRadius: BorderRadius.circular(3)),
+                                  decoration: BoxDecoration(
+                                    color: shade(i),
+                                    borderRadius: BorderRadius.circular(_markRadius),
+                                  ),
                                 ),
                                 const Gap(5),
                                 Flexible(
@@ -274,7 +297,7 @@ class _StripMap extends ConsumerWidget {
                     Container(
                       width: 10,
                       height: 10,
-                      decoration: BoxDecoration(color: shade(i), borderRadius: BorderRadius.circular(3)),
+                      decoration: BoxDecoration(color: shade(i), borderRadius: BorderRadius.circular(_markRadius)),
                     ),
                     const Gap(5),
                     ConstrainedBox(
@@ -340,15 +363,24 @@ class TrafficRanking extends StatelessWidget {
             ],
           ),
           const Gap(5),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: top <= 0 ? 0 : w / top,
-              minHeight: 6,
-              color: colour,
-              backgroundColor: scheme.surfaceContainerHighest,
+          if (homeLookNow == HomeLayout.dots)
+            // Dots: the bar as a row of dots, lit up to its share
+            SizedBox(
+              height: 6,
+              child: CustomPaint(
+                painter: _DotField(colour, lit: top <= 0 ? 0 : w / top, faint: scheme.onSurface.withValues(alpha: .15)),
+              ),
+            )
+          else
+            ClipRRect(
+              borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.bento ? 5 : 4),
+              child: LinearProgressIndicator(
+                value: top <= 0 ? 0 : w / top,
+                minHeight: homeLookNow == HomeLayout.bento ? 10 : 6,
+                color: colour,
+                backgroundColor: scheme.surfaceContainerHighest,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -416,4 +448,37 @@ class TrafficPlaceholder extends StatelessWidget {
       ],
     );
   }
+}
+
+/// a mark's corners in the legend: Dots square, Bento round, the others slightly rounded
+double get _markRadius => switch (homeLookNow) {
+  HomeLayout.dots => 0,
+  HomeLayout.bento => 5,
+  _ => 3,
+};
+
+/// A field of dots in [colour] (Dots' strips and bars): the first [lit] share lit, the rest in [faint].
+class _DotField extends CustomPainter {
+  _DotField(this.colour, {this.lit = 1, this.faint});
+
+  final Color colour;
+  final double lit;
+  final Color? faint;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const step = 5.0;
+    final r = math.min(1.8, size.height / 2 - .4);
+    final on = Paint()..color = colour;
+    final off = Paint()..color = faint ?? Colors.transparent;
+    for (var y = step / 2; y < size.height; y += step) {
+      for (var x = step / 2; x < size.width; x += step) {
+        canvas.drawCircle(Offset(x, size.height < step ? size.height / 2 : y), r, x <= size.width * lit ? on : off);
+      }
+      if (size.height < step) break;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotField old) => old.colour != colour || old.lit != lit || old.faint != faint;
 }

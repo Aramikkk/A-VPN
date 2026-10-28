@@ -170,29 +170,29 @@ class TopologyPage extends HookConsumerWidget {
                         // the connections open now, as a flow: apps, the rules that took them, where they went
                         Expanded(
                           child: _Section(
-                          expand: true,
-                          solid: true,
-                          title: t.avpn.topoSankey,
-                          trailing: _FlowLegend(live: t.avpn.flowLive, closed: t.avpn.flowClosed),
-                          child: openNow.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    t.avpn.topoSankeyEmpty,
-                                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                            expand: true,
+                            solid: true,
+                            title: t.avpn.topoSankey,
+                            trailing: _FlowLegend(live: t.avpn.flowLive, closed: t.avpn.flowClosed),
+                            child: openNow.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      t.avpn.topoSankeyEmpty,
+                                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                                    ),
+                                  )
+                                : LayoutBuilder(
+                                    builder: (context, box) => TrafficSankey(
+                                      items: openNow,
+                                      height: box.maxHeight,
+                                      // who goes where, as thick as every other route and in a fixed order; the traffic and
+                                      // the speed are written
+                                      weight: (c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble(),
+                                      value: value,
+                                      speed: byTraffic.value ? (c) => rates[c.id] ?? 0 : null,
+                                      speedValue: byTraffic.value ? speedValue : null,
+                                    ),
                                   ),
-                                )
-                              : LayoutBuilder(
-                                  builder: (context, box) => TrafficSankey(
-                                  items: openNow,
-                                  height: box.maxHeight,
-                                  // who goes where, as thick as every other route and in a fixed order; the traffic and
-                                  // the speed are written
-                                  weight: (c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble(),
-                                  value: value,
-                                  speed: byTraffic.value ? (c) => rates[c.id] ?? 0 : null,
-                                  speedValue: byTraffic.value ? speedValue : null,
-                                ),
-                                ),
                           ),
                         ),
                         // the next page is below, as in the statistics
@@ -362,7 +362,14 @@ class TopologyDayTotal extends ConsumerWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child, this.hint, this.expand = false, this.trailing, this.solid = false});
+  const _Section({
+    required this.title,
+    required this.child,
+    this.hint,
+    this.expand = false,
+    this.trailing,
+    this.solid = false,
+  });
 
   /// a pane with only a little see-through left in it, instead of the frosted glass
 
@@ -391,7 +398,14 @@ class _Section extends StatelessWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        trailing == null ? titleText : Row(children: [Expanded(child: titleText), trailing!]),
+        trailing == null
+            ? titleText
+            : Row(
+                children: [
+                  Expanded(child: titleText),
+                  trailing!,
+                ],
+              ),
         if (hint != null) ...[
           const Gap(3),
           Text(hint!, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
@@ -403,6 +417,15 @@ class _Section extends StatelessWidget {
     // the same frosted glass as the home screen's blocks
     if (solid) {
       final dark = theme.brightness == Brightness.dark;
+      // Bento and Dots: their own card
+      final own = lookCard(
+        homeLookNow,
+        dark,
+        child: content,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        radius: 18,
+      );
+      if (own != null) return own;
       return Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         decoration: BoxDecoration(

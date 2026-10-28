@@ -1029,7 +1029,25 @@ ThemeData lookTheme(ThemeData theme, HomeLayout look) {
     case HomeLayout.dots:
       final ink = _Dots.ink(dark);
       final soft = _Dots.soft(dark);
+      // the accent is the ink: no palette fill (by day a light palette fills the lit things in its colour)
+      final araLook = theme.extension<AraLook>();
       return theme.copyWith(
+        extensions: [
+          for (final e in theme.extensions.values)
+            if (e is! AraLook) e,
+          if (araLook != null)
+            AraLook(
+              gradient: araLook.gradient,
+              onGradient: araLook.onGradient,
+              fastPing: araLook.fastPing,
+              border: araLook.border,
+              data: araLook.data,
+              dark: araLook.dark,
+              graphDown: araLook.graphDown,
+              graphUp: araLook.graphUp,
+              pingOn: araLook.pingOn,
+            ),
+        ],
         textTheme: theme.textTheme.apply(fontFamily: 'JetBrains Mono'),
         appBarTheme: theme.appBarTheme.copyWith(
           titleTextStyle: (theme.appBarTheme.titleTextStyle ?? theme.textTheme.titleLarge)?.copyWith(
