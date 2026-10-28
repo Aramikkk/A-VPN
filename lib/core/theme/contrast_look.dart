@@ -296,9 +296,10 @@ enum ContrastClarity {
   // blocks looked solid next to the other pages' see-through cards)
   // three levels that can be told apart (the blocks had come out nearly solid at every one): low nearly solid,
   // medium the backdrop plainly behind, high clear glass; the blur light, so the thin line backdrops still show
-  weak('Слабо', 'Low', .9, .88, 1.5, .34),
-  medium('Средне', 'Medium', .62, .6, .5, .18),
-  strong('Сильно', 'High', .38, .36, .3, .08);
+  // all three denser than before (1.0.55): the blocks were too see-through at every level
+  weak('Слабо', 'Low', .95, .93, 1.5, .38),
+  medium('Средне', 'Medium', .76, .74, .5, .26),
+  strong('Сильно', 'High', .55, .53, .3, .15);
 
   const ContrastClarity(this.ru, this.en, this.day, this.night, this.blur, this.tile);
 

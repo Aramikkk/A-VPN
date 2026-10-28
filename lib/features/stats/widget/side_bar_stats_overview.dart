@@ -283,7 +283,8 @@ class SideBarStatsOverview extends ConsumerWidget {
         ),
         child: child,
       );
-      Widget block(Widget child) => ContrastFrost(child: child);
+      // as dense as the other pages' cards (solo), not the lighter home block that has tiles of its own inside
+      Widget block(Widget child) => ContrastFrost(solo: true, child: child);
       final contrastGraph = _SlidingGraph(
         samples: history,
         live: range == StatsRange.minute,
