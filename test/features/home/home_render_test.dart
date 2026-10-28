@@ -27,6 +27,7 @@ import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/connection/notifier/shown_connection.dart';
+import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
@@ -235,6 +236,8 @@ void main() {
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
           if (Platform.environment['LIGHT'] == '1') 'light_look': true,
+          // DOTSACCENT=<name>: the Dots style's colour
+          if ((Platform.environment['DOTSACCENT'] ?? '').isNotEmpty) 'dots_accent': Platform.environment['DOTSACCENT']!,
           // HOMELAYOUT=<name>: that look; the tiles (classic) when not given (a new install has Dots)
           'home_layout': (Platform.environment['HOMELAYOUT'] ?? '').isNotEmpty
               ? Platform.environment['HOMELAYOUT']!
@@ -351,7 +354,11 @@ void main() {
               debugShowCheckedModeBanner: false,
               theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
               builder: (context, child) => Theme(
-                data: lookTheme(Theme.of(context), HomeLayout.fromName(Platform.environment['HOMELAYOUT'])),
+                data: lookTheme(
+                  Theme.of(context),
+                  HomeLayout.fromName(Platform.environment['HOMELAYOUT']),
+                  DotsAccent.fromName(Platform.environment['DOTSACCENT']),
+                ),
                 child: ContrastGlow(child: child!),
               ),
               home: Consumer(

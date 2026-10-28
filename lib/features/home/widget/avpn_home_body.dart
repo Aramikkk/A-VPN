@@ -27,6 +27,7 @@ import 'package:hiddify/features/stats/widget/traffic_strips.dart';
 import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
+import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/fit_blocks.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';

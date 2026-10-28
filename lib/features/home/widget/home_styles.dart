@@ -12,6 +12,9 @@ HomeLayout _homeLayoutOf(BuildContext context) {
   }
 }
 
+/// The Dots style's one colour as chosen (by day or by night), set where the look is: the shell and the backdrop.
+Color dotsAccentNow = DotsAccent.fallback.colour;
+
 /// The home screen's look as the backdrop last drew it: for the panel's colour and the connect control, which have no
 /// provider reference of their own.
 HomeLayout homeLookNow = HomeLayout.classic;
@@ -581,7 +584,9 @@ abstract final class _Dots {
   static Color ink(bool dark) => dark ? const Color(0xFFEDEDE8) : const Color(0xFF111111);
   static Color grid(bool dark) => dark ? const Color(0xFF2C2C2C) : const Color(0xFFCDCCC7);
   static Color soft(bool dark) => dark ? const Color(0xFF9A9A95) : const Color(0xFF6A6A66);
-  static const red = Color(0xFFE8231C);
+
+  /// the style's one colour (the owner's choice in Settings → Themes; red until picked)
+  static Color get red => dotsAccentNow;
 
   static TextStyle mono(double size, Color colour, {FontWeight weight = FontWeight.w500, double spacing = 1.4}) =>
       TextStyle(
@@ -1177,18 +1182,19 @@ Widget? lookPlate(HomeLayout look, BuildContext context, Widget child) {
 /// The whole screen in a look that has its own (the pages, the menu, the panel): Dots in its monospaced face with the
 /// ink for the accent of the text and a square-cornered outlined tab; Bento its heavy round face for the titles and a
 /// solid tab in the accent. The others as they are.
-ThemeData lookTheme(ThemeData theme, HomeLayout look) {
+ThemeData lookTheme(ThemeData theme, HomeLayout look, [DotsAccent accent = DotsAccent.fallback]) {
   // the same theme for the same input: a new one at every build of the shell (a tab switched) told the whole app its
   // theme had changed and rebuilt it all, a stall of a tenth of a second at each switch
-  final kept = _lookThemes[(theme, look)];
+  final key = (theme, look, look == HomeLayout.dots ? accent : DotsAccent.fallback);
+  final kept = _lookThemes[key];
   if (kept != null) return kept;
   if (_lookThemes.length > 8) _lookThemes.clear();
-  return _lookThemes[(theme, look)] = _lookTheme(theme, look);
+  return _lookThemes[key] = _lookTheme(theme, look, accent);
 }
 
-final _lookThemes = <(ThemeData, HomeLayout), ThemeData>{};
+final _lookThemes = <(ThemeData, HomeLayout, DotsAccent), ThemeData>{};
 
-ThemeData _lookTheme(ThemeData theme, HomeLayout look) {
+ThemeData _lookTheme(ThemeData theme, HomeLayout look, DotsAccent accent) {
   final dark = theme.brightness == Brightness.dark;
   switch (look) {
     case HomeLayout.dots:
@@ -1220,7 +1226,13 @@ ThemeData _lookTheme(ThemeData theme, HomeLayout look) {
           ),
         ),
         primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: 'JetBrains Mono'),
-        colorScheme: theme.colorScheme.copyWith(primary: ink, onPrimary: _Dots.paper(dark)),
+        // (the chosen colour rides in the scheme's tertiary: a change of it is a change of the theme, so the screens
+        // drawing it are built again)
+        colorScheme: theme.colorScheme.copyWith(
+          primary: ink,
+          onPrimary: _Dots.paper(dark),
+          tertiary: accent.on(dark: dark),
+        ),
         // the settings' signs and every other icon in the ink
         iconTheme: theme.iconTheme.copyWith(color: ink),
         listTileTheme: theme.listTileTheme.copyWith(iconColor: ink),

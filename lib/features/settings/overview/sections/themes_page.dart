@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -444,6 +445,8 @@ class ContrastThemePicker extends ConsumerWidget {
     final clarity = ref.watch(Preferences.contrastClarity);
     // Bento and Dots: no see-through blocks and no backdrop of lines to pick
     final ownLook = ref.watch(Preferences.homeLayout).ownStyle;
+    final dotsLook = ref.watch(Preferences.homeLayout) == HomeLayout.dots;
+    final dotsAccent = ref.watch(Preferences.dotsAccent);
     final backdrop = ref.watch(Preferences.contrastBackdrop);
     final palette = ref.watch(Preferences.contrastPalette);
     final (warm, cool) = ref.watch(contrastColoursProvider).backdrop(theme.brightness);
@@ -683,54 +686,111 @@ class ContrastThemePicker extends ConsumerWidget {
               ),
             ),
           ],
-          heading(t.avpn.contrastPaletteTitle),
-          card(
-            GridView(
-              // a cell as tall as its swatch and name (a share of the width left the name cut on a narrow screen)
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 6,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 4,
-                mainAxisExtent: 76,
-              ),
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                for (final p in ContrastPalette.values)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => ref.read(Preferences.contrastPalette.notifier).update(p),
-                    child: Column(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: p == palette ? accent : Colors.transparent, width: 2),
-                          ),
-                          child: Container(
-                            width: 40,
-                            height: 40,
+          // Dots: no palettes (they changed nothing there); its OLED look with one contrast colour to pick of twelve
+          if (dotsLook) ...[
+            heading(t.avpn.dotsAccentTitle),
+            card(
+              GridView(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 4,
+                  mainAxisExtent: 76,
+                ),
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  for (final a in DotsAccent.values)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => ref.read(Preferences.dotsAccent.notifier).update(a),
+                      child: Column(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(2.5),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [p.warm, p.warm, p.cool, p.cool],
-                                stops: const [0, .5, .5, 1],
+                              border: Border.all(
+                                color: a == dotsAccent ? scheme.onSurface : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            // an OLED disc: black, the colour as its lit dot
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF111111)),
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: a.on(dark: true),
+                                  boxShadow: [BoxShadow(color: a.on(dark: true).withValues(alpha: .6), blurRadius: 8)],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        label(ru ? p.ru : p.en, p == palette),
-                      ],
+                          const SizedBox(height: 4),
+                          label(ru ? a.ru : a.en, a == dotsAccent),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ] else ...[
+            heading(t.avpn.contrastPaletteTitle),
+            card(
+              GridView(
+                // a cell as tall as its swatch and name (a share of the width left the name cut on a narrow screen)
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 4,
+                  mainAxisExtent: 76,
+                ),
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  for (final p in ContrastPalette.values)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => ref.read(Preferences.contrastPalette.notifier).update(p),
+                      child: Column(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(2.5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: p == palette ? accent : Colors.transparent, width: 2),
+                            ),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [p.warm, p.warm, p.cool, p.cool],
+                                  stops: const [0, .5, .5, 1],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          label(ru ? p.ru : p.en, p == palette),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ],
     );

@@ -1,3 +1,4 @@
+import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'dart:convert';
 
@@ -264,6 +265,14 @@ abstract class Preferences {
 
   /// A-VPN: the size of the text on top of the system's, in percent.
   static final fontScalePercent = PreferencesNotifier.create<int, int>("font_scale_percent", 100);
+
+  /// A-VPN: the Dots style's one colour (its OLED look: black, white and this).
+  static final dotsAccent = PreferencesNotifier.create<DotsAccent, String>(
+    "dots_accent",
+    DotsAccent.fallback,
+    mapFrom: DotsAccent.fromName,
+    mapTo: (value) => value.name,
+  );
 
   /// A-VPN: how the home screen is laid out (Contrast).
   // (the defaults over this file are the owner's own settings as of 1.0.72, what a new install starts with)

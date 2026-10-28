@@ -2146,6 +2146,10 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     // Bento and Dots: a backdrop of their own (a plain page, dotted paper)
     final look = ready && !ref.watch(superLightProvider) ? ref.watch(Preferences.homeLayout) : HomeLayout.classic;
     homeLookNow = look;
+    // (the settings not read yet: the colour it starts with)
+    dotsAccentNow = ready
+        ? ref.watch(Preferences.dotsAccent).on(dark: brightness == Brightness.dark)
+        : DotsAccent.fallback.colour;
     final own = lookBackdrop(look, brightness == Brightness.dark);
     if (own != null) {
       return _GlowAnchor(

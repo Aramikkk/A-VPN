@@ -151,6 +151,7 @@
     "styleBentoHint": "Solid tiles of different sizes, a bright ping tile, big figures",
     "styleDots": "Dots",
     "styleDotsHint": "Dotted paper, figures of dots, a monospaced face, black and red",
+    "dotsAccentTitle": "Accent colour",
     "profilePriorityOff": "Remove priority",
     "modesTitle": "Modes",
     "modesHint": "Sharing, Global, Server",

@@ -108,6 +108,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         ? ref.watch(Preferences.homeLayout)
         : HomeLayout.classic;
     homeLookNow = look;
+    final dotsAccent = ref.watch(Preferences.dotsAccent);
+    dotsAccentNow = dotsAccent.on(dark: Theme.of(context).brightness == Brightness.dark);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final rail = FocusScope(
       node: navScopeNode,
@@ -132,7 +134,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     );
     // the page is held as a picture while a popup opens and closes over it (see [FreezeFrame])
     return Theme(
-      data: lookTheme(Theme.of(context), look),
+      data: lookTheme(Theme.of(context), look, dotsAccent),
       child: FreezeFrame(
         child: PopScope(
           canPop: false,
