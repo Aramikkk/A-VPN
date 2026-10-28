@@ -3717,19 +3717,21 @@ class _SiteTiles extends HookConsumerWidget {
                         ),
                 ),
               ),
-            // the site's own server's flag over the whole tile, faint (it is not the main server's country)
+            // the site's own server's flag as a soft blur of its colours in the tile's corner (not the main server's country)
             if (flag.isNotEmpty)
               Positioned.fill(
                 child: ExcludeSemantics(
                   child: ClipRect(
-                    child: OverflowBox(
-                      maxWidth: double.infinity,
-                      maxHeight: double.infinity,
+                    child: ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14, tileMode: TileMode.decal),
                       child: Opacity(
-                        opacity: dark ? .16 : .22,
-                        child: Text(
-                          flag,
-                          style: const TextStyle(fontSize: 120, height: 1, fontFamilyFallback: ['Emoji']),
+                        opacity: dark ? .5 : .6,
+                        child: Align(
+                          alignment: const Alignment(1.5, -1.4),
+                          child: Text(
+                            flag,
+                            style: const TextStyle(fontSize: 70, height: 1, fontFamilyFallback: ['Emoji']),
+                          ),
                         ),
                       ),
                     ),
