@@ -71,7 +71,7 @@ class _SpeedTrafficRow extends StatelessWidget {
         Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
               child: Row(
                 children: [
                   Container(
@@ -501,7 +501,7 @@ class _PulseStats extends ConsumerWidget {
               ),
               const Gap(4),
               SizedBox(
-                height: 72,
+                height: 62,
                 child: RepaintBoundary(
                   child: CustomPaint(
                     painter: _PulsePainter(

@@ -3753,7 +3753,7 @@ class _SiteTiles extends HookConsumerWidget {
           for (final (i, site) in row.indexed) ...[if (i > 0) const Gap(8), Expanded(child: tile(site))],
         ],
       );
-      return compact ? SizedBox(height: 88, child: cells) : Expanded(child: cells);
+      return compact ? SizedBox(height: 82, child: cells) : Expanded(child: cells);
     }
 
     return GestureDetector(
