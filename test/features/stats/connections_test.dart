@@ -7,6 +7,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
+import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -342,7 +343,18 @@ void main() {
           sessionStartProvider.overrideWith(_Began.new),
         ],
         child: MaterialApp(
-          theme: theme.darkTheme(null),
+          theme: Platform.environment['DAY'] == '1' ? theme.lightTheme(null) : theme.darkTheme(null),
+          // HOMELAYOUT=bento|dots: the page in that look, as the app's shell has it
+          builder: Platform.environment['HOMELAYOUT'] == null
+              ? null
+              : (context, child) {
+                  final look = HomeLayout.fromName(Platform.environment['HOMELAYOUT']);
+                  final pages = contrastPageTheme(lookTheme(Theme.of(context), look));
+                  return Theme(
+                    data: look == HomeLayout.dots ? dotsPageColours(pages, DotsAccent.red) : pages,
+                    child: ContrastGlow(child: child!),
+                  );
+                },
           home: Consumer(
             builder: (context, ref, _) =>
                 !ref.watch(translationsProvider).hasValue ? const SizedBox() : const ConnectionsPage(),
@@ -401,7 +413,12 @@ void main() {
             builder: look == null
                 ? null
                 : (context, child) => Theme(
-                    data: contrastPageTheme(lookTheme(Theme.of(context), HomeLayout.fromName(look))),
+                    data: HomeLayout.fromName(look) == HomeLayout.dots
+                        ? dotsPageColours(
+                            contrastPageTheme(lookTheme(Theme.of(context), HomeLayout.fromName(look))),
+                            DotsAccent.red,
+                          )
+                        : contrastPageTheme(lookTheme(Theme.of(context), HomeLayout.fromName(look))),
                     child: ContrastGlow(child: child!),
                   ),
             home: Consumer(

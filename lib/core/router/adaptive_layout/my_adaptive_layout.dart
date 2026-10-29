@@ -181,9 +181,20 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                             direction: ContrastShellDock.sideways(context) ? Axis.horizontal : Axis.vertical,
                             children: [
                               Expanded(
-                                child: Theme(
-                                  data: contrastPageTheme(Theme.of(context), ref.watch(Preferences.contrastClarity)),
-                                  child: navigationShell,
+                                // a Builder: the pages' theme is made from the look's (Dots', Bento's), which sits above it,
+                                // not from the theme this build started with (their chips, switches and fonts were left out)
+                                child: Builder(
+                                  builder: (context) {
+                                    final pages = contrastPageTheme(
+                                      Theme.of(context),
+                                      ref.watch(Preferences.contrastClarity),
+                                    );
+                                    return Theme(
+                                      // Dots: the chosen accent in the pages' colours (the palette's one stays out)
+                                      data: look == HomeLayout.dots ? dotsPageColours(pages, dotsAccent) : pages,
+                                      child: navigationShell,
+                                    );
+                                  },
                                 ),
                               ),
                               ContrastShellDock(

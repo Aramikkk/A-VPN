@@ -1328,6 +1328,68 @@ Widget? lookPlate(HomeLayout look, BuildContext context, Widget child) {
   };
 }
 
+/// The ping's marks in Dots: the ink for what is well, the style's colour from [slowAt] ms on. The pages' theme keeps the
+/// palette's accent (a neon one chosen once); Dots' one colour is the chosen one, so these carry it.
+class _DotsLook extends AraLook {
+  const _DotsLook({
+    required this.ink,
+    required this.accent,
+    required super.fastPing,
+    super.gradient,
+    super.onGradient,
+    super.border,
+    super.data,
+    super.dark,
+    super.graphDown,
+    super.graphUp,
+    super.pingOn,
+  }) : super(fill: accent);
+
+  final Color ink;
+  final Color accent;
+
+  static const slowAt = 300;
+
+  @override
+  List<Color> get pingColors => [ink, ink, ink, accent];
+
+  @override
+  Color pingColor(int ms, Color muted) => ms >= slowAt ? accent : ink;
+}
+
+/// [theme] (a page's) with the Dots look's colours: the chosen accent where the page draws the theme's accent (the VPN
+/// routes, the loss, the lit things), the ping's marks in the ink and the accent. Kept for the same input.
+ThemeData dotsPageColours(ThemeData theme, DotsAccent accent) {
+  final key = (theme, accent);
+  final kept = _dotsPageThemes[key];
+  if (kept != null) return kept;
+  if (_dotsPageThemes.length > 8) _dotsPageThemes.clear();
+  final dark = theme.brightness == Brightness.dark;
+  final look = theme.extension<AraLook>();
+  final result = theme.copyWith(
+    extensions: [
+      for (final e in theme.extensions.values)
+        if (e is! AraLook) e,
+      _DotsLook(
+        ink: _Dots.ink(dark),
+        accent: accent.on(dark: dark),
+        fastPing: _Dots.ink(dark),
+        gradient: look?.gradient,
+        onGradient: look?.onGradient ?? Colors.white,
+        border: look?.border,
+        data: look?.data,
+        dark: dark,
+        graphDown: look?.graphDown,
+        graphUp: look?.graphUp,
+        pingOn: look?.pingOn,
+      ),
+    ],
+  );
+  return _dotsPageThemes[key] = result;
+}
+
+final _dotsPageThemes = <(ThemeData, DotsAccent), ThemeData>{};
+
 /// The whole screen in a look that has its own (the pages, the menu, the panel): Dots in its monospaced face with the
 /// ink for the accent of the text and a square-cornered outlined tab; Bento its heavy round face for the titles and a
 /// solid tab in the accent. The others as they are.

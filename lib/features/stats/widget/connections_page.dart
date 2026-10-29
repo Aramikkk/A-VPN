@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -812,7 +813,8 @@ class _RouteBadge extends ConsumerWidget {
         decoration: BoxDecoration(
           color: route == ConnectionRoute.vpn ? color.withValues(alpha: .16) : null,
           border: Border.all(color: color.withValues(alpha: route == ConnectionRoute.vpn ? .0 : .6)),
-          borderRadius: BorderRadius.circular(20),
+          // Dots: the angular corner of its other boxes
+          borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.dots ? 4 : 20),
         ),
         child: Text(
           group.mixed ? '$text $count' : text,
@@ -893,7 +895,7 @@ class ConnectionAppIcon extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     if (icon != null) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(size * .3),
+        borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.dots ? 4 : size * .3),
         child: Image.memory(icon!, width: size, height: size, cacheWidth: (size * 3).round(), gaplessPlayback: true),
       );
     }
@@ -901,7 +903,10 @@ class ConnectionAppIcon extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .14), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.dots ? 4 : 10),
+      ),
       child: Text(
         name.isEmpty ? '?' : name.characters.first.toUpperCase(),
         style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w700, fontSize: 16),
