@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// The app's mark in the Dots style: the A as an 11×11 matrix of dots (a triangle with a cut-out at its foot), its
-/// top cap red, the unlit dots faint, on a rounded square. Black on paper by day and light on black by night, as the
+/// The app's mark in the Dots style: a staircase of dots (8 x 8 in blocks of 2 x 2): black blocks in the corner, the
+/// step in red, small faint dots beyond, on a rounded square. Black on paper by day and light on black by night, as the
 /// launcher icon.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 24});
 
   final double size;
 
-  static const _n = 11;
-  static const _pad = 96.0;
-
-  static bool _inside(double x, double y, (double, double) a, (double, double) b, (double, double) c) {
-    double side((double, double) p, (double, double) q, (double, double) r) =>
-        (p.$1 - r.$1) * (q.$2 - r.$2) - (q.$1 - r.$1) * (p.$2 - r.$2);
-    final p = (x, y);
-    final d = [side(p, a, b), side(p, b, c), side(p, c, a)];
-    return !(d.any((v) => v < 0) && d.any((v) => v > 0));
-  }
+  static const _n = 8;
+  static const _pad = 170.0;
 
   static final _svgs = <bool, String>{};
 
@@ -26,17 +18,13 @@ class AppLogo extends StatelessWidget {
     final ground = dark ? '#111111' : '#EAE9E5';
     final ink = dark ? '#F2F2EE' : '#111111';
     final faint = dark ? '#2C2C2C' : '#CDCCC7';
-    const cap = '#EE4245';
     const step = (680 - 2 * _pad) / (_n - 1);
     final dots = StringBuffer();
     for (var j = 0; j < _n; j++) {
       for (var i = 0; i < _n; i++) {
-        final u = i / (_n - 1);
-        final v = j / (_n - 1);
-        final on =
-            _inside(u, v, (.5, 0), (-.02, 1), (1.02, 1)) && !_inside(u, v, (.5, .58), (.27, 1.05), (.73, 1.05));
-        final colour = on ? (v < .3 ? cap : ink) : faint;
-        final r = step * (on ? .36 : .36 * .55);
+        final total = i ~/ 2 + j ~/ 2;
+        final colour = total < 3 ? ink : (total == 3 ? '#EE4245' : faint);
+        final r = step * (total <= 3 ? .47 : .13);
         dots.write(
           '<circle cx="${(_pad + i * step).toStringAsFixed(1)}" cy="${(_pad + j * step).toStringAsFixed(1)}" '
           'r="${r.toStringAsFixed(1)}" fill="$colour"/>',
