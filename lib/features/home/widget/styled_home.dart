@@ -401,6 +401,7 @@ class _StatusBlock extends HookConsumerWidget {
           connected: connected,
           timeText: timeFigure,
           ping: quality.ping,
+          loss: quality.loss,
           down: downFigure,
           up: upFigure,
           vpn: vpn,
@@ -979,6 +980,11 @@ class _GraphiteDock extends HookConsumerWidget {
         if (!item.isGroup && item.isVisible && item.urlTestDelay > 0 && item.urlTestDelay < 65000) item,
     ]..sort((a, b) => a.urlTestDelay.compareTo(b.urlTestDelay));
     final answering = answeringServers.length;
+    final shownServers = [
+      for (final item in group?.items ?? <OutboundInfo>[])
+        if (!item.isGroup && item.isVisible) item,
+    ].length;
+    final dotsLook = homeLookNow == HomeLayout.dots;
     final (:ping, :loss) = _sessionQuality(ref, on);
     final measured = ping != null;
     final lossText = _lossText(loss);
@@ -1019,37 +1025,39 @@ class _GraphiteDock extends HookConsumerWidget {
     final contrastOn = theme.contrastLayout && on;
     final gaugeInk = contrastOn ? (homeLookNow == HomeLayout.dots ? _Dots.ink(dark) : accent) : ink;
     final lossInk = dark ? const Color(0xFFA3A9B0) : const Color(0xFF8C939C);
-    Widget side({required Widget top, required String label, VoidCallback? onTap, Color? labelColor}) => Material(
-      // Contrast: no plate, right on its black panel
-      color: theme.contrastLayout ? Colors.transparent : scheme.onSurface.withValues(alpha: dark ? .06 : .045),
-      borderRadius: BorderRadius.circular(18),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          // shrinks rather than overflows on the narrowest screens
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: iconSize + 2,
-                  child: Center(child: top),
+    Widget side({required Widget top, required String label, VoidCallback? onTap, Color? labelColor, Widget? meter}) =>
+        Material(
+          // Contrast: no plate, right on its black panel
+          color: theme.contrastLayout ? Colors.transparent : scheme.onSurface.withValues(alpha: dark ? .06 : .045),
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              // shrinks rather than overflows on the narrowest screens
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: iconSize + 2,
+                      child: Center(child: top),
+                    ),
+                    const Gap(4),
+                    Text(
+                      homeLookNow == HomeLayout.dots ? label.toUpperCase() : label,
+                      style: labelColor == null ? caption : caption?.copyWith(color: labelColor),
+                    ),
+                    if (meter != null) ...[const Gap(6), meter],
+                  ],
                 ),
-                const Gap(4),
-                Text(
-                  homeLookNow == HomeLayout.dots ? label.toUpperCase() : label,
-                  style: labelColor == null ? caption : caption?.copyWith(color: labelColor),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        );
     // the glowing gauge in the middle; the ping check on its left and the servers answering on its right
     final content = Row(
       children: [
@@ -1060,6 +1068,14 @@ class _GraphiteDock extends HookConsumerWidget {
             child: side(
               top: on && testing
                   ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: ink))
+                  : dotsLook
+                  // Dots: the figure in the dot matrix, as the ping above
+                  ? _DotNumber(
+                      on && measured && !busy ? lossText : '—',
+                      cell: 3.6,
+                      colour: on && measured && !busy && loss >= _DotsStats.alertLoss ? _Dots.red : _Dots.ink(dark),
+                      faint: _Dots.ink(dark).withValues(alpha: .14),
+                    )
                   : theme.contrastLayout
                   // Contrast: the loss here, as the servers answering are on the right: the sign and the figure (the ping is
                   // in the top block; a tap here still pings)
@@ -1085,6 +1101,10 @@ class _GraphiteDock extends HookConsumerWidget {
               label: theme.contrastLayout ? t.avpn.dockLossLabel : t.avpn.stPingButton,
               labelColor: theme.contrastLayout && on && measured && !busy ? lossInk : null,
               onTap: on && !busy && !testing ? onCheck : null,
+              // Dots: ten dots, a tenth lit for each tenth of the packets lost
+              meter: dotsLook
+                  ? _dotMeter(context, on && measured && !busy ? (loss / 10).ceil().clamp(0, 10) : 0, _Dots.red)
+                  : null,
             ),
           ),
         ),
@@ -1110,24 +1130,39 @@ class _GraphiteDock extends HookConsumerWidget {
               label: t.avpn.dockServersAnswering(count: answering),
               child: ExcludeSemantics(
                 child: side(
-                  top: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.dns_rounded, size: iconSize - 2, color: contrastOn ? scheme.onSurface : ink),
-                      const Gap(6),
-                      Text(
-                        on ? '$answering' : '—',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          height: 1,
-                          fontSize: sideFigure,
-                          fontFamily: figureFace,
-                          color: contrastOn ? gaugeInk : null,
+                  top: dotsLook
+                      ? _DotNumber(
+                          on ? '$answering' : '—',
+                          cell: 3.6,
+                          colour: _Dots.ink(dark),
+                          faint: _Dots.ink(dark).withValues(alpha: .14),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.dns_rounded, size: iconSize - 2, color: contrastOn ? scheme.onSurface : ink),
+                            const Gap(6),
+                            Text(
+                              on ? '$answering' : '—',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                height: 1,
+                                fontSize: sideFigure,
+                                fontFamily: figureFace,
+                                color: contrastOn ? gaugeInk : null,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
                   label: t.avpn.dockActive,
+                  // Dots: ten dots, as many lit as the share of the servers answering
+                  meter: dotsLook
+                      ? _dotMeter(
+                          context,
+                          on && shownServers > 0 ? (answering * 10 / shownServers).round().clamp(0, 10) : 0,
+                          _Dots.ink(dark),
+                        )
+                      : null,
                   // the servers of this session (what the "Servers VPN" tab over the panel opened)
                   onTap: on ? () => showGlassPopup(context, const _SessionServers()) : null,
                 ),

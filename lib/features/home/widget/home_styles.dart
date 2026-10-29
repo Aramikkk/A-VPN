@@ -663,12 +663,17 @@ class _DotNumber extends StatelessWidget {
     '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
     '9': ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
     '—': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
+    '.': ['0', '0', '0', '0', '0', '0', '1'],
+    '%': ['11001', '11010', '00010', '00100', '01000', '01011', '10011'],
   };
+
+  /// the columns a glyph takes with the gap after it
+  static int advance(String c) => _glyphs[c]![0].length + 1;
 
   @override
   Widget build(BuildContext context) {
     final chars = text.split('').where(_glyphs.containsKey).toList();
-    final width = chars.isEmpty ? 0.0 : (chars.length * 6 - 1) * cell;
+    final width = chars.isEmpty ? 0.0 : (chars.fold<int>(0, (n, c) => n + advance(c)) - 1) * cell;
     return CustomPaint(
       size: Size(width, 7 * cell),
       painter: _DotNumberPainter(chars: chars, cell: cell, colour: colour, faint: faint),
@@ -689,20 +694,42 @@ class _DotNumberPainter extends CustomPainter {
     final on = Paint()..color = colour;
     final off = Paint()..color = faint;
     final r = cell * .42;
-    for (final (i, c) in chars.indexed) {
+    var column = 0;
+    for (final c in chars) {
       final rows = _DotNumber._glyphs[c]!;
       for (var y = 0; y < 7; y++) {
-        for (var x = 0; x < 5; x++) {
-          final centre = Offset((i * 6 + x + .5) * cell, (y + .5) * cell);
+        for (var x = 0; x < rows[y].length; x++) {
+          final centre = Offset((column + x + .5) * cell, (y + .5) * cell);
           canvas.drawCircle(centre, rows[y][x] == '1' ? r : r * .45, rows[y][x] == '1' ? on : off);
         }
       }
+      column += _DotNumber.advance(c);
     }
   }
 
   @override
   bool shouldRepaint(_DotNumberPainter old) =>
       old.chars.join() != chars.join() || old.cell != cell || old.colour != colour || old.faint != faint;
+}
+
+/// Ten small dots, [lit] of them in [colour] and the rest faint: the dock's loss and servers answering
+Widget _dotMeter(BuildContext context, int lit, Color colour) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < 10; i++)
+        Container(
+          width: 4.5,
+          height: 4.5,
+          margin: const EdgeInsets.symmetric(horizontal: 1.2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: i < lit ? colour : _Dots.ink(dark).withValues(alpha: .18),
+          ),
+        ),
+    ],
+  );
 }
 
 /// A line of the dotted sheet: a label in small capitals on the left, the value on the right.
@@ -785,6 +812,7 @@ class _DotsStats extends HookConsumerWidget {
     required this.connected,
     required this.timeText,
     required this.ping,
+    required this.loss,
     required this.down,
     required this.up,
     required this.vpn,
@@ -795,11 +823,18 @@ class _DotsStats extends HookConsumerWidget {
   final bool connected;
   final String timeText;
   final int? ping;
+
+  /// the share of packets lost, in percent
+  final double loss;
   final (String, String) down;
   final (String, String) up;
   final (String, String) vpn;
   final (String, String) direct;
   final bool slim;
+
+  /// the ping this slow or the loss this heavy turns the figures to the accent
+  static const alertPing = 300;
+  static const alertLoss = 15.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -844,7 +879,10 @@ class _DotsStats extends HookConsumerWidget {
             child: _DotNumber(
               connected && ping != null ? '$ping' : '—',
               cell: slim ? 6 : 10,
-              colour: ink,
+              // the ordinary colour; the accent when the ping is very high or the loss is heavy
+              colour: connected && ((ping ?? 0) >= _DotsStats.alertPing || loss >= _DotsStats.alertLoss)
+                  ? _Dots.red
+                  : ink,
               faint: _Dots.grid(dark),
             ),
           ),
