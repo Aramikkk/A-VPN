@@ -57,7 +57,7 @@ class _StyledHome extends HookConsumerWidget {
     final serverMode = ref.watch(ConfigOptions.homeNetwork);
     // the super light mode: the servers in a list of their own where the delays were, and nothing else
     final superLight = ref.watch(superLightProvider);
-    // the ping, the loss and the sites' delays are asked together every 3 seconds (the pace of the ping's own probes),
+    // the ping, the loss and the sites' delays are asked together every 5 seconds,
     // while the VPN is up, the app is in front and this is the screen on view (they all move at one pace)
     final lifecycle = useAppLifecycleState();
     final live = connected && visible && !superLight && (lifecycle == null || lifecycle == AppLifecycleState.resumed);
@@ -76,7 +76,7 @@ class _StyledHome extends HookConsumerWidget {
       }
 
       tick();
-      final timer = Timer.periodic(const Duration(seconds: 3), (_) => tick());
+      final timer = Timer.periodic(const Duration(seconds: 5), (_) => tick());
       return () {
         timer.cancel();
         quality.driven = false;

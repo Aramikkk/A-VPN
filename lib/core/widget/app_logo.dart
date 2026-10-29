@@ -46,7 +46,7 @@ class AppLogo extends StatelessWidget {
     void put(List<(int, int)> list, String colour, double radius) {
       for (final (x, y) in list) {
         dots.write(
-          '<circle cx="${(340 + x * _k).toStringAsFixed(1)}" cy="${(340 + (y - 619) * _k + 12.2).toStringAsFixed(1)}" '
+          '<circle cx="${(340 + x * _k).toStringAsFixed(1)}" cy="${(340 + (y - 619) * _k + 4.1).toStringAsFixed(1)}" '
           'r="${(radius * _k).toStringAsFixed(1)}" fill="$colour"/>',
         );
       }
