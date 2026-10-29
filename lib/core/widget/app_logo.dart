@@ -1,16 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// The app's mark in the Dots style: a staircase of dots (8 x 8 in blocks of 2 x 2): black blocks in the corner, the
-/// step in red, small faint dots beyond, on a rounded square. Black on paper by day and light on black by night, as the
-/// launcher icon.
+/// The app's mark in the Dots style: the A as big dots (its bar in red, small faint dots inside) on a rounded square.
+/// Black on paper by day and light on black by night, as the launcher icon.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 24});
 
   final double size;
 
-  static const _n = 8;
-  static const _pad = 170.0;
+  // dot centres as offsets from the middle of the letter (pixels of a 1254 px picture of it), mirrored left and right
+  static const _ink = [
+    (0, 224),
+    (-68, 331),
+    (68, 331),
+    (-121, 441),
+    (121, 441),
+    (-174, 553),
+    (174, 553),
+    (-256, 789),
+    (256, 789),
+    (-187, 900),
+    (187, 900),
+    (-311, 900),
+    (311, 900),
+    (-244, 1013),
+    (244, 1013),
+    (-364, 1013),
+    (364, 1013),
+  ];
+  static const _bar = [(-70, 673), (70, 673), (-210, 673), (210, 673)];
+  static const _faint = [(0, 443), (-49, 556), (49, 556), (-112, 795), (112, 795)];
+  static const _k = .5;
 
   static final _svgs = <bool, String>{};
 
@@ -18,19 +38,19 @@ class AppLogo extends StatelessWidget {
     final ground = dark ? '#111111' : '#EAE9E5';
     final ink = dark ? '#F2F2EE' : '#111111';
     final faint = dark ? '#2C2C2C' : '#CDCCC7';
-    const step = (680 - 2 * _pad) / (_n - 1);
     final dots = StringBuffer();
-    for (var j = 0; j < _n; j++) {
-      for (var i = 0; i < _n; i++) {
-        final total = i ~/ 2 + j ~/ 2;
-        final colour = total < 3 ? ink : (total == 3 ? '#EE4245' : faint);
-        final r = step * (total <= 3 ? .47 : .13);
+    void put(List<(int, int)> list, String colour, double radius) {
+      for (final (x, y) in list) {
         dots.write(
-          '<circle cx="${(_pad + i * step).toStringAsFixed(1)}" cy="${(_pad + j * step).toStringAsFixed(1)}" '
-          'r="${r.toStringAsFixed(1)}" fill="$colour"/>',
+          '<circle cx="${(340 + x * _k).toStringAsFixed(1)}" cy="${(340 + (y - 619) * _k).toStringAsFixed(1)}" '
+          'r="${(radius * _k).toStringAsFixed(1)}" fill="$colour"/>',
         );
       }
     }
+
+    put(_faint, faint, 24);
+    put(_ink, ink, 52);
+    put(_bar, '#EE4245', 52);
     return '<svg viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">'
         '<rect width="680" height="680" rx="176" fill="$ground"/>$dots</svg>';
   });
