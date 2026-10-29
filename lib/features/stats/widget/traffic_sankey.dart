@@ -2356,9 +2356,9 @@ class _SlowPulse extends ChangeNotifier implements ValueListenable<double> {
 
 /// A shield with a stroke across it (26 by 22 round [centre]): traffic that goes without the VPN.
 void _shieldOff(Canvas canvas, Offset centre, Color colour) {
-  // Dots: the shield of dots, crossed by a stroke of dots
+  // Dots: the shield of dots with nothing in it (only its edge), not struck out
   if (homeLookNow == HomeLayout.dots) {
-    paintDotShield(canvas, Rect.fromCenter(center: centre, width: 23, height: 26), colour, crossed: true);
+    paintDotShield(canvas, Rect.fromCenter(center: centre, width: 23, height: 26), colour, hollow: true);
     return;
   }
   const w = 26.0;

@@ -29,6 +29,8 @@ import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/model/ping_graph.dart';
+import 'package:hiddify/features/home/model/site_graph.dart';
 import 'package:hiddify/features/home/widget/fit_blocks.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';

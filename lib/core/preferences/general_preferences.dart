@@ -1,5 +1,7 @@
 import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/model/ping_graph.dart';
+import 'package:hiddify/features/home/model/site_graph.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -271,6 +273,22 @@ abstract class Preferences {
     "dots_accent",
     DotsAccent.fallback,
     mapFrom: DotsAccent.fromName,
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: how the Dots ping block draws the answers (the menu of the big ping).
+  static final pingGraph = PreferencesNotifier.create<PingGraph, String>(
+    "ping_graph",
+    PingGraph.fallback,
+    mapFrom: PingGraph.fromName,
+    mapTo: (value) => value.name,
+  );
+
+  /// A-VPN: how the Dots sites block shows the delays (the menu a tap on the block opens).
+  static final siteGraph = PreferencesNotifier.create<SiteGraph, String>(
+    "site_graph",
+    SiteGraph.fallback,
+    mapFrom: SiteGraph.fromName,
     mapTo: (value) => value.name,
   );
 

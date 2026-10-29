@@ -236,6 +236,9 @@ void main() {
           // CLARITY=<weak|medium|strong>: how see-through the blocks are
           if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
           if (Platform.environment['LIGHT'] == '1') 'light_look': true,
+          // PINGGRAPH=<name>: how the Dots ping block draws the answers
+          if ((Platform.environment['PINGGRAPH'] ?? '').isNotEmpty) 'ping_graph': Platform.environment['PINGGRAPH']!,
+          if ((Platform.environment['SITEGRAPH'] ?? '').isNotEmpty) 'site_graph': Platform.environment['SITEGRAPH']!,
           // DOTSACCENT=<name>: the Dots style's colour
           if ((Platform.environment['DOTSACCENT'] ?? '').isNotEmpty) 'dots_accent': Platform.environment['DOTSACCENT']!,
           // HOMELAYOUT=<name>: that look; the tiles (classic) when not given (a new install has Dots)

@@ -53,6 +53,10 @@ class _HomePopupTransitionState extends State<HomePopupTransition> {
     opacity: _curve,
     // the card is drawn once and the fade and scale move that picture: otherwise every frame of the opening redraws
     // the whole list into a temporary layer
-    child: ScaleTransition(scale: _scale, alignment: widget.alignment, child: RepaintBoundary(child: widget.child)),
+    child: ScaleTransition(
+      scale: _scale,
+      alignment: widget.alignment,
+      child: RepaintBoundary(child: widget.child),
+    ),
   );
 }

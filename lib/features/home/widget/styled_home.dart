@@ -1894,7 +1894,7 @@ class _ContrastHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // the big ping block opens the session's traffic (it came down from the top with a swipe); the swipe down now pings
     // every server, as the check button does (Settings are on the cog; the super light mode keeps its swipe to them)
-    Widget opensTraffic(Widget block) => superLight
+    Widget opensTraffic(Widget block) => superLight || homeLookNow == HomeLayout.dots
         ? block
         : GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => context.goNamed('traffic'), child: block);
     return _LongSwipe(

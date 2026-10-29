@@ -714,8 +714,8 @@ class _DotsBinPainter extends CustomPainter {
 }
 
 /// A shield of dots (the Dots look's shield): a field of dots in the shape of a shield, its edge dots bolder and the
-/// inner ones fainter; [crossed]: a stroke of bold dots across it (traffic that goes without the VPN).
-void paintDotShield(Canvas canvas, Rect box, Color colour, {bool crossed = false}) {
+/// inner ones fainter; [hollow]: only its edge (a shield with nothing in it: traffic that goes without the VPN).
+void paintDotShield(Canvas canvas, Rect box, Color colour, {bool hollow = false}) {
   const cols = 7;
   const rows = 8;
   final sx = box.width / cols;
@@ -735,6 +735,7 @@ void paintDotShield(Canvas canvas, Rect box, Color colour, {bool crossed = false
     for (var i = 0; i < cols; i++) {
       if (!inside(i, j)) continue;
       final edge = !inside(i - 1, j) || !inside(i + 1, j) || !inside(i, j - 1) || !inside(i, j + 1);
+      if (hollow && !edge) continue;
       canvas.drawCircle(
         Offset(box.left + (i + .5) * sx, box.top + (j + .5) * sy),
         edge ? r : r * .55,
@@ -742,39 +743,26 @@ void paintDotShield(Canvas canvas, Rect box, Color colour, {bool crossed = false
       );
     }
   }
-  if (crossed) {
-    for (var k = 0; k < 7; k++) {
-      final t = k / 6;
-      canvas.drawCircle(
-        Offset(box.left + sx * .3 + (box.width - sx * .6) * t, box.bottom - sy * .6 - (box.height - sy * 1.2) * t),
-        r * 1.05,
-        bold,
-      );
-    }
-  }
 }
 
 class _DotShieldPainter extends CustomPainter {
-  _DotShieldPainter(this.colour, this.crossed);
+  _DotShieldPainter(this.colour, this.hollow);
 
   final Color colour;
-  final bool crossed;
+  final bool hollow;
 
   @override
-  void paint(Canvas canvas, Size size) => paintDotShield(canvas, Offset.zero & size, colour, crossed: crossed);
+  void paint(Canvas canvas, Size size) => paintDotShield(canvas, Offset.zero & size, colour, hollow: hollow);
 
   @override
-  bool shouldRepaint(_DotShieldPainter old) => old.colour != colour || old.crossed != crossed;
+  bool shouldRepaint(_DotShieldPainter old) => old.colour != colour || old.hollow != hollow;
 }
 
 /// The shield sign in the Dots look (of dots), as an icon [size] high.
-Widget shieldSign({Color? color, double size = 24, bool crossed = false}) => Builder(
+Widget shieldSign({Color? color, double size = 24, bool hollow = false}) => Builder(
   builder: (context) => CustomPaint(
     size: Size(size * .88, size),
-    painter: _DotShieldPainter(
-      color ?? IconTheme.of(context).color ?? Theme.of(context).colorScheme.onSurface,
-      crossed,
-    ),
+    painter: _DotShieldPainter(color ?? IconTheme.of(context).color ?? Theme.of(context).colorScheme.onSurface, hollow),
   ),
 );
 
@@ -991,6 +979,7 @@ class _DotsStats extends HookConsumerWidget {
     // one of 100 stand at different heights (the bars were scaled to the highest of them, so any ping filled them)
     // capped at 400 ms: a few timeouts (1500 ms) must not squash every normal answer into a stripe; they run off the top
     final scale = math.min(_niceMax(answers.isEmpty ? 1 : answers.reduce(math.max).toDouble(), least: 200), 400.0);
+    final style = ref.watch(Preferences.pingGraph);
     return _dotPaper(
       context,
       Column(
@@ -1011,15 +1000,19 @@ class _DotsStats extends HookConsumerWidget {
             ],
           ),
           Gap(slim ? 6 : 12),
-          Center(
-            child: _DotNumber(
-              connected && ping != null ? '$ping' : '—',
-              cell: slim ? 6 : 10,
-              // the ordinary colour; the accent when the ping is very high or the loss is heavy
-              colour: connected && ((ping ?? 0) >= _DotsStats.alertPing || loss >= _DotsStats.alertLoss)
-                  ? _Dots.red
-                  : ink,
-              faint: _Dots.grid(dark),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: slim ? null : () => unawaited(_pickPingGraph(context, ref, style)),
+            child: Center(
+              child: _DotNumber(
+                connected && ping != null ? '$ping' : '—',
+                cell: slim ? 6 : 10,
+                // the ordinary colour; the accent when the ping is very high or the loss is heavy
+                colour: connected && ((ping ?? 0) >= _DotsStats.alertPing || loss >= _DotsStats.alertLoss)
+                    ? _Dots.red
+                    : ink,
+                faint: _Dots.grid(dark),
+              ),
             ),
           ),
           const Gap(8),
@@ -1031,52 +1024,293 @@ class _DotsStats extends HookConsumerWidget {
           ),
           if (!slim) ...[
             const Gap(10),
-            SizedBox(
-              height: 46,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _PingGridPainter(scale: scale, line: ink.withValues(alpha: .22), text: _Dots.soft(dark)),
+            if (style == PingGraph.bars)
+              SizedBox(
+                height: 46,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _PingGridPainter(
+                          scale: scale,
+                          line: ink.withValues(alpha: .22),
+                          text: _Dots.soft(dark),
+                        ),
+                      ),
                     ),
-                  ),
-                  Positioned.fill(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 28),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          for (final (i, s) in bars.indexed) ...[
-                            if (i > 0) const Gap(3),
-                            Expanded(
-                              child: FractionallySizedBox(
-                                heightFactor: s == null ? 1 : (s / scale).clamp(.04, 1.0),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    // a lost probe or a slow answer (250 ms and over) in red
-                                    color: s == null || s >= 250 ? _Dots.red : ink,
-                                    borderRadius: BorderRadius.circular(2),
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 28),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            for (final (i, s) in bars.indexed) ...[
+                              if (i > 0) const Gap(3),
+                              Expanded(
+                                child: FractionallySizedBox(
+                                  heightFactor: s == null ? 1 : (s / scale).clamp(.04, 1.0),
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      // a lost probe or a slow answer (250 ms and over) in red
+                                      color: s == null || s >= 250 ? _Dots.red : ink,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              )
+            else ...[
+              SizedBox(
+                height: switch (style) {
+                  PingGraph.equalizer => 58.0,
+                  PingGraph.ruler => 40.0,
+                  PingGraph.trace => 58.0,
+                  _ => 52.0,
+                },
+                child: CustomPaint(
+                  size: Size.infinite,
+                  painter: _PingDotsPainter(
+                    style: style,
+                    samples: style == PingGraph.heat ? samples : bars,
+                    scale: scale,
+                    ping: connected ? ping : null,
+                    ink: ink,
+                    accent: _Dots.red,
+                    faint: _Dots.grid(dark),
+                    text: _Dots.soft(dark),
                   ),
-                ],
+                ),
               ),
-            ),
+              if (style == PingGraph.ruler && answers.isNotEmpty) ...[
+                const Gap(6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('MIN ${answers.reduce(math.min)}', style: _Dots.mono(10, _Dots.soft(dark), spacing: 1.5)),
+                    Text(
+                      'MAX ${answers.reduce(math.max)}',
+                      style: _Dots.mono(
+                        10,
+                        answers.reduce(math.max) >= _DotsStats.alertPing ? _Dots.red : _Dots.soft(dark),
+                        spacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
             _dotRule(context),
-            _dotRow(context, '↓ ${t.avpn.superLightDown}', '${down.$1} ${down.$2}'),
-            _dotRow(context, '↑ ${t.avpn.superLightUp}', '${up.$1} ${up.$2}'),
-            _dotRow(context, 'VPN / ${t.avpn.connDirect}', '${vpn.$1} / ${direct.$1} ${direct.$2}'),
+            // the rows open the traffic (the big ping picks how the answers are drawn)
+            for (final row in [
+              ('↓ ${t.avpn.superLightDown}', '${down.$1} ${down.$2}'),
+              ('↑ ${t.avpn.superLightUp}', '${up.$1} ${up.$2}'),
+              ('VPN / ${t.avpn.connDirect}', '${vpn.$1} / ${direct.$1} ${direct.$2}'),
+            ])
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => context.goNamed('traffic'),
+                child: _dotRow(context, row.$1, row.$2),
+              ),
           ],
         ],
       ),
     );
   }
+}
+
+/// The menu of the ways the ping block draws the answers.
+Future<void> _pickPingGraph(BuildContext context, WidgetRef ref, PingGraph now) {
+  final ru = ref.read(translationsProvider).requireValue.$meta.locale.languageCode == 'ru';
+  return showDialog<void>(
+    context: context,
+    builder: (dialog) => SimpleDialog(
+      title: Text(ru ? 'Вид задержки' : 'Ping view'),
+      children: [
+        for (final g in PingGraph.values)
+          ListTile(
+            dense: true,
+            title: Text(ru ? g.ru : g.en),
+            trailing: g == now ? const Icon(Icons.check_rounded) : null,
+            onTap: () {
+              unawaited(ref.read(Preferences.pingGraph.notifier).update(g));
+              Navigator.of(dialog).pop();
+            },
+          ),
+      ],
+    ),
+  );
+}
+
+/// The history of the answers in dots: an equalizer, a ruler with a marker, a dotted trace, a grid.
+class _PingDotsPainter extends CustomPainter {
+  _PingDotsPainter({
+    required this.style,
+    required this.samples,
+    required this.scale,
+    required this.ping,
+    required this.ink,
+    required this.accent,
+    required this.faint,
+    required this.text,
+  });
+
+  final PingGraph style;
+  final List<int?> samples;
+
+  /// the top of the equalizer and of the trace, as the bars have it (the ruler's is always 400)
+  final double scale;
+  final int? ping;
+  final Color ink;
+  final Color accent;
+  final Color faint;
+  final Color text;
+
+  static const _top = 400.0;
+
+  void _dot(Canvas canvas, Offset at, double r, Color c) => canvas.drawCircle(at, r, Paint()..color = c);
+
+  bool _slow(int? s) => s == null || s >= 250;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    switch (style) {
+      case PingGraph.equalizer:
+        const n = 24;
+        const rows = 7;
+        final shown = samples.length > n ? samples.sublist(samples.length - n) : samples;
+        final gw = size.width / n;
+        final rh = (size.height - 6) / (rows - 1);
+        for (var i = 0; i < n; i++) {
+          final has = i < shown.length;
+          final s = has ? shown[i] : null;
+          final lit = !has ? 0 : (s == null ? rows : (s / (scale / rows)).round().clamp(1, rows));
+          for (var r = 0; r < rows; r++) {
+            final at = Offset(gw * i + gw / 2, size.height - 3 - r * rh);
+            if (r < lit) {
+              _dot(canvas, at, 2.4, _slow(s) ? accent : ink);
+            } else {
+              _dot(canvas, at, 1.0, faint);
+            }
+          }
+        }
+      case PingGraph.ruler:
+        const n = 48;
+        final gw = size.width / n;
+        const y = 16.0;
+        for (var k = 0; k < n; k++) {
+          final v = k / (n - 1) * _top;
+          final on = ping != null && v <= ping!;
+          final hot = v >= 300;
+          _dot(
+            canvas,
+            Offset(gw * k + gw / 2, y),
+            on ? 3 : 1.4,
+            on ? (hot ? accent : ink) : (hot ? accent.withValues(alpha: .35) : faint),
+          );
+        }
+        if (ping != null) {
+          final mx = gw / 2 + (size.width - gw) * (ping!.clamp(0, 400) / _top);
+          canvas.drawPath(
+            Path()
+              ..moveTo(mx, y - 6)
+              ..lineTo(mx - 4.5, y - 14)
+              ..lineTo(mx + 4.5, y - 14)
+              ..close(),
+            Paint()..color = ping! >= 300 ? accent : ink,
+          );
+        }
+        for (final v in const [0, 100, 200, 300, 400]) {
+          final tp = TextPainter(
+            text: TextSpan(
+              text: v == 400 ? '400+' : '$v',
+              style: _Dots.mono(8.5, text, weight: FontWeight.w700, spacing: 0),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          final x = gw / 2 + (size.width - gw) * (v / _top);
+          tp.paint(canvas, Offset((x - tp.width / 2).clamp(0, size.width - tp.width), y + 11));
+        }
+      case PingGraph.trace:
+        const n = 24;
+        final shown = samples.length > n ? samples.sublist(samples.length - n) : samples;
+        if (shown.isEmpty) return;
+        const top = 6.0;
+        final base = size.height - 4;
+        Offset at(int i) {
+          final v = (shown[i] ?? scale).clamp(0, scale) / scale;
+          return Offset(size.width * i / (n - 1), base - (base - top) * v);
+        }
+
+        canvas.drawLine(
+          Offset(0, base - (base - top) * .25),
+          Offset(size.width, base - (base - top) * .25),
+          Paint()
+            ..color = faint
+            ..strokeWidth = 1,
+        );
+        for (var i = 0; i < shown.length - 1; i++) {
+          final a = at(i);
+          final b = at(i + 1);
+          final steps = math.max(2, ((b - a).distance / 5).floor());
+          for (var k = 0; k < steps; k++) {
+            _dot(canvas, Offset.lerp(a, b, k / steps)!, 1.4, _slow(shown[i]) ? accent : ink);
+          }
+        }
+        for (var i = 0; i < shown.length; i++) {
+          _dot(canvas, at(i), _slow(shown[i]) ? 3 : 2.2, _slow(shown[i]) ? accent : ink);
+        }
+        canvas.drawCircle(
+          at(shown.length - 1),
+          7,
+          Paint()
+            ..color = ink
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1,
+        );
+      case PingGraph.heat:
+        const cols = 30;
+        const rows = 4;
+        final shown = samples.length > cols * rows ? samples.sublist(samples.length - cols * rows) : samples;
+        final gw = size.width / cols;
+        final rh = (size.height - 6) / (rows - 1);
+        // the newest at the bottom right: the grid is filled from the end
+        final start = cols * rows - shown.length;
+        for (var k = 0; k < cols * rows; k++) {
+          final at = Offset(gw * (k % cols) + gw / 2, 3 + rh * (k ~/ cols));
+          final i = k - start;
+          if (i < 0) {
+            _dot(canvas, at, 1.0, faint);
+            continue;
+          }
+          final s = shown[i];
+          if (_slow(s)) {
+            _dot(canvas, at, 3, accent);
+          } else {
+            // the slower, the brighter and bigger
+            final t = (s! / 150).clamp(0.0, 1.0);
+            _dot(canvas, at, 1.6 + t, Color.lerp(faint, ink, .35 + .65 * t)!);
+          }
+        }
+      case PingGraph.bars:
+        break;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PingDotsPainter old) =>
+      old.style != style ||
+      old.ping != ping ||
+      old.scale != scale ||
+      old.ink != ink ||
+      old.accent != accent ||
+      !listEquals(old.samples, samples);
 }
 
 /// The marks behind the ping bars: a faint line at 100, 200, 400 ms (as far as the scale goes), its figure at the right.
@@ -1122,28 +1356,242 @@ class _SiteDots extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final entries = _siteEntries(ref, scheme);
     if (entries.isEmpty) return const SizedBox.shrink();
-    return _dotPaper(
-      context,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SitesHeader(),
-          for (final e in entries)
-            _dotRow(
-              context,
-              e.name,
-              !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
-              valueColour: e.measured && e.colour != _SiteTiles._good ? _Dots.red : null,
-              country: e.country,
-            ),
-        ],
+    final style = ref.watch(Preferences.siteGraph);
+    final history = style == SiteGraph.history ? ref.watch(siteHistoryProvider) : const <String, List<int?>>{};
+    // one scale for all the sites' histories: from zero to a round number over the highest answer (200 ms at least)
+    var highest = 0;
+    for (final h in history.values) {
+      for (final s in h) {
+        if (s != null && s > highest) highest = s;
+      }
+    }
+    final scale = math.min(_niceMax(highest.toDouble(), least: 200), 400.0);
+    final ink = _Dots.ink(dark);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => unawaited(_pickSiteGraph(context, ref, style)),
+      child: _dotPaper(
+        context,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SitesHeader(),
+            for (final e in entries)
+              switch (style) {
+                SiteGraph.list => _dotRow(
+                  context,
+                  e.name,
+                  !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
+                  valueColour: e.measured && e.colour != _SiteTiles._good ? _Dots.red : null,
+                  country: e.country,
+                ),
+                SiteGraph.history => _sitePlate(
+                  dark,
+                  e,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          e.name.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _Dots.mono(11, _Dots.soft(dark)),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 120,
+                        height: 24,
+                        child: CustomPaint(
+                          painter: _SitePainter(
+                            history: true,
+                            samples: history[e.key] ?? const [],
+                            ms: e.ms,
+                            scale: scale,
+                            ink: ink,
+                            accent: _Dots.red,
+                            faint: _Dots.grid(dark),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 48, child: _siteFigure(e, dark, ink)),
+                    ],
+                  ),
+                ),
+                SiteGraph.scales => _sitePlate(
+                  dark,
+                  e,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              e.name.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _Dots.mono(11, _Dots.soft(dark)),
+                            ),
+                          ),
+                          _siteFigure(e, dark, ink),
+                        ],
+                      ),
+                      const Gap(3),
+                      SizedBox(
+                        height: 8,
+                        child: CustomPaint(
+                          painter: _SitePainter(
+                            history: false,
+                            samples: const [],
+                            ms: e.measured ? e.ms : null,
+                            scale: 400,
+                            ink: ink,
+                            accent: _Dots.red,
+                            faint: _Dots.grid(dark),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              },
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
     );
   }
+}
+
+/// The figure of a site's delay, the accent when it is slow.
+Widget _siteFigure(_SiteEntry e, bool dark, Color ink) => Align(
+  alignment: Alignment.centerRight,
+  child: Text(
+    !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
+    style: _Dots.mono(
+      15,
+      e.measured && e.colour != _SiteTiles._good ? _Dots.red : ink,
+      weight: FontWeight.w800,
+      spacing: .5,
+    ),
+  ),
+);
+
+/// A line of the sites' block, with the faint plate under it where the site's server is in another country.
+Widget _sitePlate(bool dark, _SiteEntry e, Widget row) => Padding(
+  padding: const EdgeInsets.symmetric(vertical: 4),
+  child: e.country.isEmpty
+      ? row
+      : Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: -6,
+              right: -6,
+              top: -3,
+              bottom: -3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: _Dots.ink(dark).withValues(alpha: dark ? .09 : .07),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            row,
+          ],
+        ),
+);
+
+/// The dots of a site: the last rounds as stacks of dots (history), or a row filled up to the delay (scale).
+class _SitePainter extends CustomPainter {
+  _SitePainter({
+    required this.history,
+    required this.samples,
+    required this.ms,
+    required this.scale,
+    required this.ink,
+    required this.accent,
+    required this.faint,
+  });
+
+  final bool history;
+  final List<int?> samples;
+  final int? ms;
+  final double scale;
+  final Color ink;
+  final Color accent;
+  final Color faint;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    void dot(Offset at, double r, Color c) => canvas.drawCircle(at, r, Paint()..color = c);
+    if (history) {
+      const n = 14;
+      const rows = 5;
+      final shown = samples.length > n ? samples.sublist(samples.length - n) : samples;
+      final gw = size.width / n;
+      final rh = (size.height - 4) / (rows - 1);
+      for (var i = 0; i < n; i++) {
+        final k = i - (n - shown.length);
+        final has = k >= 0;
+        final s = has ? shown[k] : null;
+        final lit = !has ? 0 : (s == null ? rows : (s / (scale / rows)).round().clamp(1, rows));
+        for (var r = 0; r < rows; r++) {
+          final at = Offset(gw * i + gw / 2, size.height - 2 - r * rh);
+          if (r < lit) {
+            dot(at, 1.7, has && (s == null || s >= 250) ? accent : ink);
+          } else {
+            dot(at, .8, faint);
+          }
+        }
+      }
+    } else {
+      const n = 36;
+      final gw = size.width / n;
+      for (var k = 0; k < n; k++) {
+        final v = k / (n - 1) * scale;
+        final on = ms != null && v <= ms!;
+        final hot = v >= 240;
+        dot(Offset(gw * k + gw / 2, size.height / 2), on ? 2.4 : 1.1, on ? (hot ? accent : ink) : faint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SitePainter old) =>
+      old.history != history ||
+      old.ms != ms ||
+      old.scale != scale ||
+      old.ink != ink ||
+      old.accent != accent ||
+      !listEquals(old.samples, samples);
+}
+
+/// The menu of the ways the sites' block shows the delays.
+Future<void> _pickSiteGraph(BuildContext context, WidgetRef ref, SiteGraph now) {
+  final ru = ref.read(translationsProvider).requireValue.$meta.locale.languageCode == 'ru';
+  return showDialog<void>(
+    context: context,
+    builder: (dialog) => SimpleDialog(
+      title: Text(ru ? 'Вид сайтов' : 'Sites view'),
+      children: [
+        for (final g in SiteGraph.values)
+          ListTile(
+            dense: true,
+            title: Text(ru ? g.ru : g.en),
+            trailing: g == now ? const Icon(Icons.check_rounded) : null,
+            onTap: () {
+              unawaited(ref.read(Preferences.siteGraph.notifier).update(g));
+              Navigator.of(dialog).pop();
+            },
+          ),
+      ],
+    ),
+  );
 }
 
 /// Dots' server: the flag, the protocol in small capitals over the country, the ping in dots.

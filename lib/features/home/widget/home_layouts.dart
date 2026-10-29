@@ -493,11 +493,14 @@ class _PulseStats extends HookConsumerWidget {
 
 /// The sites the home screen times, with the delay's colour, as the tiles have them: the name, the delay, the level.
 class _SiteEntry {
-  const _SiteEntry(this.name, this.ms, this.measured, this.colour, this.level, {this.country = ''});
+  const _SiteEntry(this.name, this.ms, this.measured, this.colour, this.level, {this.country = '', this.key = ''});
 
   /// the country the site's server is in, written out ("Финляндия"), when it is not the one the main server is in
   /// ('' otherwise: the site goes where everything goes)
   final String country;
+
+  /// the site's key, what its history is kept under
+  final String key;
 
   final String name;
   final int? ms;
@@ -538,6 +541,7 @@ List<_SiteEntry> _siteEntries(WidgetRef ref, ColorScheme scheme) {
           !measured ? scheme.outlineVariant : _SiteTiles._colour(ms, grade),
           !measured ? 0.0 : (ms == null ? .08 : (1 - ms / grade.scale).clamp(.08, 1.0)),
           country: _otherCountry(siteServers[site.key], mainServer),
+          key: site.key,
         );
       }(),
   ];
