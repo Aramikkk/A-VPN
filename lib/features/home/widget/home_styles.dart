@@ -1360,255 +1360,195 @@ class _SiteDots extends ConsumerWidget {
     final entries = _siteEntries(ref, scheme);
     if (entries.isEmpty) return const SizedBox.shrink();
     final style = ref.watch(Preferences.siteGraph);
-    final history = style == SiteGraph.history ? ref.watch(siteHistoryProvider) : const <String, List<int?>>{};
-    // one scale for all the sites' histories: a round number over the usual answers (the 90th percentile and a quarter
-    // more, 100 ms at least, 400 at most): one timeout or a slow answer runs off the top, it does not flatten the rest
-    final answers = <int>[
-      for (final h in history.values)
-        for (final s in h)
-          if (s != null) s,
-    ]..sort();
-    final usual = answers.isEmpty ? 0 : answers[((answers.length - 1) * .9).floor()];
-    final scale = math.min(_niceMax(usual * 1.25, least: 100), 400.0);
-    final ink = _Dots.ink(dark);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => unawaited(_pickSiteGraph(context, ref, style)),
-      child: _dotPaper(
-        context,
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _SitesHeader(),
-            if (style == SiteGraph.axis) ...[const Gap(8), _SiteAxis(entries)],
-            for (final e in entries)
-              switch (style) {
-                SiteGraph.axis => const SizedBox.shrink(),
-                SiteGraph.list => _dotRow(
-                  context,
-                  e.name,
-                  !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
-                  valueColour: e.measured && e.colour != _SiteTiles._good ? _Dots.red : null,
-                  country: e.country,
-                ),
-                SiteGraph.history => _sitePlate(
-                  dark,
-                  e,
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          e.name.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: _Dots.mono(11, _Dots.soft(dark)),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 120,
-                        height: 24,
-                        child: CustomPaint(
-                          painter: _SitePainter(
-                            history: true,
-                            samples: history[e.key] ?? const [],
-                            ms: e.ms,
-                            scale: scale,
-                            ink: ink,
-                            accent: _Dots.red,
-                            faint: _Dots.grid(dark),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 48, child: _siteFigure(e, dark, ink)),
-                    ],
-                  ),
-                ),
-                SiteGraph.scales => _sitePlate(
-                  dark,
-                  e,
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              e.name.toUpperCase(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: _Dots.mono(11, _Dots.soft(dark)),
-                            ),
-                          ),
-                          _siteFigure(e, dark, ink),
-                        ],
-                      ),
-                      const Gap(3),
-                      SizedBox(
-                        height: 8,
-                        child: CustomPaint(
-                          painter: _SitePainter(
-                            history: false,
-                            samples: const [],
-                            ms: e.measured ? e.ms : null,
-                            scale: 400,
-                            ink: ink,
-                            accent: _Dots.red,
-                            faint: _Dots.grid(dark),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              },
-          ],
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      ),
-    );
-  }
-}
-
-/// Dots' sites on one axis: each site a dot at its delay, its name and figure over it, in rows where they would meet.
-class _SiteAxis extends StatelessWidget {
-  const _SiteAxis(this.entries);
-
-  final List<_SiteEntry> entries;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final ink = _Dots.ink(dark);
     final soft = _Dots.soft(dark);
-    return LayoutBuilder(
-      builder: (context, box) {
-        final width = box.maxWidth;
-        const margin = 14.0;
-        final plot = width - 2 * margin;
-        final marks = <_AxisMark>[];
-        for (final e in entries) {
-          if (!e.measured) continue;
-          final slow = e.ms == null || e.colour != _SiteTiles._good;
-          final name = TextPainter(
-            text: TextSpan(
-              text: (e.name.split(' ').first).toUpperCase().substring(0, math.min(9, e.name.split(' ').first.length)),
-              style: _Dots.mono(9, soft, spacing: .6),
+    final faint = _Dots.grid(dark);
+    return _dotPaper(
+      context,
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SitesHeader(),
+          switch (style) {
+            SiteGraph.list => Column(
+              children: [
+                for (final e in entries)
+                  _dotRow(
+                    context,
+                    e.name,
+                    !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
+                    valueColour: e.measured && e.colour != _SiteTiles._good ? _Dots.red : null,
+                    country: e.country,
+                  ),
+              ],
             ),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          final value = TextPainter(
-            text: TextSpan(
-              text: e.ms == null ? '—' : '${e.ms}',
-              style: _Dots.mono(12, slow ? _Dots.red : ink, weight: FontWeight.w800),
+            SiteGraph.scales => Column(
+              children: [
+                for (final e in entries)
+                  _sitePlate(
+                    dark,
+                    e,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                e.name.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: _Dots.mono(11, soft),
+                              ),
+                            ),
+                            _siteFigure(e, ink),
+                          ],
+                        ),
+                        const Gap(3),
+                        SizedBox(
+                          height: 8,
+                          child: CustomPaint(
+                            painter: _SitePainter(
+                              kind: SiteGraph.scales,
+                              ms: e.measured ? e.ms : null,
+                              ink: ink,
+                              accent: _Dots.red,
+                              faint: faint,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          final x = margin + plot * ((e.ms ?? 400).clamp(0, 400) / 400);
-          marks.add(_AxisMark(x, name, value, slow));
-        }
-        marks.sort((a, b) => a.x.compareTo(b.x));
-        // the rows: the first one where the label does not meet the one before
-        final edges = <double>[];
-        for (final m in marks) {
-          final w = math.max(m.name.width, m.value.width);
-          final left = (m.x - w / 2).clamp(0.0, width - w);
-          var level = 0;
-          while (level < edges.length && left < edges[level] + 5) {
-            level++;
-          }
-          if (level == edges.length) edges.add(0);
-          edges[level] = left + w;
-          m.level = level;
-          m.left = left;
-        }
-        const pitch = 38.0;
-        final rows = math.max(1, edges.length);
-        final height = 40 + (rows - 1) * pitch + 26;
-        return SizedBox(
-          height: height,
-          child: CustomPaint(
-            size: Size.infinite,
-            painter: _AxisPainter(marks, margin, pitch, ink, _Dots.red, _Dots.grid(dark), soft),
-          ),
-        );
-      },
+            SiteGraph.digits => Column(
+              children: [
+                for (var i = 0; i < entries.length; i += 3)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      children: [
+                        for (var k = i; k < i + 3; k++)
+                          Expanded(
+                            child: k < entries.length
+                                ? _siteDigits(entries[k], ink, soft, faint)
+                                : const SizedBox.shrink(),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            SiteGraph.columns => Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  for (final e in entries)
+                    Expanded(
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 8 * 14.0,
+                            width: 16,
+                            child: CustomPaint(
+                              painter: _SitePainter(
+                                kind: SiteGraph.columns,
+                                ms: e.measured ? e.ms : null,
+                                ink: ink,
+                                accent: _Dots.red,
+                                faint: faint,
+                              ),
+                            ),
+                          ),
+                          const Gap(6),
+                          Text(_shortName(e.name), maxLines: 1, style: _Dots.mono(9, soft, spacing: .4)),
+                          const Gap(2),
+                          _siteFigure(e, ink, size: 11, align: Alignment.center),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            SiteGraph.lanes => Column(
+              children: [
+                for (final e in entries)
+                  _sitePlate(
+                    dark,
+                    e,
+                    SizedBox(
+                      height: 22,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 56,
+                            child: Text(
+                              _shortName(e.name),
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              style: _Dots.mono(10, soft, spacing: .4),
+                            ),
+                          ),
+                          Expanded(
+                            child: CustomPaint(
+                              size: const Size.fromHeight(22),
+                              painter: _SitePainter(
+                                kind: SiteGraph.lanes,
+                                ms: e.measured ? e.ms : null,
+                                ink: ink,
+                                accent: _Dots.red,
+                                faint: faint,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 52, child: _siteFigure(e, ink)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          },
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
     );
   }
 }
 
-class _AxisMark {
-  _AxisMark(this.x, this.name, this.value, this.slow);
-
-  final double x;
-  final TextPainter name;
-  final TextPainter value;
-  final bool slow;
-  int level = 0;
-  double left = 0;
+/// A site's name cut to what fits a narrow column.
+String _shortName(String name) {
+  final first = name.split(' ').first.toUpperCase();
+  return first.length > 7 ? first.substring(0, 7) : first;
 }
 
-class _AxisPainter extends CustomPainter {
-  _AxisPainter(this.marks, this.margin, this.pitch, this.ink, this.accent, this.faint, this.text);
-
-  final List<_AxisMark> marks;
-  final double margin;
-  final double pitch;
-  final Color ink;
-  final Color accent;
-  final Color faint;
-  final Color text;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final axisY = size.height - 22;
-    final plot = size.width - 2 * margin;
-    // the axis: a row of small dots, red from 240 ms
-    for (var k = 0; k <= 40; k++) {
-      final v = k * 10;
-      canvas.drawCircle(
-        Offset(margin + plot * k / 40, axisY),
-        k % 10 == 0 ? 2 : 1.1,
-        Paint()..color = v >= 240 ? accent.withValues(alpha: .45) : faint,
-      );
-    }
-    for (final v in const [0, 100, 200, 300, 400]) {
-      final tp = TextPainter(
-        text: TextSpan(
-          text: v == 400 ? '400+' : '$v',
-          style: _Dots.mono(8.5, text, weight: FontWeight.w700, spacing: 0),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final x = margin + plot * v / 400;
-      tp.paint(canvas, Offset((x - tp.width / 2).clamp(0.0, size.width - tp.width), axisY + 7));
-    }
-    for (final m in marks) {
-      final dotY = axisY - 14 - m.level * pitch;
-      final colour = m.slow ? accent : ink;
-      // the stem down to the axis, dotted
-      // (only for the lowest row: a stem through the labels of the rows under would cross their text)
-      for (var y = dotY + 6; m.level == 0 && y < axisY - 3; y += 5) {
-        canvas.drawCircle(Offset(m.x, y), .9, Paint()..color = faint);
-      }
-      canvas.drawCircle(Offset(m.x, dotY), 4.5, Paint()..color = colour);
-      final w = math.max(m.name.width, m.value.width);
-      m.value.paint(canvas, Offset(m.left + (w - m.value.width) / 2, dotY - 8 - m.value.height));
-      m.name.paint(canvas, Offset(m.left + (w - m.name.width) / 2, dotY - 8 - m.value.height - m.name.height));
-    }
-  }
-
-  @override
-  bool shouldRepaint(_AxisPainter old) => true;
+/// A site's delay in big dots with its name under it (a second and a half is 1.5, in seconds).
+Widget _siteDigits(_SiteEntry e, Color ink, Color soft, Color faint) {
+  final slow = e.measured && e.colour != _SiteTiles._good;
+  final ms = e.ms;
+  final text = !e.measured || ms == null ? '—' : (ms >= 1000 ? (ms / 1000).toStringAsFixed(1) : '$ms');
+  return Column(
+    children: [
+      _DotNumber(text, cell: 4.2, colour: slow ? _Dots.red : ink, faint: faint),
+      const Gap(5),
+      Text(
+        '${_shortName(e.name)}${ms != null && ms >= 1000 ? ' · С' : ''}',
+        maxLines: 1,
+        style: _Dots.mono(9, soft, spacing: .6),
+      ),
+    ],
+  );
 }
 
 /// The figure of a site's delay, the accent when it is slow.
-Widget _siteFigure(_SiteEntry e, bool dark, Color ink) => Align(
-  alignment: Alignment.centerRight,
+Widget _siteFigure(_SiteEntry e, Color ink, {double size = 15, Alignment align = Alignment.centerRight}) => Align(
+  alignment: align,
   child: Text(
     !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
     style: _Dots.mono(
-      15,
+      size,
       e.measured && e.colour != _SiteTiles._good ? _Dots.red : ink,
       weight: FontWeight.w800,
       spacing: .5,
@@ -1641,22 +1581,12 @@ Widget _sitePlate(bool dark, _SiteEntry e, Widget row) => Padding(
         ),
 );
 
-/// The dots of a site: the last rounds as stacks of dots (history), or a row filled up to the delay (scale).
+/// The dots of a site: a row filled up to the delay (scales), a column of them (columns), a runner on a track (lanes).
 class _SitePainter extends CustomPainter {
-  _SitePainter({
-    required this.history,
-    required this.samples,
-    required this.ms,
-    required this.scale,
-    required this.ink,
-    required this.accent,
-    required this.faint,
-  });
+  _SitePainter({required this.kind, required this.ms, required this.ink, required this.accent, required this.faint});
 
-  final bool history;
-  final List<int?> samples;
+  final SiteGraph kind;
   final int? ms;
-  final double scale;
   final Color ink;
   final Color accent;
   final Color faint;
@@ -1664,46 +1594,57 @@ class _SitePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     void dot(Offset at, double r, Color c) => canvas.drawCircle(at, r, Paint()..color = c);
-    if (history) {
-      const n = 14;
-      const rows = 5;
-      final shown = samples.length > n ? samples.sublist(samples.length - n) : samples;
-      final gw = size.width / n;
-      final rh = (size.height - 4) / (rows - 1);
-      for (var i = 0; i < n; i++) {
-        final k = i - (n - shown.length);
-        final has = k >= 0;
-        final s = has ? shown[k] : null;
-        final lit = !has ? 0 : (s == null ? rows : (s / (scale / rows)).round().clamp(1, rows));
+    final slow = ms != null && ms! >= 240;
+    switch (kind) {
+      case SiteGraph.columns:
+        const rows = 8;
+        final lit = ms == null ? 0 : (ms! / (400 / rows)).round().clamp(1, rows);
+        final rh = size.height / rows;
         for (var r = 0; r < rows; r++) {
-          final at = Offset(gw * i + gw / 2, size.height - 2 - r * rh);
+          final at = Offset(size.width / 2, size.height - rh / 2 - r * rh);
           if (r < lit) {
-            dot(at, 1.7, has && (s == null || s >= 250) ? accent : ink);
+            dot(at, 4.2, slow ? accent : ink);
           } else {
-            dot(at, .8, faint);
+            dot(at, 1.4, faint);
           }
         }
-      }
-    } else {
-      const n = 36;
-      final gw = size.width / n;
-      for (var k = 0; k < n; k++) {
-        final v = k / (n - 1) * scale;
-        final on = ms != null && v <= ms!;
-        final hot = v >= 240;
-        dot(Offset(gw * k + gw / 2, size.height / 2), on ? 2.4 : 1.1, on ? (hot ? accent : ink) : faint);
-      }
+      case SiteGraph.lanes:
+        const n = 26;
+        final gw = size.width / n;
+        final y = size.height / 2;
+        for (var k = 0; k < n; k++) {
+          dot(Offset(gw * k + gw / 2, y), 1.2, faint);
+        }
+        if (ms != null) {
+          // the faster, the nearer the finish on the right
+          final run = 1 - (ms!.clamp(0, 400) / 400);
+          final head = size.width * run;
+          for (var t = 0; t < 5; t++) {
+            dot(Offset(math.max(3.0, head - t * 7), y), 3.4 - t * .5, slow ? accent : ink);
+          }
+        }
+        canvas.drawLine(
+          Offset(size.width - 1, y - 8),
+          Offset(size.width - 1, y + 8),
+          Paint()
+            ..color = faint
+            ..strokeWidth = 1,
+        );
+      case _:
+        const n = 36;
+        final gw = size.width / n;
+        for (var k = 0; k < n; k++) {
+          final v = k / (n - 1) * 400;
+          final on = ms != null && v <= ms!;
+          final hot = v >= 240;
+          dot(Offset(gw * k + gw / 2, size.height / 2), on ? 2.4 : 1.1, on ? (hot ? accent : ink) : faint);
+        }
     }
   }
 
   @override
   bool shouldRepaint(_SitePainter old) =>
-      old.history != history ||
-      old.ms != ms ||
-      old.scale != scale ||
-      old.ink != ink ||
-      old.accent != accent ||
-      !listEquals(old.samples, samples);
+      old.kind != kind || old.ms != ms || old.ink != ink || old.accent != accent || old.faint != faint;
 }
 
 /// The menu of the ways the sites' block shows the delays.
