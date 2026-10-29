@@ -4644,129 +4644,143 @@ class _SitesHeader extends HookConsumerWidget {
     // accent fills round it, a site at a time, closes when they have all answered and fades
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
-      child: Row(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          // the delay check, a pill like the multi-server one beside it: the sign and the name; while the sites are
-          // asked the sign is a small ring of the accent that fills a site at a time
-          // Dots: no check button here, the swipe down on the home screen refreshes
-          if (!signs)
-            Container(
-              height: 30,
-              padding: const EdgeInsets.symmetric(horizontal: 9),
-              decoration:
-                  delayPill?.box ??
-                  BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
-                    border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
-                  ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  sites.testing
-                      ? TweenAnimationBuilder<double>(
-                          tween: Tween(end: (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0)),
-                          duration: lightDuration(const Duration(milliseconds: 500)),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, fill, _) => SizedBox(
-                            width: 15,
-                            height: 15,
-                            child: CircularProgressIndicator(
-                              value: fill,
-                              strokeWidth: 2,
-                              strokeCap: StrokeCap.round,
-                              color: accent,
-                              backgroundColor: scheme.outlineVariant,
-                            ),
-                          ),
-                        )
-                      : Icon(Icons.refresh_rounded, size: 15, color: delayPill?.ink ?? scheme.onSurfaceVariant),
-                  if (!signs) const Gap(6),
-                  if (!signs)
-                    Text(
-                      upper ? t.avpn.sitesTitle.toUpperCase() : t.avpn.sitesTitle,
-                      style:
-                          delayPill?.text ??
-                          theme.textTheme.labelSmall?.copyWith(
-                            color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: .3,
-                          ),
-                    ),
-                ],
+          // Dots: the block's name in the middle of the block
+          if (signs)
+            IgnorePointer(
+              child: Text(
+                t.avpn.multiServersTitle.toUpperCase(),
+                maxLines: 1,
+                style: _Dots.mono(10, _Dots.soft(theme.brightness == Brightness.dark), spacing: 1.6),
               ),
             ),
-          if (!signs) const Spacer(),
-          // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
-          GestureDetector(
-            key: const Key('multi-servers'),
-            behavior: HitTestBehavior.opaque,
-            onTap: () => ref.read(multiPref.notifier).update(!multiOn),
-            child: Container(
-              height: 30,
-              padding: const EdgeInsets.symmetric(horizontal: 9),
-              decoration:
-                  multiPill?.box ??
-                  BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
-                    border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
+          Row(
+            children: [
+              // the delay check, a pill like the multi-server one beside it: the sign and the name; while the sites are
+              // asked the sign is a small ring of the accent that fills a site at a time
+              // Dots: no check button here, the swipe down on the home screen refreshes
+              if (!signs)
+                Container(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 9),
+                  decoration:
+                      delayPill?.box ??
+                      BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        color: sites.testing ? accent.withValues(alpha: .16) : Colors.transparent,
+                        border: Border.all(color: sites.testing ? accent : scheme.outlineVariant),
+                      ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      sites.testing
+                          ? TweenAnimationBuilder<double>(
+                              tween: Tween(end: (.08 + .92 * sites.done / math.max(1, shown.length)).clamp(0.0, 1.0)),
+                              duration: lightDuration(const Duration(milliseconds: 500)),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, fill, _) => SizedBox(
+                                width: 15,
+                                height: 15,
+                                child: CircularProgressIndicator(
+                                  value: fill,
+                                  strokeWidth: 2,
+                                  strokeCap: StrokeCap.round,
+                                  color: accent,
+                                  backgroundColor: scheme.outlineVariant,
+                                ),
+                              ),
+                            )
+                          : Icon(Icons.refresh_rounded, size: 15, color: delayPill?.ink ?? scheme.onSurfaceVariant),
+                      if (!signs) const Gap(6),
+                      if (!signs)
+                        Text(
+                          upper ? t.avpn.sitesTitle.toUpperCase() : t.avpn.sitesTitle,
+                          style:
+                              delayPill?.text ??
+                              theme.textTheme.labelSmall?.copyWith(
+                                color: sites.testing ? scheme.onSurface : scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .3,
+                              ),
+                        ),
+                    ],
                   ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.alt_route_rounded,
-                    size: 15,
-                    color: multiPill?.ink ?? (multiOn ? accent : scheme.onSurfaceVariant),
+                ),
+              if (!signs) const Spacer(),
+              // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
+              GestureDetector(
+                key: const Key('multi-servers'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => ref.read(multiPref.notifier).update(!multiOn),
+                child: Container(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 9),
+                  decoration:
+                      multiPill?.box ??
+                      BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        color: multiOn ? accent.withValues(alpha: .16) : Colors.transparent,
+                        border: Border.all(color: multiOn ? accent : scheme.outlineVariant),
+                      ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.alt_route_rounded,
+                        size: 15,
+                        color: multiPill?.ink ?? (multiOn ? accent : scheme.onSurfaceVariant),
+                      ),
+                      // Dots: the network the switch is for, beside the sign
+                      if (signs) ...[
+                        const Gap(5),
+                        Icon(
+                          onMobile ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded,
+                          size: 15,
+                          color: multiPill?.ink ?? (multiOn ? accent : scheme.onSurfaceVariant),
+                        ),
+                      ] else ...[
+                        const Gap(6),
+                        Text(
+                          upper
+                              ? '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}'.toUpperCase()
+                              : '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
+                          style:
+                              multiPill?.text ??
+                              theme.textTheme.labelSmall?.copyWith(
+                                color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .3,
+                              ),
+                        ),
+                      ],
+                    ],
                   ),
-                  // Dots: the network the switch is for, beside the sign
-                  if (signs) ...[
-                    const Gap(5),
-                    Icon(
-                      onMobile ? Icons.signal_cellular_alt_rounded : Icons.wifi_rounded,
-                      size: 15,
-                      color: multiPill?.ink ?? (multiOn ? accent : scheme.onSurfaceVariant),
-                    ),
-                  ] else ...[
-                    const Gap(6),
-                    Text(
-                      upper
-                          ? '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}'.toUpperCase()
-                          : '${t.avpn.multiServers} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
-                      style:
-                          multiPill?.text ??
-                          theme.textTheme.labelSmall?.copyWith(
-                            color: multiOn ? scheme.onSurface : scheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: .3,
-                          ),
-                    ),
-                  ],
-                ],
+                ),
               ),
-            ),
+              // Dots: the switch on the left, the button of the block's view on the right
+              if (signs) ...[
+                const Spacer(),
+                GestureDetector(
+                  key: const Key('sites-view'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => unawaited(_pickSiteGraph(context, ref, ref.read(Preferences.siteGraph))),
+                  child: Container(
+                    height: 30,
+                    width: 34,
+                    decoration:
+                        delayPill?.box ??
+                        BoxDecoration(
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: scheme.outlineVariant),
+                        ),
+                    child: Icon(Icons.grid_view_rounded, size: 15, color: delayPill?.ink ?? scheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ],
           ),
-          // Dots: the switch on the left, the button of the block's view on the right
-          if (signs) ...[
-            const Spacer(),
-            GestureDetector(
-              key: const Key('sites-view'),
-              behavior: HitTestBehavior.opaque,
-              onTap: () => unawaited(_pickSiteGraph(context, ref, ref.read(Preferences.siteGraph))),
-              child: Container(
-                height: 30,
-                width: 34,
-                decoration:
-                    delayPill?.box ??
-                    BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: scheme.outlineVariant),
-                    ),
-                child: Icon(Icons.grid_view_rounded, size: 15, color: delayPill?.ink ?? scheme.onSurfaceVariant),
-              ),
-            ),
-          ],
         ],
       ),
     );

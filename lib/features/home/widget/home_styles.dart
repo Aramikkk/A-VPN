@@ -1350,11 +1350,21 @@ class _PingGridPainter extends CustomPainter {
 }
 
 /// Dots' sites: a line for each, the name on the left and the delay on the right, red when it is slow.
-class _SiteDots extends ConsumerWidget {
+class _SiteDots extends HookConsumerWidget {
   const _SiteDots();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // the delays are asked again every minute while the VPN is up and the block is on the screen (quietly: no ring)
+    final up = ref.watch(connectionNotifierProvider.select((v) => v.valueOrNull?.isConnected ?? false));
+    useEffect(() {
+      if (!up) return null;
+      final timer = Timer.periodic(
+        const Duration(minutes: 1),
+        (_) => unawaited(ref.read(siteLatencyProvider.notifier).test(quiet: true)),
+      );
+      return timer.cancel;
+    }, [up]);
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final entries = _siteEntries(ref, scheme);
