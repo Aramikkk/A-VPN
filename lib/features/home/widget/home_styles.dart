@@ -1137,10 +1137,9 @@ class _BentoButton extends StatelessWidget {
   }
 }
 
-/// Dots' connect control: a black disc (light by night) with a red dot that glows while connected.
-/// Dots' connect control: a square-cornered plate (the pills' and plates' shape) with the power sign drawn in dots, a
-/// ring open at the top and a stem; off, faint dots on the paper in an outline, on, the plate in the ink with the sign
-/// lit in the accent; connecting, a lit stretch of the ring runs round it.
+/// Dots' connect control: a toggle of dots right on the paper, a track of small dots with a square thumb of nine
+/// dots; off, the thumb sits at the left, faint; on, at the right, lit in the accent and glowing; connecting, it runs
+/// back and forth. The network is named under it.
 class _DotsButton extends HookWidget {
   const _DotsButton({required this.on, required this.busy, required this.size, this.label, this.onTap});
 
@@ -1153,38 +1152,44 @@ class _DotsButton extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final spin = useAnimationController(duration: const Duration(milliseconds: 1400));
+    final run = useAnimationController(duration: const Duration(milliseconds: 900));
     useEffect(() {
-      busy ? spin.repeat() : spin.stop();
+      busy ? run.repeat(reverse: true) : run.stop();
       return null;
     }, [busy]);
     final ink = _Dots.ink(dark);
     final soft = _Dots.soft(dark);
-    // no plate: the sign of dots right on the paper, the network under it
+    final width = size * 1.15;
+    Widget toggle(double position) => CustomPaint(
+      size: Size(width, width * 2 / 10),
+      painter: _ToggleDotsPainter(
+        position: position,
+        thumb: on || busy ? _Dots.red : soft,
+        track: ink.withValues(alpha: .2),
+        glow: on && !busy,
+      ),
+    );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedBuilder(
-              animation: spin,
-              builder: (context, _) => CustomPaint(
-                size: Size.square(size * .92),
-                painter: _PowerDotsPainter(
-                  lit: on || busy ? _Dots.red : soft,
-                  stem: on ? ink : soft,
-                  faint: on ? ink.withValues(alpha: .25) : soft,
-                  phase: busy ? spin.value : null,
-                  glow: on,
-                ),
-              ),
-            ),
-            // the line stays when there is no network to name, so the panel does not change height (the sign jumped up
-            // when the name came)
-            const Gap(8),
+            busy
+                ? AnimatedBuilder(
+                    animation: run,
+                    builder: (context, _) => toggle(Curves.easeInOut.transform(run.value)),
+                  )
+                : TweenAnimationBuilder<double>(
+                    tween: Tween(end: on ? 1.0 : 0.0),
+                    duration: lightDuration(const Duration(milliseconds: 260)),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, position, _) => toggle(position),
+                  ),
+            // the line stays when there is no network to name, so the panel does not change height
+            const Gap(10),
             Text((label ?? ' ').toUpperCase(), style: _Dots.mono(10, on ? ink : soft, spacing: 1.6)),
           ],
         ),
@@ -1193,83 +1198,50 @@ class _DotsButton extends HookWidget {
   }
 }
 
-class _PowerDotsPainter extends CustomPainter {
-  _PowerDotsPainter({
-    required this.lit,
-    required this.stem,
-    required this.faint,
-    required this.phase,
-    required this.glow,
-  });
+class _ToggleDotsPainter extends CustomPainter {
+  _ToggleDotsPainter({required this.position, required this.thumb, required this.track, required this.glow});
 
-  /// the centre dot's colour (the accent, or the faint one when off)
-  final Color lit;
-
-  /// the frame's dots when on
-  final Color stem;
-  final Color faint;
-
-  /// connecting: how far round the frame the lit stretch has run (0 to 1); null otherwise
-  final double? phase;
-
-  /// on: the centre glows
+  /// 0 at the left end, 1 at the right
+  final double position;
+  final Color thumb;
+  final Color track;
   final bool glow;
 
-  /// the frame's dots of the 5 x 5 grid, clockwise from the top left (the corners are left out)
-  static const _frame = [
-    (1, 0), (2, 0), (3, 0), (4, 1), (4, 2), (4, 3), (3, 4), (2, 4), (1, 4), (0, 3), (0, 2), (0, 1), //
-  ];
+  static const _columns = 11;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final step = size.width / 4;
-    Offset at(int i, int j) => Offset(i * step, j * step);
-    final big = step * .31;
-    final small = step * .1;
-    final dim = Paint()..color = faint.withValues(alpha: .7);
-    for (var j = 0; j < 5; j++) {
-      for (var i = 0; i < 5; i++) {
-        if (i == 2 && j == 2) continue;
-        final corner = (i == 0 || i == 4) && (j == 0 || j == 4);
-        final onFrame = !corner && (i == 0 || i == 4 || j == 0 || j == 4);
-        if (!onFrame) canvas.drawCircle(at(i, j), small, dim);
+    final step = size.width / (_columns - 1);
+    final row = size.height / 2;
+    final small = step * .17;
+    final big = step * .4;
+    final trackPaint = Paint()..color = track;
+    for (var j = 0; j < 3; j++) {
+      for (var i = 0; i < _columns; i++) {
+        canvas.drawCircle(Offset(i * step, row * j), small, trackPaint);
       }
     }
-    for (final (k, (i, j)) in _frame.indexed) {
-      var colour = phase == null ? (glow ? stem : faint) : faint;
-      var lamp = false;
-      if (phase != null) {
-        final d = (k / _frame.length - phase!) % 1.0;
-        lamp = (d < 0 ? d + 1 : d) < .34;
-        if (lamp) colour = lit;
+    final left = position * (_columns - 3);
+    final lit = Paint()..color = thumb;
+    for (var j = 0; j < 3; j++) {
+      for (var i = 0; i < 3; i++) {
+        canvas.drawCircle(Offset((left + i) * step, row * j), big, lit);
       }
-      if (lamp) {
-        canvas.drawCircle(
-          at(i, j),
-          big * 1.9,
-          Paint()
-            ..color = lit.withValues(alpha: .3)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-        );
-      }
-      canvas.drawCircle(at(i, j), big * .85, Paint()..color = colour);
     }
-    final centre = at(2, 2);
     if (glow) {
       canvas.drawCircle(
-        centre,
-        big * 2.3,
+        Offset((left + 1) * step, row),
+        step * 1.6,
         Paint()
-          ..color = lit.withValues(alpha: .4)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+          ..color = thumb.withValues(alpha: .35)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
       );
     }
-    canvas.drawCircle(centre, big * 1.35, Paint()..color = phase != null ? lit.withValues(alpha: .55) : lit);
   }
 
   @override
-  bool shouldRepaint(_PowerDotsPainter old) =>
-      old.lit != lit || old.stem != stem || old.faint != faint || old.phase != phase || old.glow != glow;
+  bool shouldRepaint(_ToggleDotsPainter old) =>
+      old.position != position || old.thumb != thumb || old.track != track || old.glow != glow;
 }
 
 /// A pill over the sites (the delay check, the multi-server switch) in a look that has its own: Bento's solid chip,
@@ -1291,7 +1263,7 @@ class _PowerDotsPainter extends CustomPainter {
         box: BoxDecoration(
           color: on ? _Dots.ink(dark) : null,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: _Dots.ink(dark).withValues(alpha: .7)),
+          border: Border.all(color: _Dots.ink(dark).withValues(alpha: .35)),
         ),
         ink: ink,
         text: _Dots.mono(11, ink, weight: FontWeight.w700),
@@ -1322,7 +1294,7 @@ Widget? lookPlate(HomeLayout look, BuildContext context, Widget child) {
         decoration: BoxDecoration(
           color: _Dots.paper(dark),
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: _Dots.ink(dark).withValues(alpha: .7)),
+          border: Border.all(color: _Dots.ink(dark).withValues(alpha: .35)),
         ),
         child: child,
       ),
