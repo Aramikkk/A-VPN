@@ -17,7 +17,7 @@ enum SiteGraph {
   final String ru;
   final String en;
 
-  static const fallback = axis;
+  static const fallback = scales;
 
   static SiteGraph fromName(String? name) => values.firstWhere((e) => e.name == name, orElse: () => fallback);
 }
