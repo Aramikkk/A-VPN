@@ -68,6 +68,8 @@ class AboutPage extends HookConsumerWidget {
                       Text(t.common.appTitle, style: Theme.of(context).textTheme.titleLarge),
                       const Gap(4),
                       Text("${t.common.version} ${appInfo.presentVersion}"),
+                      const Gap(2),
+                      Text('by aramikkk', style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 ],

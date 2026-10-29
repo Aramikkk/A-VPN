@@ -667,6 +667,52 @@ class _DotGridPainter extends CustomPainter {
 /// white on a dark one (the OLED palette's accent is black, and the dark ink vanished on it)
 Color _onAccent(Color accent) => accent.computeLuminance() > .4 ? ContrastPalette.ink : Colors.white;
 
+/// The "clear" sign of the stats pages: in Dots a small bin of dots (a lid and a body, the body's sides lit), else the
+/// sweep sign.
+Widget clearIcon({Color? color, double size = 24}) {
+  if (homeLookNow != HomeLayout.dots) return Icon(Icons.delete_sweep_rounded, color: color, size: size);
+  return Builder(
+    builder: (context) => CustomPaint(
+      size: Size.square(size),
+      painter: _DotsBinPainter(
+        color ?? IconTheme.of(context).color ?? _Dots.ink(Theme.of(context).brightness == Brightness.dark),
+      ),
+    ),
+  );
+}
+
+class _DotsBinPainter extends CustomPainter {
+  _DotsBinPainter(this.colour);
+
+  final Color colour;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final step = size.width / 8;
+    final lit = Paint()..color = colour;
+    final dim = Paint()..color = colour.withValues(alpha: .3);
+    final r = step * .38;
+    Offset at(num i, num j) => Offset((i + .5) * step, (j + .5) * step);
+    // the handle and the lid
+    for (final i in const [3, 4]) {
+      canvas.drawCircle(at(i, 0), r, lit);
+    }
+    for (var i = 0; i < 8; i++) {
+      canvas.drawCircle(at(i, 1.6), r, lit);
+    }
+    // the body: its sides and bottom lit, the middle faint
+    for (var j = 3; j < 8; j++) {
+      for (var i = 1; i <= 6; i++) {
+        final edge = i == 1 || i == 6 || j == 7;
+        canvas.drawCircle(at(i, j), edge ? r : r * .55, edge ? lit : dim);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotsBinPainter old) => old.colour != colour;
+}
+
 /// A number drawn as a 5×7 matrix of dots for each figure: the lit dots in the ink, the rest faint.
 class _DotNumber extends StatelessWidget {
   const _DotNumber(this.text, {required this.cell, required this.colour, required this.faint});

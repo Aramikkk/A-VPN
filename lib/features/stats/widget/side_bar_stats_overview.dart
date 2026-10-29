@@ -1490,9 +1490,11 @@ class _PingBlock extends ConsumerWidget {
               painter: _PingGraph(
                 period.bars,
                 slots: period.slots,
-                colour: theme.araAccent,
-                // Dots: a slow answer in its red, as the home screen's bars
-                slow: homeLookNow == HomeLayout.dots ? const Color(0xFFE8231C) : const Color(0xFF8C939C),
+                // Dots: the ordinary bars in the text's colour (white by night, black by day), the style's colour only
+                // for a very slow answer (300 ms and over)
+                colour: homeLookNow == HomeLayout.dots ? scheme.onSurface : theme.araAccent,
+                slow: homeLookNow == HomeLayout.dots ? theme.araAccent : const Color(0xFF8C939C),
+                slowAt: homeLookNow == HomeLayout.dots ? 300 : 150,
                 grid: scheme.onSurface.withValues(alpha: .06),
               ),
               child: const SizedBox.expand(),
@@ -1517,13 +1519,23 @@ class _PingBlock extends ConsumerWidget {
 /// A bar per slot, as tall as its ping on a scale rounded up from the slowest; slots over 150 ms grey, a slot
 /// with nothing answered left out.
 class _PingGraph extends CustomPainter {
-  _PingGraph(this.bars, {required this.slots, required this.colour, required this.slow, required this.grid});
+  _PingGraph(
+    this.bars, {
+    required this.slots,
+    required this.colour,
+    required this.slow,
+    required this.grid,
+    this.slowAt = 150,
+  });
 
   final List<int?> bars;
   final int slots;
   final Color colour;
   final Color slow;
   final Color grid;
+
+  /// from this many ms a bar is drawn in [slow]
+  final int slowAt;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1548,7 +1560,7 @@ class _PingGraph extends CustomPainter {
           Rect.fromLTWH((start + i) * w + w * .15, size.height - h, w * .7, h),
           Radius.circular(math.min(2, w * .3)),
         ),
-        paint..color = v > 150 ? slow : colour,
+        paint..color = v > slowAt ? slow : colour,
       );
     }
   }

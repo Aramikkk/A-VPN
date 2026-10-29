@@ -1856,7 +1856,7 @@ class _HomeTraffic extends ConsumerWidget {
 /// Contrast's home: on the upper zone (its light behind the app bar too: [ContrastGlow]) the session, the servers,
 /// the traffic and the toggles, each a block of its own; then a black panel holding the connect control only, with
 /// a tab on its top edge that brings the connections in.
-class _ContrastHome extends StatelessWidget {
+class _ContrastHome extends ConsumerWidget {
   const _ContrastHome({
     required this.header,
     required this.status,
@@ -1891,11 +1891,15 @@ class _ContrastHome extends StatelessWidget {
   final bool superLight;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // the big ping block opens the session's traffic (it came down from the top with a swipe); the swipe down now pings
+    // every server, as the check button does (Settings are on the cog; the super light mode keeps its swipe to them)
+    Widget opensTraffic(Widget block) => superLight
+        ? block
+        : GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => context.goNamed('traffic'), child: block);
     return _LongSwipe(
-      // down: the session's traffic comes down from the top (Settings are on the cog); up: the day's connections
-      // come up from the panel
-      onDown: () => superLight ? context.goNamed('settings') : context.goNamed('traffic'),
+      // down: a ping of everything; up: the day's connections come up from the panel
+      onDown: () => superLight ? context.goNamed('settings') : unawaited(pingAllServers(ref)),
       onUp: () {
         if (!superLight) context.goNamed('connections');
       },
@@ -1939,9 +1943,10 @@ class _ContrastHome extends StatelessWidget {
                     FitSlot(
                       group: 1,
                       grow: homeLookNow == HomeLayout.bento ? 3 : 0,
-                      child: _ContrastBlock(child: status),
+                      child: _ContrastBlock(child: opensTraffic(status)),
                     ),
-                    if (statusSlim != null) FitSlot(group: 1, rank: 1, child: _ContrastBlock(child: statusSlim!)),
+                    if (statusSlim != null)
+                      FitSlot(group: 1, rank: 1, child: _ContrastBlock(child: opensTraffic(statusSlim!))),
                     if (!superLight) FitSlot(group: 2, child: _ContrastBlock(child: servers)),
                     FitSlot(
                       group: 3,
@@ -1965,7 +1970,7 @@ class _ContrastHome extends StatelessWidget {
                 Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
                 // the blocks a little apart (14, was 8)
                 if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(14)],
-                _ContrastBlock(child: status),
+                _ContrastBlock(child: opensTraffic(status)),
                 between(),
                 // the super light mode: the servers' list below holds the one in use, so not twice
                 if (!superLight) ...[_ContrastBlock(child: servers), between()],

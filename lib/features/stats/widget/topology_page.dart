@@ -150,7 +150,7 @@ class TopologyPage extends HookConsumerWidget {
           if (state.items.any((c) => !c.active))
             IconButton(
               tooltip: t.avpn.connClear,
-              icon: const Icon(Icons.cleaning_services_rounded),
+              icon: clearIcon(),
               onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
             ),
         ],

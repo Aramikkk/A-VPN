@@ -184,7 +184,7 @@ class ConnectionsPage extends HookConsumerWidget {
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       iconSize: 18,
-                      icon: Icon(Icons.cleaning_services_rounded, color: scheme.onSurfaceVariant),
+                      icon: clearIcon(color: scheme.onSurfaceVariant),
                       onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
                     ),
                 ],
@@ -241,7 +241,7 @@ class ConnectionsPage extends HookConsumerWidget {
                 if (all.any((c) => !c.active))
                   IconButton(
                     tooltip: t.avpn.connClear,
-                    icon: const Icon(Icons.cleaning_services_rounded),
+                    icon: clearIcon(),
                     onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
                   ),
               ],
@@ -277,7 +277,7 @@ class ConnectionsPage extends HookConsumerWidget {
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
                                       iconSize: 18,
-                                      icon: Icon(Icons.cleaning_services_rounded, color: scheme.onSurfaceVariant),
+                                      icon: clearIcon(color: scheme.onSurfaceVariant),
                                       onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
                                     ),
                                 ],

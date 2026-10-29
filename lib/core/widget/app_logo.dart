@@ -30,7 +30,7 @@ class AppLogo extends StatelessWidget {
   ];
   static const _bar = [(-70, 673), (70, 673), (-210, 673), (210, 673)];
   static const _faint = [(0, 443), (-49, 556), (49, 556), (-112, 795), (112, 795)];
-  static const _k = .5;
+  static const _k = .42;
 
   static final _svgs = <bool, String>{};
 

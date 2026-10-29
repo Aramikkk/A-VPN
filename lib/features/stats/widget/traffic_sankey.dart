@@ -1881,13 +1881,7 @@ bool _lookLine(
           ..strokeCap = StrokeCap.round
           ..strokeWidth = live ? 3.2 : 2.2,
       );
-      if (head) {
-        final headAt = metric.getTangentForOffset(metric.length * at)!.position;
-        canvas.drawRect(
-          Rect.fromCenter(center: headAt, width: 7, height: 7),
-          Paint()..color = colour.withValues(alpha: (live ? 1 : .55) * alpha),
-        );
-      }
+      // no fixed head on a Dots line: only the squares that run along the ones in use show where the traffic goes
       return true;
     case HomeLayout.bento:
       final path = metric.extractPath(0, metric.length);
