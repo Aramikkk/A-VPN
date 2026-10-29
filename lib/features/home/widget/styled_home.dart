@@ -4696,7 +4696,7 @@ class _SitesHeader extends HookConsumerWidget {
                 ],
               ),
             ),
-          const Spacer(),
+          if (!signs) const Spacer(),
           // the multi-server switch, for the network in use (Wi-Fi or LTE): a tap turns it on or off
           GestureDetector(
             key: const Key('multi-servers'),
@@ -4747,6 +4747,8 @@ class _SitesHeader extends HookConsumerWidget {
               ),
             ),
           ),
+          // Dots: the switch alone, on the left
+          if (signs) const Spacer(),
         ],
       ),
     );

@@ -1361,14 +1361,15 @@ class _SiteDots extends ConsumerWidget {
     if (entries.isEmpty) return const SizedBox.shrink();
     final style = ref.watch(Preferences.siteGraph);
     final history = style == SiteGraph.history ? ref.watch(siteHistoryProvider) : const <String, List<int?>>{};
-    // one scale for all the sites' histories: from zero to a round number over the highest answer (200 ms at least)
-    var highest = 0;
-    for (final h in history.values) {
-      for (final s in h) {
-        if (s != null && s > highest) highest = s;
-      }
-    }
-    final scale = math.min(_niceMax(highest.toDouble(), least: 200), 400.0);
+    // one scale for all the sites' histories: a round number over the usual answers (the 90th percentile and a quarter
+    // more, 100 ms at least, 400 at most): one timeout or a slow answer runs off the top, it does not flatten the rest
+    final answers = <int>[
+      for (final h in history.values)
+        for (final s in h)
+          if (s != null) s,
+    ]..sort();
+    final usual = answers.isEmpty ? 0 : answers[((answers.length - 1) * .9).floor()];
+    final scale = math.min(_niceMax(usual * 1.25, least: 100), 400.0);
     final ink = _Dots.ink(dark);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
