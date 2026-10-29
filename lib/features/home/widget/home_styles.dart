@@ -1461,7 +1461,7 @@ class _SiteDots extends HookConsumerWidget {
                         Column(
                           children: [
                             SizedBox(
-                              height: 8 * 14.0,
+                              height: 7 * 14.0,
                               width: 16,
                               child: CustomPaint(
                                 painter: _SitePainter(
@@ -1480,8 +1480,24 @@ class _SiteDots extends HookConsumerWidget {
                                 height: 14,
                                 child: e.flag.isEmpty ? null : Center(child: _flagMark(e.flag, width: 18)),
                               ),
-                            Text(_shortName(e.name), maxLines: 1, style: _Dots.mono(9, soft, spacing: .4)),
-                            const Gap(2),
+                            // the same gap between the flag, the name and the figure
+                            const Gap(5),
+                            // the whole name, as small as it takes to fit its column
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              child: SizedBox(
+                                height: 13,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    e.name.toUpperCase(),
+                                    maxLines: 1,
+                                    style: _Dots.mono(9, soft, spacing: 0),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const Gap(5),
                             _siteFigure(e, ink, size: 11, align: Alignment.center),
                           ],
                         ),
@@ -1537,14 +1553,74 @@ class _SiteDots extends HookConsumerWidget {
 /// A country's flag as a small grid of square pixels (Dots): the stripes, crosses and discs of the commonest countries;
 /// any other country keeps its emoji.
 Widget _flagMark(String? flag, {double width = 26}) {
-  final grid = _PixelFlag.of(flag ?? '');
-  if (grid == null) {
+  if (flag == null || flag.isEmpty) {
     return Text(
-      flag ?? '🌐',
+      '🌐',
       style: TextStyle(fontSize: width * .66, height: 1, fontFamilyFallback: const ['Emoji']),
     );
   }
-  return CustomPaint(size: Size(width, width * 2 / 3), painter: _PixelFlag(grid));
+  return _FlagMark(flag, width);
+}
+
+/// A flag in pixels: the pattern drawn by hand when there is one, else the country's emoji of the bundled font turned
+/// into the same grid (drawn to a picture once, each cell the average of its block), so every country has a pixel flag.
+class _FlagMark extends StatefulWidget {
+  const _FlagMark(this.flag, this.width);
+
+  final String flag;
+  final double width;
+
+  @override
+  State<_FlagMark> createState() => _FlagMarkState();
+}
+
+class _FlagMarkState extends State<_FlagMark> {
+  List<List<Color>>? _grid;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(_FlagMark old) {
+    super.didUpdateWidget(old);
+    if (old.flag != widget.flag) _resolve();
+  }
+
+  void _resolve() {
+    final flag = widget.flag;
+    _grid = _PixelFlag.of(flag) ?? _PixelFlag.pixelated[flag];
+    _failed = false;
+    if (_grid != null) return;
+    unawaited(
+      _PixelFlag.pixelate(flag).then((grid) {
+        if (!mounted || widget.flag != flag) return;
+        setState(() {
+          _grid = grid;
+          _failed = grid == null;
+        });
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final grid = _grid;
+    if (grid != null) {
+      return CustomPaint(size: Size(widget.width, widget.width * 2 / 3), painter: _PixelFlag(grid));
+    }
+    if (_failed) {
+      return Text(
+        widget.flag,
+        style: TextStyle(fontSize: widget.width * .66, height: 1, fontFamilyFallback: const ['Emoji']),
+      );
+    }
+    // while the picture is made: the room of the flag
+    return SizedBox(width: widget.width, height: widget.width * 2 / 3);
+  }
 }
 
 /// A site's name with its flag before it (when its server is in another country), the name cut by an ellipsis.
@@ -1632,6 +1708,74 @@ class _PixelFlag extends CustomPainter {
 
   static final _cache = <String, List<List<Color>>?>{};
 
+  /// the flags made from the emoji, by the emoji (kept: a flag is drawn once)
+  static final pixelated = <String, List<List<Color>>?>{};
+  static final _making = <String, Future<List<List<Color>>?>>{};
+
+  /// The country's emoji drawn to a picture and cut to the grid; null when the font has no picture for it.
+  static Future<List<List<Color>>?> pixelate(String flag) => _making.putIfAbsent(flag, () async {
+    try {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: flag,
+          style: const TextStyle(fontSize: 120, height: 1, fontFamily: 'Emoji', color: Color(0xFF000000)),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final w = painter.width.ceil();
+      final h = painter.height.ceil();
+      if (w < 8 || h < 8) return null;
+      final recorder = ui.PictureRecorder();
+      painter.paint(Canvas(recorder), Offset.zero);
+      final image = await recorder.endRecording().toImage(w, h);
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      image.dispose();
+      if (data == null) return null;
+      final px = data.buffer.asUint8List();
+      // the box the flag takes in the picture
+      var x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          if (px[(y * w + x) * 4 + 3] > 40) {
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+          }
+        }
+      }
+      if (x1 - x0 < 8 || y1 - y0 < 8) return null;
+      final bw = (x1 - x0 + 1) / cols;
+      final bh = (y1 - y0 + 1) / rows;
+      final grid = <List<Color>>[];
+      for (var cy = 0; cy < rows; cy++) {
+        final row = <Color>[];
+        for (var cx = 0; cx < cols; cx++) {
+          var r = 0.0, g = 0.0, b = 0.0, a = 0.0;
+          final xa = (x0 + cx * bw).floor(), xb = (x0 + (cx + 1) * bw).ceil();
+          final ya = (y0 + cy * bh).floor(), yb = (y0 + (cy + 1) * bh).ceil();
+          for (var y = ya; y < yb && y < h; y++) {
+            for (var x = xa; x < xb && x < w; x++) {
+              final i = (y * w + x) * 4;
+              final alpha = px[i + 3] / 255;
+              r += px[i] * alpha;
+              g += px[i + 1] * alpha;
+              b += px[i + 2] * alpha;
+              a += alpha;
+            }
+          }
+          row.add(
+            a < 1 ? const Color(0xFF808080) : Color.fromARGB(255, (r / a).round(), (g / a).round(), (b / a).round()),
+          );
+        }
+        grid.add(row);
+      }
+      return pixelated[flag] = grid;
+    } catch (_) {
+      return null;
+    }
+  });
+
   /// the pixels of a flag emoji's country, null when there is no pattern for it
   static List<List<Color>>? of(String flag) => _cache.putIfAbsent(flag, () {
     final letters = flag.runes.where((r) => r >= 0x1F1E6 && r <= 0x1F1FF).toList();
@@ -1670,16 +1814,8 @@ class _PixelFlag extends CustomPainter {
   bool shouldRepaint(_PixelFlag old) => !identical(old.grid, grid);
 }
 
-/// A faint plate under a site's column or tile where its server is in another country than the main one.
-Widget _flagPlate(bool dark, _SiteEntry e, Widget child) => e.flag.isEmpty
-    ? child
-    : DecoratedBox(
-        decoration: BoxDecoration(
-          color: _Dots.ink(dark).withValues(alpha: dark ? .09 : .07),
-          borderRadius: BorderRadius.circular(3),
-        ),
-        child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: child),
-      );
+/// (the sites with a server of their own are marked by the flag alone, no plate under them)
+Widget _flagPlate(bool dark, _SiteEntry e, Widget child) => child;
 
 /// A site's name cut to what fits a narrow column.
 String _shortName(String name) {
@@ -1720,30 +1856,9 @@ Widget _siteFigure(_SiteEntry e, Color ink, {double size = 15, Alignment align =
   ),
 );
 
-/// A line of the sites' block, with the faint plate under it where the site's server is in another country.
-Widget _sitePlate(bool dark, _SiteEntry e, Widget row) => Padding(
-  padding: const EdgeInsets.symmetric(vertical: 4),
-  child: e.country.isEmpty
-      ? row
-      : Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              left: -6,
-              right: -6,
-              top: -3,
-              bottom: -3,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: _Dots.ink(dark).withValues(alpha: dark ? .09 : .07),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-            row,
-          ],
-        ),
-);
+/// A line of the sites' block (the flag before the name says that its server is another one).
+Widget _sitePlate(bool dark, _SiteEntry e, Widget row) =>
+    Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: row);
 
 /// The dots of a site: a row filled up to the delay (scales), a column of them (columns), a runner on a track (lanes).
 class _SitePainter extends CustomPainter {
@@ -1761,7 +1876,7 @@ class _SitePainter extends CustomPainter {
     final slow = ms != null && ms! >= 240;
     switch (kind) {
       case SiteGraph.columns:
-        const rows = 8;
+        const rows = 7;
         final lit = ms == null ? 0 : (ms! / (400 / rows)).round().clamp(1, rows);
         final rh = size.height / rows;
         for (var r = 0; r < rows; r++) {

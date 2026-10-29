@@ -33,7 +33,7 @@ class AppLogo extends StatelessWidget {
 
   // the shield the letter is knocked out of: its outline (points on the 680 square)
   static const _shield =
-      '547,68 598,119 598,340 597,367 594,392 589,417 582,441 573,464 562,486 549,507 534,527 517,546 497,564 476,581 453,598 428,613 401,627 371,640 340,653 340,653 309,640 279,627 252,613 227,598 204,581 183,564 163,546 146,527 131,507 118,486 107,464 98,441 91,417 86,392 83,367 82,340 82,119 133,68';
+      '547,95 598,146 598,340 597,367 594,392 589,417 582,441 573,464 562,486 549,507 534,527 517,546 497,564 476,581 453,598 428,613 401,627 371,640 340,653 340,653 309,640 279,627 252,613 227,598 204,581 183,564 163,546 146,527 131,507 118,486 107,464 98,441 91,417 86,392 83,367 82,340 82,146 133,95';
 
   static final _svgs = <bool, String>{};
 
@@ -46,7 +46,7 @@ class AppLogo extends StatelessWidget {
     void put(List<(int, int)> list, String colour, double radius) {
       for (final (x, y) in list) {
         dots.write(
-          '<circle cx="${(340 + x * _k).toStringAsFixed(1)}" cy="${(340 + (y - 619) * _k + 13.6).toStringAsFixed(1)}" '
+          '<circle cx="${(340 + x * _k).toStringAsFixed(1)}" cy="${(340 + (y - 619) * _k + 12.2).toStringAsFixed(1)}" '
           'r="${(radius * _k).toStringAsFixed(1)}" fill="$colour"/>',
         );
       }
