@@ -7,14 +7,17 @@ enum SiteGraph {
   history('История', 'History'),
 
   /// the name with the figure over a row of dots filled up to the delay
-  scales('Шкалы', 'Scales');
+  scales('Шкалы', 'Scales'),
+
+  /// all the sites as dots on one axis of the delay
+  axis('Ось', 'Axis');
 
   const SiteGraph(this.ru, this.en);
 
   final String ru;
   final String en;
 
-  static const fallback = history;
+  static const fallback = axis;
 
   static SiteGraph fromName(String? name) => values.firstWhere((e) => e.name == name, orElse: () => fallback);
 }

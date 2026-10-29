@@ -1380,8 +1380,10 @@ class _SiteDots extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _SitesHeader(),
+            if (style == SiteGraph.axis) ...[const Gap(8), _SiteAxis(entries)],
             for (final e in entries)
               switch (style) {
+                SiteGraph.axis => const SizedBox.shrink(),
                 SiteGraph.list => _dotRow(
                   context,
                   e.name,
@@ -1465,6 +1467,138 @@ class _SiteDots extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Dots' sites on one axis: each site a dot at its delay, its name and figure over it, in rows where they would meet.
+class _SiteAxis extends StatelessWidget {
+  const _SiteAxis(this.entries);
+
+  final List<_SiteEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ink = _Dots.ink(dark);
+    final soft = _Dots.soft(dark);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final width = box.maxWidth;
+        const margin = 14.0;
+        final plot = width - 2 * margin;
+        final marks = <_AxisMark>[];
+        for (final e in entries) {
+          if (!e.measured) continue;
+          final slow = e.ms == null || e.colour != _SiteTiles._good;
+          final name = TextPainter(
+            text: TextSpan(
+              text: (e.name.split(' ').first).toUpperCase().substring(0, math.min(9, e.name.split(' ').first.length)),
+              style: _Dots.mono(9, soft, spacing: .6),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          final value = TextPainter(
+            text: TextSpan(
+              text: e.ms == null ? '—' : '${e.ms}',
+              style: _Dots.mono(12, slow ? _Dots.red : ink, weight: FontWeight.w800),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          final x = margin + plot * ((e.ms ?? 400).clamp(0, 400) / 400);
+          marks.add(_AxisMark(x, name, value, slow));
+        }
+        marks.sort((a, b) => a.x.compareTo(b.x));
+        // the rows: the first one where the label does not meet the one before
+        final edges = <double>[];
+        for (final m in marks) {
+          final w = math.max(m.name.width, m.value.width);
+          final left = (m.x - w / 2).clamp(0.0, width - w);
+          var level = 0;
+          while (level < edges.length && left < edges[level] + 5) {
+            level++;
+          }
+          if (level == edges.length) edges.add(0);
+          edges[level] = left + w;
+          m.level = level;
+          m.left = left;
+        }
+        const pitch = 38.0;
+        final rows = math.max(1, edges.length);
+        final height = 40 + (rows - 1) * pitch + 26;
+        return SizedBox(
+          height: height,
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: _AxisPainter(marks, margin, pitch, ink, _Dots.red, _Dots.grid(dark), soft),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AxisMark {
+  _AxisMark(this.x, this.name, this.value, this.slow);
+
+  final double x;
+  final TextPainter name;
+  final TextPainter value;
+  final bool slow;
+  int level = 0;
+  double left = 0;
+}
+
+class _AxisPainter extends CustomPainter {
+  _AxisPainter(this.marks, this.margin, this.pitch, this.ink, this.accent, this.faint, this.text);
+
+  final List<_AxisMark> marks;
+  final double margin;
+  final double pitch;
+  final Color ink;
+  final Color accent;
+  final Color faint;
+  final Color text;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final axisY = size.height - 22;
+    final plot = size.width - 2 * margin;
+    // the axis: a row of small dots, red from 240 ms
+    for (var k = 0; k <= 40; k++) {
+      final v = k * 10;
+      canvas.drawCircle(
+        Offset(margin + plot * k / 40, axisY),
+        k % 10 == 0 ? 2 : 1.1,
+        Paint()..color = v >= 240 ? accent.withValues(alpha: .45) : faint,
+      );
+    }
+    for (final v in const [0, 100, 200, 300, 400]) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: v == 400 ? '400+' : '$v',
+          style: _Dots.mono(8.5, text, weight: FontWeight.w700, spacing: 0),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final x = margin + plot * v / 400;
+      tp.paint(canvas, Offset((x - tp.width / 2).clamp(0.0, size.width - tp.width), axisY + 7));
+    }
+    for (final m in marks) {
+      final dotY = axisY - 14 - m.level * pitch;
+      final colour = m.slow ? accent : ink;
+      // the stem down to the axis, dotted
+      // (only for the lowest row: a stem through the labels of the rows under would cross their text)
+      for (var y = dotY + 6; m.level == 0 && y < axisY - 3; y += 5) {
+        canvas.drawCircle(Offset(m.x, y), .9, Paint()..color = faint);
+      }
+      canvas.drawCircle(Offset(m.x, dotY), 4.5, Paint()..color = colour);
+      final w = math.max(m.name.width, m.value.width);
+      m.value.paint(canvas, Offset(m.left + (w - m.value.width) / 2, dotY - 8 - m.value.height));
+      m.name.paint(canvas, Offset(m.left + (w - m.name.width) / 2, dotY - 8 - m.value.height - m.name.height));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AxisPainter old) => true;
 }
 
 /// The figure of a site's delay, the accent when it is slow.
