@@ -1,11 +1,10 @@
 part of 'avpn_home_body.dart';
 
-/// The home screen's look in use (Settings → Themes → Home), for widgets with no provider reference of their own; the
-/// super light mode always has the classic one.
+/// The home screen's look in use (Settings → Themes → Home), for widgets with no provider reference of their own (the
+/// super light mode keeps it too: its own lighter form of the look).
 HomeLayout _homeLayoutOf(BuildContext context) {
   try {
     final container = ProviderScope.containerOf(context, listen: false);
-    if (container.read(superLightProvider)) return HomeLayout.classic;
     return container.read(Preferences.homeLayout);
   } catch (_) {
     return HomeLayout.classic;
@@ -14,6 +13,14 @@ HomeLayout _homeLayoutOf(BuildContext context) {
 
 /// The Dots style's one colour as chosen (by day or by night), set where the look is: the shell and the backdrop.
 Color dotsAccentNow = DotsAccent.fallback.colour;
+
+/// A server's flag as the look draws it: pixels in Dots (about [width] wide), the emoji (of [emoji] size) in the others.
+Widget flagGlyph(String? flag, {required double emoji, required double width}) => homeLookNow == HomeLayout.dots
+    ? flagMark(flag, width: width)
+    : Text(
+        flag ?? '🌐',
+        style: TextStyle(fontSize: emoji, fontFamilyFallback: const ['Emoji']),
+      );
 
 /// The home screen's look as the backdrop last drew it: for the panel's colour and the connect control, which have no
 /// provider reference of their own.
@@ -1617,12 +1624,6 @@ Widget _flaggedText(_SiteEntry e, String text, TextStyle style, {String suffix =
 
 /// (the sites with a server of their own are marked by the flag alone, no plate under them)
 Widget _flagPlate(bool dark, _SiteEntry e, Widget child) => child;
-
-/// A site's name cut to what fits a narrow column.
-String _shortName(String name) {
-  final first = name.split(' ').first.toUpperCase();
-  return first.length > 7 ? first.substring(0, 7) : first;
-}
 
 /// A site's delay in big dots with its name under it (a second and a half is 1.5, in seconds).
 Widget _siteDigits(_SiteEntry e, Color ink, Color soft, Color faint) {

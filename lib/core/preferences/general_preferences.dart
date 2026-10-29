@@ -17,7 +17,6 @@ import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart
 import 'package:hiddify/features/profile/model/profile_sort_enum.dart';
 import 'package:hiddify/features/proxy/model/ping_style.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
-import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 bool _debugIntroPage = false;

@@ -856,7 +856,7 @@ class _GraphiteRow extends StatelessWidget {
                     child: Center(
                       child: group
                           ? AraIconPaint(child: Icon(Icons.auto_awesome_rounded, size: 24, color: scheme.primary))
-                          : Text(flag ?? '🌐', style: const TextStyle(fontSize: 28, fontFamilyFallback: ['Emoji'])),
+                          : flagGlyph(flag, emoji: 28, width: 36),
                     ),
                   ),
                 ),
@@ -2856,7 +2856,7 @@ class _ContrastRow extends StatelessWidget {
                       ),
                       child: group
                           ? Icon(Icons.auto_awesome_rounded, size: 18, color: selected ? theme.araIcon : ink)
-                          : Text(flag ?? '🌐', style: const TextStyle(fontSize: 18, fontFamilyFallback: ['Emoji'])),
+                          : flagGlyph(flag, emoji: 18, width: 24),
                     ),
                   ),
                   const Gap(11),
@@ -3644,13 +3644,7 @@ class _SessionServers extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            FlagBadge(
-                              profile: name.profile,
-                              child: Text(
-                                name.flag ?? '🌐',
-                                style: const TextStyle(fontSize: 20, fontFamilyFallback: ['Emoji']),
-                              ),
-                            ),
+                            FlagBadge(profile: name.profile, child: flagGlyph(name.flag, emoji: 20, width: 30)),
                             const Gap(9),
                             Expanded(
                               child: Column(
@@ -4178,9 +4172,6 @@ class ContrastPlate extends ConsumerWidget {
     );
   }
 }
-
-/// [v] in whole percents (0 to 1): an animation to it starts again only when it moves by one.
-double _percent(double v) => v.isFinite ? (v * 100).round() / 100 : 0;
 
 /// The arcs' target: [next] when the arcs are to move to it (off, or switching, or a change of at least 10% of the arc
 /// in either and ten seconds since they last moved), else where they already head.

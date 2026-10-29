@@ -135,8 +135,16 @@ class PixelFlag extends CustomPainter {
     'DK': _cross(_r, _w),
     'NO': _cross(_r, _w),
     'CH': (x, y) => ((x >= 5 && x <= 6 && y >= 1 && y <= 6) || (y >= 3 && y <= 4 && x >= 3 && x <= 8)) ? _w : _r,
-    'GB': (x, y) =>
-        (x >= 5 && x <= 6) || (y >= 3 && y <= 4) ? _r : ((x >= 4 && x <= 7) || (y >= 2 && y <= 5) ? _w : _bl),
+    // the Union Jack: a red cross on a white one, white diagonals over the blue
+    'GB': (x, y) {
+      if ((x >= 5 && x <= 6) || (y >= 3 && y <= 4)) return _r;
+      if ((x >= 4 && x <= 7) || (y >= 2 && y <= 5)) return _w;
+      // the diagonals of the 12 by 8 field (slope 8/12), a cell and a bit thick
+      final dx = x + .5 - 6;
+      final dy = y + .5 - 4;
+      final near = math.min((dy - dx * 2 / 3).abs(), (dy + dx * 2 / 3).abs());
+      return near < .85 ? _w : _bl;
+    },
     'US': (x, y) => (x < 5 && y < 4) ? _bl : (y.isEven ? _r : _w),
     'TR': (x, y) => _dist(x, y) < 1.9 ? _w : _r,
     'JP': (x, y) => _dist(x, y) < 2.3 ? _r : _w,

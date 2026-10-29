@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/features/home/widget/pixel_flag.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
@@ -661,12 +662,20 @@ class _InnerRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
-                Text(
-                  [_routeText(t, group), ports, if (rules.isNotEmpty) '${t.avpn.connRule}: $rules'].join(' · '),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
+                if (homeLookNow == HomeLayout.dots)
+                  flagsText(
+                    [_routeText(t, group), ports, if (rules.isNotEmpty) '${t.avpn.connRule}: $rules'].join(' · '),
+                    maxLines: 2,
+                    width: 14,
+                    style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  )
+                else
+                  Text(
+                    [_routeText(t, group), ports, if (rules.isNotEmpty) '${t.avpn.connRule}: $rules'].join(' · '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
               ],
             ),
           ),
@@ -816,12 +825,18 @@ class _RouteBadge extends ConsumerWidget {
           // Dots: the angular corner of its other boxes
           borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.dots ? 4 : 20),
         ),
-        child: Text(
-          group.mixed ? '$text $count' : text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
-        ),
+        child: homeLookNow == HomeLayout.dots
+            ? flagsText(
+                group.mixed ? '$text $count' : text,
+                width: 14,
+                style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+              )
+            : Text(
+                group.mixed ? '$text $count' : text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+              ),
       );
     }
 

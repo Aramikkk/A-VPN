@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart' show homeLookNow;
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
-import 'package:hiddify/core/theme/ara_accent.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:gap/gap.dart';
