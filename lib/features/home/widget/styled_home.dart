@@ -1915,6 +1915,8 @@ class _ContrastHome extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, fit) => FitBlocks(
                   minGap: 10,
+                  // Bento on a tall screen: the gaps stay slim, the hero and the sites tiles grow into the room
+                  maxGap: homeLookNow == HomeLayout.bento ? 18 : null,
                   steps: const [
                     (group: 4, rank: -1),
                     (group: 3, rank: 1),
@@ -1934,10 +1936,18 @@ class _ContrastHome extends StatelessWidget {
                         ],
                       ),
                     ),
-                    FitSlot(group: 1, child: _ContrastBlock(child: status)),
+                    FitSlot(
+                      group: 1,
+                      grow: homeLookNow == HomeLayout.bento ? 3 : 0,
+                      child: _ContrastBlock(child: status),
+                    ),
                     if (statusSlim != null) FitSlot(group: 1, rank: 1, child: _ContrastBlock(child: statusSlim!)),
                     if (!superLight) FitSlot(group: 2, child: _ContrastBlock(child: servers)),
-                    FitSlot(group: 3, child: _ContrastBlock(child: traffic!)),
+                    FitSlot(
+                      group: 3,
+                      grow: homeLookNow == HomeLayout.bento ? 2 : 0,
+                      child: _ContrastBlock(child: traffic!),
+                    ),
                     if (trafficSlim != null) FitSlot(group: 3, rank: 1, child: _ContrastBlock(child: trafficSlim!)),
                     if (trafficSlim != null) FitSlot(group: 3, rank: 2, child: const _SiteStrip()),
                     if (withToggles) FitSlot(group: 4, child: _ContrastBlock(child: toggles!)),

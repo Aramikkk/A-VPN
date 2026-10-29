@@ -1162,7 +1162,8 @@ class _SankeyPainter extends CustomPainter {
         ..cubicTo((xa + xb) / 2, l.fromY + th / 2, (xa + xb) / 2, l.toY + th / 2, xb, l.toY + th / 2);
       final shaderBox = Rect.fromLTRB(xa, 0, xb, size.height);
       // Bento and Dots: their own line and head, whatever the picture's look
-      if (_lookLine(canvas, centre.computeMetrics().first, colour, live: live, alpha: bright ? 1 : .3)) continue;
+      if (_lookLine(canvas, centre.computeMetrics().first, colour, live: live, alpha: bright ? 1 : .3, head: moving))
+        continue;
       final fill = Paint()
         ..isAntiAlias = true
         ..shader = LinearGradient(
@@ -1864,6 +1865,10 @@ bool _lookLine(
   required bool live,
   required double alpha,
   double at = .62,
+
+  /// the head (a square or a disc) is drawn only where traffic is moving; a connection standing idle shows its line
+  /// alone
+  bool head = true,
 }) {
   switch (homeLookNow) {
     case HomeLayout.dots:
@@ -1876,11 +1881,13 @@ bool _lookLine(
           ..strokeCap = StrokeCap.round
           ..strokeWidth = live ? 3.2 : 2.2,
       );
-      final head = metric.getTangentForOffset(metric.length * at)!.position;
-      canvas.drawRect(
-        Rect.fromCenter(center: head, width: 7, height: 7),
-        Paint()..color = colour.withValues(alpha: (live ? 1 : .55) * alpha),
-      );
+      if (head) {
+        final headAt = metric.getTangentForOffset(metric.length * at)!.position;
+        canvas.drawRect(
+          Rect.fromCenter(center: headAt, width: 7, height: 7),
+          Paint()..color = colour.withValues(alpha: (live ? 1 : .55) * alpha),
+        );
+      }
       return true;
     case HomeLayout.bento:
       final path = metric.extractPath(0, metric.length);
@@ -1893,9 +1900,11 @@ bool _lookLine(
           ..strokeWidth = live ? 5 : 2.6
           ..color = colour.withValues(alpha: (live ? 1 : .35) * alpha),
       );
-      final head = metric.getTangentForOffset(metric.length * at)!.position;
-      canvas.drawCircle(head, live ? 5.5 : 4, Paint()..color = colour.withValues(alpha: (live ? 1 : .55) * alpha));
-      if (live) canvas.drawCircle(head, 2, Paint()..color = Colors.white.withValues(alpha: .9 * alpha));
+      if (head) {
+        final headAt = metric.getTangentForOffset(metric.length * at)!.position;
+        canvas.drawCircle(headAt, live ? 5.5 : 4, Paint()..color = colour.withValues(alpha: (live ? 1 : .55) * alpha));
+        if (live) canvas.drawCircle(headAt, 2, Paint()..color = Colors.white.withValues(alpha: .9 * alpha));
+      }
       return true;
     default:
       return false;
@@ -2094,7 +2103,7 @@ class _TopDownPainter extends CustomPainter {
       final colour = g.colour;
       final k = bright ? 1.0 : .25;
       // Bento and Dots: their own line and head
-      if (_lookLine(canvas, g.metric, colour, live: live, alpha: k)) continue;
+      if (_lookLine(canvas, g.metric, colour, live: live, alpha: k, head: live && _moving(l))) continue;
       canvas.drawPath(
         g.path,
         Paint()

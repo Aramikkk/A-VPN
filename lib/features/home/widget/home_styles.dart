@@ -203,15 +203,16 @@ class _BentoStats extends HookConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final accent = theme.araAccent;
-    final ink = ContrastPalette.ink;
+    final ink = _onAccent(theme.araAccent);
     final live = ref.watch(connectionQualityProvider);
     final kept = useRef<List<int?>>(const []);
     if (connected && live.isNotEmpty) kept.value = live;
     final samples = connected ? live : kept.value;
-    final hero = _bentoTile(
+    Widget heroTile({required bool fill}) => _bentoTile(
       context,
       SizedBox(
-        height: slim ? 84 : 118,
+        // given a tight height (the page has room to spare) it fills it
+        height: fill ? double.infinity : (slim ? 84 : 118),
         child: Stack(
           children: [
             Column(
@@ -243,86 +244,92 @@ class _BentoStats extends HookConsumerWidget {
       colour: accent,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
     );
-    if (slim) return hero;
+    if (slim) return heroTile(fill: false);
     final muted = scheme.onSurfaceVariant;
     final share = (vpnShare * 100).round();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        hero,
-        const Gap(8),
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _bentoTile(
-                  context,
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+    return LayoutBuilder(
+      builder: (context, box) {
+        final fill = box.hasTightHeight;
+        Widget tilesRow(Widget row) => fill ? Expanded(flex: 2, child: row) : IntrinsicHeight(child: row);
+        return Column(
+          mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (fill) Expanded(flex: 3, child: heroTile(fill: true)) else heroTile(fill: false),
+            const Gap(8),
+            tilesRow(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _bentoTile(
+                      context,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.south_rounded, size: 14, color: accent),
-                          const Gap(3),
-                          Text(t.avpn.superLightDown, style: _Bento.label(muted)),
-                        ],
-                      ),
-                      const Gap(8),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text.rich(
-                          TextSpan(
+                          Row(
                             children: [
-                              TextSpan(text: down.$1),
-                              TextSpan(text: ' ${down.$2}', style: _Bento.label(muted)),
+                              Icon(Icons.south_rounded, size: 14, color: accent),
+                              const Gap(3),
+                              Text(t.avpn.superLightDown, style: _Bento.label(muted)),
                             ],
                           ),
-                          style: _Bento.figure(26, scheme.onSurface),
-                        ),
+                          const Gap(8),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(text: down.$1),
+                                  TextSpan(text: ' ${down.$2}', style: _Bento.label(muted)),
+                                ],
+                              ),
+                              style: _Bento.figure(26, scheme.onSurface),
+                            ),
+                          ),
+                          const Gap(4),
+                          Text('↑ ${up.$1} ${up.$2}', style: _Bento.label(muted)),
+                        ],
                       ),
-                      const Gap(4),
-                      Text('↑ ${up.$1} ${up.$2}', style: _Bento.label(muted)),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              const Gap(8),
-              Expanded(
-                child: _bentoTile(
-                  context,
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('VPN', style: _Bento.label(_Bento.orangeInk)),
-                      const Gap(8),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: connected ? '$share' : '—'),
-                            if (connected) TextSpan(text: '%', style: _Bento.figure(14, _Bento.orangeInk)),
-                          ],
-                        ),
-                        style: _Bento.figure(30, ink),
+                  const Gap(8),
+                  Expanded(
+                    child: _bentoTile(
+                      context,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('VPN', style: _Bento.label(_Bento.orangeInk)),
+                          const Gap(8),
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: connected ? '$share' : '—'),
+                                if (connected) TextSpan(text: '%', style: _Bento.figure(14, _Bento.orangeInk)),
+                              ],
+                            ),
+                            style: _Bento.figure(30, ink),
+                          ),
+                          const Gap(4),
+                          Text(
+                            '${vpn.$1} ${vpn.$2} · ${direct.$1} ${direct.$2}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: _Bento.label(_Bento.orangeInk),
+                          ),
+                        ],
                       ),
-                      const Gap(4),
-                      Text(
-                        '${vpn.$1} ${vpn.$2} · ${direct.$1} ${direct.$2}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: _Bento.label(_Bento.orangeInk),
-                      ),
-                    ],
+                      colour: _Bento.orange,
+                    ),
                   ),
-                  colour: _Bento.orange,
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -340,7 +347,7 @@ class _SiteBento extends ConsumerWidget {
     final entries = _siteEntries(ref, scheme);
     if (entries.isEmpty) return const SizedBox.shrink();
     final anyCountry = entries.any((e) => e.country.isNotEmpty);
-    Widget cell(_SiteEntry e) => Container(
+    Widget cell(_SiteEntry e, bool fill) => Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: _Bento.inner(dark), borderRadius: BorderRadius.circular(16)),
       // the fill as in Contrast's tiles: the water rises from the bottom, the faster the site answers the higher, in
@@ -353,7 +360,8 @@ class _SiteBento extends ConsumerWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 8, 9),
+            // given room the tile is stretched to the height it is handed, so its padding gives a little
+            padding: fill ? const EdgeInsets.fromLTRB(10, 4, 8, 4) : const EdgeInsets.fromLTRB(10, 8, 8, 9),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -377,7 +385,8 @@ class _SiteBento extends ConsumerWidget {
                       ).copyWith(fontSize: 10.5, fontWeight: FontWeight.w800, height: 1.1),
                     ),
                   ),
-                const Gap(3),
+                // given room (the page is tall) the delay sits at the bottom of its tile
+                if (fill) const Spacer() else const Gap(3),
                 Text(
                   !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
                   style: _Bento.figure(20, e.colour == _SiteTiles._good ? scheme.onSurface : e.colour),
@@ -388,29 +397,41 @@ class _SiteBento extends ConsumerWidget {
         ],
       ),
     );
-    return _bentoTile(
-      context,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SitesHeader(),
-          for (var start = 0; start < entries.length; start += 3) ...[
-            if (start > 0) const Gap(6),
-            Row(
-              children: [
-                for (var k = 0; k < 3; k++) ...[
-                  if (k > 0) const Gap(6),
-                  Expanded(child: start + k < entries.length ? cell(entries[start + k]) : const SizedBox.shrink()),
-                ],
+    return LayoutBuilder(
+      builder: (context, box) {
+        // a tight height: the page has room to spare, the rows of tiles take it
+        final fill = box.hasTightHeight;
+        return _bentoTile(
+          context,
+          Column(
+            mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _SitesHeader(),
+              for (var start = 0; start < entries.length; start += 3) ...[
+                if (start > 0) const Gap(6),
+                if (fill)
+                  Expanded(child: _siteRow(entries, start, cell, fill))
+                else
+                  _siteRow(entries, start, cell, fill),
               ],
-            ),
-          ],
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        );
+      },
     );
   }
+
+  Widget _siteRow(List<_SiteEntry> entries, int start, Widget Function(_SiteEntry, bool) cell, bool fill) => Row(
+    crossAxisAlignment: fill ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
+    children: [
+      for (var k = 0; k < 3; k++) ...[
+        if (k > 0) const Gap(6),
+        Expanded(child: start + k < entries.length ? cell(entries[start + k], fill) : const SizedBox.shrink()),
+      ],
+    ],
+  );
 }
 
 /// Bento's server: a tile with the server's label, the flag and the country, the ping in heavy figures.
@@ -493,7 +514,7 @@ Widget _bentoServerRow(
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
-                child: Icon(Icons.north_east_rounded, size: 15, color: ContrastPalette.ink),
+                child: Icon(Icons.north_east_rounded, size: 15, color: _onAccent(accent)),
               ),
             ],
           ),
@@ -641,6 +662,10 @@ class _DotGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(_DotGridPainter old) => old.paper != paper || old.dot != dot;
 }
+
+/// The ink that reads on the accent (Bento's hero tile, its chips and its connect button): dark on a light accent,
+/// white on a dark one (the OLED palette's accent is black, and the dark ink vanished on it)
+Color _onAccent(Color accent) => accent.computeLuminance() > .4 ? ContrastPalette.ink : Colors.white;
 
 /// A number drawn as a 5×7 matrix of dots for each figure: the lit dots in the ink, the rest faint.
 class _DotNumber extends StatelessWidget {
@@ -1114,7 +1139,7 @@ class _BentoButton extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final accent = theme.araAccent;
     final lit = on || busy;
-    final ink = lit ? ContrastPalette.ink : theme.colorScheme.onSurface;
+    final ink = lit ? _onAccent(theme.araAccent) : theme.colorScheme.onSurface;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -1251,7 +1276,7 @@ class _ToggleDotsPainter extends CustomPainter {
   final dark = theme.brightness == Brightness.dark;
   switch (look) {
     case HomeLayout.bento:
-      final ink = on ? ContrastPalette.ink : theme.colorScheme.onSurface;
+      final ink = on ? _onAccent(theme.araAccent) : theme.colorScheme.onSurface;
       return (
         box: BoxDecoration(color: on ? theme.araAccent : _Bento.inner(dark), borderRadius: BorderRadius.circular(15)),
         ink: ink,
@@ -1447,8 +1472,8 @@ ThemeData _lookTheme(ThemeData theme, HomeLayout look, DotsAccent accent) {
           side: BorderSide.none,
           backgroundColor: _Bento.tile(dark),
           selectedColor: theme.araAccent,
-          checkmarkColor: ContrastPalette.ink,
-          secondaryLabelStyle: TextStyle(color: ContrastPalette.ink, fontWeight: FontWeight.w800),
+          checkmarkColor: _onAccent(theme.araAccent),
+          secondaryLabelStyle: TextStyle(color: _onAccent(theme.araAccent), fontWeight: FontWeight.w800),
         ),
         segmentedButtonTheme: SegmentedButtonThemeData(
           style: ButtonStyle(
@@ -1457,7 +1482,8 @@ ThemeData _lookTheme(ThemeData theme, HomeLayout look, DotsAccent accent) {
               (states) => states.contains(WidgetState.selected) ? theme.araAccent : _Bento.tile(dark),
             ),
             foregroundColor: WidgetStateProperty.resolveWith(
-              (states) => states.contains(WidgetState.selected) ? ContrastPalette.ink : theme.colorScheme.onSurface,
+              (states) =>
+                  states.contains(WidgetState.selected) ? _onAccent(theme.araAccent) : theme.colorScheme.onSurface,
             ),
           ),
         ),
@@ -1475,7 +1501,9 @@ ThemeData _lookTheme(ThemeData theme, HomeLayout look, DotsAccent accent) {
           indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           iconTheme: WidgetStateProperty.resolveWith(
             (states) => IconThemeData(
-              color: states.contains(WidgetState.selected) ? ContrastPalette.ink : theme.colorScheme.onSurfaceVariant,
+              color: states.contains(WidgetState.selected)
+                  ? _onAccent(theme.araAccent)
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -1509,7 +1537,7 @@ ShapeBorder? lookPopupShape(HomeLayout look, bool dark) => switch (look) {
   return switch (look) {
     HomeLayout.bento => (
       box: BoxDecoration(color: on ? theme.araAccent : _Bento.inner(dark), borderRadius: BorderRadius.circular(24)),
-      ink: on ? ContrastPalette.ink : theme.colorScheme.onSurface,
+      ink: on ? _onAccent(theme.araAccent) : theme.colorScheme.onSurface,
     ),
     HomeLayout.dots => (
       box: BoxDecoration(
@@ -1549,13 +1577,13 @@ class LookNavBar extends StatelessWidget {
     Widget item(int i) {
       final d = destinations[i];
       final on = i == selected;
-      final ink = bento ? (on ? ContrastPalette.ink : soft) : (on ? _Dots.paper(dark) : _Dots.ink(dark));
+      final ink = bento ? (on ? _onAccent(theme.araAccent) : soft) : (on ? _Dots.paper(dark) : _Dots.ink(dark));
       final sign = IconTheme(
         data: IconThemeData(color: ink, size: 22),
         child: on ? (d.selectedIcon ?? d.icon) : d.icon,
       );
       final label = bento
-          ? _Bento.label(on ? ContrastPalette.ink : soft).copyWith(fontSize: 12, fontWeight: FontWeight.w800)
+          ? _Bento.label(on ? _onAccent(theme.araAccent) : soft).copyWith(fontSize: 12, fontWeight: FontWeight.w800)
           : _Dots.mono(10, on ? _Dots.ink(dark) : soft, weight: FontWeight.w700, spacing: 1.2);
       return Expanded(
         child: GestureDetector(
