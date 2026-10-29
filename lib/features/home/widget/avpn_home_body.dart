@@ -32,6 +32,7 @@ import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/model/ping_graph.dart';
 import 'package:hiddify/features/home/model/site_graph.dart';
 import 'package:hiddify/features/home/widget/fit_blocks.dart';
+import 'package:hiddify/features/home/widget/pixel_flag.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/features/stats/notifier/session_totals.dart';

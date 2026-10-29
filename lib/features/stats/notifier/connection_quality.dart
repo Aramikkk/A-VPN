@@ -99,6 +99,7 @@ class ConnectionQuality extends Notifier<List<int?>> {
     final url = _url;
     if (client != null && url != null) unawaited(_probe(client, url));
   }
+
   final _samples = <int?>[];
   final _minutes = <int, PingBucket>{};
   final _days = <int, PingBucket>{};
@@ -125,6 +126,9 @@ class ConnectionQuality extends Notifier<List<int?>> {
   /// the core's session the probes so far belong to
   DateTime? _session;
   bool _foreground = true;
+
+  /// the home screen asks for the probes itself (at the same moment as the sites' delays): the own timer waits
+  bool driven = false;
 
   /// the phone probes while the app is on screen; a computer all the time (in the tray too), for its watchdog
   bool get _probing => _foreground || PlatformUtils.isDesktop;
@@ -184,7 +188,14 @@ class ConnectionQuality extends Notifier<List<int?>> {
     Timer? timer;
     void schedule() {
       timer?.cancel();
-      if (_probing) timer = Timer.periodic(_every, (_) => unawaited(_probe(client, url)));
+      // the app in front: at its own pace; a computer's watchdog while the window is hidden: a probe in 15 seconds is
+      // enough (the phone does not probe at all out of sight)
+      final every = _foreground ? _every : const Duration(seconds: 15);
+      if (_probing) {
+        timer = Timer.periodic(every, (_) {
+          if (!driven) unawaited(_probe(client, url));
+        });
+      }
     }
 
     void background() {

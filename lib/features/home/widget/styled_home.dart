@@ -57,6 +57,32 @@ class _StyledHome extends HookConsumerWidget {
     final serverMode = ref.watch(ConfigOptions.homeNetwork);
     // the super light mode: the servers in a list of their own where the delays were, and nothing else
     final superLight = ref.watch(superLightProvider);
+    // the ping, the loss and the sites' delays are asked together every 3 seconds (the pace of the ping's own probes),
+    // while the VPN is up, the app is in front and this is the screen on view (they all move at one pace)
+    final lifecycle = useAppLifecycleState();
+    final live = connected && visible && !superLight && (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+    useEffect(() {
+      if (!live) return null;
+      final quality = ref.read(connectionQualityProvider.notifier);
+      final connections = ref.read(connectionsProvider.notifier);
+      // one tick for all: the probe of the ping (and so the loss), the round of the sites and the list of the
+      // connections start at the same moment, their own timers wait meanwhile
+      quality.driven = true;
+      connections.driven = true;
+      void tick() {
+        quality.probeNow();
+        connections.pollNow();
+        unawaited(ref.read(siteLatencyProvider.notifier).test(quiet: true));
+      }
+
+      tick();
+      final timer = Timer.periodic(const Duration(seconds: 3), (_) => tick());
+      return () {
+        timer.cancel();
+        quality.driven = false;
+        connections.driven = false;
+      };
+    }, [live]);
     // how the blocks are laid out (the super light mode has its own look)
     final layout = superLight ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
     // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one

@@ -10,6 +10,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/features/home/widget/pixel_flag.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
@@ -1352,7 +1353,9 @@ class _SankeyPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           )..layout();
           glyph.paint(canvas, Offset(x, labelTop));
-        } else {
+        } else if (!(homeLookNow == HomeLayout.dots &&
+            flag != null &&
+            paintPixelFlag(canvas, flag, Offset(x + 13, labelTop + nameH / 2), 26, alpha: alpha))) {
           _label(
             canvas,
             shownName,
@@ -1467,15 +1470,23 @@ class SankeyDetails extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        selection.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontFamilyFallback: const ['Emoji'],
+                      if (homeLookNow == HomeLayout.dots)
+                        flagsText(
+                          selection.title,
+                          maxLines: 2,
+                          width: 21,
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                        )
+                      else
+                        Text(
+                          selection.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontFamilyFallback: const ['Emoji'],
+                          ),
                         ),
-                      ),
                       if (routeName != null)
                         Text(
                           routeName,
@@ -1553,12 +1564,14 @@ class _Rows extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        e.key,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontFamilyFallback: const ['Emoji']),
-                      ),
+                      child: homeLookNow == HomeLayout.dots
+                          ? flagsText(e.key, style: theme.textTheme.bodyMedium, width: 18)
+                          : Text(
+                              e.key,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(fontFamilyFallback: const ['Emoji']),
+                            ),
                     ),
                     const Gap(8),
                     Text(value(e.value), style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
@@ -1692,7 +1705,9 @@ class _ChipsView extends StatelessWidget {
                   child: Row(
                     children: [
                       if (flag != null) ...[
-                        Text(flag.group(1)!, style: const TextStyle(fontSize: 15, fontFamilyFallback: ['Emoji'])),
+                        homeLookNow == HomeLayout.dots
+                            ? flagMark(flag.group(1), width: 21)
+                            : Text(flag.group(1)!, style: const TextStyle(fontSize: 15, fontFamilyFallback: ['Emoji'])),
                         const SizedBox(width: 5),
                       ],
                       Expanded(
@@ -2179,7 +2194,7 @@ class _TopDownPainter extends CustomPainter {
           final icon = n.route == ConnectionRoute.block ? Icons.block_rounded : null;
           final top = rowY[2] + 12;
           if (direct) {
-            _shieldOff(canvas, Offset(cx, top + 10), colourOf(n.route).withValues(alpha: alpha));
+            _shieldOff(canvas, Offset(cx, top + 11), colourOf(n.route).withValues(alpha: alpha));
           } else if (icon != null) {
             final glyph = TextPainter(
               text: TextSpan(
@@ -2202,11 +2217,19 @@ class _TopDownPainter extends CustomPainter {
               bold: flag == null,
               width: 70,
             );
-            p.paint(canvas, Offset(cx - p.width / 2, top));
+            // Dots: the flag in pixels, its middle where the shield's is
+            final pixel =
+                homeLookNow == HomeLayout.dots &&
+                flag != null &&
+                paintPixelFlag(canvas, flag, Offset(cx, top + 11), 30, alpha: alpha);
+            if (!pixel) p.paint(canvas, Offset(cx - p.width / 2, top));
+            final frameW = pixel ? 30.0 : p.width;
+            final frameH = pixel ? 20.0 : p.height;
+            final frameTop = pixel ? top + 1 : top;
             // a whitelist ("БС", LTE only) server: a faint square frame round its flag, to tell it from the others
             if (flag != null && ServerRegionFilter.isMobileOnly(label)) {
               canvas.drawRect(
-                Rect.fromLTWH(cx - p.width / 2 - 4, top - 2, p.width + 8, p.height + 4),
+                Rect.fromLTWH(cx - frameW / 2 - 4, frameTop - 2, frameW + 8, frameH + 4),
                 Paint()
                   ..style = PaintingStyle.stroke
                   ..strokeWidth = 1
@@ -2219,7 +2242,7 @@ class _TopDownPainter extends CustomPainter {
                 ? profileBadgesNow[mark.profile!]
                 : null;
             if (badge != null) {
-              final by = top + p.height + 8;
+              final by = top + (pixel ? 22.0 : p.height) + 8;
               canvas.drawCircle(Offset(cx, by), 6, Paint()..color = badge.colour.withValues(alpha: alpha));
               final letter = _text(badge.letter, 8.5, Colors.white.withValues(alpha: alpha), bold: true, width: 12);
               letter.paint(canvas, Offset(cx - letter.width / 2, by - letter.height / 2));
@@ -2356,9 +2379,9 @@ class _SlowPulse extends ChangeNotifier implements ValueListenable<double> {
 
 /// A shield with a stroke across it (26 by 22 round [centre]): traffic that goes without the VPN.
 void _shieldOff(Canvas canvas, Offset centre, Color colour) {
-  // Dots: the shield of dots with nothing in it (only its edge), not struck out
+  // Dots: the shield of dots with nothing in it (only its edge), struck out by a line of dots
   if (homeLookNow == HomeLayout.dots) {
-    paintDotShield(canvas, Rect.fromCenter(center: centre, width: 23, height: 26), colour, hollow: true);
+    paintDotShield(canvas, Rect.fromCenter(center: centre, width: 20, height: 23), colour, hollow: true, struck: true);
     return;
   }
   const w = 26.0;

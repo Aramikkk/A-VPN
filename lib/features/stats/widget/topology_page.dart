@@ -8,7 +8,9 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
+import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
+import 'package:hiddify/features/home/widget/pixel_flag.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
@@ -552,15 +554,24 @@ class _RuleRows extends ConsumerWidget {
                                   ),
                                   const Gap(4),
                                   Flexible(
-                                    child: Text(
-                                      way,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: colour,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
+                                    child: homeLookNow == HomeLayout.dots
+                                        ? flagsText(
+                                            way,
+                                            width: 17,
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: colour,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          )
+                                        : Text(
+                                            way,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: colour,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
                                   ),
                                 ],
                               ),

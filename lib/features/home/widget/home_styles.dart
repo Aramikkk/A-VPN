@@ -715,7 +715,7 @@ class _DotsBinPainter extends CustomPainter {
 
 /// A shield of dots (the Dots look's shield): a field of dots in the shape of a shield, its edge dots bolder and the
 /// inner ones fainter; [hollow]: only its edge (a shield with nothing in it: traffic that goes without the VPN).
-void paintDotShield(Canvas canvas, Rect box, Color colour, {bool hollow = false}) {
+void paintDotShield(Canvas canvas, Rect box, Color colour, {bool hollow = false, bool struck = false}) {
   const cols = 7;
   const rows = 8;
   final sx = box.width / cols;
@@ -741,6 +741,14 @@ void paintDotShield(Canvas canvas, Rect box, Color colour, {bool hollow = false}
         edge ? r : r * .55,
         edge ? bold : soft,
       );
+    }
+  }
+  // struck out: a line of dots across it, from the upper left to the lower right (a little over the edges)
+  if (struck) {
+    const n = 7;
+    for (var k = 0; k < n; k++) {
+      final t = k / (n - 1);
+      canvas.drawCircle(Offset(box.left - 2 + (box.width + 4) * t, box.top - 1 + (box.height + 2) * t), r * 1.05, bold);
     }
   }
 }
@@ -1355,16 +1363,6 @@ class _SiteDots extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // the delays are asked again every minute while the VPN is up and the block is on the screen (quietly: no ring)
-    final up = ref.watch(connectionNotifierProvider.select((v) => v.valueOrNull?.isConnected ?? false));
-    useEffect(() {
-      if (!up) return null;
-      final timer = Timer.periodic(
-        const Duration(minutes: 1),
-        (_) => unawaited(ref.read(siteLatencyProvider.notifier).test(quiet: true)),
-      );
-      return timer.cancel;
-    }, [up]);
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final entries = _siteEntries(ref, scheme);
@@ -1478,7 +1476,7 @@ class _SiteDots extends HookConsumerWidget {
                             if (entries.any((x) => x.flag.isNotEmpty))
                               SizedBox(
                                 height: 14,
-                                child: e.flag.isEmpty ? null : Center(child: _flagMark(e.flag, width: 18)),
+                                child: e.flag.isEmpty ? null : Center(child: flagMark(e.flag, width: 18)),
                               ),
                             // the same gap between the flag, the name and the figure
                             const Gap(5),
@@ -1550,79 +1548,6 @@ class _SiteDots extends HookConsumerWidget {
   }
 }
 
-/// A country's flag as a small grid of square pixels (Dots): the stripes, crosses and discs of the commonest countries;
-/// any other country keeps its emoji.
-Widget _flagMark(String? flag, {double width = 26}) {
-  if (flag == null || flag.isEmpty) {
-    return Text(
-      '🌐',
-      style: TextStyle(fontSize: width * .66, height: 1, fontFamilyFallback: const ['Emoji']),
-    );
-  }
-  return _FlagMark(flag, width);
-}
-
-/// A flag in pixels: the pattern drawn by hand when there is one, else the country's emoji of the bundled font turned
-/// into the same grid (drawn to a picture once, each cell the average of its block), so every country has a pixel flag.
-class _FlagMark extends StatefulWidget {
-  const _FlagMark(this.flag, this.width);
-
-  final String flag;
-  final double width;
-
-  @override
-  State<_FlagMark> createState() => _FlagMarkState();
-}
-
-class _FlagMarkState extends State<_FlagMark> {
-  List<List<Color>>? _grid;
-  bool _failed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolve();
-  }
-
-  @override
-  void didUpdateWidget(_FlagMark old) {
-    super.didUpdateWidget(old);
-    if (old.flag != widget.flag) _resolve();
-  }
-
-  void _resolve() {
-    final flag = widget.flag;
-    _grid = _PixelFlag.of(flag) ?? _PixelFlag.pixelated[flag];
-    _failed = false;
-    if (_grid != null) return;
-    unawaited(
-      _PixelFlag.pixelate(flag).then((grid) {
-        if (!mounted || widget.flag != flag) return;
-        setState(() {
-          _grid = grid;
-          _failed = grid == null;
-        });
-      }),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final grid = _grid;
-    if (grid != null) {
-      return CustomPaint(size: Size(widget.width, widget.width * 2 / 3), painter: _PixelFlag(grid));
-    }
-    if (_failed) {
-      return Text(
-        widget.flag,
-        style: TextStyle(fontSize: widget.width * .66, height: 1, fontFamilyFallback: const ['Emoji']),
-      );
-    }
-    // while the picture is made: the room of the flag
-    return SizedBox(width: widget.width, height: widget.width * 2 / 3);
-  }
-}
-
 /// A site's name with its flag before it (when its server is in another country), the name cut by an ellipsis.
 Widget _flaggedText(_SiteEntry e, String text, TextStyle style, {String suffix = ''}) {
   final label = Text('$text$suffix', maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
@@ -1630,188 +1555,11 @@ Widget _flaggedText(_SiteEntry e, String text, TextStyle style, {String suffix =
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      _flagMark(e.flag, width: 15),
+      flagMark(e.flag, width: 15),
       const Gap(5),
       Flexible(child: label),
     ],
   );
-}
-
-class _PixelFlag extends CustomPainter {
-  _PixelFlag(this.grid);
-
-  final List<List<Color>> grid;
-
-  static const cols = 12;
-  static const rows = 8;
-
-  static const _k = Color(0xFF151515);
-  static const _w = Color(0xFFF2F2EE);
-  static const _r = Color(0xFFD52B1E);
-  static const _bl = Color(0xFF0057B8);
-  static const _y = Color(0xFFFFD500);
-  static const _g = Color(0xFF1FA34A);
-  static const _o = Color(0xFFFF883E);
-  static const _mar = Color(0xFF9E3039);
-  static const _sky = Color(0xFF00AFCA);
-
-  static Color Function(int, int) _hs(List<(Color, int)> parts) {
-    final rowsOf = [
-      for (final (c, n) in parts)
-        for (var i = 0; i < n; i++) c,
-    ];
-    return (x, y) => rowsOf[y];
-  }
-
-  static Color Function(int, int) _vs(Color a, Color b, Color c) =>
-      (x, y) => x < 4 ? a : (x < 8 ? b : c);
-
-  static Color Function(int, int) _cross(Color bg, Color cross) =>
-      (x, y) => (x == 3 || x == 4 || y == 3 || y == 4) ? cross : bg;
-
-  static double _dist(int x, int y) => math.sqrt(math.pow(x - 5.5, 2) + math.pow(y - 3.5, 2));
-
-  static final Map<String, Color Function(int, int)> _flags = {
-    'DE': _hs([(_k, 3), (_r, 2), (_y, 3)]),
-    'NL': _hs([(_r, 3), (_w, 2), (_bl, 3)]),
-    'PL': _hs([(_w, 4), (_r, 4)]),
-    'LV': _hs([(_mar, 3), (_w, 2), (_mar, 3)]),
-    'LT': _hs([(_y, 3), (_g, 2), (_r, 3)]),
-    'EE': _hs([(_bl, 3), (_k, 2), (_w, 3)]),
-    'RU': _hs([(_w, 3), (_bl, 2), (_r, 3)]),
-    'UA': _hs([(_bl, 4), (_y, 4)]),
-    'AT': _hs([(_r, 3), (_w, 2), (_r, 3)]),
-    'HU': _hs([(_r, 3), (_w, 2), (_g, 3)]),
-    'BG': _hs([(_w, 3), (_g, 2), (_r, 3)]),
-    'ES': _hs([(_r, 2), (_y, 4), (_r, 2)]),
-    'SG': _hs([(_r, 4), (_w, 4)]),
-    'FR': _vs(_bl, _w, _r),
-    'IT': _vs(_g, _w, _r),
-    'BE': _vs(_k, _y, _r),
-    'RO': _vs(_bl, _y, _r),
-    'IE': _vs(_g, _w, _o),
-    'FI': _cross(_w, _bl),
-    'SE': _cross(_bl, _y),
-    'DK': _cross(_r, _w),
-    'NO': _cross(_r, _w),
-    'CH': (x, y) => ((x >= 5 && x <= 6 && y >= 1 && y <= 6) || (y >= 3 && y <= 4 && x >= 3 && x <= 8)) ? _w : _r,
-    'GB': (x, y) =>
-        (x >= 5 && x <= 6) || (y >= 3 && y <= 4) ? _r : ((x >= 4 && x <= 7) || (y >= 2 && y <= 5) ? _w : _bl),
-    'US': (x, y) => (x < 5 && y < 4) ? _bl : (y.isEven ? _r : _w),
-    'TR': (x, y) => _dist(x, y) < 1.9 ? _w : _r,
-    'JP': (x, y) => _dist(x, y) < 2.3 ? _r : _w,
-    'KZ': (x, y) => _dist(x, y) < 2.0 ? _y : _sky,
-    'CZ': (x, y) => (x <= 4 && (y - 3.5).abs() <= (4.6 - x) * .85) ? _bl : (y < 4 ? _w : _r),
-    'PT': (x, y) => x < 5 ? _g : _r,
-    'CA': (x, y) => (x >= 5 && x <= 6 && y >= 2 && y <= 5) ? _r : ((x < 3 || x >= 9) ? _r : _w),
-  };
-
-  static final _cache = <String, List<List<Color>>?>{};
-
-  /// the flags made from the emoji, by the emoji (kept: a flag is drawn once)
-  static final pixelated = <String, List<List<Color>>?>{};
-  static final _making = <String, Future<List<List<Color>>?>>{};
-
-  /// The country's emoji drawn to a picture and cut to the grid; null when the font has no picture for it.
-  static Future<List<List<Color>>?> pixelate(String flag) => _making.putIfAbsent(flag, () async {
-    try {
-      final painter = TextPainter(
-        text: TextSpan(
-          text: flag,
-          style: const TextStyle(fontSize: 120, height: 1, fontFamily: 'Emoji', color: Color(0xFF000000)),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final w = painter.width.ceil();
-      final h = painter.height.ceil();
-      if (w < 8 || h < 8) return null;
-      final recorder = ui.PictureRecorder();
-      painter.paint(Canvas(recorder), Offset.zero);
-      final image = await recorder.endRecording().toImage(w, h);
-      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-      image.dispose();
-      if (data == null) return null;
-      final px = data.buffer.asUint8List();
-      // the box the flag takes in the picture
-      var x0 = w, y0 = h, x1 = -1, y1 = -1;
-      for (var y = 0; y < h; y++) {
-        for (var x = 0; x < w; x++) {
-          if (px[(y * w + x) * 4 + 3] > 40) {
-            if (x < x0) x0 = x;
-            if (x > x1) x1 = x;
-            if (y < y0) y0 = y;
-            if (y > y1) y1 = y;
-          }
-        }
-      }
-      if (x1 - x0 < 8 || y1 - y0 < 8) return null;
-      final bw = (x1 - x0 + 1) / cols;
-      final bh = (y1 - y0 + 1) / rows;
-      final grid = <List<Color>>[];
-      for (var cy = 0; cy < rows; cy++) {
-        final row = <Color>[];
-        for (var cx = 0; cx < cols; cx++) {
-          var r = 0.0, g = 0.0, b = 0.0, a = 0.0;
-          final xa = (x0 + cx * bw).floor(), xb = (x0 + (cx + 1) * bw).ceil();
-          final ya = (y0 + cy * bh).floor(), yb = (y0 + (cy + 1) * bh).ceil();
-          for (var y = ya; y < yb && y < h; y++) {
-            for (var x = xa; x < xb && x < w; x++) {
-              final i = (y * w + x) * 4;
-              final alpha = px[i + 3] / 255;
-              r += px[i] * alpha;
-              g += px[i + 1] * alpha;
-              b += px[i + 2] * alpha;
-              a += alpha;
-            }
-          }
-          row.add(
-            a < 1 ? const Color(0xFF808080) : Color.fromARGB(255, (r / a).round(), (g / a).round(), (b / a).round()),
-          );
-        }
-        grid.add(row);
-      }
-      return pixelated[flag] = grid;
-    } catch (_) {
-      return null;
-    }
-  });
-
-  /// the pixels of a flag emoji's country, null when there is no pattern for it
-  static List<List<Color>>? of(String flag) => _cache.putIfAbsent(flag, () {
-    final letters = flag.runes.where((r) => r >= 0x1F1E6 && r <= 0x1F1FF).toList();
-    if (letters.length < 2) return null;
-    final code = String.fromCharCodes([letters[0] - 0x1F1E6 + 65, letters[1] - 0x1F1E6 + 65]);
-    final cell = _flags[code];
-    if (cell == null) return null;
-    return [
-      for (var y = 0; y < rows; y++) [for (var x = 0; x < cols; x++) cell(x, y)],
-    ];
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cell = size.width / cols;
-    final side = cell * .88;
-    // a thin frame, so a white stripe does not melt into the paper
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..color = const Color(0x66808080)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-    for (var y = 0; y < rows; y++) {
-      for (var x = 0; x < cols; x++) {
-        canvas.drawRect(
-          Rect.fromLTWH(x * cell + (cell - side) / 2, y * cell + (cell - side) / 2, side, side),
-          Paint()..color = grid[y][x],
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PixelFlag old) => !identical(old.grid, grid);
 }
 
 /// (the sites with a server of their own are marked by the flag alone, no plate under them)
@@ -1975,7 +1723,7 @@ Widget _dotsServerRow(
             if (group)
               SizedBox(width: 42, child: Icon(Icons.auto_awesome_rounded, size: 28, color: ink))
             else
-              _flagMark(flag, width: 42),
+              flagMark(flag, width: 42),
             const Gap(12),
             Expanded(
               child: Column(

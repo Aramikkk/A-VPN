@@ -337,6 +337,19 @@ class Connections extends Notifier<ConnectionsState> {
   static const saveEvery = Duration(seconds: 10);
 
   HttpClient? _client;
+  Uri? _pollUrl;
+  String _pollSecret = '';
+
+  /// the home screen asks for the list itself (at the moment of its other figures): the own timer waits
+  bool driven = false;
+
+  /// One poll now (the home screen's tick), not at the next turn of the timer.
+  void pollNow() {
+    final client = _client;
+    final url = _pollUrl;
+    if (client != null && url != null) unawaited(_poll(client, url, _pollSecret));
+  }
+
   final _seen = <String, SeenConnection>{};
 
   /// by app: when it had a connection open (see [ConnectionsState.usage])
@@ -387,6 +400,8 @@ class Connections extends Notifier<ConnectionsState> {
       ..findProxy = ((_) => 'DIRECT');
     _client = client;
     final url = Uri.parse('http://127.0.0.1:$port/connections');
+    _pollUrl = url;
+    _pollSecret = secret;
     var foreground =
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
@@ -396,7 +411,7 @@ class Connections extends Notifier<ConnectionsState> {
       timer?.cancel();
       timer = Timer(foreground ? interval * (saving ? 2 : 1) : backgroundInterval * (saving ? 4 : (night ? 6 : 1)), () {
         if (disposed) return;
-        unawaited(_poll(client, url, secret));
+        if (!driven) unawaited(_poll(client, url, secret));
         schedule();
       });
     }
