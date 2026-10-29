@@ -1144,10 +1144,10 @@ class _DotsButton extends HookWidget {
                 ),
               ),
             ),
-            if (label != null) ...[
-              const Gap(8),
-              Text(label!.toUpperCase(), style: _Dots.mono(10, on ? ink : soft, spacing: 1.6)),
-            ],
+            // the line stays when there is no network to name, so the panel does not change height (the sign jumped up
+            // when the name came)
+            const Gap(8),
+            Text((label ?? ' ').toUpperCase(), style: _Dots.mono(10, on ? ink : soft, spacing: 1.6)),
           ],
         ),
       ),
