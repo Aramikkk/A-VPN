@@ -1405,11 +1405,9 @@ class _SiteDots extends HookConsumerWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                e.name.toUpperCase(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: _Dots.mono(11, soft),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: _flaggedText(e, e.name.toUpperCase(), _Dots.mono(11, soft)),
                               ),
                             ),
                             _siteFigure(e, ink),
@@ -1443,7 +1441,7 @@ class _SiteDots extends HookConsumerWidget {
                         for (var k = i; k < i + 3; k++)
                           Expanded(
                             child: k < entries.length
-                                ? _siteDigits(entries[k], ink, soft, faint)
+                                ? _flagPlate(dark, entries[k], _siteDigits(entries[k], ink, soft, faint))
                                 : const SizedBox.shrink(),
                           ),
                       ],
@@ -1457,26 +1455,36 @@ class _SiteDots extends HookConsumerWidget {
                 children: [
                   for (final e in entries)
                     Expanded(
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            height: 8 * 14.0,
-                            width: 16,
-                            child: CustomPaint(
-                              painter: _SitePainter(
-                                kind: SiteGraph.columns,
-                                ms: e.measured ? e.ms : null,
-                                ink: ink,
-                                accent: _Dots.red,
-                                faint: faint,
+                      child: _flagPlate(
+                        dark,
+                        e,
+                        Column(
+                          children: [
+                            SizedBox(
+                              height: 8 * 14.0,
+                              width: 16,
+                              child: CustomPaint(
+                                painter: _SitePainter(
+                                  kind: SiteGraph.columns,
+                                  ms: e.measured ? e.ms : null,
+                                  ink: ink,
+                                  accent: _Dots.red,
+                                  faint: faint,
+                                ),
                               ),
                             ),
-                          ),
-                          const Gap(6),
-                          Text(_shortName(e.name), maxLines: 1, style: _Dots.mono(9, soft, spacing: .4)),
-                          const Gap(2),
-                          _siteFigure(e, ink, size: 11, align: Alignment.center),
-                        ],
+                            const Gap(6),
+                            // a site with a server of its own: its flag over the name (the line is kept for all)
+                            if (entries.any((x) => x.flag.isNotEmpty))
+                              SizedBox(
+                                height: 14,
+                                child: e.flag.isEmpty ? null : Center(child: _flagMark(e.flag, width: 18)),
+                              ),
+                            Text(_shortName(e.name), maxLines: 1, style: _Dots.mono(9, soft, spacing: .4)),
+                            const Gap(2),
+                            _siteFigure(e, ink, size: 11, align: Alignment.center),
+                          ],
+                        ),
                       ),
                     ),
                 ],
@@ -1493,12 +1501,10 @@ class _SiteDots extends HookConsumerWidget {
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 56,
-                            child: Text(
-                              _shortName(e.name),
-                              maxLines: 1,
-                              overflow: TextOverflow.clip,
-                              style: _Dots.mono(10, soft, spacing: .4),
+                            width: 64,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: _flaggedText(e, _shortName(e.name), _Dots.mono(10, soft, spacing: .4)),
                             ),
                           ),
                           Expanded(
@@ -1528,6 +1534,153 @@ class _SiteDots extends HookConsumerWidget {
   }
 }
 
+/// A country's flag as a small grid of square pixels (Dots): the stripes, crosses and discs of the commonest countries;
+/// any other country keeps its emoji.
+Widget _flagMark(String? flag, {double width = 26}) {
+  final grid = _PixelFlag.of(flag ?? '');
+  if (grid == null) {
+    return Text(
+      flag ?? '🌐',
+      style: TextStyle(fontSize: width * .66, height: 1, fontFamilyFallback: const ['Emoji']),
+    );
+  }
+  return CustomPaint(size: Size(width, width * 2 / 3), painter: _PixelFlag(grid));
+}
+
+/// A site's name with its flag before it (when its server is in another country), the name cut by an ellipsis.
+Widget _flaggedText(_SiteEntry e, String text, TextStyle style, {String suffix = ''}) {
+  final label = Text('$text$suffix', maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
+  if (e.flag.isEmpty) return label;
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _flagMark(e.flag, width: 15),
+      const Gap(5),
+      Flexible(child: label),
+    ],
+  );
+}
+
+class _PixelFlag extends CustomPainter {
+  _PixelFlag(this.grid);
+
+  final List<List<Color>> grid;
+
+  static const cols = 12;
+  static const rows = 8;
+
+  static const _k = Color(0xFF151515);
+  static const _w = Color(0xFFF2F2EE);
+  static const _r = Color(0xFFD52B1E);
+  static const _bl = Color(0xFF0057B8);
+  static const _y = Color(0xFFFFD500);
+  static const _g = Color(0xFF1FA34A);
+  static const _o = Color(0xFFFF883E);
+  static const _mar = Color(0xFF9E3039);
+  static const _sky = Color(0xFF00AFCA);
+
+  static Color Function(int, int) _hs(List<(Color, int)> parts) {
+    final rowsOf = [
+      for (final (c, n) in parts)
+        for (var i = 0; i < n; i++) c,
+    ];
+    return (x, y) => rowsOf[y];
+  }
+
+  static Color Function(int, int) _vs(Color a, Color b, Color c) =>
+      (x, y) => x < 4 ? a : (x < 8 ? b : c);
+
+  static Color Function(int, int) _cross(Color bg, Color cross) =>
+      (x, y) => (x == 3 || x == 4 || y == 3 || y == 4) ? cross : bg;
+
+  static double _dist(int x, int y) => math.sqrt(math.pow(x - 5.5, 2) + math.pow(y - 3.5, 2));
+
+  static final Map<String, Color Function(int, int)> _flags = {
+    'DE': _hs([(_k, 3), (_r, 2), (_y, 3)]),
+    'NL': _hs([(_r, 3), (_w, 2), (_bl, 3)]),
+    'PL': _hs([(_w, 4), (_r, 4)]),
+    'LV': _hs([(_mar, 3), (_w, 2), (_mar, 3)]),
+    'LT': _hs([(_y, 3), (_g, 2), (_r, 3)]),
+    'EE': _hs([(_bl, 3), (_k, 2), (_w, 3)]),
+    'RU': _hs([(_w, 3), (_bl, 2), (_r, 3)]),
+    'UA': _hs([(_bl, 4), (_y, 4)]),
+    'AT': _hs([(_r, 3), (_w, 2), (_r, 3)]),
+    'HU': _hs([(_r, 3), (_w, 2), (_g, 3)]),
+    'BG': _hs([(_w, 3), (_g, 2), (_r, 3)]),
+    'ES': _hs([(_r, 2), (_y, 4), (_r, 2)]),
+    'SG': _hs([(_r, 4), (_w, 4)]),
+    'FR': _vs(_bl, _w, _r),
+    'IT': _vs(_g, _w, _r),
+    'BE': _vs(_k, _y, _r),
+    'RO': _vs(_bl, _y, _r),
+    'IE': _vs(_g, _w, _o),
+    'FI': _cross(_w, _bl),
+    'SE': _cross(_bl, _y),
+    'DK': _cross(_r, _w),
+    'NO': _cross(_r, _w),
+    'CH': (x, y) => ((x >= 5 && x <= 6 && y >= 1 && y <= 6) || (y >= 3 && y <= 4 && x >= 3 && x <= 8)) ? _w : _r,
+    'GB': (x, y) =>
+        (x >= 5 && x <= 6) || (y >= 3 && y <= 4) ? _r : ((x >= 4 && x <= 7) || (y >= 2 && y <= 5) ? _w : _bl),
+    'US': (x, y) => (x < 5 && y < 4) ? _bl : (y.isEven ? _r : _w),
+    'TR': (x, y) => _dist(x, y) < 1.9 ? _w : _r,
+    'JP': (x, y) => _dist(x, y) < 2.3 ? _r : _w,
+    'KZ': (x, y) => _dist(x, y) < 2.0 ? _y : _sky,
+    'CZ': (x, y) => (x <= 4 && (y - 3.5).abs() <= (4.6 - x) * .85) ? _bl : (y < 4 ? _w : _r),
+    'PT': (x, y) => x < 5 ? _g : _r,
+    'CA': (x, y) => (x >= 5 && x <= 6 && y >= 2 && y <= 5) ? _r : ((x < 3 || x >= 9) ? _r : _w),
+  };
+
+  static final _cache = <String, List<List<Color>>?>{};
+
+  /// the pixels of a flag emoji's country, null when there is no pattern for it
+  static List<List<Color>>? of(String flag) => _cache.putIfAbsent(flag, () {
+    final letters = flag.runes.where((r) => r >= 0x1F1E6 && r <= 0x1F1FF).toList();
+    if (letters.length < 2) return null;
+    final code = String.fromCharCodes([letters[0] - 0x1F1E6 + 65, letters[1] - 0x1F1E6 + 65]);
+    final cell = _flags[code];
+    if (cell == null) return null;
+    return [
+      for (var y = 0; y < rows; y++) [for (var x = 0; x < cols; x++) cell(x, y)],
+    ];
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cell = size.width / cols;
+    final side = cell * .88;
+    // a thin frame, so a white stripe does not melt into the paper
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..color = const Color(0x66808080)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    for (var y = 0; y < rows; y++) {
+      for (var x = 0; x < cols; x++) {
+        canvas.drawRect(
+          Rect.fromLTWH(x * cell + (cell - side) / 2, y * cell + (cell - side) / 2, side, side),
+          Paint()..color = grid[y][x],
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PixelFlag old) => !identical(old.grid, grid);
+}
+
+/// A faint plate under a site's column or tile where its server is in another country than the main one.
+Widget _flagPlate(bool dark, _SiteEntry e, Widget child) => e.flag.isEmpty
+    ? child
+    : DecoratedBox(
+        decoration: BoxDecoration(
+          color: _Dots.ink(dark).withValues(alpha: dark ? .09 : .07),
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: child),
+      );
+
 /// A site's name cut to what fits a narrow column.
 String _shortName(String name) {
   final first = name.split(' ').first.toUpperCase();
@@ -1543,10 +1696,11 @@ Widget _siteDigits(_SiteEntry e, Color ink, Color soft, Color faint) {
     children: [
       _DotNumber(text, cell: 4.2, colour: slow ? _Dots.red : ink, faint: faint),
       const Gap(5),
-      Text(
-        '${_shortName(e.name)}${ms != null && ms >= 1000 ? ' · С' : ''}',
-        maxLines: 1,
-        style: _Dots.mono(9, soft, spacing: .6),
+      _flaggedText(
+        e,
+        _shortName(e.name),
+        _Dots.mono(9, soft, spacing: .6),
+        suffix: ms != null && ms >= 1000 ? ' · С' : '',
       ),
     ],
   );
@@ -1702,10 +1856,11 @@ Widget _dotsServerRow(
         context,
         Row(
           children: [
+            // the flag as tall as the ping's dots on the right (seven cells of 4)
             if (group)
-              Icon(Icons.auto_awesome_rounded, size: 20, color: ink)
+              SizedBox(width: 42, child: Icon(Icons.auto_awesome_rounded, size: 28, color: ink))
             else
-              Text(flag ?? '🌐', style: const TextStyle(fontSize: 20, height: 1, fontFamilyFallback: ['Emoji'])),
+              _flagMark(flag, width: 42),
             const Gap(12),
             Expanded(
               child: Column(

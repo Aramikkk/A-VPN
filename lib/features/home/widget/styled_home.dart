@@ -4650,11 +4650,33 @@ class _SitesHeader extends HookConsumerWidget {
           // Dots: the block's name in the middle of the block
           if (signs)
             IgnorePointer(
-              child: Text(
-                t.avpn.multiServersTitle.toUpperCase(),
-                maxLines: 1,
-                style: _Dots.mono(10, _Dots.soft(theme.brightness == Brightness.dark), spacing: 1.6),
-              ),
+              // while the sites are asked, a dot for each fills in as it answers
+              child: sites.testing
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var k = 0; k < shown.length; k++)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: k < sites.done
+                                    ? _Dots.ink(theme.brightness == Brightness.dark)
+                                    : _Dots.grid(theme.brightness == Brightness.dark),
+                              ),
+                            ),
+                          ),
+                      ],
+                    )
+                  : Text(
+                      t.avpn.multiServersTitle.toUpperCase(),
+                      maxLines: 1,
+                      style: _Dots.mono(10, _Dots.soft(theme.brightness == Brightness.dark), spacing: 1.6),
+                    ),
             ),
           Row(
             children: [

@@ -20,7 +20,7 @@ enum SiteGraph {
   final String ru;
   final String en;
 
-  static const fallback = scales;
+  static const fallback = columns;
 
   static SiteGraph fromName(String? name) => values.firstWhere((e) => e.name == name, orElse: () => fallback);
 }
