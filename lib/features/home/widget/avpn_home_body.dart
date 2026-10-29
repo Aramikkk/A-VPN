@@ -676,7 +676,7 @@ class _ModeSquare extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final t = ref.watch(translationsProvider).requireValue;
     // Bento and Dots: their own squares
-    final look = ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
+    final look = ref.watch(Preferences.homeLayout);
     final own = lookSquare(look, context, on: on);
     final upper = look == HomeLayout.dots;
     return AspectRatio(

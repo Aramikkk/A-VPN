@@ -1321,6 +1321,48 @@ class _PingDotsPainter extends CustomPainter {
       !listEquals(old.samples, samples);
 }
 
+/// Dots' super light status: the connection time and the two speeds (what comes in, what goes out) on its paper.
+class _DotsLightStats extends ConsumerWidget {
+  const _DotsLightStats({required this.connected, required this.timeText, required this.down, required this.up});
+
+  final bool connected;
+  final String timeText;
+  final String down;
+  final String up;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ink = _Dots.ink(dark);
+    return _dotPaper(
+      context,
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(t.avpn.contrastTime.toUpperCase(), style: _Dots.mono(11, _Dots.soft(dark), spacing: 2.4)),
+              const Spacer(),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: connected ? _Dots.red : _Dots.soft(dark)),
+              ),
+              const Gap(6),
+              Text(timeText, style: _Dots.mono(12, ink, weight: FontWeight.w800)),
+            ],
+          ),
+          _dotRule(context),
+          _dotRow(context, '↓ ${t.avpn.superLightDown}', down),
+          _dotRow(context, '↑ ${t.avpn.superLightUp}', up),
+        ],
+      ),
+    );
+  }
+}
+
 /// The marks behind the ping bars: a faint line at 100, 200, 400 ms (as far as the scale goes), its figure at the right.
 class _PingGridPainter extends CustomPainter {
   _PingGridPainter({required this.scale, required this.line, required this.text});
@@ -1515,10 +1557,15 @@ class _SiteDots extends HookConsumerWidget {
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 64,
+                            width: 86,
                             child: Align(
                               alignment: Alignment.centerLeft,
-                              child: _flaggedText(e, _shortName(e.name), _Dots.mono(10, soft, spacing: .4)),
+                              child: _flaggedText(
+                                e,
+                                e.name.toUpperCase(),
+                                _Dots.mono(10, soft, spacing: .2),
+                                fit: true,
+                              ),
                             ),
                           ),
                           Expanded(
@@ -1549,8 +1596,14 @@ class _SiteDots extends HookConsumerWidget {
 }
 
 /// A site's name with its flag before it (when its server is in another country), the name cut by an ellipsis.
-Widget _flaggedText(_SiteEntry e, String text, TextStyle style, {String suffix = ''}) {
-  final label = Text('$text$suffix', maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
+Widget _flaggedText(_SiteEntry e, String text, TextStyle style, {String suffix = '', bool fit = false}) {
+  // [fit]: the whole name, as small as it takes to fit the room it has (not cut by an ellipsis)
+  final label = fit
+      ? FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text('$text$suffix', maxLines: 1, style: style),
+        )
+      : Text('$text$suffix', maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
   if (e.flag.isEmpty) return label;
   return Row(
     mainAxisSize: MainAxisSize.min,
@@ -1582,9 +1635,10 @@ Widget _siteDigits(_SiteEntry e, Color ink, Color soft, Color faint) {
       const Gap(5),
       _flaggedText(
         e,
-        _shortName(e.name),
-        _Dots.mono(9, soft, spacing: .6),
+        e.name.toUpperCase(),
+        _Dots.mono(9, soft, spacing: .4),
         suffix: ms != null && ms >= 1000 ? ' · С' : '',
+        fit: true,
       ),
     ],
   );

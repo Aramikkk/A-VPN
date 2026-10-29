@@ -83,8 +83,8 @@ class _StyledHome extends HookConsumerWidget {
         connections.driven = false;
       };
     }, [live]);
-    // how the blocks are laid out (the super light mode has its own look)
-    final layout = superLight ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
+    // how the blocks are laid out (the super light mode keeps the look chosen: its own lighter form of it)
+    final layout = ref.watch(Preferences.homeLayout);
     // the folded phone (about 960 high) has room to spare: wider gaps and a bigger connect panel; the unfolded one
     // (about 830) keeps everything tight
     final roomy = MediaQuery.sizeOf(context).height >= 900;
@@ -368,6 +368,15 @@ class _StatusBlock extends HookConsumerWidget {
       if (ref.watch(superLightProvider)) {
         final inRate = amount(connected ? stats?.downlink.toInt() ?? 0 : 0);
         final outRate = amount(connected ? stats?.uplink.toInt() ?? 0 : 0);
+        // Dots: the same three figures on its dotted paper
+        if (layout == HomeLayout.dots) {
+          return _DotsLightStats(
+            connected: connected,
+            timeText: connected ? time : (waiting ?? '—'),
+            down: '${inRate.$1} ${inRate.$2}/${t.avpn.perSecond}',
+            up: '${outRate.$1} ${outRate.$2}/${t.avpn.perSecond}',
+          );
+        }
         return _ContrastStats(
           items: [
             (
@@ -2321,7 +2330,7 @@ class _ContrastGlowState extends ConsumerState<ContrastGlow> {
     // the settings not read yet (the first frames): the defaults
     final ready = ref.watch(sharedPreferencesProvider).hasValue;
     // Bento and Dots: a backdrop of their own (a plain page, dotted paper)
-    final look = ready && !ref.watch(superLightProvider) ? ref.watch(Preferences.homeLayout) : HomeLayout.classic;
+    final look = ready ? ref.watch(Preferences.homeLayout) : HomeLayout.classic;
     homeLookNow = look;
     // (the settings not read yet: the colour it starts with)
     dotsAccentNow = ready
@@ -2417,7 +2426,7 @@ class ContrastFrost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     // Bento and Dots: their own cards (a solid tile, an outlined box on the paper)
-    final lookReady = ref.watch(sharedPreferencesProvider).hasValue && !ref.watch(superLightProvider);
+    final lookReady = ref.watch(sharedPreferencesProvider).hasValue;
     final card = lookCard(
       lookReady ? ref.watch(Preferences.homeLayout) : HomeLayout.classic,
       dark,
@@ -4149,11 +4158,7 @@ class ContrastPlate extends ConsumerWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final clarity = ref.watch(Preferences.contrastClarity);
     // Bento and Dots: their own plates
-    final own = lookPlate(
-      ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout),
-      context,
-      child,
-    );
+    final own = lookPlate(ref.watch(Preferences.homeLayout), context, child);
     if (own != null) return own;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -4229,7 +4234,7 @@ class _ConnectionsBlock extends ConsumerWidget {
       }
     }
     // the flask's look: the figure large and thin, the VPN's share against the bypass as a split line
-    final look = ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
+    final look = ref.watch(Preferences.homeLayout);
     if (look == HomeLayout.bento || look == HomeLayout.dots) {
       return Semantics(
         key: const ValueKey('connections-block'),
@@ -4660,7 +4665,7 @@ class _SitesHeader extends HookConsumerWidget {
     final multiOn = ref.watch(multiPref);
     final shown = ref.watch(homeSitesProvider);
     // Bento and Dots: their own pills
-    final look = ref.watch(superLightProvider) ? HomeLayout.classic : ref.watch(Preferences.homeLayout);
+    final look = ref.watch(Preferences.homeLayout);
     final delayPill = lookPill(look, context, on: sites.testing);
     final multiPill = lookPill(look, context, on: multiOn);
     final upper = look == HomeLayout.dots;

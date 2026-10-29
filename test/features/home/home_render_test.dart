@@ -528,8 +528,11 @@ void main() {
           expect(find.byKey(const Key('contrast-sites')), findsNothing);
           expect(find.text('Раздача'), findsNothing);
           // the time and the two speeds, not the totals
-          expect(find.text('Загрузка'), findsOneWidget);
-          expect(find.text('Отдача'), findsOneWidget);
+          // (Dots writes them on its own lines, in capitals)
+          final dots = Platform.environment['HOMELAYOUT'] == 'dots';
+          final shown = (Platform.environment['HOMELAYOUT'] ?? '').isEmpty ? findsOneWidget : findsWidgets;
+          expect(find.text(dots ? '↓ ЗАГРУЗКА' : 'Загрузка'), shown);
+          expect(find.text(dots ? '↑ ОТДАЧА' : 'Отдача'), shown);
           expect(find.text('Через VPN'), findsNothing);
         }
         // TAP=<text>: a tap on it first, to look at what it opens

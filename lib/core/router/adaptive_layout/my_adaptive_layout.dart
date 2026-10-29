@@ -104,9 +104,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     final glass = Theme.of(context).glassLook;
     final contrastPhone = isMobileBreakpoint;
     // Bento and Dots: the whole screen in their look (the faces, the menu, the panel)
-    final look = contrastPhone && !ref.watch(superLightProvider)
-        ? ref.watch(Preferences.homeLayout)
-        : HomeLayout.classic;
+    final look = contrastPhone ? ref.watch(Preferences.homeLayout) : HomeLayout.classic;
     homeLookNow = look;
     final dotsAccent = ref.watch(Preferences.dotsAccent);
     dotsAccentNow = dotsAccent.on(dark: Theme.of(context).brightness == Brightness.dark);
