@@ -439,11 +439,11 @@ void main() {
                                 direction: land ? Axis.horizontal : Axis.vertical,
                                 children: [
                                   const Expanded(child: AraHomeBody()),
-                                  ContrastShellDock(side: land),
+                                  ContrastShellDock(side: land, page: pcw ? -1 : 1),
                                 ],
                               )
                             : const AraHomeBody(),
-                        bottomNavigationBar: pc || Platform.environment['SUPERLIGHT'] == '1'
+                        bottomNavigationBar: pc || (contrast && !pcw) || Platform.environment['SUPERLIGHT'] == '1'
                             ? null
                             : contrast
                             ? NavigationBar(

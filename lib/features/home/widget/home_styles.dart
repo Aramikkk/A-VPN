@@ -1121,37 +1121,32 @@ class _DotsButton extends HookWidget {
       return null;
     }, [busy]);
     final ink = _Dots.ink(dark);
-    final paper = _Dots.paper(dark);
-    final side = size * 1.08;
+    final soft = _Dots.soft(dark);
+    // no plate: the sign of dots right on the paper, the network under it
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        width: side,
-        height: side,
-        decoration: BoxDecoration(
-          color: on ? ink : paper,
-          borderRadius: BorderRadius.circular(dotsRadius + 2),
-          border: Border.all(color: ink.withValues(alpha: .7), width: on ? 1 : 1.4),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedBuilder(
               animation: spin,
               builder: (context, _) => CustomPaint(
-                size: Size.square(side * .64),
+                size: Size.square(size * .92),
                 painter: _PowerDotsPainter(
-                  lit: on ? _Dots.red : (busy ? _Dots.red : _Dots.soft(dark)),
-                  stem: on ? paper : _Dots.soft(dark),
-                  faint: (on ? paper : ink).withValues(alpha: .16),
+                  lit: on || busy ? _Dots.red : soft,
+                  stem: on ? ink : soft,
+                  faint: on ? ink.withValues(alpha: .25) : soft,
                   phase: busy ? spin.value : null,
                   glow: on,
                 ),
               ),
             ),
             if (label != null) ...[
-              const Gap(4),
-              Text(label!.toUpperCase(), style: _Dots.mono(8.5, (on ? paper : ink).withValues(alpha: .75), spacing: 1.4)),
+              const Gap(8),
+              Text(label!.toUpperCase(), style: _Dots.mono(10, on ? ink : soft, spacing: 1.6)),
             ],
           ],
         ),
@@ -1161,47 +1156,77 @@ class _DotsButton extends HookWidget {
 }
 
 class _PowerDotsPainter extends CustomPainter {
-  _PowerDotsPainter({required this.lit, required this.stem, required this.faint, required this.phase, required this.glow});
+  _PowerDotsPainter({
+    required this.lit,
+    required this.stem,
+    required this.faint,
+    required this.phase,
+    required this.glow,
+  });
 
+  /// the centre dot's colour (the accent, or the faint one when off)
   final Color lit;
+
+  /// the frame's dots when on
   final Color stem;
   final Color faint;
+
+  /// connecting: how far round the frame the lit stretch has run (0 to 1); null otherwise
   final double? phase;
+
+  /// on: the centre glows
   final bool glow;
 
-  static const _ring = 18;
+  /// the frame's dots of the 5 x 5 grid, clockwise from the top left (the corners are left out)
+  static const _frame = [
+    (1, 0), (2, 0), (3, 0), (4, 1), (4, 2), (4, 3), (3, 4), (2, 4), (1, 4), (0, 3), (0, 2), (0, 1), //
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
-    final r = size.width * .4;
-    final dot = size.width * .066;
-    final lamp = Paint()..color = lit;
-    for (var i = 0; i < _ring; i++) {
-      // from just right of the top, clockwise; the three at the top are left out for the stem
-      final a = -math.pi / 2 + 2 * math.pi * (i + .5) / _ring;
-      if ((i < 1) || i >= _ring - 1) continue;
-      final p = c + Offset(math.cos(a), math.sin(a)) * r;
-      var on = phase == null;
-      if (phase != null) {
-        final d = ((i / _ring) - phase!) % 1.0;
-        on = (d < 0 ? d + 1 : d) < .3;
+    final step = size.width / 4;
+    Offset at(int i, int j) => Offset(i * step, j * step);
+    final big = step * .31;
+    final small = step * .1;
+    final dim = Paint()..color = faint.withValues(alpha: .7);
+    for (var j = 0; j < 5; j++) {
+      for (var i = 0; i < 5; i++) {
+        if (i == 2 && j == 2) continue;
+        final corner = (i == 0 || i == 4) && (j == 0 || j == 4);
+        final onFrame = !corner && (i == 0 || i == 4 || j == 0 || j == 4);
+        if (!onFrame) canvas.drawCircle(at(i, j), small, dim);
       }
-      canvas.drawCircle(p, dot, on ? lamp : (Paint()..color = faint));
-      if (on && glow) {
+    }
+    for (final (k, (i, j)) in _frame.indexed) {
+      var colour = phase == null ? (glow ? stem : faint) : faint;
+      var lamp = false;
+      if (phase != null) {
+        final d = (k / _frame.length - phase!) % 1.0;
+        lamp = (d < 0 ? d + 1 : d) < .34;
+        if (lamp) colour = lit;
+      }
+      if (lamp) {
         canvas.drawCircle(
-          p,
-          dot * 2.2,
+          at(i, j),
+          big * 1.9,
           Paint()
-            ..color = lit.withValues(alpha: .35)
+            ..color = lit.withValues(alpha: .3)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
         );
       }
+      canvas.drawCircle(at(i, j), big * .85, Paint()..color = colour);
     }
-    for (var k = 0; k < 3; k++) {
-      final p = Offset(c.dx, c.dy - r * (1.15 - k * .5));
-      canvas.drawCircle(p, dot, Paint()..color = stem);
+    final centre = at(2, 2);
+    if (glow) {
+      canvas.drawCircle(
+        centre,
+        big * 2.3,
+        Paint()
+          ..color = lit.withValues(alpha: .4)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+      );
     }
+    canvas.drawCircle(centre, big * 1.35, Paint()..color = phase != null ? lit.withValues(alpha: .55) : lit);
   }
 
   @override

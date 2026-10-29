@@ -186,7 +186,17 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                                   child: navigationShell,
                                 ),
                               ),
-                              ContrastShellDock(side: ContrastShellDock.sideways(context)),
+                              ContrastShellDock(
+                                side: ContrastShellDock.sideways(context),
+                                // the phone has no tabs: its pages by swipes, marked in the dock
+                                page: PlatformUtils.isDesktop
+                                    ? -1
+                                    : switch (navigationShell.currentIndex) {
+                                        1 => 0,
+                                        3 => 2,
+                                        _ => 1,
+                                      },
+                              ),
                             ],
                           ),
                         ),
@@ -254,7 +264,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                           ),
                         ),
                       )
-                    : isMobileBreakpoint
+                    // the phone: no menu (the pages by swipes), the computer in a narrow window: its menu
+                    : isMobileBreakpoint && PlatformUtils.isDesktop
                     ? FocusScope(
                         node: navScopeNode,
                         child: DecoratedBox(

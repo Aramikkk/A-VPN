@@ -2013,7 +2013,11 @@ class _LongSwipe extends HookWidget {
 /// Contrast's panel at the bottom of every page (the shell keeps it): white by day, black by night, the connect
 /// control on it and the "Серверы VPN" tab on its top edge.
 class ContrastShellDock extends HookConsumerWidget {
-  const ContrastShellDock({super.key, this.side = false});
+  const ContrastShellDock({super.key, this.side = false, this.page = -1});
+
+  /// the phone, without tabs: which of the three pages (0 statistics, 1 home, 2 topology) is open, marked under the
+  /// control; -1 where the menu is there (a computer)
+  final int page;
 
   /// a column at the right of the page (a short screen: the phone turned), not a panel under it
   final bool side;
@@ -2070,14 +2074,13 @@ class ContrastShellDock extends HookConsumerWidget {
       child: Stack(
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 8 + (page >= 0 ? MediaQuery.viewPaddingOf(context).bottom : 0)),
             decoration: BoxDecoration(
               color: contrastPanelColor(dark),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(homeLookNow == HomeLayout.dots ? dotsRadius : 30),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(homeLookNow == HomeLayout.dots ? 0 : 30)),
+              // Dots: no edge, the control right on the page
               border: homeLookNow == HomeLayout.dots
-                  ? Border(top: BorderSide(color: _Dots.ink(dark).withValues(alpha: .7)))
+                  ? null
                   : (dark ? Border(top: BorderSide(color: Colors.white.withValues(alpha: .08))) : null),
               boxShadow: dark || homeLookNow == HomeLayout.dots
                   ? null
@@ -2089,7 +2092,33 @@ class ContrastShellDock extends HookConsumerWidget {
                       ),
                     ],
             ),
-            child: dock,
+            child: page < 0
+                ? dock
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      dock,
+                      const Gap(8),
+                      // three small squares: statistics, home, topology (swipe sideways)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < 3; i++)
+                            Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: i == page
+                                    ? theme.colorScheme.onSurface
+                                    : theme.colorScheme.onSurface.withValues(alpha: .22),
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
