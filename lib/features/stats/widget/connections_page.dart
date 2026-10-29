@@ -871,13 +871,18 @@ class _RouteDot extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(color: color.withValues(alpha: .15), shape: BoxShape.circle),
-      child: Icon(
-        route == ConnectionRoute.vpn
-            ? Icons.shield_rounded
-            : (route == ConnectionRoute.block ? Icons.block_rounded : Icons.alt_route_rounded),
-        size: size * .5,
-        color: color,
-      ),
+      // Dots: its shield of dots
+      child: route == ConnectionRoute.vpn && homeLookNow == HomeLayout.dots
+          ? Center(
+              child: shieldSign(color: color, size: size * .55),
+            )
+          : Icon(
+              route == ConnectionRoute.vpn
+                  ? Icons.shield_rounded
+                  : (route == ConnectionRoute.block ? Icons.block_rounded : Icons.alt_route_rounded),
+              size: size * .5,
+              color: color,
+            ),
     );
   }
 }

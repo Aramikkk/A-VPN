@@ -2028,7 +2028,9 @@ class _NoAdminNote extends ConsumerWidget {
   }
 }
 
-/// A short vertical swipe, down or up: past a twelfth of the height, or a flick.
+/// A short vertical swipe, down or up: past a twelfth of the height, or a flick. Down it is drawn as a pull to refresh:
+/// the page follows the finger a little way down, a refresh sign over it turns as it is pulled, and once it takes the
+/// sign spins while the page waits, then both go back.
 class _LongSwipe extends HookWidget {
   const _LongSwipe({required this.child, required this.onDown, required this.onUp});
 
@@ -2036,26 +2038,96 @@ class _LongSwipe extends HookWidget {
   final VoidCallback onDown;
   final VoidCallback onUp;
 
+  /// how far the page may be pulled down (a share of the screen's height), and how much of the finger's way it follows
+  static const _reachShare = .30;
+  static const _follow = .9;
+
   @override
   Widget build(BuildContext context) {
     final drag = useRef(0.0);
+    final pull = useState(0.0);
+    final dragging = useState(false);
+    final refreshing = useState(false);
+    final spin = useAnimationController(duration: const Duration(milliseconds: 800));
     // a computer goes by its menu, not by dragging the mouse; the super light mode has no swipes at all
     if (PlatformUtils.isDesktop || superLightNow) return child;
+    final need = MediaQuery.sizeOf(context).height / 12;
+    final reach = MediaQuery.sizeOf(context).height * _reachShare;
+    final progress = refreshing.value ? 1.0 : (drag.value / need).clamp(0.0, 1.0);
+    final theme = Theme.of(context);
+    final lit = refreshing.value || (dragging.value && drag.value > need);
+    final signColour = lit
+        ? (homeLookNow == HomeLayout.dots ? _Dots.red : theme.colorScheme.primary)
+        : theme.colorScheme.onSurfaceVariant;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onVerticalDragStart: (_) => drag.value = 0,
-      onVerticalDragUpdate: (d) => drag.value += d.primaryDelta ?? 0,
+      onVerticalDragStart: (_) {
+        drag.value = 0;
+        dragging.value = true;
+      },
+      onVerticalDragUpdate: (d) {
+        drag.value += d.primaryDelta ?? 0;
+        if (!refreshing.value) pull.value = (drag.value * _follow).clamp(0.0, reach);
+      },
       onVerticalDragEnd: (details) {
-        final need = MediaQuery.sizeOf(context).height / 12;
         final velocity = details.primaryVelocity ?? 0;
+        dragging.value = false;
         if (drag.value > need || (drag.value > 16 && velocity > 700)) {
           onDown();
-        } else if (drag.value < -need || (drag.value < -16 && velocity < -700)) {
-          onUp();
+          // the page waits a moment under the turning sign, then goes back
+          refreshing.value = true;
+          pull.value = reach * .55;
+          spin.repeat();
+          Future<void>.delayed(const Duration(milliseconds: 1400), () {
+            if (!context.mounted) return;
+            spin.stop();
+            refreshing.value = false;
+            pull.value = 0;
+          });
+        } else {
+          pull.value = 0;
+          if (drag.value < -need || (drag.value < -16 && velocity < -700)) onUp();
         }
         drag.value = 0;
       },
-      child: child,
+      onVerticalDragCancel: () {
+        dragging.value = false;
+        if (!refreshing.value) pull.value = 0;
+        drag.value = 0;
+      },
+      child: Stack(
+        // the page keeps the size it had (tight to the screen)
+        fit: StackFit.expand,
+        children: [
+          // the sign in the room the page leaves at the top (under the status bar)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + pull.value * .35 - 12,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Center(
+                child: Opacity(
+                  opacity: pull.value <= 0 ? 0 : (pull.value / 30).clamp(0.0, 1.0),
+                  child: AnimatedBuilder(
+                    animation: spin,
+                    builder: (context, _) => Transform.rotate(
+                      angle: refreshing.value ? spin.value * 2 * math.pi : progress * math.pi * 1.6,
+                      child: Icon(Icons.refresh_rounded, size: 26, color: signColour),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            // following the finger it is immediate; let go, it settles
+            duration: dragging.value ? Duration.zero : const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            transform: Matrix4.translationValues(0, pull.value, 0),
+            child: child,
+          ),
+        ],
+      ),
     );
   }
 }

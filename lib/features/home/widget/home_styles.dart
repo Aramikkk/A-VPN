@@ -713,6 +713,71 @@ class _DotsBinPainter extends CustomPainter {
   bool shouldRepaint(_DotsBinPainter old) => old.colour != colour;
 }
 
+/// A shield of dots (the Dots look's shield): a field of dots in the shape of a shield, its edge dots bolder and the
+/// inner ones fainter; [crossed]: a stroke of bold dots across it (traffic that goes without the VPN).
+void paintDotShield(Canvas canvas, Rect box, Color colour, {bool crossed = false}) {
+  const cols = 7;
+  const rows = 8;
+  final sx = box.width / cols;
+  final sy = box.height / rows;
+  bool inside(int i, int j) {
+    if (i < 0 || i >= cols || j < 0 || j >= rows) return false;
+    final u = ((i + .5) / cols) * 2 - 1;
+    final v = (j + .5) / rows;
+    final w = v < .5 ? 1.0 : math.sqrt(math.max(0.0, 1 - math.pow((v - .5) / .5, 2)));
+    return u.abs() <= w * .95;
+  }
+
+  final r = math.min(sx, sy) * .42;
+  final bold = Paint()..color = colour;
+  final soft = Paint()..color = colour.withValues(alpha: .5);
+  for (var j = 0; j < rows; j++) {
+    for (var i = 0; i < cols; i++) {
+      if (!inside(i, j)) continue;
+      final edge = !inside(i - 1, j) || !inside(i + 1, j) || !inside(i, j - 1) || !inside(i, j + 1);
+      canvas.drawCircle(
+        Offset(box.left + (i + .5) * sx, box.top + (j + .5) * sy),
+        edge ? r : r * .55,
+        edge ? bold : soft,
+      );
+    }
+  }
+  if (crossed) {
+    for (var k = 0; k < 7; k++) {
+      final t = k / 6;
+      canvas.drawCircle(
+        Offset(box.left + sx * .3 + (box.width - sx * .6) * t, box.bottom - sy * .6 - (box.height - sy * 1.2) * t),
+        r * 1.05,
+        bold,
+      );
+    }
+  }
+}
+
+class _DotShieldPainter extends CustomPainter {
+  _DotShieldPainter(this.colour, this.crossed);
+
+  final Color colour;
+  final bool crossed;
+
+  @override
+  void paint(Canvas canvas, Size size) => paintDotShield(canvas, Offset.zero & size, colour, crossed: crossed);
+
+  @override
+  bool shouldRepaint(_DotShieldPainter old) => old.colour != colour || old.crossed != crossed;
+}
+
+/// The shield sign in the Dots look (of dots), as an icon [size] high.
+Widget shieldSign({Color? color, double size = 24, bool crossed = false}) => Builder(
+  builder: (context) => CustomPaint(
+    size: Size(size * .88, size),
+    painter: _DotShieldPainter(
+      color ?? IconTheme.of(context).color ?? Theme.of(context).colorScheme.onSurface,
+      crossed,
+    ),
+  ),
+);
+
 /// A number drawn as a 5×7 matrix of dots for each figure: the lit dots in the ink, the rest faint.
 class _DotNumber extends StatelessWidget {
   const _DotNumber(this.text, {required this.cell, required this.colour, required this.faint});
