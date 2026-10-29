@@ -49,6 +49,29 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 var _connected = true;
+
+/// the settings of the variant being rendered, over the environment's (RENDER=1 HOMELAYOUT=dots ... by hand)
+final _overrides = <String, String>{};
+
+String? _env(String key) => _overrides[key] ?? Platform.environment[key];
+
+/// The views of the Dots look and the super light mode, each one rendered once in Contrast, connected: nothing may
+/// overflow or throw, and what the view is for must be on the screen.
+const _variants = <String, Map<String, String>>{
+  'dots list': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'list'},
+  'dots scales': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'scales'},
+  'dots digits': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'digits'},
+  'dots columns': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'columns', 'SITEFLAGS': '1'},
+  'dots lanes': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'lanes', 'SITEFLAGS': '1'},
+  'dots ping bars': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'bars'},
+  'dots ping equalizer': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'equalizer'},
+  'dots ping ruler': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'ruler'},
+  'dots ping trace': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'trace'},
+  'dots ping heat': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'heat'},
+  'super light dots': {'HOMELAYOUT': 'dots', 'SUPERLIGHT': '1'},
+  'super light bento': {'HOMELAYOUT': 'bento', 'SUPERLIGHT': '1'},
+  'super light pulse': {'HOMELAYOUT': 'pulse', 'SUPERLIGHT': '1'},
+};
 late StreamController<SystemInfo> _statsUpdates;
 
 class _Conn extends ConnectionNotifier {
@@ -78,7 +101,7 @@ final _servers = [
 
 /// BADGES=1: the servers of the second and third subscription carry the shifted numbers the merge gives them
 String _badged(String tag, String display) {
-  if (Platform.environment['BADGES'] != '1') return display;
+  if (_env('BADGES') != '1') return display;
   return switch (tag) {
     'nl' => '$display § 1002',
     'ee' => '$display § 1003',
@@ -115,9 +138,7 @@ class _Proxies extends ProxiesOverviewNotifier {
                   isVisible: true,
                   // WL=1: Auto on a whitelist server; AUTO=<tag>: on that one
                   groupSelectedTag: group
-                      ? ((Platform.environment['AUTO'] ?? '').isNotEmpty
-                            ? Platform.environment['AUTO']
-                            : (Platform.environment['WL'] == '1' ? 'lte' : 'pl5'))
+                      ? ((_env('AUTO') ?? '').isNotEmpty ? _env('AUTO') : (_env('WL') == '1' ? 'lte' : 'pl5'))
                       : null,
                 ),
             ],
@@ -171,7 +192,7 @@ class _Stats extends StatsNotifier {
 
 /// ICONS=<folder>: an app's own icon from <folder>/<package>.png (the phone gives the real ones), else none
 Uint8List? _icon(String package) {
-  final dir = Platform.environment['ICONS'];
+  final dir = _env('ICONS');
   if (dir == null) return null;
   final file = File('$dir/$package.png');
   return file.existsSync() ? file.readAsBytesSync() : null;
@@ -208,352 +229,361 @@ void main() {
   for (final style in AraStyle.values) {
     for (final (dark, connected) in [(true, true), (false, false), (false, true), (true, false)]) {
       final name = '${style.name}_${dark ? 'night' : 'day'}_${connected ? 'on' : 'off'}';
-      testWidgets('home: $name', (tester) async {
-        final network = Platform.environment['NETWORK'] == 'mobile' ? 'mobile' : 'wifi';
-        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          const MethodChannel('com.aravpn.app/network'),
-          (call) async => call.method == 'underlyingNetwork' ? network : null,
-        );
-        tester.binding.defaultBinaryMessenger.setMockStreamHandler(
-          const EventChannel('com.aravpn.app/network/events'),
-          MockStreamHandler.inline(
-            onListen: (_, sink) {
-              sink.success(network);
-              return null;
-            },
-          ),
-        );
-        _connected = connected;
-        _statsUpdates = StreamController<SystemInfo>();
-        addTearDown(() => _statsUpdates.close());
-        // BG=<backdrop>, PAL=<palette>: Contrast's look
-        SharedPreferences.setMockInitialValues({
-          // the theme: Contrast or Glass (GLASS=<scheme>), the same layout
-          'ara_style': style.name,
-          'glass_scheme': Platform.environment['GLASS'] ?? 'lemonade',
-          if ((Platform.environment['BG'] ?? '').isNotEmpty) 'contrast_backdrop': Platform.environment['BG']!,
-          if ((Platform.environment['PAL'] ?? '').isNotEmpty) 'contrast_palette': Platform.environment['PAL']!,
-          // CLARITY=<weak|medium|strong>: how see-through the blocks are
-          if ((Platform.environment['CLARITY'] ?? '').isNotEmpty) 'contrast_clarity': Platform.environment['CLARITY']!,
-          if (Platform.environment['LIGHT'] == '1') 'light_look': true,
-          // PINGGRAPH=<name>: how the Dots ping block draws the answers
-          if ((Platform.environment['PINGGRAPH'] ?? '').isNotEmpty) 'ping_graph': Platform.environment['PINGGRAPH']!,
-          if ((Platform.environment['SITEGRAPH'] ?? '').isNotEmpty) 'site_graph': Platform.environment['SITEGRAPH']!,
-          // DOTSACCENT=<name>: the Dots style's colour
-          if ((Platform.environment['DOTSACCENT'] ?? '').isNotEmpty) 'dots_accent': Platform.environment['DOTSACCENT']!,
-          // HOMELAYOUT=<name>: that look; the tiles (classic) when not given (a new install has Dots)
-          'home_layout': (Platform.environment['HOMELAYOUT'] ?? '').isNotEmpty
-              ? Platform.environment['HOMELAYOUT']!
-              : 'classic',
-          if (Platform.environment['SUPERLIGHT'] == '1') 'super_light': true,
-          if (Platform.environment['BADGES'] == '1') 'extra_profiles': 'chill;third',
-        });
-        // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
-        final pcw = Platform.environment['PCW'] == '1';
-        final unfolded = Platform.environment['UNFOLDED'] == '1' || pcw;
-        // PC=1: the computer's home pane in the default window (1048 x 904 less the side bar and the title bar)
-        final pc = Platform.environment['PC'] == '1';
-        // LAND=1: the folded phone turned, about 960 x 411
-        final land = Platform.environment['LAND'] == '1';
-        // SIZE=<w>x<h>: any phone-like screen in dp (a car's head unit, a short phone)
-        final custom = Platform.environment['SIZE']?.split('x').map(double.parse).toList();
-        await tester.binding.setSurfaceSize(
-          custom != null
-              ? Size(custom[0], custom[1])
+      final variants = style == AraStyle.contrast && connected && dark
+          ? <String, Map<String, String>>{'': const {}, ..._variants}
+          : <String, Map<String, String>>{'': const {}};
+      for (final MapEntry(key: variant, value: settings) in variants.entries) {
+        testWidgets(variant.isEmpty ? 'home: $name' : 'home: $name, $variant', (tester) async {
+          _overrides
+            ..clear()
+            ..addAll(settings);
+          addTearDown(_overrides.clear);
+          final network = _env('NETWORK') == 'mobile' ? 'mobile' : 'wifi';
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            const MethodChannel('com.aravpn.app/network'),
+            (call) async => call.method == 'underlyingNetwork' ? network : null,
+          );
+          tester.binding.defaultBinaryMessenger.setMockStreamHandler(
+            const EventChannel('com.aravpn.app/network/events'),
+            MockStreamHandler.inline(
+              onListen: (_, sink) {
+                sink.success(network);
+                return null;
+              },
+            ),
+          );
+          _connected = connected;
+          _statsUpdates = StreamController<SystemInfo>();
+          addTearDown(() => _statsUpdates.close());
+          // BG=<backdrop>, PAL=<palette>: Contrast's look
+          SharedPreferences.setMockInitialValues({
+            // the theme: Contrast or Glass (GLASS=<scheme>), the same layout
+            'ara_style': style.name,
+            'glass_scheme': _env('GLASS') ?? 'lemonade',
+            if ((_env('BG') ?? '').isNotEmpty) 'contrast_backdrop': _env('BG')!,
+            if ((_env('PAL') ?? '').isNotEmpty) 'contrast_palette': _env('PAL')!,
+            // CLARITY=<weak|medium|strong>: how see-through the blocks are
+            if ((_env('CLARITY') ?? '').isNotEmpty) 'contrast_clarity': _env('CLARITY')!,
+            if (_env('LIGHT') == '1') 'light_look': true,
+            // PINGGRAPH=<name>: how the Dots ping block draws the answers
+            if ((_env('PINGGRAPH') ?? '').isNotEmpty) 'ping_graph': _env('PINGGRAPH')!,
+            if ((_env('SITEGRAPH') ?? '').isNotEmpty) 'site_graph': _env('SITEGRAPH')!,
+            // DOTSACCENT=<name>: the Dots style's colour
+            if ((_env('DOTSACCENT') ?? '').isNotEmpty) 'dots_accent': _env('DOTSACCENT')!,
+            // HOMELAYOUT=<name>: that look; the tiles (classic) when not given (a new install has Dots)
+            'home_layout': (_env('HOMELAYOUT') ?? '').isNotEmpty ? _env('HOMELAYOUT')! : 'classic',
+            if (_env('SUPERLIGHT') == '1') 'super_light': true,
+            if (_env('BADGES') == '1') 'extra_profiles': 'chill;third',
+          });
+          // UNFOLDED=1: the inner screen, 1968 x 2184 at 2.625 (about 750 x 832), servers left and traffic right
+          final pcw = _env('PCW') == '1';
+          final unfolded = _env('UNFOLDED') == '1' || pcw;
+          // PC=1: the computer's home pane in the default window (1048 x 904 less the side bar and the title bar)
+          final pc = _env('PC') == '1';
+          // LAND=1: the folded phone turned, about 960 x 411
+          final land = _env('LAND') == '1';
+          // SIZE=<w>x<h>: any phone-like screen in dp (a car's head unit, a short phone)
+          final custom = _env('SIZE')?.split('x').map(double.parse).toList();
+          await tester.binding.setSurfaceSize(
+            custom != null
+                ? Size(custom[0], custom[1])
+                : pcw
+                ? const Size(960, 828)
+                : pc
+                ? const Size(745, 870)
+                : (unfolded ? const Size(750, 832) : (land ? const Size(960, 411) : const Size(411, 960))),
+          );
+          // the screen size the app reads too (MediaQuery), not only the surface drawn on
+          // the folded Fold 7: 1080 x 2520 at 2.625, about 411 x 960
+          tester.view.physicalSize = custom != null
+              ? Size(custom[0] * 2.625, custom[1] * 2.625)
               : pcw
               ? const Size(960, 828)
               : pc
               ? const Size(745, 870)
-              : (unfolded ? const Size(750, 832) : (land ? const Size(960, 411) : const Size(411, 960))),
-        );
-        // the screen size the app reads too (MediaQuery), not only the surface drawn on
-        // the folded Fold 7: 1080 x 2520 at 2.625, about 411 x 960
-        tester.view.physicalSize = custom != null
-            ? Size(custom[0] * 2.625, custom[1] * 2.625)
-            : pcw
-            ? const Size(960, 828)
-            : pc
-            ? const Size(745, 870)
-            : (unfolded ? const Size(1968, 2184) : (land ? const Size(2520, 1080) : const Size(1080, 2520)));
-        tester.view.devicePixelRatio = pc || pcw ? 1 : 2.625;
-        if (land) {
-          tester.view.padding = const FakeViewPadding(top: 24 * 2.625, bottom: 24 * 2.625);
-          tester.view.viewPadding = const FakeViewPadding(top: 24 * 2.625, bottom: 24 * 2.625);
-        }
-        addTearDown(tester.view.reset);
-        final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
-        final prefs = await tester.runAsync(SharedPreferences.getInstance);
-        final accent = AraAccent.values.byName(Platform.environment['ACCENT'] ?? 'neonRed');
-        // GLASS=<scheme>: Glass in that scheme, by day or by night as the others
-        final glassScheme = GlassScheme.values.byName(Platform.environment['GLASS'] ?? 'lemonade');
-        // both themes are drawn in the one (Contrast's) layout
-        const contrast = true;
-        final theme = AppTheme(
-          AppThemeMode.system,
-          '',
-          accent: accent,
-          style: style,
-          glassScheme: glassScheme,
-          contrastPalette: ContrastPalette.values.byName(
-            (Platform.environment['PAL'] ?? '').isEmpty ? 'claude' : Platform.environment['PAL']!,
-          ),
-        );
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              translationsProvider.overrideWith((ref) async => t),
-              profilesNotifierProvider.overrideWith(_ProfilesList.new),
-              sharedPreferencesProvider.overrideWith((ref) async => prefs!),
-              connectionNotifierProvider.overrideWith(_Conn.new),
-              shownConnectionProvider.overrideWith(_ShownConnection.new),
-              proxiesOverviewNotifierProvider.overrideWith(_Proxies.new),
-              activeProxyNotifierProvider.overrideWith(_ActiveProxy.new),
-              activeProfileProvider.overrideWith(_Profile.new),
-              statsNotifierProvider.overrideWith(_Stats.new),
-              sessionTotalsProvider.overrideWith(_SessionTotals.new),
-              profilePathResolverProvider.overrideWithValue(ProfilePathResolver(Directory.systemTemp)),
-              connectionsProvider.overrideWith(_Connections.new),
-              connectionQualityProvider.overrideWith(_Quality.new),
-              siteLatencyProvider.overrideWith(_Sites.new),
-              siteHistoryProvider.overrideWith(_SiteHistory.new),
-              // SUPERLIGHT=1: the super light mode
-              if (Platform.environment['SUPERLIGHT'] == '1') superLightProvider.overrideWithValue(true),
-              // HOMEAPPS=pkg,pkg: these apps of Settings -> Sites marked for the home screen's delay block (the phone's way)
-              if ((Platform.environment['HOMEAPPS'] ?? '').isNotEmpty)
-                homeSitesProvider.overrideWithValue(
-                  homeSitesFor(
-                    android: true,
-                    apps: Platform.environment['HOMEAPPS']!.split(','),
-                    saved: Platform.environment['HOMEAPPS']!.split(','),
-                    testUrl: 'http://www.gstatic.com/generate_204',
+              : (unfolded ? const Size(1968, 2184) : (land ? const Size(2520, 1080) : const Size(1080, 2520)));
+          tester.view.devicePixelRatio = pc || pcw ? 1 : 2.625;
+          if (land) {
+            tester.view.padding = const FakeViewPadding(top: 24 * 2.625, bottom: 24 * 2.625);
+            tester.view.viewPadding = const FakeViewPadding(top: 24 * 2.625, bottom: 24 * 2.625);
+          }
+          addTearDown(tester.view.reset);
+          final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
+          final prefs = await tester.runAsync(SharedPreferences.getInstance);
+          final accent = AraAccent.values.byName(_env('ACCENT') ?? 'neonRed');
+          // GLASS=<scheme>: Glass in that scheme, by day or by night as the others
+          final glassScheme = GlassScheme.values.byName(_env('GLASS') ?? 'lemonade');
+          // both themes are drawn in the one (Contrast's) layout
+          const contrast = true;
+          final theme = AppTheme(
+            AppThemeMode.system,
+            '',
+            accent: accent,
+            style: style,
+            glassScheme: glassScheme,
+            contrastPalette: ContrastPalette.values.byName((_env('PAL') ?? '').isEmpty ? 'claude' : _env('PAL')!),
+          );
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                translationsProvider.overrideWith((ref) async => t),
+                profilesNotifierProvider.overrideWith(_ProfilesList.new),
+                sharedPreferencesProvider.overrideWith((ref) async => prefs!),
+                connectionNotifierProvider.overrideWith(_Conn.new),
+                shownConnectionProvider.overrideWith(_ShownConnection.new),
+                proxiesOverviewNotifierProvider.overrideWith(_Proxies.new),
+                activeProxyNotifierProvider.overrideWith(_ActiveProxy.new),
+                activeProfileProvider.overrideWith(_Profile.new),
+                statsNotifierProvider.overrideWith(_Stats.new),
+                sessionTotalsProvider.overrideWith(_SessionTotals.new),
+                profilePathResolverProvider.overrideWithValue(ProfilePathResolver(Directory.systemTemp)),
+                connectionsProvider.overrideWith(_Connections.new),
+                connectionQualityProvider.overrideWith(_Quality.new),
+                siteLatencyProvider.overrideWith(_Sites.new),
+                siteHistoryProvider.overrideWith(_SiteHistory.new),
+                // SUPERLIGHT=1: the super light mode
+                if (_env('SUPERLIGHT') == '1') superLightProvider.overrideWithValue(true),
+                // HOMEAPPS=pkg,pkg: these apps of Settings -> Sites marked for the home screen's delay block (the phone's way)
+                if ((_env('HOMEAPPS') ?? '').isNotEmpty)
+                  homeSitesProvider.overrideWithValue(
+                    homeSitesFor(
+                      android: true,
+                      apps: _env('HOMEAPPS')!.split(','),
+                      saved: _env('HOMEAPPS')!.split(','),
+                      testUrl: 'http://www.gstatic.com/generate_204',
+                    ),
                   ),
+                // TWOSUBS=1: two subscriptions, so the marks and names show
+                if (_env('TWOSUBS') == '1')
+                  profileBadgesProvider.overrideWithValue([badgeOf(0, 'Sigma'), badgeOf(1, 'Phantom')]),
+                // SITEFLAGS=1: each site through its own server (Settings → Ping → Sites), its flag on the tile
+                if (_env('SITEFLAGS') == '1')
+                  siteServersProvider.overrideWith(
+                    (ref) => Stream.value(const {
+                      'instagram': '🇫🇮 Финляндия',
+                      'whatsapp': '🇵🇱 Польша',
+                      'telegram': '🇱🇻 Латвия § 1001',
+                      'chatgpt': '🇵🇱 Польша 2',
+                      'youtube': '🇫🇮 Финляндия 3 § 1002',
+                      'gdrive': '🇩🇪 Германия',
+                    }),
+                  ),
+                installedAppsProvider.overrideWith(
+                  (ref) async => {
+                    'com.google.android.youtube': (name: 'YouTube', icon: null),
+                    'com.instagram.android': (name: 'Instagram', icon: null),
+                    'com.anthropic.claude': (name: 'Claude', icon: null),
+                    'ru.yandex.disk': (name: 'Яндекс Диск', icon: _icon('ru.yandex.disk')),
+                    'ru.sberbankmobile': (name: 'СберБанк', icon: _icon('ru.sberbankmobile')),
+                  },
                 ),
-              // TWOSUBS=1: two subscriptions, so the marks and names show
-              if (Platform.environment['TWOSUBS'] == '1')
-                profileBadgesProvider.overrideWithValue([badgeOf(0, 'Sigma'), badgeOf(1, 'Phantom')]),
-              // SITEFLAGS=1: each site through its own server (Settings → Ping → Sites), its flag on the tile
-              if (Platform.environment['SITEFLAGS'] == '1')
-                siteServersProvider.overrideWith(
-                  (ref) => Stream.value(const {
-                    'instagram': '🇫🇮 Финляндия',
-                    'whatsapp': '🇵🇱 Польша',
-                    'telegram': '🇱🇻 Латвия § 1001',
-                    'chatgpt': '🇵🇱 Польша 2',
-                    'youtube': '🇫🇮 Финляндия 3 § 1002',
-                    'gdrive': '🇩🇪 Германия',
-                  }),
+              ],
+              child: MaterialApp(
+                debugShowCheckedModeBanner: false,
+                theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
+                builder: (context, child) => Theme(
+                  data: lookTheme(
+                    Theme.of(context),
+                    HomeLayout.fromName(_env('HOMELAYOUT')),
+                    DotsAccent.fromName(_env('DOTSACCENT')),
+                  ),
+                  child: ContrastGlow(child: child!),
                 ),
-              installedAppsProvider.overrideWith(
-                (ref) async => {
-                  'com.google.android.youtube': (name: 'YouTube', icon: null),
-                  'com.instagram.android': (name: 'Instagram', icon: null),
-                  'com.anthropic.claude': (name: 'Claude', icon: null),
-                  'ru.yandex.disk': (name: 'Яндекс Диск', icon: _icon('ru.yandex.disk')),
-                  'ru.sberbankmobile': (name: 'СберБанк', icon: _icon('ru.sberbankmobile')),
-                },
-              ),
-            ],
-            child: MaterialApp(
-              debugShowCheckedModeBanner: false,
-              theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
-              builder: (context, child) => Theme(
-                data: lookTheme(
-                  Theme.of(context),
-                  HomeLayout.fromName(Platform.environment['HOMELAYOUT']),
-                  DotsAccent.fromName(Platform.environment['DOTSACCENT']),
-                ),
-                child: ContrastGlow(child: child!),
-              ),
-              home: Consumer(
-                builder: (context, ref, _) =>
-                    !ref.watch(translationsProvider).hasValue || !ref.watch(sharedPreferencesProvider).hasValue
-                    ? const SizedBox()
-                    : Scaffold(
-                        // Contrast: the page on its light, as the home page draws it
-                        backgroundColor: contrast ? Colors.transparent : null,
-                        appBar: AppBar(
-                          title: const Row(children: [Text('A-VPN'), SizedBox(width: 2), ProfileRefreshButton()]),
+                home: Consumer(
+                  builder: (context, ref, _) =>
+                      !ref.watch(translationsProvider).hasValue || !ref.watch(sharedPreferencesProvider).hasValue
+                      ? const SizedBox()
+                      : Scaffold(
+                          // Contrast: the page on its light, as the home page draws it
                           backgroundColor: contrast ? Colors.transparent : null,
-                          actions: [
-                            // the modes (Sharing, Global, Server): a popup from here
-                            if (Platform.environment['SUPERLIGHT'] != '1')
-                              Builder(
-                                builder: (context) => IconButton(
-                                  key: const ValueKey('modes_button'),
-                                  onPressed: () => showGlassPopup(context, const HomeModesPanel()),
-                                  icon: Badge(
-                                    isLabelVisible: Platform.environment['MODES_ON'] == '1',
-                                    smallSize: 8,
-                                    child: const Icon(Icons.tune_rounded),
-                                  ),
-                                ),
-                              ),
-                            // the super light switch, where "add a profile" was
-                            IconButton(
-                              onPressed: () {},
-                              icon: Icon(
-                                Platform.environment['SUPERLIGHT'] == '1' ? Icons.eco_rounded : Icons.eco_outlined,
-                                color: Platform.environment['SUPERLIGHT'] == '1' ? const Color(0xFFD7F26B) : null,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                        ),
-                        body: unfolded && contrast
-                            // Contrast unfolded: the folded column on the left, the connections on the right, the
-                            // panel under both
-                            ? const Column(
-                                children: [
-                                  Expanded(
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: [
-                                        Expanded(flex: 11, child: AraHomeBody()),
-                                        Expanded(flex: 10, child: _ShellPage(child: ConnectionsPage(embedded: true))),
-                                      ],
+                          appBar: AppBar(
+                            title: const Row(children: [Text('A-VPN'), SizedBox(width: 2), ProfileRefreshButton()]),
+                            backgroundColor: contrast ? Colors.transparent : null,
+                            actions: [
+                              // the modes (Sharing, Global, Server): a popup from here
+                              if (_env('SUPERLIGHT') != '1')
+                                Builder(
+                                  builder: (context) => IconButton(
+                                    key: const ValueKey('modes_button'),
+                                    onPressed: () => showGlassPopup(context, const HomeModesPanel()),
+                                    icon: Badge(
+                                      isLabelVisible: _env('MODES_ON') == '1',
+                                      smallSize: 8,
+                                      child: const Icon(Icons.tune_rounded),
                                     ),
                                   ),
-                                  ContrastShellDock(),
-                                ],
-                              )
-                            : unfolded
-                            ? const Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(flex: 11, child: AraHomeBody(traffic: false)),
-                                  Expanded(
-                                    flex: 9,
-                                    child: Padding(
-                                      padding: EdgeInsets.fromLTRB(0, 4, 16, 16),
-                                      child: Column(
+                                ),
+                              // the super light switch, where "add a profile" was
+                              IconButton(
+                                onPressed: () {},
+                                icon: Icon(
+                                  _env('SUPERLIGHT') == '1' ? Icons.eco_rounded : Icons.eco_outlined,
+                                  color: _env('SUPERLIGHT') == '1' ? const Color(0xFFD7F26B) : null,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                          ),
+                          body: unfolded && contrast
+                              // Contrast unfolded: the folded column on the left, the connections on the right, the
+                              // panel under both
+                              ? const Column(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
-                                          Padding(padding: EdgeInsets.fromLTRB(8, 8, 8, 10), child: Text('ТРАФИК')),
-                                          Expanded(child: TrafficPanel()),
+                                          Expanded(flex: 11, child: AraHomeBody()),
+                                          Expanded(flex: 10, child: _ShellPage(child: ConnectionsPage(embedded: true))),
                                         ],
                                       ),
                                     ),
-                                  ),
-                                ],
-                              )
-                            : contrast
-                            // Contrast: the panel under the page, as the shell draws it
-                            ? Flex(
-                                direction: land ? Axis.horizontal : Axis.vertical,
-                                children: [
-                                  const Expanded(child: AraHomeBody()),
-                                  ContrastShellDock(side: land, page: pcw ? -1 : 1),
-                                ],
-                              )
-                            : const AraHomeBody(),
-                        bottomNavigationBar: pc || (contrast && !pcw) || Platform.environment['SUPERLIGHT'] == '1'
-                            ? null
-                            : contrast
-                            ? NavigationBar(
-                                height: 62,
-                                elevation: 0,
-                                backgroundColor: contrastPanelColor(dark),
-                                // PCW=1: a computer's menu, every page in it
-                                selectedIndex: pcw ? 2 : 1,
-                                destinations: [
-                                  for (final (svg, label) in [
-                                    if (pcw) (NavIcons.connections, 'Соединения'),
-                                    (NavIcons.stats, 'Статистика'),
-                                    (NavIcons.home, 'Главная'),
-                                    (NavIcons.topology, 'Топология'),
-                                    if (pcw) (NavIcons.settings, 'Настройки'),
-                                  ])
-                                    NavigationDestination(
-                                      icon: NavIcon(svg),
-                                      selectedIcon: NavIcon(svg, selected: true),
-                                      label: label,
+                                    ContrastShellDock(),
+                                  ],
+                                )
+                              : unfolded
+                              ? const Row(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(flex: 11, child: AraHomeBody(traffic: false)),
+                                    Expanded(
+                                      flex: 9,
+                                      child: Padding(
+                                        padding: EdgeInsets.fromLTRB(0, 4, 16, 16),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            Padding(padding: EdgeInsets.fromLTRB(8, 8, 8, 10), child: Text('ТРАФИК')),
+                                            Expanded(child: TrafficPanel()),
+                                          ],
+                                        ),
+                                      ),
                                     ),
-                                ],
-                              )
-                            : NavigationBar(
-                                destinations: [
-                                  for (final (svg, label) in [
-                                    (NavIcons.home, 'Главная'),
-                                    (NavIcons.stats, 'Статистика'),
-                                    (NavIcons.connections, 'Соединения'),
-                                    (NavIcons.topology, 'Топология'),
-                                    (NavIcons.settings, 'Настройки'),
-                                  ])
-                                    NavigationDestination(
-                                      icon: NavIcon(svg),
-                                      selectedIcon: NavIcon(svg, selected: true),
-                                      label: label,
-                                    ),
-                                ],
-                              ),
-                      ),
+                                  ],
+                                )
+                              : contrast
+                              // Contrast: the panel under the page, as the shell draws it
+                              ? Flex(
+                                  direction: land ? Axis.horizontal : Axis.vertical,
+                                  children: [
+                                    const Expanded(child: AraHomeBody()),
+                                    ContrastShellDock(side: land, page: pcw ? -1 : 1),
+                                  ],
+                                )
+                              : const AraHomeBody(),
+                          bottomNavigationBar: pc || (contrast && !pcw) || _env('SUPERLIGHT') == '1'
+                              ? null
+                              : contrast
+                              ? NavigationBar(
+                                  height: 62,
+                                  elevation: 0,
+                                  backgroundColor: contrastPanelColor(dark),
+                                  // PCW=1: a computer's menu, every page in it
+                                  selectedIndex: pcw ? 2 : 1,
+                                  destinations: [
+                                    for (final (svg, label) in [
+                                      if (pcw) (NavIcons.connections, 'Соединения'),
+                                      (NavIcons.stats, 'Статистика'),
+                                      (NavIcons.home, 'Главная'),
+                                      (NavIcons.topology, 'Топология'),
+                                      if (pcw) (NavIcons.settings, 'Настройки'),
+                                    ])
+                                      NavigationDestination(
+                                        icon: NavIcon(svg),
+                                        selectedIcon: NavIcon(svg, selected: true),
+                                        label: label,
+                                      ),
+                                  ],
+                                )
+                              : NavigationBar(
+                                  destinations: [
+                                    for (final (svg, label) in [
+                                      (NavIcons.home, 'Главная'),
+                                      (NavIcons.stats, 'Статистика'),
+                                      (NavIcons.connections, 'Соединения'),
+                                      (NavIcons.topology, 'Топология'),
+                                      (NavIcons.settings, 'Настройки'),
+                                    ])
+                                      NavigationDestination(
+                                        icon: NavIcon(svg),
+                                        selectedIcon: NavIcon(svg, selected: true),
+                                        label: label,
+                                      ),
+                                  ],
+                                ),
+                        ),
+                ),
               ),
             ),
-          ),
-        );
-        await tester.pump(const Duration(milliseconds: 100));
-        await tester.pump(const Duration(milliseconds: 100));
-        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-        await tester.pump(const Duration(milliseconds: 500));
-        await tester.pump(const Duration(milliseconds: 600));
-        expect(find.byType(AraHomeBody), findsOneWidget);
-        expect(find.textContaining('Обычные'), findsNothing);
-        expect(t.avpn.autoBestHint, 'Сервер с наименьшим пингом');
-        if (connected &&
-            contrast &&
-            Platform.environment['SUPERLIGHT'] != '1' &&
-            !const ['vessel', 'bento', 'dots'].contains(Platform.environment['HOMELAYOUT'] ?? '')) {
-          for (final amount in ['8 МБ', '2 МБ']) {
-            expect(
-              find.byWidgetPredicate((w) => w is Text && w.textSpan?.toPlainText() == amount),
-              findsOneWidget,
-              reason: 'top counters show native session totals, not daily history',
-            );
-          }
-        }
-        // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
-        if (connected &&
-            contrast &&
-            Platform.environment['SUPERLIGHT'] != '1' &&
-            (Platform.environment['HOMELAYOUT'] ?? '').isEmpty) {
-          final sites = find.byKey(const Key('contrast-sites'));
-          expect(sites, findsOneWidget);
-          expect(find.byKey(const Key('contrast-traffic')), findsNothing);
-          for (final name in ['Instagram', 'WhatsApp', 'Telegram', 'ChatGPT', 'YouTube', 'Google Диск']) {
-            expect(find.descendant(of: sites, matching: find.text(name)), findsOneWidget);
-          }
-        }
-        // the super light mode: no delay tiles, no toggles
-        if (connected && contrast && Platform.environment['SUPERLIGHT'] == '1') {
-          expect(find.byKey(const Key('contrast-sites')), findsNothing);
-          expect(find.text('Раздача'), findsNothing);
-          // the time and the two speeds, not the totals
-          // (Dots writes them on its own lines, in capitals)
-          final dots = Platform.environment['HOMELAYOUT'] == 'dots';
-          final shown = (Platform.environment['HOMELAYOUT'] ?? '').isEmpty ? findsOneWidget : findsWidgets;
-          expect(find.text(dots ? '↓ ЗАГРУЗКА' : 'Загрузка'), shown);
-          expect(find.text(dots ? '↑ ОТДАЧА' : 'Отдача'), shown);
-          expect(find.text('Через VPN'), findsNothing);
-        }
-        // TAP=<text>: a tap on it first, to look at what it opens
-        final tap = Platform.environment['TAP'];
-        final tapKey = Platform.environment['TAPKEY'];
-        if (tapKey != null && tapKey.isNotEmpty) {
-          await tester.tap(find.byKey(ValueKey(tapKey)).first);
+          );
           await tester.pump(const Duration(milliseconds: 100));
-          await tester.pump(const Duration(milliseconds: 400));
-        }
-        if (tap != null && tap.isNotEmpty) {
-          await tester.tap(find.text(tap).first);
           await tester.pump(const Duration(milliseconds: 100));
-          await tester.pump(const Duration(milliseconds: 400));
-        }
-        if (Platform.environment['RENDER'] == '1') {
-          await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/home_$name.png'));
-        }
-        // the timers (the clock, the ring) end with the widget
-        await tester.pumpWidget(const SizedBox());
-      });
+          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+          await tester.pump(const Duration(milliseconds: 500));
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(find.byType(AraHomeBody), findsOneWidget);
+          expect(find.textContaining('Обычные'), findsNothing);
+          expect(t.avpn.autoBestHint, 'Сервер с наименьшим пингом');
+          if (connected &&
+              contrast &&
+              _env('SUPERLIGHT') != '1' &&
+              !const ['vessel', 'bento', 'dots'].contains(_env('HOMELAYOUT') ?? '')) {
+            for (final amount in ['8 МБ', '2 МБ']) {
+              expect(
+                find.byWidgetPredicate((w) => w is Text && w.textSpan?.toPlainText() == amount),
+                findsOneWidget,
+                reason: 'top counters show native session totals, not daily history',
+              );
+            }
+          }
+          // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
+          if (connected && contrast && _env('SUPERLIGHT') != '1' && (_env('HOMELAYOUT') ?? '').isEmpty) {
+            final sites = find.byKey(const Key('contrast-sites'));
+            expect(sites, findsOneWidget);
+            expect(find.byKey(const Key('contrast-traffic')), findsNothing);
+            for (final name in ['Instagram', 'WhatsApp', 'Telegram', 'ChatGPT', 'YouTube', 'Google Диск']) {
+              expect(find.descendant(of: sites, matching: find.text(name)), findsOneWidget);
+            }
+          }
+          // the super light mode: no delay tiles, no toggles
+          if (connected && contrast && _env('SUPERLIGHT') == '1') {
+            expect(find.byKey(const Key('contrast-sites')), findsNothing);
+            expect(find.text('Раздача'), findsNothing);
+            // the time and the two speeds, not the totals
+            // (Dots writes them on its own lines, in capitals)
+            final dots = _env('HOMELAYOUT') == 'dots';
+            final shown = (_env('HOMELAYOUT') ?? '').isEmpty ? findsOneWidget : findsWidgets;
+            expect(find.text(dots ? '↓ ЗАГРУЗКА' : 'Загрузка'), shown);
+            expect(find.text(dots ? '↑ ОТДАЧА' : 'Отдача'), shown);
+            expect(find.text('Через VPN'), findsNothing);
+          }
+          // TAP=<text>: a tap on it first, to look at what it opens
+          final tap = _env('TAP');
+          final tapKey = _env('TAPKEY');
+          if (tapKey != null && tapKey.isNotEmpty) {
+            await tester.tap(find.byKey(ValueKey(tapKey)).first);
+            await tester.pump(const Duration(milliseconds: 100));
+            await tester.pump(const Duration(milliseconds: 400));
+          }
+          if (tap != null && tap.isNotEmpty) {
+            await tester.tap(find.text(tap).first);
+            await tester.pump(const Duration(milliseconds: 100));
+            await tester.pump(const Duration(milliseconds: 400));
+          }
+          if (_env('RENDER') == '1') {
+            await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/home_$name.png'));
+          }
+          // the views: what each is for is on the screen
+          if (variant.startsWith('dots ping')) expect(find.text('PING / MS'), findsWidgets);
+          if (variant.startsWith('dots') && settings.containsKey('SITEGRAPH')) {
+            expect(find.text('INSTAGRAM'), findsWidgets);
+            expect(find.text('МУЛЬТИ СЕРВЕРЫ'), findsOneWidget);
+          }
+          if (variant.startsWith('super light')) expect(find.byKey(const Key('contrast-sites')), findsNothing);
+          // the timers (the clock, the ring) end with the widget
+          await tester.pumpWidget(const SizedBox());
+        });
+      }
     }
   }
 }
@@ -564,7 +594,7 @@ class _Connections extends Connections {
   ConnectionsState build() {
     final items = [
       // EMPTY=1: no traffic yet, the placeholder picture
-      if (Platform.environment['EMPTY'] != '1')
+      if (_env('EMPTY') != '1')
         for (final (i, (app, route, server, down)) in [
           ('com.google.android.youtube', ConnectionRoute.vpn, '🇵🇱 Польша', 182e6),
           ('com.instagram.android', ConnectionRoute.vpn, '🇵🇱 Польша', 41e6),
@@ -632,9 +662,9 @@ class _Quality extends ConnectionQuality {
   List<int?> build() {
     sinceConnect = ConnectionQuality.length;
     // WAVY=1: a ping that moves, for the graphs
-    final wavy = Platform.environment['WAVY'] == '1';
+    final wavy = _env('WAVY') == '1';
     // PINGLEVEL=<ms>: a ping around that, a little moving
-    final level = int.tryParse(Platform.environment['PINGLEVEL'] ?? '');
+    final level = int.tryParse(_env('PINGLEVEL') ?? '');
     return [
       for (var i = 0; i < ConnectionQuality.length; i++)
         i == 30
@@ -659,7 +689,7 @@ class _ShellPage extends StatelessWidget {
 /// WAVY=1: a history of the sites' delays for their pulse.
 class _SiteHistory extends SiteHistory {
   @override
-  Map<String, List<int?>> build() => Platform.environment['WAVY'] != '1'
+  Map<String, List<int?>> build() => _env('WAVY') != '1'
       ? const {}
       : {
           for (final (i, site) in latencySites.indexed)
@@ -674,7 +704,7 @@ class _SiteHistory extends SiteHistory {
 class _Sites extends SiteLatency {
   @override
   SiteLatencyState build() {
-    final given = (Platform.environment['SITES'] ?? '53,61,180,244,320,51').split(',');
+    final given = (_env('SITES') ?? '53,61,180,244,320,51').split(',');
     return (
       ms: {for (final (i, site) in latencySites.indexed) site.key: i < given.length ? int.tryParse(given[i]) : null},
       at: DateTime(2026),
