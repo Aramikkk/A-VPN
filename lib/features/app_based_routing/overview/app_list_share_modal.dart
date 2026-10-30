@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/app_icon_view.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -38,7 +39,7 @@ class AppListShareModal extends ConsumerWidget {
             contentPadding: const EdgeInsetsDirectional.symmetric(horizontal: 24),
             leading: apps[pkg]?.icon == null
                 ? const Icon(Icons.android_rounded)
-                : Image.memory(apps[pkg]!.icon!, width: 32, height: 32, cacheWidth: iconPx, cacheHeight: iconPx),
+                : appIconView(apps[pkg]!.icon!, size: 32),
             title: Text(apps[pkg]?.name ?? pkg),
             subtitle: Text(pkg),
           ),

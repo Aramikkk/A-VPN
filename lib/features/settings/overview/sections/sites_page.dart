@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/app_icon_view.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -202,7 +203,7 @@ class _AppIcon extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: icon != null
-          ? Image.memory(icon!, width: 36, height: 36, cacheWidth: 108, gaplessPlayback: true)
+          ? appIconView(icon!, size: 36)
           : Container(
               width: 36,
               height: 36,

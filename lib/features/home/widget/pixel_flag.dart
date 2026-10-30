@@ -79,12 +79,12 @@ class _FlagMarkState extends State<FlagMark> {
 }
 
 class PixelFlag extends CustomPainter {
-  PixelFlag(this.grid, {this.fine = false});
+  PixelFlag(this.grid, {this.dots = true});
 
   final List<List<Color>> grid;
 
-  /// the cells with no gaps between them and only a faint grid over them: a flag with a touch of pixels
-  final bool fine;
+  /// a round dot for each cell (the topology's flags) instead of a square
+  final bool dots;
 
   static const cols = 12;
   static const rows = 8;
@@ -244,29 +244,25 @@ class PixelFlag extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final cell = size.width / cols;
     final side = cell * .88;
-    // a thin frame, so a white stripe does not melt into the paper
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..color = const Color(0x66808080)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-    if (fine) {
+    // a thin frame, so a white stripe does not melt into the paper (the dots need none)
+    if (!dots) {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..color = const Color(0x66808080)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
+    if (dots) {
       for (var y = 0; y < rows; y++) {
         for (var x = 0; x < cols; x++) {
-          // a hair over, so no seam shows between the cells
-          canvas.drawRect(Rect.fromLTWH(x * cell, y * cell, cell + .4, cell + .4), Paint()..color = grid[y][x]);
+          canvas.drawCircle(
+            Offset((x + .5) * cell, (y + .5) * cell),
+            cell * (size.width < 24 ? .56 : .47),
+            Paint()..color = grid[y][x],
+          );
         }
-      }
-      final line = Paint()
-        ..color = const Color(0x22000000)
-        ..strokeWidth = .5;
-      for (var x = 1; x < cols; x++) {
-        canvas.drawLine(Offset(x * cell, 0), Offset(x * cell, size.height), line);
-      }
-      for (var y = 1; y < rows; y++) {
-        canvas.drawLine(Offset(0, y * cell), Offset(size.width, y * cell), line);
       }
       return;
     }
@@ -281,12 +277,12 @@ class PixelFlag extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(PixelFlag old) => !identical(old.grid, grid) || old.fine != fine;
+  bool shouldRepaint(PixelFlag old) => !identical(old.grid, grid) || old.dots != dots;
 }
 
 /// A country's flag drawn on a canvas as pixels, centred on [centre], [width] wide; false while there is no pixel flag
 /// for it yet (it is being made: the caller draws the emoji, the next repaint finds the pixels).
-bool paintPixelFlag(Canvas canvas, String flag, Offset centre, double width, {double alpha = 1, bool fine = false}) {
+bool paintPixelFlag(Canvas canvas, String flag, Offset centre, double width, {double alpha = 1, bool dots = true}) {
   final grid = PixelFlag.of(flag) ?? PixelFlag.pixelated[flag];
   if (grid == null) {
     unawaited(PixelFlag.pixelate(flag));
@@ -296,7 +292,7 @@ bool paintPixelFlag(Canvas canvas, String flag, Offset centre, double width, {do
   canvas.save();
   canvas.translate(box.left, box.top);
   if (alpha < 1) canvas.saveLayer(Offset.zero & box.size, Paint()..color = Color.fromRGBO(0, 0, 0, alpha));
-  PixelFlag(grid, fine: fine).paint(canvas, box.size);
+  PixelFlag(grid, dots: dots).paint(canvas, box.size);
   if (alpha < 1) canvas.restore();
   canvas.restore();
   return true;
@@ -325,24 +321,38 @@ Widget flagsText(String text, {TextStyle? style, int maxLines = 1, double width 
   );
 }
 
-/// An app's icon as a grid of square pixels, as the flags are: the picture cut to [n] by [n] blocks (32 by 32: a touch of pixels, no more), each the average of
-/// its block (a block that is mostly empty stays empty). Made once for an app, as it is met; [revision] ticks when a
-/// new one is ready, so the picture that waits for it draws again.
+/// An app's icon in two parts: the ground as a grid of rounded cells (12 by 12) and, where the icon is a light sign on a
+/// coloured ground (a plane, a play button, a ring), the sign itself, drawn smooth over the cells.
+class PixelIcon {
+  const PixelIcon(this.grid, this.sign);
+
+  /// the ground's cells (null: nothing there, the corners of a round icon)
+  final List<List<Color?>> grid;
+
+  /// the sign: white where the icon has its light, uncoloured parts, as an alpha mask; null when the icon has none (a
+  /// picture all in colour stays all in cells)
+  final ui.Image? sign;
+}
+
+/// The icons of the apps as [PixelIcon]s: made once for an app, as it is met; [revision] ticks when a new one is ready,
+/// so the picture that waits for it draws again.
 class PixelIcons {
-  static const n = 32;
+  static const n = 12;
 
-  /// how many picture pixels go to a block's side
-  static const _block = 2;
+  /// how many picture pixels go to a cell's side
+  static const _block = 8;
+  static const _side = n * _block;
 
-  static final _grids = <String, List<List<Color?>>>{};
+  static final _icons = <String, PixelIcon>{};
   static final _making = <String, Future<void>>{};
+  static final _failed = <String>{};
 
   /// ticks when an icon is ready
   static final revision = ValueNotifier<int>(0);
 
-  /// the grid of the app [key]'s icon [png], or null while it is made (it is started now)
-  static List<List<Color?>>? of(String key, Uint8List png) {
-    final kept = _grids[key];
+  /// the icon of the app [key] from its [png], or null while it is made (it is started now)
+  static PixelIcon? of(String key, Uint8List png) {
+    final kept = _icons[key];
     if (kept != null) return kept;
     unawaited(_making.putIfAbsent(key, () => _make(key, png)));
     return null;
@@ -350,55 +360,131 @@ class PixelIcons {
 
   static Future<void> _make(String key, Uint8List png) async {
     try {
-      const side = n * _block;
-      final codec = await ui.instantiateImageCodec(png, targetWidth: side, targetHeight: side);
+      final codec = await ui.instantiateImageCodec(png, targetWidth: _side, targetHeight: _side);
       final frame = await codec.getNextFrame();
-      final data = await frame.image.toByteData();
+      final data = await frame.image.toByteData(format: ui.ImageByteFormat.rawStraightRgba);
       frame.image.dispose();
       codec.dispose();
       if (data == null) return;
       final px = data.buffer.asUint8List();
-      final grid = <List<Color?>>[];
+      // the light, uncoloured pixels are the sign (1: surely, 0: not)
+      final sign = Float32List(_side * _side);
+      var opaque = 0, light = 0;
+      for (var i = 0; i < _side * _side; i++) {
+        if (px[i * 4 + 3] < 200) continue;
+        opaque++;
+        final r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+        final lum = (.3 * r + .59 * g + .11 * b) / 255;
+        final sat = (math.max(r, math.max(g, b)) - math.min(r, math.min(g, b))) / 255;
+        final w = ((lum - .78) / .14).clamp(0.0, 1.0) * (1 - ((sat - .12) / .18).clamp(0.0, 1.0));
+        sign[i] = w;
+        if (w > .5) light++;
+      }
+      // a sign only where there is a little of it and not nearly all (a white icon is not a sign on a ground)
+      final hasSign = opaque > 0 && light / opaque > .015 && light / opaque < .55;
+      // the cells: the ground's colour, the sign's pixels left out
+      final colours = List.generate(n, (_) => List<Color?>.filled(n, null));
+      final lacking = <(int, int)>[];
       for (var by = 0; by < n; by++) {
-        final row = <Color?>[];
         for (var bx = 0; bx < n; bx++) {
-          var r = 0.0, g = 0.0, b = 0.0, a = 0.0;
+          var r = 0.0, g = 0.0, b = 0.0, weight = 0.0;
+          var cover = 0;
           for (var y = by * _block; y < by * _block + _block; y++) {
             for (var x = bx * _block; x < bx * _block + _block; x++) {
-              final i = (y * side + x) * 4;
-              final alpha = px[i + 3] / 255;
-              r += px[i] * alpha;
-              g += px[i + 1] * alpha;
-              b += px[i + 2] * alpha;
-              a += alpha;
+              final i = y * _side + x;
+              if (px[i * 4 + 3] < 128) continue;
+              cover++;
+              final w = hasSign ? 1 - sign[i] : 1.0;
+              r += px[i * 4] * w;
+              g += px[i * 4 + 1] * w;
+              b += px[i * 4 + 2] * w;
+              weight += w;
             }
           }
-          row.add(
-            a < _block * _block * .4 ? null : Color.fromARGB(255, (r / a).round(), (g / a).round(), (b / a).round()),
-          );
+          if (cover < _block * _block * .4) continue;
+          if (weight < _block * _block * .12) {
+            lacking.add((bx, by));
+          } else {
+            colours[by][bx] = Color.fromARGB(255, (r / weight).round(), (g / weight).round(), (b / weight).round());
+          }
         }
-        grid.add(row);
       }
-      _grids[key] = grid;
+      // the cells under the sign take the colour of their neighbours
+      for (var pass = 0; pass < 6 && lacking.isNotEmpty; pass++) {
+        final done = <(int, int)>[];
+        for (final (bx, by) in lacking) {
+          var r = 0, g = 0, b = 0, count = 0;
+          for (var dy = -1; dy <= 1; dy++) {
+            for (var dx = -1; dx <= 1; dx++) {
+              final x = bx + dx, y = by + dy;
+              if (x < 0 || y < 0 || x >= n || y >= n) continue;
+              final c = colours[y][x];
+              if (c == null || lacking.contains((x, y))) continue;
+              r += (c.r * 255).round();
+              g += (c.g * 255).round();
+              b += (c.b * 255).round();
+              count++;
+            }
+          }
+          if (count > 0) {
+            colours[by][bx] = Color.fromARGB(255, r ~/ count, g ~/ count, b ~/ count);
+            done.add((bx, by));
+          }
+        }
+        lacking.removeWhere(done.contains);
+      }
+      ui.Image? mask;
+      if (hasSign) {
+        final bytes = Uint8List(_side * _side * 4);
+        for (var i = 0; i < _side * _side; i++) {
+          bytes[i * 4] = 255;
+          bytes[i * 4 + 1] = 255;
+          bytes[i * 4 + 2] = 255;
+          bytes[i * 4 + 3] = (sign[i] * 255).round();
+        }
+        final done = Completer<ui.Image>();
+        ui.decodeImageFromPixels(bytes, _side, _side, ui.PixelFormat.rgba8888, done.complete);
+        mask = await done.future;
+      }
+      _icons[key] = PixelIcon(colours, mask);
       revision.value++;
     } catch (_) {
-      // an icon that cannot be read stays the name
+      // an icon that cannot be read stays as the picture it is
+      _failed.add(key);
+      revision.value++;
     }
   }
 
-  /// the grid in [box]: a square for each block, a little apart
-  static void paint(Canvas canvas, Rect box, List<List<Color?>> grid, {double alpha = 1}) {
+  /// whether the icon of [key] could not be made
+  static bool failed(String key) => _failed.contains(key);
+
+  /// the icon in [box]: a rounded cell for each block of the ground, a little apart, and the sign over them
+  static void paint(Canvas canvas, Rect box, PixelIcon icon, {double alpha = 1}) {
     final cell = box.width / n;
     final side = cell * .9;
     for (var y = 0; y < n; y++) {
       for (var x = 0; x < n; x++) {
-        final c = grid[y][x];
+        final c = icon.grid[y][x];
         if (c == null) continue;
-        canvas.drawRect(
-          Rect.fromLTWH(box.left + x * cell + (cell - side) / 2, box.top + y * cell + (cell - side) / 2, side, side),
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(box.left + x * cell + (cell - side) / 2, box.top + y * cell + (cell - side) / 2, side, side),
+            Radius.circular(cell * .24),
+          ),
           Paint()..color = c.withValues(alpha: alpha),
         );
       }
+    }
+    final sign = icon.sign;
+    if (sign != null) {
+      canvas.drawImageRect(
+        sign,
+        Rect.fromLTWH(0, 0, _side.toDouble(), _side.toDouble()),
+        box,
+        Paint()
+          ..filterQuality = FilterQuality.high
+          ..color = Color.fromRGBO(255, 255, 255, alpha),
+      );
     }
   }
 }
@@ -408,4 +494,40 @@ bool hasPixelFlag(String flag) {
   if (PixelFlag.of(flag) != null || PixelFlag.pixelated[flag] != null) return true;
   unawaited(PixelFlag.pixelate(flag));
   return false;
+}
+
+class _PixelIconPainter extends CustomPainter {
+  _PixelIconPainter(this.icon);
+
+  final PixelIcon icon;
+
+  @override
+  void paint(Canvas canvas, Size size) => PixelIcons.paint(canvas, Offset.zero & size, icon);
+
+  @override
+  bool shouldRepaint(_PixelIconPainter old) => !identical(old.icon, icon);
+}
+
+/// An app's icon in the Dots look, [size] square: cells for the ground and the sign smooth over them. While it is made
+/// there is room for it; an icon that cannot be made is the picture itself.
+class DotsAppIcon extends StatelessWidget {
+  const DotsAppIcon({super.key, required this.icon, this.size = 32});
+
+  final Uint8List icon;
+  final double size;
+
+  /// what the icon is kept under: its size and the start of its bytes
+  static String keyOf(Uint8List bytes) => '${bytes.length}:${Object.hashAll(bytes.take(256))}';
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+    valueListenable: PixelIcons.revision,
+    builder: (context, _, _) {
+      final key = keyOf(icon);
+      final made = PixelIcons.of(key, icon);
+      if (made != null) return CustomPaint(size: Size.square(size), painter: _PixelIconPainter(made));
+      if (PixelIcons.failed(key)) return Image.memory(icon, width: size, height: size, gaplessPlayback: true);
+      return SizedBox(width: size, height: size);
+    },
+  );
 }

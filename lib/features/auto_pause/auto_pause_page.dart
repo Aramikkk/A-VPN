@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/app_icon_view.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -157,7 +158,7 @@ class AutoPausePage extends HookConsumerWidget {
                   onChanged: (_) => toggle(app.packageName),
                   secondary: icon == null || icon.isEmpty
                       ? const Icon(Icons.android_rounded)
-                      : Image.memory(icon, width: 36, height: 36, cacheWidth: 108, gaplessPlayback: true),
+                      : appIconView(icon, size: 36),
                   title: Text(app.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(app.packageName, maxLines: 1, overflow: TextOverflow.ellipsis),
                 );

@@ -1,6 +1,7 @@
 import 'package:dartx/dartx.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/app_icon_view.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -342,9 +343,7 @@ class AppListPage extends HookConsumerWidget with PresLogger {
               value: flag == null ? false : PkgFlag.checkboxValue(flag),
               tristate: true,
               onChanged: (_) => ref.read(AppListProvider(mode).notifier).updatePkg(package.packageName),
-              secondary: package.icon == null
-                  ? null
-                  : Image.memory(package.icon!, width: 48, height: 48, cacheWidth: 48, cacheHeight: 48),
+              secondary: package.icon == null ? null : appIconView(package.icon!, size: 48),
             );
           },
           itemCount: packages.length,

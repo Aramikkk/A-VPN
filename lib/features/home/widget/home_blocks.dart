@@ -477,13 +477,7 @@ class _MosaicCell extends StatelessWidget {
         final icon = ClipRRect(
           borderRadius: BorderRadius.circular(side * .3),
           child: app.icon != null && tile.more == 0
-              ? Image.memory(
-                  app.icon!,
-                  width: side,
-                  height: side,
-                  cacheWidth: (side * 3).round(),
-                  gaplessPlayback: true,
-                )
+              ? appIconView(app.icon!, size: side)
               : Container(
                   width: side,
                   height: side,

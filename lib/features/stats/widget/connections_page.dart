@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/app_icon_view.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/home/widget/pixel_flag.dart';
@@ -916,7 +917,7 @@ class ConnectionAppIcon extends StatelessWidget {
     if (icon != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.dots ? 4 : size * .3),
-        child: Image.memory(icon!, width: size, height: size, cacheWidth: (size * 3).round(), gaplessPlayback: true),
+        child: appIconView(icon!, size: size),
       );
     }
     return Container(

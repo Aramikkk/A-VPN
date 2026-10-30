@@ -381,7 +381,7 @@ class SankeyGeometry {
   }
 
   /// the widest of the glyphs at the sides (the flag), and the room left at the edge of the picture
-  static const glyph = 34.0;
+  static const glyph = 40.0;
   static const edge = 12.0;
 
   static const nodeW = 6.0;
@@ -1405,11 +1405,11 @@ class _SankeyPainter extends CustomPainter {
         final tile = ci == 0 && stepped && appGrid == null;
         final glyphAlone = appGrid != null || pixelFlag || shield || tile;
         final nameH = appGrid != null || tile
-            ? 30.0
+            ? 36.0
             : pixelFlag
-            ? 24.0
+            ? 27.0
             : shield
-            ? 26.0
+            ? 28.0
             : icon != null
             ? 20.0
             : _text(shownName, nameW, strong: nameStrong, size: shownSize, lines: shownLines, right: ci == 0).height;
@@ -1431,9 +1431,9 @@ class _SankeyPainter extends CustomPainter {
         }
         if (appGrid != null) {
           // room between the icon and its bar
-          PixelIcons.paint(canvas, Rect.fromLTWH(x - 1 - 30, labelTop, 30, 30), appGrid, alpha: alpha);
+          PixelIcons.paint(canvas, Rect.fromLTWH(x - 1 - 36, labelTop, 36, 36), appGrid, alpha: alpha);
         } else if (tile) {
-          final box = RRect.fromRectAndRadius(Rect.fromLTWH(x - 1 - 30, labelTop, 30, 30), const Radius.circular(7));
+          final box = RRect.fromRectAndRadius(Rect.fromLTWH(x - 1 - 36, labelTop, 36, 36), const Radius.circular(8));
           canvas.drawRRect(box, Paint()..color = c.ink.withValues(alpha: .1 * alpha));
           canvas.drawRRect(
             box,
@@ -1444,16 +1444,16 @@ class _SankeyPainter extends CustomPainter {
           );
           final letter = _text(
             mark.text.isEmpty ? '?' : mark.text.substring(0, 1).toUpperCase(),
-            30,
+            36,
             strong: true,
-            size: 15,
+            size: 17,
             color: c.ink.withValues(alpha: alpha),
           );
-          letter.paint(canvas, Offset(x - 1 - 15 - letter.width / 2, labelTop + 15 - letter.height / 2));
+          letter.paint(canvas, Offset(x - 1 - 18 - letter.width / 2, labelTop + 18 - letter.height / 2));
         } else if (shield) {
           paintDotShield(
             canvas,
-            Rect.fromCenter(center: Offset(x + 1 + 17, labelTop + nameH / 2), width: 21, height: 24),
+            Rect.fromCenter(center: Offset(x + 1 + 20, labelTop + nameH / 2), width: 23, height: 26),
             _route(n.route).withValues(alpha: alpha),
             hollow: true,
             struck: true,
@@ -1474,7 +1474,7 @@ class _SankeyPainter extends CustomPainter {
           glyph.paint(canvas, Offset(x, labelTop));
         } else if (!(homeLookNow == HomeLayout.dots &&
             flag != null &&
-            paintPixelFlag(canvas, flag, Offset(x + 1 + 17, labelTop + nameH / 2), 34, alpha: alpha, fine: stepped))) {
+            paintPixelFlag(canvas, flag, Offset(x + 1 + 20, labelTop + nameH / 2), 40, alpha: alpha, dots: stepped))) {
           _label(
             canvas,
             shownName,

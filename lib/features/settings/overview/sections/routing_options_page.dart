@@ -1,5 +1,6 @@
 import 'package:circle_flags/circle_flags.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/app_icon_view.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -353,9 +354,7 @@ class _AppListRow extends ConsumerWidget {
         children: [
           for (final pkg in logoApps)
             switch (ref.watch(appLogoProvider(pkg))) {
-              AsyncData(value: final icon?) => ClipOval(
-                child: Image.memory(icon, width: 24, height: 24, cacheWidth: logoPx, cacheHeight: logoPx),
-              ),
+              AsyncData(value: final icon?) => ClipOval(child: appIconView(icon, size: 24)),
               AsyncLoading() => _loadingLogo,
               _ => const Icon(Icons.android_rounded),
             },

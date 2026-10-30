@@ -94,7 +94,10 @@ void main() {
       final before = PixelIcons.revision.value;
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
       expect(PixelIcons.revision.value, greaterThan(before));
-      final grid = PixelIcons.of('half-red', png)!;
+      final icon = PixelIcons.of('half-red', png)!;
+      final grid = icon.grid;
+      // all of one colour: no sign to draw smooth
+      expect(icon.sign, isNull);
       expect(grid.length, PixelIcons.n);
       expect(grid.every((row) => row.length == PixelIcons.n), isTrue);
       // (the picture is scaled to the blocks: a red a hair off is still red)
@@ -106,6 +109,66 @@ void main() {
       }
       expect(grid[0][PixelIcons.n - 1], isNull);
       expect(grid[9][PixelIcons.n - 1], isNull);
+    });
+
+    testWidgets('a light sign on a coloured ground is kept apart: the ground in cells, the sign smooth', (
+      tester,
+    ) async {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawRect(const Rect.fromLTWH(0, 0, 96, 96), Paint()..color = const Color(0xFF2090E0));
+      canvas.drawCircle(const Offset(48, 48), 22, Paint()..color = const Color(0xFFFFFFFF));
+      final png = (await tester.runAsync(() async {
+        final image = await recorder.endRecording().toImage(96, 96);
+        return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      }))!;
+      // (made in the real zone: the picture of the sign is decoded by the engine)
+      await tester.runAsync(() async {
+        PixelIcons.of('sign', png);
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      final icon = PixelIcons.of('sign', png)!;
+      expect(icon.sign, isNotNull);
+      // the cell under the sign is the ground's colour, not white
+      final middle = icon.grid[PixelIcons.n ~/ 2][PixelIcons.n ~/ 2]!;
+      expect(middle.b, greaterThan(.8));
+      expect(middle.r, lessThan(.3));
+      expect(icon.grid[0][0]!.b, greaterThan(.8));
+    });
+
+    testWidgets('a white icon is not a sign on a ground: all in cells', (tester) async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 96, 96), Paint()..color = const Color(0xFFFFFFFF));
+      final png = (await tester.runAsync(() async {
+        final image = await recorder.endRecording().toImage(96, 96);
+        return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      }))!;
+      PixelIcons.of('white', png);
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+      final icon = PixelIcons.of('white', png)!;
+      expect(icon.sign, isNull);
+      expect(icon.grid[3][3], const Color(0xFFFFFFFF));
+    });
+
+    testWidgets('DotsAppIcon has room for the icon while it is made and draws it when it is ready', (tester) async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 96, 96), Paint()..color = const Color(0xFF30A050));
+      final png = (await tester.runAsync(() async {
+        final image = await recorder.endRecording().toImage(96, 96);
+        return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      }))!;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(child: DotsAppIcon(icon: png, size: 40)),
+          ),
+        ),
+      );
+      expect(tester.getSize(find.byType(DotsAppIcon)), const Size.square(40));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+      await tester.pump();
+      expect(find.descendant(of: find.byType(DotsAppIcon), matching: find.byType(CustomPaint)), findsWidgets);
+      expect(tester.getSize(find.byType(DotsAppIcon)), const Size.square(40));
     });
 
     testWidgets('an icon that is not a picture is never made, and nothing breaks', (tester) async {

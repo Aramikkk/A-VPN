@@ -1,6 +1,7 @@
 import 'package:dartx/dartx.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/home/widget/app_icon_view.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -170,7 +171,7 @@ class PackageNamesPage extends HookConsumerWidget {
                   onChanged: (_) => save(isSelected ? [...selected.where((e) => e != pkg)] : [...selected, pkg]),
                   secondary: app?.icon == null
                       ? const SizedBox.square(dimension: 48, child: Icon(Icons.android_rounded))
-                      : Image.memory(app!.icon!, width: 48, height: 48, cacheWidth: 48, cacheHeight: 48),
+                      : appIconView(app!.icon!, size: 48),
                   title: Row(
                     children: [
                       Flexible(child: Text(app?.name ?? pkg, maxLines: 1, overflow: TextOverflow.ellipsis)),
