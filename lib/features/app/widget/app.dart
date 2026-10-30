@@ -4,7 +4,7 @@ import 'package:accessibility_tools/accessibility_tools.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hiddify/core/widget/ui_scale.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -18,6 +18,7 @@ import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/theme/app_icon.dart';
 import 'package:hiddify/core/theme/app_theme.dart';
+import 'package:hiddify/core/widget/ui_scale.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
 import 'package:hiddify/features/app_update/notifier/app_update_notifier.dart';
@@ -153,7 +154,10 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                         ],
                       );
                     }
-                    child = UiScale(scale: uiScale, fontScale: fontScale, child: child);
+                    // the size of everything: as set in Themes, and by itself larger on a big landscape screen of a phone-like
+                    // system (a car's, a tablet's); a computer keeps what it is set to
+                    final auto = PlatformUtils.isDesktop ? 1.0 : autoUiScale(MediaQuery.sizeOf(context));
+                    child = UiScale(scale: uiScale * auto, fontScale: fontScale, child: child);
                     if (kDebugMode && _debugAccessibility) {
                       return AccessibilityTools(checkFontOverflows: true, child: child);
                     }

@@ -245,7 +245,17 @@ class SettingsPage extends HookConsumerWidget {
   }
 }
 
-/// The sections as squares, two to a row: the last one, when alone in its row, stretches across it.
+/// How the settings' tiles lie on a screen [width] points across: the columns and how much larger than on a phone each tile
+/// and what is in it is. A phone has two columns at the usual size; a tablet or a car's wide screen (a BYD Han, a
+/// computer in landscape) more columns and everything bigger, so it is not a few small squares in a sea of room.
+({int columns, double scale}) settingsGridLayout(double width, {double gap = 8}) {
+  final columns = width < 560 ? 2 : (width < 900 ? 3 : (width < 1300 ? 4 : 6));
+  final tile = (width - gap * (columns - 1)) / columns;
+  return (columns: columns, scale: (tile / 190).clamp(1.0, 2.2));
+}
+
+/// The sections as squares, in as many columns as the screen takes (two on a phone), each as large as the room gives: the
+/// last one, when alone in its row in two columns, stretches across it.
 class _SectionGrid extends StatelessWidget {
   const _SectionGrid({required this.items});
 
@@ -261,13 +271,15 @@ class _SectionGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, box) {
         const gap = 8.0;
-        final side = (box.maxWidth - gap) / 2;
+        final layout = settingsGridLayout(box.maxWidth, gap: gap);
+        final k = layout.scale;
+        final side = (box.maxWidth - gap * (layout.columns - 1)) / layout.columns;
         Widget tile(int i, double width) {
           final (icon, title, caption, where) = items[i];
           return SizedBox(
             width: width,
             // enough for the sign, two lines of the name and two of the caption on a narrow screen
-            height: math.max(side * .7, 128.0),
+            height: math.max(side * .7, 128.0 * k),
             child: Material(
               // Bento: a solid tile; Dots: the paper with an inked edge
               color: switch (homeLookNow) {
@@ -291,20 +303,20 @@ class _SectionGrid extends StatelessWidget {
               child: InkWell(
                 onTap: () => context.go(where),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12 * k),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 34,
-                        height: 34,
+                        width: 34 * k,
+                        height: 34 * k,
                         // Dots: an inked square with the sign on the paper's colour
                         decoration: homeLookNow == HomeLayout.dots
                             ? BoxDecoration(color: scheme.onSurface, borderRadius: BorderRadius.circular(4))
                             : BoxDecoration(shape: BoxShape.circle, color: accent),
                         child: Icon(
                           icon,
-                          size: 19,
+                          size: 19 * k,
                           color: homeLookNow == HomeLayout.dots
                               ? (dark ? const Color(0xFF151515) : const Color(0xFFEAE9E5))
                               : ContrastPalette.ink,
@@ -315,14 +327,21 @@ class _SectionGrid extends StatelessWidget {
                         title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.15),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                          fontSize: (theme.textTheme.titleSmall?.fontSize ?? 14) * k,
+                        ),
                       ),
-                      const Gap(2),
+                      Gap(2 * k),
                       Text(
                         caption,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: (theme.textTheme.labelSmall?.fontSize ?? 11) * k,
+                        ),
                       ),
                     ],
                   ),
@@ -334,7 +353,7 @@ class _SectionGrid extends StatelessWidget {
 
         final tiles = <Widget>[];
         for (var i = 0; i < items.length; i++) {
-          final alone = i == items.length - 1 && items.length.isOdd;
+          final alone = layout.columns == 2 && i == items.length - 1 && items.length.isOdd;
           tiles.add(tile(i, alone ? box.maxWidth : side));
         }
         return Wrap(spacing: gap, runSpacing: gap, children: tiles);

@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/failures.dart';
-import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_repository.dart';
@@ -111,10 +110,8 @@ class ProfileDetailsNotifier extends _$ProfileDetailsNotifier with AppLogger {
                     );
                 return false;
               },
-              (r) {
-                ref.read(inAppNotificationControllerProvider).showSuccessToast(t.pages.profiles.msg.update.success);
-                return true;
-              },
+              // (no "profile updated" toast: the profile's own row shows a tick)
+              (r) => true,
             );
           }) ??
           false;

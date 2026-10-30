@@ -120,7 +120,7 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
         final t = ref.read(translationsProvider).requireValue;
         final notification = ref.read(inAppNotificationControllerProvider);
         if (failedNames.isEmpty) {
-          notification.showSuccessToast(t.pages.profiles.msg.update.bulkSuccess(count: successCount));
+          // all updated: no toast (the profiles' rows show it), only a failure is told
         } else {
           notification.showErrorToast(
             t.pages.profiles.msg.update.bulkPartial(

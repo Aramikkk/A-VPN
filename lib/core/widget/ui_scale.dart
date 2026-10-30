@@ -3,6 +3,14 @@ import 'package:flutter/widgets.dart';
 /// The whole app drawn [scale] times its size (a car's screen is far from the eyes, a small phone close): the child is
 /// laid out in a screen 1/[scale] as large and scaled up to fill the real one, with touches mapped back; the text is
 /// scaled on its own by [fontScale] on top of the system's.
+/// How much larger everything is made by itself on a big landscape screen of a phone-like system (a car's, a tablet's: a
+/// BYD Han's is a metre across): 1 on a phone and in portrait, up to 1.8 on the widest, so the touch targets and the text
+/// are as at hand there as on a phone. What the user sets in Settings → Themes comes on top of it.
+double autoUiScale(Size size) {
+  if (size.width < 1000 || size.width <= size.height) return 1.0;
+  return (size.width / 800).clamp(1.0, 1.8);
+}
+
 class UiScale extends StatelessWidget {
   const UiScale({super.key, required this.scale, required this.fontScale, required this.child});
 
