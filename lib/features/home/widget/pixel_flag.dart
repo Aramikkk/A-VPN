@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -301,4 +302,77 @@ Widget flagsText(String text, {TextStyle? style, int maxLines = 1, double width 
     maxLines: maxLines,
     overflow: TextOverflow.ellipsis,
   );
+}
+
+/// An app's icon as a grid of square pixels, as the flags are: the picture cut to [n] by [n] blocks, each the average of
+/// its block (a block that is mostly empty stays empty). Made once for an app, as it is met; [revision] ticks when a
+/// new one is ready, so the picture that waits for it draws again.
+class PixelIcons {
+  static const n = 10;
+
+  static final _grids = <String, List<List<Color?>>>{};
+  static final _making = <String, Future<void>>{};
+
+  /// ticks when an icon is ready
+  static final revision = ValueNotifier<int>(0);
+
+  /// the grid of the app [key]'s icon [png], or null while it is made (it is started now)
+  static List<List<Color?>>? of(String key, Uint8List png) {
+    final kept = _grids[key];
+    if (kept != null) return kept;
+    unawaited(_making.putIfAbsent(key, () => _make(key, png)));
+    return null;
+  }
+
+  static Future<void> _make(String key, Uint8List png) async {
+    try {
+      const side = n * 6;
+      final codec = await ui.instantiateImageCodec(png, targetWidth: side, targetHeight: side);
+      final frame = await codec.getNextFrame();
+      final data = await frame.image.toByteData();
+      frame.image.dispose();
+      codec.dispose();
+      if (data == null) return;
+      final px = data.buffer.asUint8List();
+      final grid = <List<Color?>>[];
+      for (var by = 0; by < n; by++) {
+        final row = <Color?>[];
+        for (var bx = 0; bx < n; bx++) {
+          var r = 0.0, g = 0.0, b = 0.0, a = 0.0;
+          for (var y = by * 6; y < by * 6 + 6; y++) {
+            for (var x = bx * 6; x < bx * 6 + 6; x++) {
+              final i = (y * side + x) * 4;
+              final alpha = px[i + 3] / 255;
+              r += px[i] * alpha;
+              g += px[i + 1] * alpha;
+              b += px[i + 2] * alpha;
+              a += alpha;
+            }
+          }
+          row.add(a < 36 * .4 ? null : Color.fromARGB(255, (r / a).round(), (g / a).round(), (b / a).round()));
+        }
+        grid.add(row);
+      }
+      _grids[key] = grid;
+      revision.value++;
+    } catch (_) {
+      // an icon that cannot be read stays the name
+    }
+  }
+
+  /// the grid in [box]: a square for each block, a little apart
+  static void paint(Canvas canvas, Rect box, List<List<Color?>> grid, {double alpha = 1}) {
+    final cell = box.width / n;
+    final side = cell * .86;
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        final c = grid[y][x];
+        if (c == null) continue;
+        canvas.drawRect(
+          Rect.fromLTWH(box.left + x * cell + (cell - side) / 2, box.top + y * cell + (cell - side) / 2, side, side),
+          Paint()..color = c.withValues(alpha: alpha),
+        );
+      }
+    }
+  }
 }

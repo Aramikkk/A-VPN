@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -74,6 +75,38 @@ void main() {
     testWidgets('no flag at all is the globe', (tester) async {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: flagMark(null))));
       expect(find.text('🌐'), findsOneWidget);
+    });
+  });
+
+  group('pixel icons', () {
+    /// a PNG: the left half red, the right half empty
+    Future<Uint8List> halfRed() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 30, 60), Paint()..color = const Color(0xFFFF0000));
+      final image = await recorder.endRecording().toImage(60, 60);
+      return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+    }
+
+    testWidgets('an icon is cut to blocks: the red half is red, the empty half stays empty', (tester) async {
+      final png = (await tester.runAsync(halfRed))!;
+      // not ready at once: it is made, and the revision ticks
+      expect(PixelIcons.of('half-red', png), isNull);
+      final before = PixelIcons.revision.value;
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+      expect(PixelIcons.revision.value, greaterThan(before));
+      final grid = PixelIcons.of('half-red', png)!;
+      expect(grid.length, PixelIcons.n);
+      expect(grid.every((row) => row.length == PixelIcons.n), isTrue);
+      expect(grid[0][0], const Color(0xFFFF0000));
+      expect(grid[4][PixelIcons.n ~/ 2 - 1], const Color(0xFFFF0000));
+      expect(grid[0][PixelIcons.n - 1], isNull);
+      expect(grid[9][PixelIcons.n - 1], isNull);
+    });
+
+    testWidgets('an icon that is not a picture is never made, and nothing breaks', (tester) async {
+      expect(PixelIcons.of('broken', Uint8List.fromList([1, 2, 3])), isNull);
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      expect(PixelIcons.of('broken', Uint8List.fromList([1, 2, 3])), isNull);
     });
   });
 

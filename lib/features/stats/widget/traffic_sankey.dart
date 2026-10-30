@@ -972,6 +972,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
               _pulse,
               widget.look,
               stepped: widget.stepped,
+              icons: widget.icons,
             ),
           ),
         ),
@@ -1002,7 +1003,11 @@ class _SankeyPainter extends CustomPainter {
     this.pulse,
     this.look, {
     this.stepped = false,
-  }) : super(repaint: pulse);
+    this.icons = const {},
+  }) : super(repaint: Listenable.merge([pulse, PixelIcons.revision]));
+
+  /// the apps' icons by name (the stepped picture draws them as pixels)
+  final Map<String, Uint8List> icons;
 
   final SankeyLook look;
 
@@ -1326,7 +1331,8 @@ class _SankeyPainter extends CustomPainter {
         // above it is done: thin neighbours would print over each other
         final tall = n.h >= 18;
         final amount = value(n.real);
-        final speedText = speedValue?.call(n.speed);
+        // (the stepped picture writes a speed only where something moves: no row of zeros)
+        final speedText = stepped && n.speed < 1 ? null : speedValue?.call(n.speed);
         final lines = 1 + (tall && speedText != null && n.h >= 44 ? 1 : 0);
         final width = switch (ci) {
           0 => g.labelL - 9,
@@ -1355,7 +1361,13 @@ class _SankeyPainter extends CustomPainter {
         final shownName = flag ?? mark.text;
         final shownSize = flag != null ? 17.0 : nameSize;
         final shownLines = flag != null || icon != null ? 1 : nameLines;
-        final nameH = icon != null
+        // the stepped (Dots) picture: an app is its icon in pixels, as a server is its flag; the name stays where there
+        // is no icon (or it is not ready yet)
+        final appIcon = ci == 0 && stepped ? icons[mark.text] : null;
+        final appGrid = appIcon == null ? null : PixelIcons.of(mark.text, appIcon);
+        final nameH = appGrid != null
+            ? 26.0
+            : icon != null
             ? 20.0
             : _text(shownName, nameW, strong: nameStrong, size: shownSize, lines: shownLines, right: ci == 0).height;
         final blockH = nameH + (tall ? 13 * lines : 0);
@@ -1374,7 +1386,9 @@ class _SankeyPainter extends CustomPainter {
           final letter = _text(badge.letter, 12, strong: true, size: 8.5, color: Colors.white);
           letter.paint(canvas, Offset(cx - letter.width / 2, cy - letter.height / 2));
         }
-        if (icon != null) {
+        if (appGrid != null) {
+          PixelIcons.paint(canvas, Rect.fromLTWH(x - 26, labelTop, 26, 26), appGrid, alpha: alpha);
+        } else if (icon != null) {
           final glyph = TextPainter(
             text: TextSpan(
               text: String.fromCharCode(icon.codePoint),
