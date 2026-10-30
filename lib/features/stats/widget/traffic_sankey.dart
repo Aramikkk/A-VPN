@@ -1169,7 +1169,15 @@ class _SankeyPainter extends CustomPainter {
         // symmetric: the first at the left edge, the last at the right edge, the middle over its bar
         p.paint(
           canvas,
-          Offset(i == 0 ? SankeyGeometry.edge : (i == 1 ? xs[1] : size.width - SankeyGeometry.edge - p.width), 0),
+          Offset(
+            i == 0
+                ? SankeyGeometry.edge
+                // the middle one over the middle of the picture, between the two outer bars
+                : (i == 1
+                      ? (xs[0] + SankeyGeometry.nodeW + xs[2]) / 2 - p.width / 2
+                      : size.width - SankeyGeometry.edge - p.width),
+            0,
+          ),
         );
         continue;
       }

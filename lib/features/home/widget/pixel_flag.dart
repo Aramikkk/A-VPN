@@ -323,9 +323,13 @@ Widget flagsText(String text, {TextStyle? style, int maxLines = 1, double width 
 
 /// An app's own icon, decoded, to be drawn with a thin grid of pixels over it (Dots).
 class PixelIcon {
-  const PixelIcon(this.image);
+  const PixelIcon(this.image, this.source);
 
   final ui.Image image;
+
+  /// the part of the picture that is the icon: a square round what is drawn in it, so icons with wide empty margins
+  /// (a round one on nothing) come out as big as those that fill their tile
+  final Rect source;
 }
 
 /// The icons of the apps as [PixelIcon]s: decoded once for an app, as it is met; [revision] ticks when a new one is ready,
@@ -353,7 +357,29 @@ class PixelIcons {
       final codec = await ui.instantiateImageCodec(png, targetWidth: _side, targetHeight: _side);
       final frame = await codec.getNextFrame();
       codec.dispose();
-      _icons[key] = PixelIcon(frame.image);
+      final data = await frame.image.toByteData();
+      var left = _side, top = _side, right = -1, bottom = -1;
+      if (data != null) {
+        for (var y = 0; y < _side; y++) {
+          for (var x = 0; x < _side; x++) {
+            if (data.getUint8((y * _side + x) * 4 + 3) < 48) continue;
+            if (x < left) left = x;
+            if (x > right) right = x;
+            if (y < top) top = y;
+            if (y > bottom) bottom = y;
+          }
+        }
+      }
+      const whole = _side * 1.0;
+      var source = const Rect.fromLTWH(0, 0, whole, whole);
+      if (right > left && bottom > top) {
+        final side = math.min(whole, (math.max(right - left, bottom - top) + 1) * 1.02);
+        final cx = (left + right + 1) / 2, cy = (top + bottom + 1) / 2;
+        final x = (cx - side / 2).clamp(0.0, whole - side).toDouble();
+        final y = (cy - side / 2).clamp(0.0, whole - side).toDouble();
+        source = Rect.fromLTWH(x, y, side, side);
+      }
+      _icons[key] = PixelIcon(frame.image, source);
       revision.value++;
     } catch (_) {
       // an icon that cannot be read stays as the picture it is
@@ -368,12 +394,7 @@ class PixelIcons {
   /// the icon in [box] as it is, with a thin grid of fine lines over it (only over the icon itself, not its corners)
   static void paint(Canvas canvas, Rect box, PixelIcon icon, {double alpha = 1}) {
     canvas.saveLayer(box, Paint()..color = Color.fromRGBO(255, 255, 255, alpha));
-    canvas.drawImageRect(
-      icon.image,
-      Rect.fromLTWH(0, 0, _side.toDouble(), _side.toDouble()),
-      box,
-      Paint()..filterQuality = FilterQuality.high,
-    );
+    canvas.drawImageRect(icon.image, icon.source, box, Paint()..filterQuality = FilterQuality.high);
     final n = box.width < 30 ? 12 : 18;
     final cell = box.width / n;
     final line = Paint()

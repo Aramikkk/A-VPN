@@ -99,6 +99,31 @@ void main() {
       expect(PixelIcons.of('green', png), same(icon));
     });
 
+    testWidgets('an icon with wide empty margins is cut to what is drawn, as big as one that fills its tile', (
+      tester,
+    ) async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawCircle(const Offset(48, 48), 20, Paint()..color = const Color(0xFF2090E0));
+      final png = (await tester.runAsync(() async {
+        final image = await recorder.endRecording().toImage(96, 96);
+        return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      }))!;
+      await tester.runAsync(() async {
+        PixelIcons.of('small-round', png);
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      final icon = PixelIcons.of('small-round', png)!;
+      // the circle is 40 of 96 across: the part taken is about that, not the whole picture
+      expect(icon.source.width, lessThan(100));
+      expect(icon.source.width, greaterThan(70));
+      final full = (await tester.runAsync(green))!;
+      await tester.runAsync(() async {
+        PixelIcons.of('full', full);
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      expect(PixelIcons.of('full', full)!.source.width, closeTo(192, 8));
+    });
+
     testWidgets('the grid is over the icon only: a corner outside it stays clear', (tester) async {
       final png = (await tester.runAsync(green))!;
       await tester.runAsync(() async {
