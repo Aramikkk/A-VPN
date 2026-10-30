@@ -361,13 +361,28 @@ class SankeyModel {
 
 /// Where the columns stand in a width: the apps' names on the left, the nodes, the servers' names on the right.
 class SankeyGeometry {
-  SankeyGeometry(double width) {
+  SankeyGeometry(double width, {bool stepped = false}) {
+    if (stepped) {
+      // symmetric: an icon (30) or a flag (34) at each edge, the same room for both, the sites in the middle (their bar and
+      // their names together centred between the two bars)
+      final side = glyph + 8 + edge;
+      this.labelL = side;
+      labelR = side;
+      final x2 = width - side - nodeW;
+      final group = nodeW + 5 + 118;
+      xs = [side, ((side + nodeW + x2) - group) / 2, x2];
+      return;
+    }
     final labelL = math.min(88.0, width * .24);
     labelR = math.min(70.0, width * .19);
     this.labelL = labelL;
     final x2 = width - labelR - nodeW;
     xs = [labelL, (labelL + x2) / 2, x2];
   }
+
+  /// the widest of the glyphs at the sides (the flag), and the room left at the edge of the picture
+  static const glyph = 34.0;
+  static const edge = 12.0;
 
   static const nodeW = 6.0;
 
@@ -751,7 +766,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
   }
 
   void _tap(Offset at, double width, double height) {
-    final geometry = SankeyGeometry(width);
+    final geometry = SankeyGeometry(width, stepped: widget.stepped);
     _model.layout(height - SankeyGeometry.headerH);
     at = at.translate(0, -SankeyGeometry.headerH);
     for (final n in _model.columns.expand((c) => c)) {
@@ -1141,13 +1156,23 @@ class _SankeyPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final g = SankeyGeometry(size.width);
+    final g = SankeyGeometry(size.width, stepped: stepped);
     final xs = g.xs;
     // the columns' names over them, then the picture under
     for (final (i, title) in headers.indexed) {
       if (title.isEmpty) continue;
-      final width = i == 1 ? (xs[2] - xs[1]) : (i == 0 ? g.labelL : g.labelR + 10);
+      final width = stepped
+          ? (i == 1 ? (xs[2] - xs[1]) : 120.0)
+          : (i == 1 ? (xs[2] - xs[1]) : (i == 0 ? g.labelL : g.labelR + 10));
       final p = _text(title.toUpperCase(), width, strong: true, size: 9.5, color: c.soft);
+      if (stepped) {
+        // symmetric: the first at the left edge, the last at the right edge, the middle over its bar
+        p.paint(
+          canvas,
+          Offset(i == 0 ? SankeyGeometry.edge : (i == 1 ? xs[1] : size.width - SankeyGeometry.edge - p.width), 0),
+        );
+        continue;
+      }
       p.paint(canvas, Offset(i == 0 ? xs[0] - 7 - p.width : (i == 1 ? xs[1] : xs[2]), 0));
     }
     // a long arrow along the top from the first column to the last: the flow goes from the left to the right
@@ -1376,8 +1401,10 @@ class _SankeyPainter extends CustomPainter {
         final pixelFlag = stepped && flag != null && hasPixelFlag(flag);
         final shield = stepped && ci == 2 && n.route == ConnectionRoute.direct;
         // an icon, a flag or the shield stands alone (the amounts are written in the middle column only)
-        final glyphAlone = appGrid != null || pixelFlag || shield;
-        final nameH = appGrid != null
+        // an app with no icon (or not ready yet): a tile with its first letter, in the icon's place and size
+        final tile = ci == 0 && stepped && appGrid == null;
+        final glyphAlone = appGrid != null || pixelFlag || shield || tile;
+        final nameH = appGrid != null || tile
             ? 30.0
             : pixelFlag
             ? 24.0
@@ -1404,11 +1431,29 @@ class _SankeyPainter extends CustomPainter {
         }
         if (appGrid != null) {
           // room between the icon and its bar
-          PixelIcons.paint(canvas, Rect.fromLTWH(x - 6 - 30, labelTop, 30, 30), appGrid, alpha: alpha);
+          PixelIcons.paint(canvas, Rect.fromLTWH(x - 1 - 30, labelTop, 30, 30), appGrid, alpha: alpha);
+        } else if (tile) {
+          final box = RRect.fromRectAndRadius(Rect.fromLTWH(x - 1 - 30, labelTop, 30, 30), const Radius.circular(7));
+          canvas.drawRRect(box, Paint()..color = c.ink.withValues(alpha: .1 * alpha));
+          canvas.drawRRect(
+            box,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1
+              ..color = c.ink.withValues(alpha: .3 * alpha),
+          );
+          final letter = _text(
+            mark.text.isEmpty ? '?' : mark.text.substring(0, 1).toUpperCase(),
+            30,
+            strong: true,
+            size: 15,
+            color: c.ink.withValues(alpha: alpha),
+          );
+          letter.paint(canvas, Offset(x - 1 - 15 - letter.width / 2, labelTop + 15 - letter.height / 2));
         } else if (shield) {
           paintDotShield(
             canvas,
-            Rect.fromCenter(center: Offset(x + 6 + 12, labelTop + nameH / 2), width: 21, height: 24),
+            Rect.fromCenter(center: Offset(x + 1 + 17, labelTop + nameH / 2), width: 21, height: 24),
             _route(n.route).withValues(alpha: alpha),
             hollow: true,
             struck: true,
@@ -1429,7 +1474,7 @@ class _SankeyPainter extends CustomPainter {
           glyph.paint(canvas, Offset(x, labelTop));
         } else if (!(homeLookNow == HomeLayout.dots &&
             flag != null &&
-            paintPixelFlag(canvas, flag, Offset(x + 6 + 17, labelTop + nameH / 2), 34, alpha: alpha))) {
+            paintPixelFlag(canvas, flag, Offset(x + 1 + 17, labelTop + nameH / 2), 34, alpha: alpha, fine: stepped))) {
           _label(
             canvas,
             shownName,

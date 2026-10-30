@@ -79,9 +79,12 @@ class _FlagMarkState extends State<FlagMark> {
 }
 
 class PixelFlag extends CustomPainter {
-  PixelFlag(this.grid);
+  PixelFlag(this.grid, {this.fine = false});
 
   final List<List<Color>> grid;
+
+  /// the cells with no gaps between them and only a faint grid over them: a flag with a touch of pixels
+  final bool fine;
 
   static const cols = 12;
   static const rows = 8;
@@ -249,6 +252,24 @@ class PixelFlag extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
+    if (fine) {
+      for (var y = 0; y < rows; y++) {
+        for (var x = 0; x < cols; x++) {
+          // a hair over, so no seam shows between the cells
+          canvas.drawRect(Rect.fromLTWH(x * cell, y * cell, cell + .4, cell + .4), Paint()..color = grid[y][x]);
+        }
+      }
+      final line = Paint()
+        ..color = const Color(0x22000000)
+        ..strokeWidth = .5;
+      for (var x = 1; x < cols; x++) {
+        canvas.drawLine(Offset(x * cell, 0), Offset(x * cell, size.height), line);
+      }
+      for (var y = 1; y < rows; y++) {
+        canvas.drawLine(Offset(0, y * cell), Offset(size.width, y * cell), line);
+      }
+      return;
+    }
     for (var y = 0; y < rows; y++) {
       for (var x = 0; x < cols; x++) {
         canvas.drawRect(
@@ -260,12 +281,12 @@ class PixelFlag extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(PixelFlag old) => !identical(old.grid, grid);
+  bool shouldRepaint(PixelFlag old) => !identical(old.grid, grid) || old.fine != fine;
 }
 
 /// A country's flag drawn on a canvas as pixels, centred on [centre], [width] wide; false while there is no pixel flag
 /// for it yet (it is being made: the caller draws the emoji, the next repaint finds the pixels).
-bool paintPixelFlag(Canvas canvas, String flag, Offset centre, double width, {double alpha = 1}) {
+bool paintPixelFlag(Canvas canvas, String flag, Offset centre, double width, {double alpha = 1, bool fine = false}) {
   final grid = PixelFlag.of(flag) ?? PixelFlag.pixelated[flag];
   if (grid == null) {
     unawaited(PixelFlag.pixelate(flag));
@@ -275,7 +296,7 @@ bool paintPixelFlag(Canvas canvas, String flag, Offset centre, double width, {do
   canvas.save();
   canvas.translate(box.left, box.top);
   if (alpha < 1) canvas.saveLayer(Offset.zero & box.size, Paint()..color = Color.fromRGBO(0, 0, 0, alpha));
-  PixelFlag(grid).paint(canvas, box.size);
+  PixelFlag(grid, fine: fine).paint(canvas, box.size);
   if (alpha < 1) canvas.restore();
   canvas.restore();
   return true;
@@ -304,14 +325,14 @@ Widget flagsText(String text, {TextStyle? style, int maxLines = 1, double width 
   );
 }
 
-/// An app's icon as a grid of square pixels, as the flags are: the picture cut to [n] by [n] blocks (16 by 16), each the average of
+/// An app's icon as a grid of square pixels, as the flags are: the picture cut to [n] by [n] blocks (32 by 32: a touch of pixels, no more), each the average of
 /// its block (a block that is mostly empty stays empty). Made once for an app, as it is met; [revision] ticks when a
 /// new one is ready, so the picture that waits for it draws again.
 class PixelIcons {
-  static const n = 16;
+  static const n = 32;
 
   /// how many picture pixels go to a block's side
-  static const _block = 4;
+  static const _block = 2;
 
   static final _grids = <String, List<List<Color?>>>{};
   static final _making = <String, Future<void>>{};
@@ -368,7 +389,7 @@ class PixelIcons {
   /// the grid in [box]: a square for each block, a little apart
   static void paint(Canvas canvas, Rect box, List<List<Color?>> grid, {double alpha = 1}) {
     final cell = box.width / n;
-    final side = cell * .94;
+    final side = cell * .9;
     for (var y = 0; y < n; y++) {
       for (var x = 0; x < n; x++) {
         final c = grid[y][x];
