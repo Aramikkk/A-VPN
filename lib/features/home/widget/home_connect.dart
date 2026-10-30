@@ -422,7 +422,8 @@ class _GraphiteDock extends HookConsumerWidget {
               // Contrast: the loss's name under it
               label: theme.contrastLayout ? t.avpn.dockLossLabel : t.avpn.stPingButton,
               labelColor: theme.contrastLayout && on && measured && !busy ? lossInk : null,
-              onTap: on && !busy && !testing ? onCheck : null,
+              // the servers of this session (what the "Servers VPN" tab over the panel opened)
+              onTap: on ? () => showGlassPopup(context, const _SessionServers()) : null,
               // Dots: ten dots, a tenth lit for each tenth of the packets lost
               meter: dotsLook
                   ? _dotMeter(context, on && measured && !busy ? (loss / 10).ceil().clamp(0, 10) : 0, _Dots.red)
@@ -485,8 +486,16 @@ class _GraphiteDock extends HookConsumerWidget {
                           _Dots.ink(dark),
                         )
                       : null,
-                  // the servers of this session (what the "Servers VPN" tab over the panel opened)
-                  onTap: on ? () => showGlassPopup(context, const _SessionServers()) : null,
+                  // the servers answering their ping, the fastest first; one tapped is chosen
+                  onTap: on && answering > 0
+                      ? () => showModalBottomSheet<void>(
+                          context: context,
+                          showDragHandle: true,
+                          isScrollControlled: true,
+                          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
+                          builder: (_) => _AnsweringSheet(servers: answeringServers, selected: group?.selected),
+                        )
+                      : null,
                 ),
               ),
             ),

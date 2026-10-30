@@ -180,15 +180,6 @@ class ConnectionsPage extends HookConsumerWidget {
                     style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 1.4),
                   ),
                   const Spacer(),
-                  if (all.any((c) => !c.active))
-                    IconButton(
-                      tooltip: t.avpn.connClear,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      iconSize: 18,
-                      icon: clearIcon(color: scheme.onSurfaceVariant),
-                      onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
-                    ),
                 ],
               ),
             ),
@@ -235,19 +226,7 @@ class ConnectionsPage extends HookConsumerWidget {
       );
     }
     return Scaffold(
-      appBar: embedded
-          ? null
-          : AppBar(
-              title: Text(t.avpn.connectionsTab),
-              actions: [
-                if (all.any((c) => !c.active))
-                  IconButton(
-                    tooltip: t.avpn.connClear,
-                    icon: clearIcon(),
-                    onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
-                  ),
-              ],
-            ),
+      appBar: embedded ? null : AppBar(title: Text(t.avpn.connectionsTab)),
       body: !state.available && all.isEmpty
           ? _Empty(icon: Icons.link_off_rounded, text: t.avpn.connNotConnected)
           : Center(
@@ -273,15 +252,6 @@ class ConnectionsPage extends HookConsumerWidget {
                                     ),
                                   ),
                                   const Spacer(),
-                                  if (all.any((c) => !c.active))
-                                    IconButton(
-                                      tooltip: t.avpn.connClear,
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      iconSize: 18,
-                                      icon: clearIcon(color: scheme.onSurfaceVariant),
-                                      onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
-                                    ),
                                 ],
                               ),
                             ),

@@ -392,7 +392,12 @@ class PixelIcons {
   static bool failed(String key) => _failed.contains(key);
 
   /// the icon in [box] as it is, with a thin grid of fine lines over it (only over the icon itself, not its corners)
-  static void paint(Canvas canvas, Rect box, PixelIcon icon, {double alpha = 1}) {
+  static void paint(Canvas canvas, Rect box, PixelIcon icon, {double alpha = 1, Color edge = const Color(0xFF000000)}) {
+    // a faint outline in the paper's ink round the icon's own shape, so a white tile has an edge and is not seen smaller
+    final halo = Paint()
+      ..filterQuality = FilterQuality.high
+      ..colorFilter = ColorFilter.mode(edge.withValues(alpha: .24 * alpha), BlendMode.srcIn);
+    canvas.drawImageRect(icon.image, icon.source, box.inflate(.9), halo);
     canvas.saveLayer(box, Paint()..color = Color.fromRGBO(255, 255, 255, alpha));
     canvas.drawImageRect(icon.image, icon.source, box, Paint()..filterQuality = FilterQuality.high);
     final n = box.width < 30 ? 12 : 18;
@@ -417,15 +422,16 @@ bool hasPixelFlag(String flag) {
 }
 
 class _PixelIconPainter extends CustomPainter {
-  _PixelIconPainter(this.icon);
+  _PixelIconPainter(this.icon, this.edge);
 
   final PixelIcon icon;
+  final Color edge;
 
   @override
-  void paint(Canvas canvas, Size size) => PixelIcons.paint(canvas, Offset.zero & size, icon);
+  void paint(Canvas canvas, Size size) => PixelIcons.paint(canvas, Offset.zero & size, icon, edge: edge);
 
   @override
-  bool shouldRepaint(_PixelIconPainter old) => !identical(old.icon, icon);
+  bool shouldRepaint(_PixelIconPainter old) => !identical(old.icon, icon) || old.edge != edge;
 }
 
 /// An app's icon in the Dots look, [size] square: cells for the ground and the sign smooth over them. While it is made
@@ -445,7 +451,13 @@ class DotsAppIcon extends StatelessWidget {
     builder: (context, _, _) {
       final key = keyOf(icon);
       final made = PixelIcons.of(key, icon);
-      if (made != null) return CustomPaint(size: Size.square(size), painter: _PixelIconPainter(made));
+      if (made != null) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        return CustomPaint(
+          size: Size.square(size),
+          painter: _PixelIconPainter(made, dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000)),
+        );
+      }
       if (PixelIcons.failed(key)) return Image.memory(icon, width: size, height: size, gaplessPlayback: true);
       return SizedBox(width: size, height: size);
     },

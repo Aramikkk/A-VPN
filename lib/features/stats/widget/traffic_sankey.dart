@@ -1351,6 +1351,11 @@ class _SankeyPainter extends CustomPainter {
     }
 
     final lastBottom = [-99.0, -99.0, -99.0];
+    // some server on the right carries its subscription's badge: all the marks there keep the room for it
+    final anyBadge = model.columns[2].any((n) {
+      final profile = splitMark(n.label).profile;
+      return profile != null && profile >= 0 && profile < profileBadgesNow.length;
+    });
     for (final (ci, column) in model.columns.indexed) {
       for (final n in column) {
         final bright = on(n.flows);
@@ -1428,7 +1433,8 @@ class _SankeyPainter extends CustomPainter {
         final x = switch (ci) {
           0 => xs[0] - 7,
           1 => xs[1] + SankeyGeometry.nodeW + 5,
-          _ => xs[2] + SankeyGeometry.nodeW + 7 + (badge == null ? 0 : 15),
+          // the stepped picture: the same place for every mark on the right (a flag, the shield), badge or none
+          _ => xs[2] + SankeyGeometry.nodeW + 7 + (badge == null && !(stepped && anyBadge) ? 0 : 15),
         };
         if (badge != null) {
           final cy = labelTop + nameH / 2;
@@ -1439,7 +1445,7 @@ class _SankeyPainter extends CustomPainter {
         }
         if (appGrid != null) {
           // as near its bar as the server's mark is to its own (7 points)
-          PixelIcons.paint(canvas, Rect.fromLTWH(x - 36, labelTop, 36, 36), appGrid, alpha: alpha);
+          PixelIcons.paint(canvas, Rect.fromLTWH(x - 36, labelTop, 36, 36), appGrid, alpha: alpha, edge: c.ink);
         } else if (tile) {
           final box = RRect.fromRectAndRadius(Rect.fromLTWH(x - 36, labelTop, 36, 36), const Radius.circular(8));
           canvas.drawRRect(box, Paint()..color = c.ink.withValues(alpha: .1 * alpha));

@@ -147,15 +147,6 @@ class TopologyPage extends HookConsumerWidget {
             ],
           ),
         ),
-        actions: [
-          // starts the picture over from now; it starts over by itself at 03:00
-          if (state.items.any((c) => !c.active))
-            IconButton(
-              tooltip: t.avpn.connClear,
-              icon: clearIcon(),
-              onPressed: () => ref.read(connectionsProvider.notifier).clearClosed(),
-            ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(

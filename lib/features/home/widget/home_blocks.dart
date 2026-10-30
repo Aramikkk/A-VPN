@@ -1215,3 +1215,67 @@ class _HomeStats extends ConsumerWidget {
     );
   }
 }
+
+/// The servers answering their ping, the fastest first: a tap on one chooses it.
+class _AnsweringSheet extends ConsumerWidget {
+  const _AnsweringSheet({required this.servers, required this.selected});
+
+  final List<OutboundInfo> servers;
+  final String? selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+          child: Text(
+            t.avpn.dockServersAnswering(count: servers.length),
+            style: theme.textTheme.titleSmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        Flexible(
+          child: ListView.builder(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+            itemCount: servers.length,
+            itemBuilder: (context, i) {
+              final server = servers[i];
+              final name = serverName(server);
+              final chosen = server.tag == selected;
+              return ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.dots ? 6 : 14),
+                ),
+                selected: chosen,
+                selectedTileColor: scheme.primary.withValues(alpha: .12),
+                leading: flagGlyph(name.flag, emoji: 22, width: 30),
+                title: Text(
+                  _marked(name.title.contains(' - ') ? name.title.split(' - ').last.trim() : name.title, name.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: chosen ? FontWeight.w800 : FontWeight.w600,
+                    color: chosen ? scheme.primary : null,
+                  ),
+                ),
+                trailing: _Delay(delay: server.urlTestDelay, testing: false),
+                onTap: () {
+                  ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
+                  Navigator.of(context).pop();
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
