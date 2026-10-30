@@ -97,8 +97,13 @@ void main() {
       final grid = PixelIcons.of('half-red', png)!;
       expect(grid.length, PixelIcons.n);
       expect(grid.every((row) => row.length == PixelIcons.n), isTrue);
-      expect(grid[0][0], const Color(0xFFFF0000));
-      expect(grid[4][PixelIcons.n ~/ 2 - 1], const Color(0xFFFF0000));
+      // (the picture is scaled to the blocks: a red a hair off is still red)
+      for (final c in [grid[0][0], grid[4][PixelIcons.n ~/ 2 - 2]]) {
+        expect(c, isNotNull);
+        expect(c!.r, greaterThan(.95));
+        expect(c.g, lessThan(.05));
+        expect(c.b, lessThan(.05));
+      }
       expect(grid[0][PixelIcons.n - 1], isNull);
       expect(grid[9][PixelIcons.n - 1], isNull);
     });

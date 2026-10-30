@@ -304,11 +304,14 @@ Widget flagsText(String text, {TextStyle? style, int maxLines = 1, double width 
   );
 }
 
-/// An app's icon as a grid of square pixels, as the flags are: the picture cut to [n] by [n] blocks, each the average of
+/// An app's icon as a grid of square pixels, as the flags are: the picture cut to [n] by [n] blocks (16 by 16), each the average of
 /// its block (a block that is mostly empty stays empty). Made once for an app, as it is met; [revision] ticks when a
 /// new one is ready, so the picture that waits for it draws again.
 class PixelIcons {
-  static const n = 10;
+  static const n = 16;
+
+  /// how many picture pixels go to a block's side
+  static const _block = 4;
 
   static final _grids = <String, List<List<Color?>>>{};
   static final _making = <String, Future<void>>{};
@@ -326,7 +329,7 @@ class PixelIcons {
 
   static Future<void> _make(String key, Uint8List png) async {
     try {
-      const side = n * 6;
+      const side = n * _block;
       final codec = await ui.instantiateImageCodec(png, targetWidth: side, targetHeight: side);
       final frame = await codec.getNextFrame();
       final data = await frame.image.toByteData();
@@ -339,8 +342,8 @@ class PixelIcons {
         final row = <Color?>[];
         for (var bx = 0; bx < n; bx++) {
           var r = 0.0, g = 0.0, b = 0.0, a = 0.0;
-          for (var y = by * 6; y < by * 6 + 6; y++) {
-            for (var x = bx * 6; x < bx * 6 + 6; x++) {
+          for (var y = by * _block; y < by * _block + _block; y++) {
+            for (var x = bx * _block; x < bx * _block + _block; x++) {
               final i = (y * side + x) * 4;
               final alpha = px[i + 3] / 255;
               r += px[i] * alpha;
@@ -349,7 +352,9 @@ class PixelIcons {
               a += alpha;
             }
           }
-          row.add(a < 36 * .4 ? null : Color.fromARGB(255, (r / a).round(), (g / a).round(), (b / a).round()));
+          row.add(
+            a < _block * _block * .4 ? null : Color.fromARGB(255, (r / a).round(), (g / a).round(), (b / a).round()),
+          );
         }
         grid.add(row);
       }
@@ -363,7 +368,7 @@ class PixelIcons {
   /// the grid in [box]: a square for each block, a little apart
   static void paint(Canvas canvas, Rect box, List<List<Color?>> grid, {double alpha = 1}) {
     final cell = box.width / n;
-    final side = cell * .86;
+    final side = cell * .94;
     for (var y = 0; y < n; y++) {
       for (var x = 0; x < n; x++) {
         final c = grid[y][x];
