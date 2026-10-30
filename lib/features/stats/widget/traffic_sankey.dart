@@ -479,14 +479,17 @@ class TrafficSankey extends ConsumerWidget {
         ),
     ];
     return SankeyDiagram(
-      flows: flows,
+      // what is under 100 KB is not on the picture (a route is an app, its site and its server together)
+      flows: unit > 1 ? flowsOverHundredKb(flows) : flows,
       value: value,
       height: height,
       unit: unit,
       even: true,
       calm: true,
       look: SankeyLook.dots,
-      topDown: true,
+      // Dots: across, from the left to the right, the lines of dots in steps; the other looks from the top down
+      stepped: homeLookNow == HomeLayout.dots,
+      topDown: homeLookNow != HomeLayout.dots,
       icons: icons,
       speedValue: speedValue,
       headers: [t.avpn.sankeyApps, t.avpn.sankeySites, t.avpn.sankeyTo],
@@ -497,6 +500,19 @@ class TrafficSankey extends ConsumerWidget {
           showGlassPopup(context, SankeyDetails(selection: selection, value: value, speedValue: speedValue)),
     );
   }
+}
+
+/// The flows of the routes (an app, its site and its server) that carried 100 KB or more; [flows] weigh in bytes.
+List<SankeyFlow> flowsOverHundredKb(List<SankeyFlow> flows) {
+  final sums = <String, double>{};
+  String key(SankeyFlow f) => '${f.app} ${f.site} ${f.out}';
+  for (final f in flows) {
+    sums[key(f)] = (sums[key(f)] ?? 0) + f.weight;
+  }
+  return [
+    for (final f in flows)
+      if (sums[key(f)]! >= 100 * 1024) f,
+  ];
 }
 
 /// How the routes are drawn in the ribbons view.
@@ -536,6 +552,7 @@ class SankeyDiagram extends StatefulWidget {
     this.chips = false,
     this.look = SankeyLook.ribbons,
     this.topDown = false,
+    this.stepped = false,
     this.icons = const {},
     this.speedValue,
     this.headers = const [],
@@ -557,6 +574,9 @@ class SankeyDiagram extends StatefulWidget {
 
   /// on a narrow screen (under 600) the picture goes from the top to the bottom, with the apps' icons
   final bool topDown;
+
+  /// the thin lines go in steps (right angles: along, across, along) instead of curves
+  final bool stepped;
 
   /// the apps' icons by their names on the picture
   final Map<String, Uint8List> icons;
@@ -951,6 +971,7 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
               widget.speedValue,
               _pulse,
               widget.look,
+              stepped: widget.stepped,
             ),
           ),
         ),
@@ -979,10 +1000,14 @@ class _SankeyPainter extends CustomPainter {
     this.headers,
     this.speedValue,
     this.pulse,
-    this.look,
-  ) : super(repaint: pulse);
+    this.look, {
+    this.stepped = false,
+  }) : super(repaint: pulse);
 
   final SankeyLook look;
+
+  /// the thin lines in steps
+  final bool stepped;
 
   /// the pulse's turn, 0..1
   final Animation<double> pulse;
@@ -1121,7 +1146,7 @@ class _SankeyPainter extends CustomPainter {
       p.paint(canvas, Offset(i == 0 ? xs[0] - 7 - p.width : (i == 1 ? xs[1] : xs[2]), 0));
     }
     // a long arrow along the top from the first column to the last: the flow goes from the left to the right
-    if (look == SankeyLook.thin || look == SankeyLook.dots) {
+    if (look == SankeyLook.thin || look == SankeyLook.dots || stepped) {
       final rail = Paint()
         ..color = c.ink.withValues(alpha: .28)
         ..strokeWidth = 1.5;
@@ -1158,9 +1183,19 @@ class _SankeyPainter extends CustomPainter {
       final xb = xs[l.to.column];
       final from = l.from.route == null ? c.app : colour;
       final th = model.thickness(l);
-      final centre = Path()
-        ..moveTo(xa, l.fromY + th / 2)
-        ..cubicTo((xa + xb) / 2, l.fromY + th / 2, (xa + xb) / 2, l.toY + th / 2, xb, l.toY + th / 2);
+      final fromY = l.fromY + th / 2;
+      final toY = l.toY + th / 2;
+      // steps: along to a turn, across, along; the turns of the lines in separate places, so the crossings read
+      final turn = (xa + xb) / 2 + (((toY / 9).floor() % 5) - 2) * 7.0;
+      final centre = stepped
+          ? (Path()
+              ..moveTo(xa, fromY)
+              ..lineTo(turn, fromY)
+              ..lineTo(turn, toY)
+              ..lineTo(xb, toY))
+          : (Path()
+              ..moveTo(xa, fromY)
+              ..cubicTo((xa + xb) / 2, fromY, (xa + xb) / 2, toY, xb, toY));
       final shaderBox = Rect.fromLTRB(xa, 0, xb, size.height);
       // Bento and Dots: their own line and head, whatever the picture's look
       if (_lookLine(canvas, centre.computeMetrics().first, colour, live: live, alpha: bright ? 1 : .3, head: moving))

@@ -10,6 +10,22 @@ SankeyModel build(List<SankeyFlow> flows) =>
     SankeyModel.build(flows, otherApp: 'other', otherRule: 'other', otherOut: 'other');
 
 void main() {
+  test('under 100 KB a route is not on the picture, as a sum of its connections it can be', () {
+    const kb = 1024.0;
+    SankeyFlow route(String app, String site, double w) =>
+        SankeyFlow(app: app, rule: 'r', out: 'SE', route: ConnectionRoute.vpn, weight: w, site: site);
+    final kept = flowsOverHundredKb([
+      route('A', 'a.com', 40 * kb),
+      route('B', 'b.com', 200 * kb),
+      // two connections of one route: together over 100 KB
+      route('C', 'c.com', 60 * kb),
+      route('C', 'c.com', 60 * kb),
+    ]);
+    expect(kept.map((f) => f.app), ['B', 'C', 'C']);
+    expect(flowsOverHundredKb([route('A', 'a.com', 100 * kb - 1)]), isEmpty);
+    expect(flowsOverHundredKb([route('A', 'a.com', 100 * kb)]), hasLength(1));
+  });
+
   final flows = [
     flow('Chrome', 'ru', 'direct', ConnectionRoute.direct, 400),
     flow('Chrome', 'rest', 'SE', ConnectionRoute.vpn, 100),
@@ -104,7 +120,6 @@ void main() {
     expect(big.weight / a.weight, lessThan(3.5));
     expect(big.real / a.real, closeTo(10, 1e-9));
   });
-
 
   group('even: nothing changes size or place as traffic moves', () {
     SankeyModel even(List<SankeyFlow> f) =>
