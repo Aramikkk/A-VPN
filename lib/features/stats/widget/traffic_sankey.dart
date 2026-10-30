@@ -1430,10 +1430,10 @@ class _SankeyPainter extends CustomPainter {
           letter.paint(canvas, Offset(cx - letter.width / 2, cy - letter.height / 2));
         }
         if (appGrid != null) {
-          // room between the icon and its bar
-          PixelIcons.paint(canvas, Rect.fromLTWH(x - 1 - 36, labelTop, 36, 36), appGrid, alpha: alpha);
+          // as near its bar as the server's mark is to its own (7 points)
+          PixelIcons.paint(canvas, Rect.fromLTWH(x - 36, labelTop, 36, 36), appGrid, alpha: alpha);
         } else if (tile) {
-          final box = RRect.fromRectAndRadius(Rect.fromLTWH(x - 1 - 36, labelTop, 36, 36), const Radius.circular(8));
+          final box = RRect.fromRectAndRadius(Rect.fromLTWH(x - 36, labelTop, 36, 36), const Radius.circular(8));
           canvas.drawRRect(box, Paint()..color = c.ink.withValues(alpha: .1 * alpha));
           canvas.drawRRect(
             box,
@@ -1449,7 +1449,7 @@ class _SankeyPainter extends CustomPainter {
             size: 17,
             color: c.ink.withValues(alpha: alpha),
           );
-          letter.paint(canvas, Offset(x - 1 - 18 - letter.width / 2, labelTop + 18 - letter.height / 2));
+          letter.paint(canvas, Offset(x - 18 - letter.width / 2, labelTop + 18 - letter.height / 2));
         } else if (shield) {
           paintDotShield(
             canvas,
