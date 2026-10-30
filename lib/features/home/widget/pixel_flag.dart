@@ -321,27 +321,17 @@ Widget flagsText(String text, {TextStyle? style, int maxLines = 1, double width 
   );
 }
 
-/// An app's icon in two parts: the ground as a grid of rounded cells (12 by 12) and, where the icon is a light sign on a
-/// coloured ground (a plane, a play button, a ring), the sign itself, drawn smooth over the cells.
+/// An app's own icon, decoded, to be drawn with a thin grid of pixels over it (Dots).
 class PixelIcon {
-  const PixelIcon(this.grid, this.sign);
+  const PixelIcon(this.image);
 
-  /// the ground's cells (null: nothing there, the corners of a round icon)
-  final List<List<Color?>> grid;
-
-  /// the sign: white where the icon has its light, uncoloured parts, as an alpha mask; null when the icon has none (a
-  /// picture all in colour stays all in cells)
-  final ui.Image? sign;
+  final ui.Image image;
 }
 
-/// The icons of the apps as [PixelIcon]s: made once for an app, as it is met; [revision] ticks when a new one is ready,
+/// The icons of the apps as [PixelIcon]s: decoded once for an app, as it is met; [revision] ticks when a new one is ready,
 /// so the picture that waits for it draws again.
 class PixelIcons {
-  static const n = 12;
-
-  /// how many picture pixels go to a cell's side
-  static const _block = 8;
-  static const _side = n * _block;
+  static const _side = 192;
 
   static final _icons = <String, PixelIcon>{};
   static final _making = <String, Future<void>>{};
@@ -362,140 +352,8 @@ class PixelIcons {
     try {
       final codec = await ui.instantiateImageCodec(png, targetWidth: _side, targetHeight: _side);
       final frame = await codec.getNextFrame();
-      final data = await frame.image.toByteData(format: ui.ImageByteFormat.rawStraightRgba);
-      frame.image.dispose();
       codec.dispose();
-      if (data == null) return;
-      final px = data.buffer.asUint8List();
-      // the light, uncoloured pixels are the sign (1: surely, 0: not)
-      final sign = Float32List(_side * _side);
-      var opaque = 0, light = 0;
-      for (var i = 0; i < _side * _side; i++) {
-        if (px[i * 4 + 3] < 200) continue;
-        opaque++;
-        final r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
-        final lum = (.3 * r + .59 * g + .11 * b) / 255;
-        final sat = (math.max(r, math.max(g, b)) - math.min(r, math.min(g, b))) / 255;
-        final w = ((lum - .78) / .14).clamp(0.0, 1.0) * (1 - ((sat - .12) / .18).clamp(0.0, 1.0));
-        sign[i] = w;
-        if (w > .5) light++;
-      }
-      // a sign only where there is a little of it and not nearly all, and the ground under it is a colour (a white icon
-      // with a dark picture, or a pale one, is no sign on a ground: it stays all in cells)
-      var groundSat = 0.0, groundLum = 0.0, ground = 0;
-      for (var i = 0; i < _side * _side; i++) {
-        if (px[i * 4 + 3] < 200 || sign[i] > .5) continue;
-        final r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
-        groundSat += (math.max(r, math.max(g, b)) - math.min(r, math.min(g, b))) / 255;
-        groundLum += (.3 * r + .59 * g + .11 * b) / 255;
-        ground++;
-      }
-      final coloured = ground > 0 && groundSat / ground > .28 && groundLum / ground < .8;
-      var hasSign = opaque > 0 && coloured && light / opaque > .015 && light / opaque < .55;
-      // a neutral ground (white, grey, black): the sign is whatever differs from it, light or dark or coloured, drawn smooth
-      // in its own colours
-      var ownColours = false;
-      if (!hasSign && opaque > 0) {
-        final band = (_side * .07).round();
-        var gr = 0.0, gg = 0.0, gb = 0.0, gn = 0;
-        for (var y = 0; y < _side; y++) {
-          for (var x = 0; x < _side; x++) {
-            if (x >= band && y >= band && x < _side - band && y < _side - band) continue;
-            final i = y * _side + x;
-            if (px[i * 4 + 3] < 200) continue;
-            gr += px[i * 4];
-            gg += px[i * 4 + 1];
-            gb += px[i * 4 + 2];
-            gn++;
-          }
-        }
-        if (gn > 0) {
-          gr /= gn * 255;
-          gg /= gn * 255;
-          gb /= gn * 255;
-          var differing = 0;
-          for (var i = 0; i < _side * _side; i++) {
-            if (px[i * 4 + 3] < 200) {
-              sign[i] = 0;
-              continue;
-            }
-            final dr = px[i * 4] / 255 - gr, dg = px[i * 4 + 1] / 255 - gg, db = px[i * 4 + 2] / 255 - gb;
-            final w = ((math.sqrt(dr * dr + dg * dg + db * db) - .22) / .14).clamp(0.0, 1.0);
-            sign[i] = w;
-            if (w > .5) differing++;
-          }
-          final share = differing / opaque;
-          if (share > .02 && share < .7) {
-            hasSign = true;
-            ownColours = true;
-          }
-        }
-      }
-      // the cells: the ground's colour, the sign's pixels left out
-      final colours = List.generate(n, (_) => List<Color?>.filled(n, null));
-      final lacking = <(int, int)>[];
-      for (var by = 0; by < n; by++) {
-        for (var bx = 0; bx < n; bx++) {
-          var r = 0.0, g = 0.0, b = 0.0, weight = 0.0;
-          var cover = 0;
-          for (var y = by * _block; y < by * _block + _block; y++) {
-            for (var x = bx * _block; x < bx * _block + _block; x++) {
-              final i = y * _side + x;
-              if (px[i * 4 + 3] < 128) continue;
-              cover++;
-              final w = hasSign ? 1 - sign[i] : 1.0;
-              r += px[i * 4] * w;
-              g += px[i * 4 + 1] * w;
-              b += px[i * 4 + 2] * w;
-              weight += w;
-            }
-          }
-          if (cover < _block * _block * .4) continue;
-          if (weight < _block * _block * .12) {
-            lacking.add((bx, by));
-          } else {
-            colours[by][bx] = Color.fromARGB(255, (r / weight).round(), (g / weight).round(), (b / weight).round());
-          }
-        }
-      }
-      // the cells under the sign take the colour of their neighbours
-      for (var pass = 0; pass < 6 && lacking.isNotEmpty; pass++) {
-        final done = <(int, int)>[];
-        for (final (bx, by) in lacking) {
-          var r = 0, g = 0, b = 0, count = 0;
-          for (var dy = -1; dy <= 1; dy++) {
-            for (var dx = -1; dx <= 1; dx++) {
-              final x = bx + dx, y = by + dy;
-              if (x < 0 || y < 0 || x >= n || y >= n) continue;
-              final c = colours[y][x];
-              if (c == null || lacking.contains((x, y))) continue;
-              r += (c.r * 255).round();
-              g += (c.g * 255).round();
-              b += (c.b * 255).round();
-              count++;
-            }
-          }
-          if (count > 0) {
-            colours[by][bx] = Color.fromARGB(255, r ~/ count, g ~/ count, b ~/ count);
-            done.add((bx, by));
-          }
-        }
-        lacking.removeWhere(done.contains);
-      }
-      ui.Image? mask;
-      if (hasSign) {
-        final bytes = Uint8List(_side * _side * 4);
-        for (var i = 0; i < _side * _side; i++) {
-          bytes[i * 4] = ownColours ? px[i * 4] : 255;
-          bytes[i * 4 + 1] = ownColours ? px[i * 4 + 1] : 255;
-          bytes[i * 4 + 2] = ownColours ? px[i * 4 + 2] : 255;
-          bytes[i * 4 + 3] = (sign[i] * 255).round();
-        }
-        final done = Completer<ui.Image>();
-        ui.decodeImageFromPixels(bytes, _side, _side, ui.PixelFormat.rgba8888, done.complete);
-        mask = await done.future;
-      }
-      _icons[key] = PixelIcon(colours, mask);
+      _icons[key] = PixelIcon(frame.image);
       revision.value++;
     } catch (_) {
       // an icon that cannot be read stays as the picture it is
@@ -507,34 +365,26 @@ class PixelIcons {
   /// whether the icon of [key] could not be made
   static bool failed(String key) => _failed.contains(key);
 
-  /// the icon in [box]: a rounded cell for each block of the ground, a little apart, and the sign over them
+  /// the icon in [box] as it is, with a thin grid of fine lines over it (only over the icon itself, not its corners)
   static void paint(Canvas canvas, Rect box, PixelIcon icon, {double alpha = 1}) {
+    canvas.saveLayer(box, Paint()..color = Color.fromRGBO(255, 255, 255, alpha));
+    canvas.drawImageRect(
+      icon.image,
+      Rect.fromLTWH(0, 0, _side.toDouble(), _side.toDouble()),
+      box,
+      Paint()..filterQuality = FilterQuality.high,
+    );
+    final n = box.width < 30 ? 12 : 18;
     final cell = box.width / n;
-    final side = cell * .9;
-    for (var y = 0; y < n; y++) {
-      for (var x = 0; x < n; x++) {
-        final c = icon.grid[y][x];
-        if (c == null) continue;
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(box.left + x * cell + (cell - side) / 2, box.top + y * cell + (cell - side) / 2, side, side),
-            Radius.circular(cell * .24),
-          ),
-          Paint()..color = c.withValues(alpha: alpha),
-        );
-      }
+    final line = Paint()
+      ..blendMode = BlendMode.srcATop
+      ..color = const Color(0x46000000)
+      ..strokeWidth = (box.width / 132).clamp(.4, 1.0);
+    for (var i = 1; i < n; i++) {
+      canvas.drawLine(Offset(box.left + i * cell, box.top), Offset(box.left + i * cell, box.bottom), line);
+      canvas.drawLine(Offset(box.left, box.top + i * cell), Offset(box.right, box.top + i * cell), line);
     }
-    final sign = icon.sign;
-    if (sign != null) {
-      canvas.drawImageRect(
-        sign,
-        Rect.fromLTWH(0, 0, _side.toDouble(), _side.toDouble()),
-        box,
-        Paint()
-          ..filterQuality = FilterQuality.high
-          ..color = Color.fromRGBO(255, 255, 255, alpha),
-      );
-    }
+    canvas.restore();
   }
 }
 
