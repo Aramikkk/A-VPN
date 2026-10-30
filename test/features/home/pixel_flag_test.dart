@@ -136,6 +136,28 @@ void main() {
       expect(icon.grid[0][0]!.b, greaterThan(.8));
     });
 
+    testWidgets('a dark picture on white is the sign (smooth, in its own colour), the cells under it stay white', (
+      tester,
+    ) async {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawRect(const Rect.fromLTWH(0, 0, 96, 96), Paint()..color = const Color(0xFFFFFFFF));
+      canvas.drawCircle(const Offset(48, 48), 26, Paint()..color = const Color(0xFF202020));
+      final png = (await tester.runAsync(() async {
+        final image = await recorder.endRecording().toImage(96, 96);
+        return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      }))!;
+      await tester.runAsync(() async {
+        PixelIcons.of('dark-on-white', png);
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      final icon = PixelIcons.of('dark-on-white', png)!;
+      expect(icon.sign, isNotNull);
+      expect(icon.grid[0][0], const Color(0xFFFFFFFF));
+      final middle = icon.grid[PixelIcons.n ~/ 2][PixelIcons.n ~/ 2]!;
+      expect(middle.r, greaterThan(.9));
+    });
+
     testWidgets('a white icon is not a sign on a ground: all in cells', (tester) async {
       final recorder = ui.PictureRecorder();
       Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 96, 96), Paint()..color = const Color(0xFFFFFFFF));

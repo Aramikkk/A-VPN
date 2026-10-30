@@ -380,8 +380,57 @@ class PixelIcons {
         sign[i] = w;
         if (w > .5) light++;
       }
-      // a sign only where there is a little of it and not nearly all (a white icon is not a sign on a ground)
-      final hasSign = opaque > 0 && light / opaque > .015 && light / opaque < .55;
+      // a sign only where there is a little of it and not nearly all, and the ground under it is a colour (a white icon
+      // with a dark picture, or a pale one, is no sign on a ground: it stays all in cells)
+      var groundSat = 0.0, groundLum = 0.0, ground = 0;
+      for (var i = 0; i < _side * _side; i++) {
+        if (px[i * 4 + 3] < 200 || sign[i] > .5) continue;
+        final r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+        groundSat += (math.max(r, math.max(g, b)) - math.min(r, math.min(g, b))) / 255;
+        groundLum += (.3 * r + .59 * g + .11 * b) / 255;
+        ground++;
+      }
+      final coloured = ground > 0 && groundSat / ground > .28 && groundLum / ground < .8;
+      var hasSign = opaque > 0 && coloured && light / opaque > .015 && light / opaque < .55;
+      // a neutral ground (white, grey, black): the sign is whatever differs from it, light or dark or coloured, drawn smooth
+      // in its own colours
+      var ownColours = false;
+      if (!hasSign && opaque > 0) {
+        final band = (_side * .07).round();
+        var gr = 0.0, gg = 0.0, gb = 0.0, gn = 0;
+        for (var y = 0; y < _side; y++) {
+          for (var x = 0; x < _side; x++) {
+            if (x >= band && y >= band && x < _side - band && y < _side - band) continue;
+            final i = y * _side + x;
+            if (px[i * 4 + 3] < 200) continue;
+            gr += px[i * 4];
+            gg += px[i * 4 + 1];
+            gb += px[i * 4 + 2];
+            gn++;
+          }
+        }
+        if (gn > 0) {
+          gr /= gn * 255;
+          gg /= gn * 255;
+          gb /= gn * 255;
+          var differing = 0;
+          for (var i = 0; i < _side * _side; i++) {
+            if (px[i * 4 + 3] < 200) {
+              sign[i] = 0;
+              continue;
+            }
+            final dr = px[i * 4] / 255 - gr, dg = px[i * 4 + 1] / 255 - gg, db = px[i * 4 + 2] / 255 - gb;
+            final w = ((math.sqrt(dr * dr + dg * dg + db * db) - .22) / .14).clamp(0.0, 1.0);
+            sign[i] = w;
+            if (w > .5) differing++;
+          }
+          final share = differing / opaque;
+          if (share > .02 && share < .7) {
+            hasSign = true;
+            ownColours = true;
+          }
+        }
+      }
       // the cells: the ground's colour, the sign's pixels left out
       final colours = List.generate(n, (_) => List<Color?>.filled(n, null));
       final lacking = <(int, int)>[];
@@ -437,9 +486,9 @@ class PixelIcons {
       if (hasSign) {
         final bytes = Uint8List(_side * _side * 4);
         for (var i = 0; i < _side * _side; i++) {
-          bytes[i * 4] = 255;
-          bytes[i * 4 + 1] = 255;
-          bytes[i * 4 + 2] = 255;
+          bytes[i * 4] = ownColours ? px[i * 4] : 255;
+          bytes[i * 4 + 1] = ownColours ? px[i * 4 + 1] : 255;
+          bytes[i * 4 + 2] = ownColours ? px[i * 4 + 2] : 255;
           bytes[i * 4 + 3] = (sign[i] * 255).round();
         }
         final done = Completer<ui.Image>();
