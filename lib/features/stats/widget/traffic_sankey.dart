@@ -1156,15 +1156,23 @@ class _SankeyPainter extends CustomPainter {
         ..color = c.ink.withValues(alpha: .28)
         ..strokeWidth = 1.5;
       final railY = SankeyGeometry.headerH - 4;
-      canvas.drawLine(Offset(xs[0], railY), Offset(size.width - 6, railY), rail);
-      canvas.drawPath(
-        Path()
-          ..moveTo(size.width - 1, railY)
-          ..lineTo(size.width - 12, railY - 5)
-          ..lineTo(size.width - 12, railY + 5)
-          ..close(),
-        Paint()..color = c.ink.withValues(alpha: .28),
-      );
+      if (stepped) {
+        // Dots, across: a plain line of small dots, no head
+        final dot = Paint()..color = c.ink.withValues(alpha: .35);
+        for (var x = xs[0]; x < size.width - 6; x += 9) {
+          canvas.drawCircle(Offset(x, railY), 1.3, dot);
+        }
+      } else {
+        canvas.drawLine(Offset(xs[0], railY), Offset(size.width - 6, railY), rail);
+        canvas.drawPath(
+          Path()
+            ..moveTo(size.width - 1, railY)
+            ..lineTo(size.width - 12, railY - 5)
+            ..lineTo(size.width - 12, railY + 5)
+            ..close(),
+          Paint()..color = c.ink.withValues(alpha: .28),
+        );
+      }
     }
     canvas.save();
     canvas.translate(0, SankeyGeometry.headerH);
@@ -1365,12 +1373,20 @@ class _SankeyPainter extends CustomPainter {
         // is no icon (or it is not ready yet)
         final appIcon = ci == 0 && stepped ? icons[mark.text] : null;
         final appGrid = appIcon == null ? null : PixelIcons.of(mark.text, appIcon);
+        final pixelFlag = stepped && flag != null && hasPixelFlag(flag);
+        final shield = stepped && ci == 2 && n.route == ConnectionRoute.direct;
+        // an icon, a flag or the shield stands alone (the amounts are written in the middle column only)
+        final glyphAlone = appGrid != null || pixelFlag || shield;
         final nameH = appGrid != null
+            ? 30.0
+            : pixelFlag
+            ? 24.0
+            : shield
             ? 26.0
             : icon != null
             ? 20.0
             : _text(shownName, nameW, strong: nameStrong, size: shownSize, lines: shownLines, right: ci == 0).height;
-        final blockH = nameH + (tall ? 13 * lines : 0);
+        final blockH = nameH + (tall && !glyphAlone ? 13 * lines : 0);
         final labelTop = n.y + n.h / 2 - blockH / 2;
         if (labelTop < lastBottom[ci] + 1) continue;
         lastBottom[ci] = labelTop + blockH;
@@ -1387,7 +1403,16 @@ class _SankeyPainter extends CustomPainter {
           letter.paint(canvas, Offset(cx - letter.width / 2, cy - letter.height / 2));
         }
         if (appGrid != null) {
-          PixelIcons.paint(canvas, Rect.fromLTWH(x - 26, labelTop, 26, 26), appGrid, alpha: alpha);
+          // room between the icon and its bar
+          PixelIcons.paint(canvas, Rect.fromLTWH(x - 6 - 30, labelTop, 30, 30), appGrid, alpha: alpha);
+        } else if (shield) {
+          paintDotShield(
+            canvas,
+            Rect.fromCenter(center: Offset(x + 6 + 12, labelTop + nameH / 2), width: 21, height: 24),
+            _route(n.route).withValues(alpha: alpha),
+            hollow: true,
+            struck: true,
+          );
         } else if (icon != null) {
           final glyph = TextPainter(
             text: TextSpan(
@@ -1404,7 +1429,7 @@ class _SankeyPainter extends CustomPainter {
           glyph.paint(canvas, Offset(x, labelTop));
         } else if (!(homeLookNow == HomeLayout.dots &&
             flag != null &&
-            paintPixelFlag(canvas, flag, Offset(x + 13, labelTop + nameH / 2), 26, alpha: alpha))) {
+            paintPixelFlag(canvas, flag, Offset(x + 6 + 17, labelTop + nameH / 2), 34, alpha: alpha))) {
           _label(
             canvas,
             shownName,
@@ -1417,7 +1442,7 @@ class _SankeyPainter extends CustomPainter {
             alpha: alpha,
           );
         }
-        if (tall) {
+        if (tall && !glyphAlone) {
           _label(
             canvas,
             amount,

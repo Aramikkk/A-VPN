@@ -376,3 +376,10 @@ class PixelIcons {
     }
   }
 }
+
+/// Whether a pixel flag for [flag] is ready now (if it is not, it is made: the next drawing finds it).
+bool hasPixelFlag(String flag) {
+  if (PixelFlag.of(flag) != null || PixelFlag.pixelated[flag] != null) return true;
+  unawaited(PixelFlag.pixelate(flag));
+  return false;
+}
