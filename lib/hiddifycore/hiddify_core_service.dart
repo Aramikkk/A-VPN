@@ -122,9 +122,18 @@ class HiddifyCoreService with InfraLogger {
       final networkOptions = options.copyWith(balancerTolerance: options.balancerToleranceWifi);
       // latestOptions = options;
       try {
-        final res = await core.fgClient.changeHiddifySettings(
-          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(networkOptions.toJson())),
-        );
+        final request = ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(networkOptions.toJson()));
+        CoreInfoResponse res;
+        try {
+          res = await core.fgClient.changeHiddifySettings(request);
+        } on GrpcError catch (e) {
+          // the app's own core is not answering (refused: it was never set up, or its channel went stale): set it up
+          // again and ask once more, as the config check does, instead of failing adding a profile for it
+          if (e.code != StatusCode.unavailable) rethrow;
+          loggy.warning("core is not reachable, setting it up again: $e");
+          await setup().run();
+          res = await core.fgClient.changeHiddifySettings(request);
+        }
         if (res.messageType != MessageType.EMPTY) return left("${res.messageType} ${res.message}");
         await core.bgClient.changeHiddifySettings(
           ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(networkOptions.toJson())),
