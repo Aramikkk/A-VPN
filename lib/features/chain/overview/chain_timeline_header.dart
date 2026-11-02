@@ -41,11 +41,18 @@ class ChainTimelineHeader extends HookConsumerWidget {
           Icon(level.icon(), size: 18, color: ChainLook.soft(context)),
           const Gap(10),
           Expanded(
-            child: Text(
-              level.present(t).title.toUpperCase(),
-              style: ChainLook.mono(14, ChainLook.ink(context), weight: FontWeight.w700, spacing: 1.6),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            // the name shrinks to the room the mode button leaves rather than being cut ("ДОПОЛНИТЕЛЬ…")
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  level.present(t).title.toUpperCase(),
+                  style: ChainLook.mono(14, ChainLook.ink(context), weight: FontWeight.w700, spacing: 1.6),
+                  maxLines: 1,
+                ),
+              ),
             ),
           ),
           const Gap(12),
