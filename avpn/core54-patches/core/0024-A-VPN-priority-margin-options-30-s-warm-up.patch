@@ -1,7 +1,7 @@
 From 940cec71abb3bbdd8fd186ea5e631033bddf3caa Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Wed, 28 Oct 2026 10:54:00 +0300
-Subject: [PATCH 24/27] A-VPN: priority/margin options, 30 s warm-up
+Subject: [PATCH 24/28] A-VPN: priority/margin options, 30 s warm-up
 
 ---
  v2/config/builder.go          | 40 ++++++++++++++++++++++++++++++++++-

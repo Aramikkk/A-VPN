@@ -1,7 +1,7 @@
 From 31e436aa045449b23671745831e20d2dfdd3ecc4 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Mon, 12 Oct 2026 22:16:23 +0300
-Subject: [PATCH 06/27] VPN totals from the same connections as the session
+Subject: [PATCH 06/28] VPN totals from the same connections as the session
  total
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

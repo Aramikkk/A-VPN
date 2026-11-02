@@ -1,7 +1,7 @@
 From aa650866aaf35b50fa28693ce22745dd912584d8 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Sat, 24 Oct 2026 10:11:59 +0300
-Subject: [PATCH 23/27] AI chat groups: gemini, claude, perplexity; sticky
+Subject: [PATCH 23/28] AI chat groups: gemini, claude, perplexity; sticky
 
 ---
  v2/config/site_groups.go      | 53 ++++++++++++++++++++++++++++++++---

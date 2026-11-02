@@ -1,7 +1,7 @@
 From 42079b1bb1f7fed679f6a8d861841a1ed497e922 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Tue, 20 Oct 2026 22:53:29 +0300
-Subject: [PATCH 16/27] config: site groups choose by three steady answers, 10
+Subject: [PATCH 16/28] config: site groups choose by three steady answers, 10
  s tests, every 2 min
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

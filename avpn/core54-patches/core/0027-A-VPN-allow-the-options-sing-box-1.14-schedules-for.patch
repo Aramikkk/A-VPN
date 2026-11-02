@@ -1,7 +1,7 @@
 From 6ce935812d47d637857ff0cbe2657ac3ba634f25 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Mon, 2 Nov 2026 16:44:45 +0300
-Subject: [PATCH 27/27] A-VPN: allow the options sing-box 1.14 schedules for
+Subject: [PATCH 27/28] A-VPN: allow the options sing-box 1.14 schedules for
  removal (the older core only warned)
 
 ---

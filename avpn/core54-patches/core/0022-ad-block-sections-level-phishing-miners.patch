@@ -1,7 +1,7 @@
 From 2f5a1685da253613edfe31a6b22c53c1d6fd8a89 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Fri, 23 Oct 2026 19:11:17 +0300
-Subject: [PATCH 22/27] ad block sections: level, phishing, miners
+Subject: [PATCH 22/28] ad block sections: level, phishing, miners
 
 ---
  v2/config/adblock.go        | 49 +++++++++++++++++++++++++++++--------

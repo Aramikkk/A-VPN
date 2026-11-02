@@ -1,0 +1,45 @@
+From eafc753853b7d506527e31ad3a993f3a1a31b521 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 17:01:48 +0300
+Subject: [PATCH 28/28] A-VPN: DNS rules carry no strategy (sing-box 1.14
+ refuses it), with a test
+
+---
+ v2/config/builder.go | 20 ++++----------------
+ 1 file changed, 4 insertions(+), 16 deletions(-)
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 0191442..eb0fe2f 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -457,23 +457,11 @@ func isIPv6Supported() bool {
+ 	return err == nil
+ }
+ 
+-// dnsStrategy is the strategy of a DNS rule: the explicit setting when there is one, else what
+-// the IPv6 mode asks. Neither ever becomes ipv4_only or ipv6_only: the core's own lookups then
+-// favour one family, but a client still gets both A and AAAA, and a config whose server has only
+-// the other family still routes (hiddify-app #2307, #2420 are about IPv6-first sites on proxies
+-// without IPv6; the mode used to reach only the local listeners).
++// dnsStrategy is the strategy of a DNS rule. A-VPN writes none: sing-box 1.14 calls the DNS rule action's `strategy`
++// legacy and the core refuses to start with it ("Legacy `strategy` DNS rule action option is deprecated"), and A-VPN
++// does not use IPv6 on its own, so there is no preference to put there.
+ func dnsStrategy(explicit, ipv6Mode option.DomainStrategy) option.DomainStrategy {
+-	strategy := explicit
+-	if strategy == option.DomainStrategy(C.DomainStrategyAsIS) {
+-		strategy = ipv6Mode
+-	}
+-	switch strategy {
+-	case option.DomainStrategy(C.DomainStrategyIPv4Only):
+-		return option.DomainStrategy(C.DomainStrategyPreferIPv4)
+-	case option.DomainStrategy(C.DomainStrategyIPv6Only):
+-		return option.DomainStrategy(C.DomainStrategyPreferIPv6)
+-	}
+-	return strategy
++	return option.DomainStrategy(C.DomainStrategyAsIS)
+ }
+ 
+ // shouldEnableIPv6 says whether the local listeners also bind IPv6: whenever the host has it. The
+-- 
+2.55.0.windows.3
+
