@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/chain/model/chain_enum.dart';
+import 'package:hiddify/features/chain/overview/chain_look.dart';
 import 'package:hiddify/features/chain/overview/chain_mode_icon.dart';
 import 'package:hiddify/features/chain/overview/chain_mode_menu.dart';
 import 'package:hiddify/features/common/custom_text_scroll.dart';
@@ -21,23 +22,24 @@ class ChainModeButton extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final theme = Theme.of(context);
     final isDisable = type.isDisable(ref.watch(ConfigOptions.chainStatus));
     final mode = switch (type) {
       ChainType.extraSecurity => ref.watch(ConfigOptions.extraSecurityMode),
       ChainType.unblocker => ref.watch(ConfigOptions.unblockerMode),
     };
-    final bColor = isDisable ? theme.colorScheme.secondaryContainer : theme.colorScheme.primaryContainer;
-    final fColor = isDisable ? theme.colorScheme.onSecondaryContainer : theme.colorScheme.onPrimaryContainer;
+    final fColor = isDisable ? ChainLook.soft(context) : ChainLook.ink(context);
     return ChainModeMenu(
       (context, toggleVisibility, child) => Material(
-        color: bColor,
-        borderRadius: BorderRadius.circular(100),
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: isDisable ? ChainLook.line(context) : ChainLook.accent, width: 1.5),
+        ),
         child: InkWell(
           onTap: toggleVisibility,
-          borderRadius: BorderRadius.circular(100),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            height: 32,
+            height: 34,
             padding: const EdgeInsetsDirectional.only(start: 12, end: 8),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -49,7 +51,7 @@ class ChainModeButton extends HookConsumerWidget {
                 Flexible(
                   child: CustomTextScroll(
                     isDisable ? t.common.disable : mode.present(t),
-                    style: theme.textTheme.labelMedium?.copyWith(color: fColor),
+                    style: ChainLook.mono(12.5, fColor, weight: FontWeight.w700, spacing: .8),
                   ),
                 ),
                 const Gap(4),

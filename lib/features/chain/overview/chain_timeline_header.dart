@@ -3,6 +3,7 @@ import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/chain/model/chain_enum.dart';
+import 'package:hiddify/features/chain/overview/chain_look.dart';
 import 'package:hiddify/features/chain/overview/chain_mode_button.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -17,25 +18,34 @@ class ChainTimelineHeader extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
 
+    final chain = ref.watch(ConfigOptions.chainStatus);
+    // the step that is on has a lit dot; the others a grey one
+    final on = switch (level) {
+      ChainTimelineLevel.extraSecurity => chain.isExtraSecurity(),
+      ChainTimelineLevel.unblocker => chain.isUnblocker(),
+      _ => true,
+    };
     return Container(
       margin: const EdgeInsetsDirectional.only(end: 16),
-      height: 32,
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? theme.colorScheme.surfaceContainerHighest
-            : Colors.black12,
-        borderRadius: const BorderRadiusDirectional.only(topEnd: Radius.circular(100), bottomEnd: Radius.circular(100)),
-      ),
+      height: 44,
+      padding: const EdgeInsetsDirectional.only(start: 4),
       child: Row(
         children: [
-          const Gap(4),
-          SizedBox(child: Icon(level.icon(), size: 20, color: theme.colorScheme.onSurfaceVariant)),
-          const Gap(12),
+          Container(
+            width: 14,
+            height: 14,
+            margin: const EdgeInsetsDirectional.only(start: 3),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: on ? ChainLook.accent : ChainLook.line(context)),
+          ),
+          const Gap(14),
+          Icon(level.icon(), size: 18, color: ChainLook.soft(context)),
+          const Gap(10),
           Expanded(
             child: Text(
-              level.present(t).title,
-              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
+              level.present(t).title.toUpperCase(),
+              style: ChainLook.mono(14, ChainLook.ink(context), weight: FontWeight.w700, spacing: 1.6),
               maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const Gap(12),
@@ -48,7 +58,7 @@ class ChainTimelineHeader extends HookConsumerWidget {
                 : 0,
             child: Text(
               t.pages.settings.chain.finalIp,
-              style: theme.textTheme.labelMedium?.copyWith(color: ChainConst.finalIpColor(theme)),
+              style: ChainLook.mono(12, ChainConst.finalIpColor(theme), weight: FontWeight.w700, spacing: 1),
               maxLines: 1,
             ),
           ),
