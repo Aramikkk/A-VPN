@@ -180,7 +180,7 @@ class _DotsStats extends HookConsumerWidget {
             for (final row in [
               ('↓ ${t.avpn.superLightDown}', '${down.$1} ${down.$2}'),
               ('↑ ${t.avpn.superLightUp}', '${up.$1} ${up.$2}'),
-              ('VPN / ${t.avpn.connDirect}', '${vpn.$1} / ${direct.$1} ${direct.$2}'),
+              ('VPN / ${t.avpn.connDirect}', '${vpn.$1} ${vpn.$2} / ${direct.$1} ${direct.$2}'),
             ])
               GestureDetector(
                 behavior: HitTestBehavior.opaque,

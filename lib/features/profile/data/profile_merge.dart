@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:hiddify/features/profile/data/country_names.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:path/path.dart' as p;
@@ -176,7 +177,7 @@ abstract class ProfileMerge {
         return entry.key[0].toUpperCase() + entry.key.substring(1);
       }
     }
-    return code;
+    return countryNamesRu[code] ?? code;
   }
 
   /// The flag emoji of a country code (or of a list key).

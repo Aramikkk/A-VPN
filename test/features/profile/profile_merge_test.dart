@@ -132,6 +132,10 @@ void _countryTests() {
     expect(ProfileMerge.countryName('SE'), 'Швеция');
     expect(ProfileMerge.flag('SE'), '🇸🇪');
     expect(ProfileMerge.countryName('SE:bs'), 'Швеция');
+    // a country the filter has no name for is named from the full list, and an unknown code stays as it is
+    expect(ProfileMerge.countryName('LU'), 'Люксембург');
+    expect(ProfileMerge.countryName('MT:bs'), 'Мальта');
+    expect(ProfileMerge.countryName('ZZ'), 'ZZ');
     expect(ProfileMerge.flag('SE:bs'), '🇸🇪');
     expect(ProfileMerge.isWhitelist('SE:bs'), isTrue);
     expect(ProfileMerge.isWhitelist('SE'), isFalse);
