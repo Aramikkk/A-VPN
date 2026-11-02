@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/native/ara_tools.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
@@ -467,9 +468,17 @@ class TrafficSankey extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     // the apps' icons by the name the picture gives them
+    // (an app the list gave no icon for: asked from the system by its package, and drawn when it comes)
+    final native = ref.watch(nativeIconsProvider);
+    final lacking = [
+      for (final c in items)
+        if (c.app.isNotEmpty && apps[c.app]?.icon == null && !native.containsKey(c.app) && !c.app.contains('.exe'))
+          c.app,
+    ];
+    if (lacking.isNotEmpty) Future.microtask(() => ref.read(nativeIconsProvider.notifier).want(lacking));
     final icons = <String, Uint8List>{
       for (final c in items)
-        if (apps[c.app]?.icon case final Uint8List icon)
+        if ((apps[c.app]?.icon ?? native[c.app]) case final Uint8List icon)
           (c.app.isEmpty ? t.avpn.connUnknownApp : connectionAppName(t, apps, c.app)): icon,
     };
     final flows = <SankeyFlow>[

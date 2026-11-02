@@ -16,6 +16,12 @@ part 'profiles_update_notifier.g.dart';
 typedef ProfileUpdateStatus = ({String name, bool success});
 
 @Riverpod(keepAlive: true)
+/// The profiles whose failure to update was last told (see above), kept over the runs.
+String? _toldFailure;
+
+/// When each profile was last asked to update, by its id (what it was, successful or not).
+final _lastTry = <String, DateTime>{};
+
 class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifier with AppLogger {
   static const prefKey = "profiles_update_check";
   static const interval = Duration(minutes: 15);
@@ -93,8 +99,14 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
           < 0 => null,
           _ => Duration(hours: hours),
         };
+        // a profile that failed is asked again only after its whole interval too (it was every 15 minutes: its last
+        // successful update stayed old)
+        final tried = _lastTry[profile.id];
+        final triedRecently =
+            tried != null && updateInterval != null && DateTime.now().difference(tried) < updateInterval;
         final shouldUpdate =
-            force || updateInterval != null && updateInterval <= DateTime.now().difference(profile.lastUpdate);
+            force ||
+            updateInterval != null && updateInterval <= DateTime.now().difference(profile.lastUpdate) && !triedRecently;
         if (!shouldUpdate) {
           loggy.debug(
             "skipping profile [${profile.id}] update. last successful update: [${profile.lastUpdate}] - interval: [${profile.options?.updateInterval}]",
@@ -108,6 +120,7 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
       // Sequential on purpose: validation and the active-profile reconnect share
       // one native core that is not safe to call concurrently (it can hang).
       for (final profile in toUpdate) {
+        _lastTry[profile.id] = DateTime.now();
         await ref.read(updateProfileNotifierProvider(profile.id).notifier).updateProfile(profile, isBulk: true);
         if (ref.read(updateProfileNotifierProvider(profile.id)).hasError) {
           failedNames.add(profile.name);
@@ -119,9 +132,14 @@ class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifie
       if (successCount > 0 || failedNames.isNotEmpty) {
         final t = ref.read(translationsProvider).requireValue;
         final notification = ref.read(inAppNotificationControllerProvider);
+        // a failure is told once: the same profiles failing at the next run (every 15 minutes) are not told again; told
+        // again only when the ones failing are others, or after all went well in between
+        final failing = ([...failedNames]..sort()).join('|');
         if (failedNames.isEmpty) {
-          // all updated: no toast (the profiles' rows show it), only a failure is told
-        } else {
+          // all updated: no toast (the profiles' rows show it)
+          _toldFailure = null;
+        } else if (failing != _toldFailure) {
+          _toldFailure = failing;
           notification.showErrorToast(
             t.pages.profiles.msg.update.bulkPartial(
               success: successCount,

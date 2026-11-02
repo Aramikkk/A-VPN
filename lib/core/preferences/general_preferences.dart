@@ -275,6 +275,10 @@ abstract class Preferences {
     mapTo: (value) => value.name,
   );
 
+  /// A-VPN: the public folder of Yandex Disk the program updates itself from (a latest.json and the APK in it): the
+  /// link, or empty
+  static final updateFolder = PreferencesNotifier.create<String, String>("update_folder", "");
+
   /// A-VPN: how the Dots ping block draws the answers (the menu of the big ping).
   static final pingGraph = PreferencesNotifier.create<PingGraph, String>(
     "ping_graph",

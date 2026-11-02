@@ -50,6 +50,7 @@ class MainActivity : FlutterFragmentActivity(), ServiceConnection.Callback {
         flutterEngine.plugins.add(NetworkTypeHandler())
         flutterEngine.plugins.add(AutoPauseHandler())
         flutterEngine.plugins.add(AppIconHandler())
+        flutterEngine.plugins.add(AraToolsHandler())
         flutterEngine.plugins.add(EventHandler())
         flutterEngine.plugins.add(LogHandler())
 //        flutterEngine.plugins.add(GroupsChannel(lifecycleScope))

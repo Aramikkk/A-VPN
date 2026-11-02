@@ -8,6 +8,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/widget/adaptive_icon.dart';
+import 'package:hiddify/features/app_update/widget/ara_update_tile.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -20,6 +21,8 @@ class AboutPage extends HookConsumerWidget {
     final appInfo = ref.watch(appInfoProvider).requireValue;
 
     final conditionalTiles = [
+      // the program's own update from the update folder (Android)
+      if (PlatformUtils.isAndroid) const AraUpdateTile(),
       // no update check: it would look at Hiddify's releases, and A-VPN's updates come from its own builds
       if (PlatformUtils.isDesktop)
         ListTile(
