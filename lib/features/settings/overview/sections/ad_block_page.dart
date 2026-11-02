@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart' show Status;
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Settings / Ad blocking (beta): ads, trackers and malware domains refused at the VPN's level for every app and
@@ -24,6 +28,7 @@ class AdBlockPage extends HookConsumerWidget {
     // the exceptions are for every section
     final on = adsOn || phishing || miners;
     final allow = ref.watch(ConfigOptions.adBlockAllow);
+    final ru = t.$meta.locale.languageCode == 'ru';
     final field = useTextEditingController();
 
     // the lists are in the config: the next connection has them, now when connected
@@ -79,6 +84,11 @@ class AdBlockPage extends HookConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
+          // the extra protection (WARP, Psiphon, another profile) and the way round blocks: its own page, with the state of
+          // the connection under the name
+          heading(ru ? 'Доп. защита' : 'Extra protection'),
+          const _ChainEntry(),
+          heading(t.avpn.adBlock),
           note(t.avpn.adBlockMsg),
           SwitchListTile.adaptive(
             secondary: const Icon(Icons.block_rounded),
@@ -170,6 +180,51 @@ class AdBlockPage extends HookConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// The row that opens the chain page (extra protection: WARP, Psiphon or another profile, and the unblocker): what is on,
+/// and while connected how the connection stands (the core says it for the server in use).
+class _ChainEntry extends ConsumerWidget {
+  const _ChainEntry();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ru = ref.watch(translationsProvider).requireValue.$meta.locale.languageCode == 'ru';
+    final chain = ref.watch(ConfigOptions.chainStatus);
+    final mode = ref.watch(ConfigOptions.extraSecurityMode);
+    final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
+    final status = connected ? ref.watch(activeProxyNotifierProvider).valueOrNull?.status : null;
+    final what = switch (chain) {
+      ChainStatus.off => ru ? 'Выключена' : 'Off',
+      ChainStatus.extraSecurity => switch (mode) {
+        ChainMode.warp => 'WARP',
+        ChainMode.psiphon => 'Psiphon',
+        ChainMode.profile => ru ? 'Другой профиль' : 'Another profile',
+      },
+      ChainStatus.unblocker => ru ? 'Обход блокировок' : 'Unblocker',
+    };
+    final state = status == null || status == Status.READY || chain == ChainStatus.off
+        ? null
+        : switch (status) {
+            Status.CONNECTING => ru ? 'подключается…' : 'connecting…',
+            Status.RECONNECTING => ru ? 'переподключается…' : 'reconnecting…',
+            Status.SEARCHING => ru ? 'ищет сервер…' : 'searching…',
+            Status.REGISTERING => ru ? 'регистрируется…' : 'registering…',
+            Status.FAILED => ru ? 'не удалось подключиться' : 'failed',
+            _ => null,
+          };
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: const Icon(Icons.shield_moon_outlined),
+      title: Text(ru ? 'WARP, Psiphon, цепочка' : 'WARP, Psiphon, chain'),
+      subtitle: Text(
+        state == null ? what : '$what · $state',
+        style: TextStyle(color: status == Status.FAILED ? scheme.error : null),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => context.pushNamed('chainOptions'),
     );
   }
 }
