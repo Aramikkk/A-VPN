@@ -430,6 +430,7 @@
     "sankeyServers": "Серверы",
     "sankeyShare": "$share% потока · соединений: $count",
     "topoSankeyEmpty": "Сейчас нет открытых соединений",
+    "topoSankeySmall": "Пока нет потоков крупнее 100 КБ",
     "topoDayTitle": "Всего с 03:00",
     "topoDayDetail": "VPN $vpn · напрямую $direct",
     "topoDayGap": "В разбивке ниже учтено $listed: соединения короче 2 секунд и то, что было, пока приложение было закрыто, в неё не попали",

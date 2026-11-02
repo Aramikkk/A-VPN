@@ -142,7 +142,7 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
           .upsertRemote(profile.url)
           .match(
             (err) {
-              loggy.warning("failed to update profile", err);
+              loggy.warning("failed to update profile: $err", err);
               throw err;
             },
             (_) async {

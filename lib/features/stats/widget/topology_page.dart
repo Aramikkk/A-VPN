@@ -212,6 +212,8 @@ class TopologyPage extends HookConsumerWidget {
                                       child: TrafficSankey(
                                         items: openNow,
                                         height: box.maxHeight,
+                                        // counted: the size of a step is one connection, and no 100 KB cut
+                                        unit: byTraffic.value ? 20480 : 1,
                                         // who goes where, as thick as every other route and in a fixed order; the traffic and
                                         // the speed are written
                                         weight: (c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble(),

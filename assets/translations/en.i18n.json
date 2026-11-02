@@ -430,6 +430,7 @@
     "sankeyServers": "Servers",
     "sankeyShare": "$share% of the flow · connections: $count",
     "topoSankeyEmpty": "No open connections right now",
+    "topoSankeySmall": "No flows over 100 KB yet",
     "topoDayTitle": "Total since 03:00",
     "topoDayDetail": "VPN $vpn · direct $direct",
     "topoDayGap": "The breakdown below holds $listed: connections shorter than 2 seconds and those while the app was closed aren't in it",

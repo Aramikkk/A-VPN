@@ -248,7 +248,8 @@ Future<void> _toggleConnection(WidgetRef ref) async {
   // the loss of the last five minutes (100 probes), not of the whole connection: one lost probe early on would stay in
   // the figure for as long as the VPN is up
   final summary = summarize(session.length > 100 ? session.sublist(session.length - 100) : session);
-  return (ping: on ? summary.ping : null, loss: summary.loss ?? 0);
+  // under a minute of probes (20) one lost probe is a fifth of them: the figure waits, as after a restart it read 20%
+  return (ping: on ? summary.ping : null, loss: session.length < 20 ? 0 : summary.loss ?? 0);
 }
 
 String _lossText(double loss) => loss == 0 ? '0%' : '${loss.toStringAsFixed(loss < 10 ? 1 : 0)}%';
