@@ -277,6 +277,9 @@ abstract class Preferences {
 
   /// A-VPN: the public folder of Yandex Disk the program updates itself from (a latest.json and the APK in it): the
   /// link, or empty
+  /// The newest crash report the user was offered, by name, so each crash is offered once.
+  static final lastSeenCrashReport = PreferencesNotifier.create<String, String>("last_seen_crash_report", "");
+
   static final updateFolder = PreferencesNotifier.create<String, String>(
     "update_folder",
     "https://disk.yandex.ru/d/REPLACED",

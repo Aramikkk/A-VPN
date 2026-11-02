@@ -1,5 +1,6 @@
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/app_update/auto_update.dart';
+import 'package:hiddify/features/crash_report/notifier/crash_report_notifier.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
@@ -120,6 +121,14 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
       );
       return timer.cancel;
     }, [prefsReady]);
+
+    // a crash in the previous run is offered for sending once the first frame is up
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(crashReportNotifierProvider.notifier).checkOnStart();
+      });
+      return null;
+    }, const []);
 
     // updating ActiveBreakpointNotifier value
     useEffect(() {

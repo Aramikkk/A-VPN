@@ -245,7 +245,9 @@ Future<void> _toggleConnection(WidgetRef ref) async {
   final samples = ref.watch(connectionQualityProvider);
   final quality = ref.read(connectionQualityProvider.notifier);
   final session = samples.sublist(samples.length - math.min(quality.sinceConnect, samples.length));
-  final summary = summarize(session);
+  // the loss of the last five minutes (100 probes), not of the whole connection: one lost probe early on would stay in
+  // the figure for as long as the VPN is up
+  final summary = summarize(session.length > 100 ? session.sublist(session.length - 100) : session);
   return (ping: on ? summary.ping : null, loss: summary.loss ?? 0);
 }
 

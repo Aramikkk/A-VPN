@@ -259,8 +259,10 @@ class ConnectionQuality extends Notifier<List<int?>> {
       final response = await request.close().timeout(timeout);
       await response.drain<void>();
       ms = watch.elapsedMilliseconds;
-    } catch (_) {
+    } catch (e) {
       ms = null; // lost
+      // what a lost probe was, so the log says why the loss is not zero (a timeout or an error of the connection)
+      _logger.warning('probe lost after ${watch.elapsedMilliseconds} ms: ${e.runtimeType}: $e');
     }
     if (!identical(client, _client)) return; // disposed meanwhile
     final now = DateTime.now();

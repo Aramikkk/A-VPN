@@ -26,6 +26,7 @@ import 'package:hiddify/features/common/qr_code_dialog.dart';
 import 'package:hiddify/features/common/qr_code_scanner_screen.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/features/crash_report/widget/crash_report_dialog.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -101,6 +102,10 @@ class DialogNotifier extends _$DialogNotifier {
     required bool canIgnore,
   }) async {
     return await _show<void>(NewVersionDialog(currentVersion, newVersion, canIgnore: canIgnore));
+  }
+
+  Future<void> showCrashReport() async {
+    return await _show<void>(const CrashReportDialog());
   }
 
   Future<bool> showConfirmation({

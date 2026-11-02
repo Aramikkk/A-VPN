@@ -667,6 +667,8 @@
       "coreLogLevel": "Core level",
       "coreLogLevelMsg": "Takes effect after reconnecting",
       "buffer": "Buffer",
+      "diagnostics": "Diagnostics report",
+      "diagnosticsMsg": "Crash reports, logs and your settings without servers or passwords, as one zip",
       "daysLog": "Log of the last 3 days",
       "daysLogMsg": "What the app and the core wrote in the last three days, in one file"
     },
@@ -1135,6 +1137,11 @@
     }
   },
   "dialogs": {
+    "crashReport": {
+      "title": "A-VPN crashed last time",
+      "msg": "Send a report to the developer so this gets fixed? It holds the crash details, the logs and your configuration with servers, keys and passwords removed, as one zip file you can look at before sending.",
+      "send": "Send report"
+    },
     "sortProfiles": {
       "title": "Sort by",
       "sort": {

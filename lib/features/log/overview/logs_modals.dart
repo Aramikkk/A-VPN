@@ -11,6 +11,7 @@ import 'package:hiddify/core/logger/ring/log_ring.dart';
 import 'package:hiddify/core/logger/sinks/file_sink.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
+import 'package:hiddify/features/crash_report/widget/crash_report_dialog.dart';
 import 'package:hiddify/features/log/data/log_data_providers.dart';
 import 'package:hiddify/features/log/data/log_path_resolver.dart';
 import 'package:hiddify/features/log/overview/logs_overview_notifier.dart';
@@ -75,9 +76,20 @@ class LogsShareModal extends ConsumerWidget {
                 await out.writeAsString(
                   [for (final f in days) '==== ${f.uri.pathSegments.last} ====\n${await f.readAsString()}'].join('\n'),
                 );
-                await _saveFileAs(out, t: t, notifications: notifications);
+                await saveFileAs(out, t: t, notifications: notifications);
               },
             ),
+          // everything at once, as the crash dialog sends it: reports, logs, goroutines and the config without servers or
+          // secrets
+          ListTile(
+            leading: const Icon(FluentIcons.folder_zip_20_regular),
+            title: Text(t.pages.logs.diagnostics),
+            subtitle: Text(t.pages.logs.diagnosticsMsg),
+            onTap: () async {
+              Navigator.of(context).pop();
+              await shareDiagnostics(ref);
+            },
+          ),
           for (final (title, subtitle, file) in files)
             ListTile(
               leading: const Icon(FluentIcons.document_20_regular),
@@ -85,7 +97,7 @@ class LogsShareModal extends ConsumerWidget {
               subtitle: Text(subtitle),
               onTap: () async {
                 Navigator.of(context).pop();
-                await _saveFileAs(file, t: t, notifications: notifications);
+                await saveFileAs(file, t: t, notifications: notifications);
               },
             ),
         ],
@@ -218,12 +230,12 @@ Future<void> _exportLines(
   final target = paths.appExportFile();
 
   await writeLinesToFile(target.path, records.map(formatRecord));
-  await _saveFileAs(target, t: t, notifications: notifications);
+  await saveFileAs(target, t: t, notifications: notifications);
 }
 
 /// Desktop gets a save dialog; a phone gets the share sheet, which is what
 /// "save this somewhere" means there.
-Future<void> _saveFileAs(
+Future<void> saveFileAs(
   File source, {
   required Translations t,
   required InAppNotificationController notifications,
