@@ -774,10 +774,10 @@ class _SankeyDiagramState extends State<SankeyDiagram> with SingleTickerProvider
     if (mounted) setState(() => _lit = const {});
   }
 
-  void _tap(Offset at, double width, double height) {
+  void _tap(Offset position, double width, double height) {
     final geometry = SankeyGeometry(width, stepped: widget.stepped);
     _model.layout(height - SankeyGeometry.headerH);
-    at = at.translate(0, -SankeyGeometry.headerH);
+    final at = position.translate(0, -SankeyGeometry.headerH);
     for (final n in _model.columns.expand((c) => c)) {
       if (geometry.hit(n, width).contains(at)) {
         unawaited(_select(SankeySelection(title: n.label, route: n.route, flows: n.flows, total: _realTotal)));

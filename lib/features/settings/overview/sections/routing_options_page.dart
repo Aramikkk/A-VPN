@@ -347,7 +347,6 @@ class _AppListRow extends ConsumerWidget {
     }
     final logoApps = apps.take(_maxLogos).toList();
     // decoded at the screen's density, so the logos stay sharp
-    final logoPx = (24 * MediaQuery.devicePixelRatioOf(context)).round();
     return row(
       // each logo fills its place when it loads; the text is final already
       leading: _LogoStack(

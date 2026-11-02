@@ -24,7 +24,6 @@ class AppListShareModal extends ConsumerWidget {
     final region = ref.watch(ConfigOptions.region);
     final mode = ref.watch(Preferences.perAppProxyMode);
     // decoded at the screen's density, so the icons stay sharp
-    final iconPx = (32 * MediaQuery.devicePixelRatioOf(context)).round();
 
     Widget section(String title, List<String> pkgs) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,

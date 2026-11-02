@@ -60,7 +60,9 @@ void main() {
         ],
         child: MaterialApp(
           theme: dark ? ThemeData.dark() : ThemeData.light(),
-          home: const Scaffold(body: Center(child: SingleChildScrollView(child: UpdateCard()))),
+          home: const Scaffold(
+            body: Center(child: SingleChildScrollView(child: UpdateCard())),
+          ),
         ),
       ),
     );
@@ -90,7 +92,10 @@ void main() {
   });
 
   testWidgets('the download shows the share, the size and that it goes on in the background', (tester) async {
-    await show(tester, const UpdateState(phase: UpdatePhase.downloading, info: info, progress: .62, speed: 3.2 * 1024 * 1024));
+    await show(
+      tester,
+      const UpdateState(phase: UpdatePhase.downloading, info: info, progress: .62, speed: 3.2 * 1024 * 1024),
+    );
     expect(find.text('62%'), findsOneWidget);
     expect(find.textContaining('МБ'), findsWidgets);
     expect(find.textContaining('загрузка продолжится'), findsOneWidget);

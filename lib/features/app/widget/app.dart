@@ -116,7 +116,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
       if (!PlatformUtils.isAndroid || !prefsReady) return null;
       final timer = startAutoUpdate(
         ref,
-        ru: () => locale.flutterLocale?.languageCode == 'ru',
+        ru: () => locale.flutterLocale.languageCode == 'ru',
         tell: (message) => ref.read(inAppNotificationControllerProvider).showInfoToast(message),
       );
       return timer.cancel;

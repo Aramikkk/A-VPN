@@ -19,7 +19,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'rules_notifier.g.dart';
 
-const _geoUrl = 'https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set';
 
 /// Rules the app ships with, in the order a new list starts with. They are always in the list: the user can
 /// only switch and move them, and their content comes from here, so an update can change it.

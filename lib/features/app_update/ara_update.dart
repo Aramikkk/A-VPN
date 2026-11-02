@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:hiddify/core/native/ara_tools.dart';
 import 'package:path_provider/path_provider.dart';
@@ -13,6 +14,7 @@ class AraUpdateInfo {
     required this.apk,
     required this.size,
     required this.notes,
+    this.sha256 = '',
   });
 
   factory AraUpdateInfo.fromJson(Map<String, dynamic> json) => AraUpdateInfo(
@@ -21,6 +23,7 @@ class AraUpdateInfo {
     apk: json['apk'] as String,
     size: (json['size'] as num?)?.toInt() ?? 0,
     notes: (json['notes'] as String?) ?? '',
+    sha256: ((json['sha256'] as String?) ?? '').trim().toLowerCase(),
   );
 
   /// "1.1.13"
@@ -37,6 +40,9 @@ class AraUpdateInfo {
 
   /// what is new, as written in the changelog
   final String notes;
+
+  /// the APK's SHA-256 (hex; empty: not said, as in the builds before it was added)
+  final String sha256;
 
   bool isNewerThan(int installedBuild) => build > installedBuild;
 }
@@ -104,7 +110,17 @@ abstract class AraUpdate {
       file.deleteSync();
       throw const FormatException('the file came incomplete');
     }
+    if (!matchesSha256(file, info.sha256)) {
+      file.deleteSync();
+      throw const FormatException('the file is not the one that was published');
+    }
     return file;
+  }
+
+  /// Whether [file] has the SHA-256 [expected] (hex); true when none is expected.
+  static bool matchesSha256(File file, String expected) {
+    if (expected.isEmpty) return true;
+    return sha256.convert(file.readAsBytesSync()).toString() == expected.trim().toLowerCase();
   }
 
   /// Hands the downloaded APK to the installer: "ok", "permission" (the page for allowing it opened) or "error".

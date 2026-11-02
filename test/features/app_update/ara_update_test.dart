@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/app_update/ara_update.dart';
 
@@ -22,5 +24,25 @@ void main() {
     final info = AraUpdateInfo.fromJson({'version': '1.0.0', 'build': 1, 'apk': 'a.apk'});
     expect(info.size, 0);
     expect(info.notes, '');
+  });
+
+  test('the published SHA-256 is read, and a file is checked against it', () {
+    final info = AraUpdateInfo.fromJson({
+      'version': '1.1.23',
+      'build': 60123,
+      'apk': 'a.apk',
+      'sha256': ' B5BB9D8014A0F9B1D61E21E796D78DCCDF1352F23CD32812F4850B878AE4944C ',
+    });
+    expect(info.sha256, 'b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c');
+    final file = File('${Directory.systemTemp.path}/ara_sha_test.bin')..writeAsBytesSync([0x61, 0x62, 0x63]);
+    addTearDown(file.deleteSync);
+    // SHA-256 of "abc"
+    const abc = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+    expect(AraUpdate.matchesSha256(file, abc), isTrue);
+    expect(AraUpdate.matchesSha256(file, abc.toUpperCase()), isTrue);
+    expect(AraUpdate.matchesSha256(file, info.sha256), isFalse);
+    // builds published before the hash was added say none: not refused
+    expect(AraUpdate.matchesSha256(file, ''), isTrue);
+    expect(AraUpdateInfo.fromJson({'version': '1', 'build': 1, 'apk': 'a'}).sha256, '');
   });
 }
