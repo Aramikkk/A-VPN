@@ -1,0 +1,222 @@
+From 5968e2455744526abd4c31abd8734b9866814f77 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 13:59:22 +0300
+Subject: [PATCH 01/26] A-VPN core patches
+
+Keep route rules from the start config ahead of the built-in ones (home
+WireGuard network, Server mode), and expose the URL test timeout as
+url-test-timeout.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ hiddify-sing-box                    |   2 +-
+ v2/config/builder.go                |  18 ++++
+ v2/config/hiddify_option.go         |   2 +
+ v2/config/input_route_rules_test.go | 135 ++++++++++++++++++++++++++++
+ 4 files changed, 156 insertions(+), 1 deletion(-)
+ create mode 100644 v2/config/input_route_rules_test.go
+
+diff --git a/hiddify-sing-box b/hiddify-sing-box
+index 004371d..f685aa9 160000
+--- a/hiddify-sing-box
++++ b/hiddify-sing-box
+@@ -1 +1 @@
+-Subproject commit 004371d6be2395ee4379054a8cf113f339dbe231
++Subproject commit f685aa92f63b751e0879227efc698a45f76b9ced
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 5e449ab..3bf2224 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -92,10 +92,27 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 	if err := setRoutingOptions(&options, hopts); err != nil {
+ 		return nil, err
+ 	}
++	prependInputRouteRules(&options, input)
+ 
+ 	return &options, nil
+ }
+ 
++// prependInputRouteRules keeps the route rules written into the config the app starts the core with (A-VPN
++// adds one that sends a home network to a WireGuard endpoint it adds alongside). Parsed provider profiles
++// carry no route rules, so only those reach here. They go right after sniffing and DNS hijacking, before
++// every built-in and app rule, so a home network isn't sent direct as a private range first.
++func prependInputRouteRules(options *option.Options, input *option.Options) {
++	if input == nil || input.Route == nil || len(input.Route.Rules) == 0 || options.Route == nil {
++		return
++	}
++	head := min(2, len(options.Route.Rules))
++	rules := make([]option.Rule, 0, len(options.Route.Rules)+len(input.Route.Rules))
++	rules = append(rules, options.Route.Rules[:head]...)
++	rules = append(rules, input.Route.Rules...)
++	rules = append(rules, options.Route.Rules[head:]...)
++	options.Route.Rules = rules
++}
++
+ // dialDetour maps the built-in empty direct outbounds to "" (dial directly),
+ // since sing-box rejects a detour to an empty direct outbound.
+ func dialDetour(tag string) string {
+@@ -387,6 +404,7 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
+ 				IpInfoURL:      hopt.IpInfoUrl,
+ 				Interval:       badoption.Duration(hopt.URLTestInterval.Duration()),
+ 				DebounceWindow: badoption.Duration(time.Millisecond * 500),
++				URLTestTimeout: badoption.Duration(hopt.URLTestTimeout.Duration()),
+ 				IdleTimeout:    badoption.Duration(hopt.URLTestInterval.Duration().Nanoseconds() * 3),
+ 			},
+ 		}
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index c2bd23c..d8d86e3 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -71,6 +71,8 @@ type URLTestOptions struct {
+ 	URLTestInterval    DurationInSeconds `json:"url-test-interval,omitempty" overridable:"true"`
+ 	// Custom IP geolocation endpoint (subscription `ipinfo-url`); ipapi.co-compatible JSON.
+ 	IpInfoUrl string `json:"ipinfo-url,omitempty" overridable:"true"`
++	// A-VPN: how long one server's test may take before it counts as unreachable (0 = the core's 5 s)
++	URLTestTimeout DurationInSeconds `json:"url-test-timeout,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+ 
+diff --git a/v2/config/input_route_rules_test.go b/v2/config/input_route_rules_test.go
+new file mode 100644
+index 0000000..b6d23a8
+--- /dev/null
++++ b/v2/config/input_route_rules_test.go
+@@ -0,0 +1,135 @@
++package config
++
++import (
++	"strings"
++	"testing"
++	"time"
++
++	C "github.com/sagernet/sing-box/constant"
++	"github.com/sagernet/sing-box/experimental/libbox"
++	"github.com/sagernet/sing-box/option"
++)
++
++// A start config as A-VPN writes it: the provider's servers, a WireGuard endpoint for the home network,
++// and a rule sending the home network to that endpoint.
++const homeNetworkProfile = `{
++  "outbounds": [{"type": "socks", "tag": "proxy-a", "server": "127.0.0.1", "server_port": 1080}],
++  "endpoints": [{"type": "wireguard", "tag": "home §hide§", "address": ["192.168.99.198/32"],
++    "private_key": "YNZ1j9cQaXg0yRtj3yJ8gBf7JbXg5mJcVZ5D2P5m+3E=",
++    "peers": [{"address": "203.0.113.1", "port": 8443,
++      "public_key": "yR/S2c+QvLGTFCec7QyO02tzJq6XduLOrcDZsJ66JCw=",
++      "allowed_ips": ["192.168.1.0/24", "192.168.88.1/32"],
++      "persistent_keepalive_interval": 300}]}],
++  "route": {"rules": [{"ip_cidr": ["192.168.1.0/24", "192.168.88.1/32"], "action": "route", "outbound": "home §hide§"}]}
++}`
++
++func TestHomeNetworkRuleSurvivesBuild(t *testing.T) {
++	options, err := BuildConfig(libbox.BaseContext(nil), DefaultHiddifyOptions(), &ReadOptions{Content: homeNetworkProfile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the config: %v", err)
++	}
++
++	rules := options.Route.Rules
++	if len(rules) < 3 {
++		t.Fatalf("too few rules: %d", len(rules))
++	}
++	if rules[0].DefaultOptions.Action != C.RuleActionTypeSniff || rules[1].DefaultOptions.Action != C.RuleActionTypeHijackDNS {
++		t.Fatalf("sniff and DNS hijack must stay first")
++	}
++	home := rules[2].DefaultOptions
++	if home.RouteOptions.Outbound != "home §hide§" || len(home.IPCIDR) != 2 {
++		t.Fatalf("the home rule must come right after them, got %+v", home)
++	}
++
++	found := false
++	for _, endpoint := range options.Endpoints {
++		if endpoint.Tag == "home §hide§" {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatalf("the WireGuard endpoint is missing from the built config")
++	}
++	for _, outbound := range options.Outbounds {
++		if outbound.Type == C.TypeSelector {
++			for _, tag := range outbound.Options.(*option.SelectorOutboundOptions).Outbounds {
++				if tag == "home §hide§" {
++					t.Fatalf("the home endpoint must stay out of the server selector")
++				}
++			}
++		}
++	}
++}
++
++func TestNoInputRulesLeavesBuiltinsAlone(t *testing.T) {
++	options := &option.Options{Route: &option.RouteOptions{Rules: []option.Rule{{Type: C.RuleTypeDefault}}}}
++	prependInputRouteRules(options, &option.Options{})
++	if len(options.Route.Rules) != 1 {
++		t.Fatalf("rules changed without input rules: %d", len(options.Route.Rules))
++	}
++}
++
++// On mobile data A-VPN sends the home WireGuard through the server selector (an "LTE Only" server passes the
++// operator's whitelist where the home server's address doesn't).
++func TestHomeNetworkThroughSelector(t *testing.T) {
++	profile := strings.Replace(homeNetworkProfile, `"address": ["192.168.99.198/32"],`,
++		`"address": ["192.168.99.198/32"], "detour": "select",`, 1)
++	options, err := BuildConfig(libbox.BaseContext(nil), DefaultHiddifyOptions(), &ReadOptions{Content: profile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects a WireGuard endpoint detoured through the selector: %v", err)
++	}
++	for _, endpoint := range options.Endpoints {
++		if endpoint.Tag != "home §hide§" {
++			continue
++		}
++		wg := endpoint.Options.(*option.WireGuardEndpointOptions)
++		if wg.Detour != "select" {
++			t.Fatalf("detour lost: %q", wg.Detour)
++		}
++		if wg.MTU == 0 || wg.MTU > 1280 {
++			t.Fatalf("a detoured WireGuard needs the smaller MTU, got %d", wg.MTU)
++		}
++		return
++	}
++	t.Fatalf("home endpoint missing")
++}
++
++// A-VPN's "Server" mode: the home network through WireGuard, every other connection direct, so the provider's
++// servers carry nothing.
++func TestServerModeSendsEverythingElseDirect(t *testing.T) {
++	profile := strings.Replace(homeNetworkProfile,
++		`"route": {"rules": [{"ip_cidr": ["192.168.1.0/24", "192.168.88.1/32"], "action": "route", "outbound": "home §hide§"}]}`,
++		`"route": {"rules": [{"ip_cidr": ["192.168.1.0/24", "192.168.88.1/32"], "action": "route", "outbound": "home §hide§"},
++		  {"network": ["tcp", "udp"], "action": "route", "outbound": "direct §hide§"}]}`, 1)
++	options, err := BuildConfig(libbox.BaseContext(nil), DefaultHiddifyOptions(), &ReadOptions{Content: profile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the server-mode config: %v", err)
++	}
++	direct := options.Route.Rules[3].DefaultOptions
++	if direct.RouteOptions.Outbound != OutboundDirectTag || len(direct.Network) != 2 {
++		t.Fatalf("the catch-all direct rule must follow the home rule, got %+v", direct)
++	}
++}
++
++
++// A-VPN's ping timeout setting reaches the core's server monitoring.
++func TestURLTestTimeoutReachesMonitoring(t *testing.T) {
++	hopt := DefaultHiddifyOptions()
++	hopt.URLTestTimeout = 3
++	options, err := BuildConfig(libbox.BaseContext(nil), hopt, &ReadOptions{Content: homeNetworkProfile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if got := options.Experimental.Monitoring.URLTestTimeout.Build(); got != 3*time.Second {
++		t.Fatalf("url test timeout = %v, want 3s", got)
++	}
++}
+-- 
+2.55.0.windows.3
+

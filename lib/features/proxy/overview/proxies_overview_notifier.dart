@@ -10,9 +10,11 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
+import 'package:hiddify/features/proxy/data/proxy_repository.dart';
 import 'package:hiddify/features/proxy/model/proxy_failure.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/hiddifycore/init_signal.dart';
 
 import 'package:hiddify/utils/riverpod_utils.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -63,6 +65,9 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
   Stream<OutboundGroup?> build() {
     ref.disposeDelay(const Duration(seconds: 15));
     final serviceRunning = ref.watch(serviceRunningProvider);
+    // set up again on a new gRPC channel when the app comes back from the background: the stream below lived on the
+    // old one
+    ref.watch(coreRestartSignalProvider);
     if (!serviceRunning) {
       return Stream.error(const ServiceNotRunning());
     }
@@ -84,16 +89,44 @@ class ProxiesOverviewNotifier extends _$ProxiesOverviewNotifier with AppLogger {
     //       ),
     //     )
     //     .asyncMap((proxies) async => _sortOutbounds(proxies, sortBy));
-    return ref
-        .watch(proxyRepositoryProvider)
-        .watchProxies()
-        .map(
-          (event) => event.getOrElse((err) {
+    ref.onDispose(() => _reopenTimer?.cancel());
+    return _watchProxies(ref.watch(proxyRepositoryProvider), sortBy);
+  }
+
+  Timer? _reopenTimer;
+
+  /// A pause that the provider's disposal cancels: a plain Future.delayed would outlive it.
+  Future<void> _pause(Duration duration) {
+    final done = Completer<void>();
+    _reopenTimer = Timer(duration, done.complete);
+    return done.future;
+  }
+
+  /// The proxies, kept alive: a failed stream used to become an error the page showed as "Unexpected error" while the
+  /// tunnel worked. The failure is logged, the last list stays, and an ended stream is opened again after 2 s, then
+  /// twice as long up to 30 s while it keeps failing.
+  Stream<OutboundGroup?> _watchProxies(ProxyRepository repo, ProxiesSort sortBy) async* {
+    const shortest = Duration(seconds: 2);
+    const longest = Duration(seconds: 30);
+    var wait = shortest;
+    while (true) {
+      try {
+        await for (final event in repo.watchProxies()) {
+          final proxies = event.fold((err) {
             loggy.warning("error receiving proxies", err);
-            throw err;
-          }),
-        )
-        .asyncMap((proxies) async => await _sortOutbounds(proxies, sortBy));
+            return null;
+          }, (value) => (value,));
+          if (proxies == null) continue;
+          wait = shortest;
+          yield await _sortOutbounds(proxies.$1, sortBy);
+        }
+      } catch (e) {
+        loggy.debug("proxies stream failed: $e");
+      }
+      loggy.debug("proxies stream ended, opening it again in ${wait.inSeconds} s");
+      await _pause(wait);
+      wait = wait * 2 > longest ? longest : wait * 2;
+    }
   }
 
   // Future<List<OutboundGroup>> _sortOutbounds(

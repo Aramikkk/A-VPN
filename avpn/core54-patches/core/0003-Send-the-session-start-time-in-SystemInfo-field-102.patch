@@ -1,0 +1,96 @@
+From a92bfcdac9c57ec7eeaa1cdfae54c80b1f020942 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 17:02:55 +0300
+Subject: [PATCH 03/26] Send the session start time in SystemInfo (field 102)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/hcore/commands.go         |  2 +-
+ v2/hcore/vpn_traffic.go      | 11 +++++++++--
+ v2/hcore/vpn_traffic_test.go |  6 ++++--
+ 3 files changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/v2/hcore/commands.go b/v2/hcore/commands.go
+index 447c19e..907b75f 100644
+--- a/v2/hcore/commands.go
++++ b/v2/hcore/commands.go
+@@ -41,7 +41,7 @@ func (h *HiddifyInstance) readStatus(prev *SystemInfo) *SystemInfo {
+ 			message.Downlink = message.DownlinkTotal - prev.DownlinkTotal
+ 		}
+ 		vpnUp, vpnDown := h.vpnTraffic()
+-		withVpnTraffic(&message, vpnUp, vpnDown)
++		withVpnTraffic(&message, vpnUp, vpnDown, ss.StartedAt())
+ 		if box := h.Box(); box != nil {
+ 			current := ""
+ 			if currentOutBound, ok := box.Outbound().Outbound(config.OutboundSelectTag); ok {
+diff --git a/v2/hcore/vpn_traffic.go b/v2/hcore/vpn_traffic.go
+index 252e7f5..f1835a5 100644
+--- a/v2/hcore/vpn_traffic.go
++++ b/v2/hcore/vpn_traffic.go
+@@ -6,6 +6,7 @@ package hcore
+ 
+ import (
+ 	"strings"
++	"time"
+ 
+ 	C "github.com/sagernet/sing-box/constant"
+ 	"google.golang.org/protobuf/encoding/protowire"
+@@ -14,6 +15,8 @@ import (
+ const (
+ 	vpnUplinkTotalField   protowire.Number = 100
+ 	vpnDownlinkTotalField protowire.Number = 101
++	// when the session started, Unix milliseconds (0 when stopped)
++	startedAtField protowire.Number = 102
+ )
+ 
+ // isProviderServer reports whether traffic credited to an outbound of this type and tag went through a VPN
+@@ -49,9 +52,13 @@ func (h *HiddifyInstance) vpnTraffic() (up, down int64) {
+ 	return up, down
+ }
+ 
+-// withVpnTraffic adds the VPN totals to message as fields the generated code doesn't know.
+-func withVpnTraffic(message *SystemInfo, up, down int64) {
++// withVpnTraffic adds the VPN totals and the session's start to message as fields the generated code doesn't know.
++func withVpnTraffic(message *SystemInfo, up, down int64, startedAt time.Time) {
+ 	var raw []byte
++	if !startedAt.IsZero() {
++		raw = protowire.AppendTag(raw, startedAtField, protowire.VarintType)
++		raw = protowire.AppendVarint(raw, uint64(startedAt.UnixMilli()))
++	}
+ 	raw = protowire.AppendTag(raw, vpnUplinkTotalField, protowire.VarintType)
+ 	raw = protowire.AppendVarint(raw, uint64(up))
+ 	raw = protowire.AppendTag(raw, vpnDownlinkTotalField, protowire.VarintType)
+diff --git a/v2/hcore/vpn_traffic_test.go b/v2/hcore/vpn_traffic_test.go
+index 3db448e..1ec6fe1 100644
+--- a/v2/hcore/vpn_traffic_test.go
++++ b/v2/hcore/vpn_traffic_test.go
+@@ -2,6 +2,7 @@ package hcore
+ 
+ import (
+ 	"testing"
++	"time"
+ 
+ 	"google.golang.org/protobuf/encoding/protowire"
+ 	"google.golang.org/protobuf/proto"
+@@ -9,7 +10,7 @@ import (
+ 
+ func TestVpnTrafficSurvivesTheWire(t *testing.T) {
+ 	message := &SystemInfo{UplinkTotal: 10, DownlinkTotal: 20}
+-	withVpnTraffic(message, 3, 7)
++	withVpnTraffic(message, 3, 7, time.UnixMilli(1700000000000))
+ 	raw, err := proto.Marshal(message)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -25,7 +26,8 @@ func TestVpnTrafficSurvivesTheWire(t *testing.T) {
+ 		raw = raw[m:]
+ 		got[num] = v
+ 	}
+-	if got[8] != 10 || got[9] != 20 || got[vpnUplinkTotalField] != 3 || got[vpnDownlinkTotalField] != 7 {
++	if got[8] != 10 || got[9] != 20 || got[vpnUplinkTotalField] != 3 || got[vpnDownlinkTotalField] != 7 ||
++		got[startedAtField] != 1700000000000 {
+ 		t.Fatalf("fields on the wire: %v", got)
+ 	}
+ }
+-- 
+2.55.0.windows.3
+

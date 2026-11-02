@@ -1,0 +1,131 @@
+From c6ec6b310de93b3668a5b31ddf5cfbf410e1dd64 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 18:55:31 +0300
+Subject: [PATCH 05/14] hot reload: URL test timeout changes on the running
+ monitor
+
+A network switch (Wi-Fi <-> mobile data) changes only experimental.monitoring's
+URL test timeout, which made CheckHotReload refuse and the core restart. The
+timeout is now atomic and set on the running monitor after a hot reload.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ common/monitoring/outbound_monitoring.go | 17 +++++++++++++----
+ h_box_hotreload.go                       | 23 +++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 4 deletions(-)
+
+diff --git a/common/monitoring/outbound_monitoring.go b/common/monitoring/outbound_monitoring.go
+index d27cc8302..a6c359383 100644
+--- a/common/monitoring/outbound_monitoring.go
++++ b/common/monitoring/outbound_monitoring.go
+@@ -88,7 +88,8 @@ type OutboundMonitoring struct {
+ 	workersRunning   atomic.Bool
+ 	mainInterval     time.Duration
+ 	debounceWindow   time.Duration
+-	urlTestTimeout   time.Duration
++	// H: atomic, so a hot reload can change it on the running monitor (SetURLTestTimeout)
++	urlTestTimeout   atomic.Int64
+ 	onDemand         []time.Duration // H: see option.MonitoringOptions.OnDemandTimeouts
+ 	workersCount     int
+ 	history          adapter.URLTestHistoryStorage
+@@ -326,7 +327,6 @@ func NewOutboundMonitoring(ctx context.Context, logger log.ContextLogger, option
+ 		mainInterval:   options.Interval.Build(),
+ 		idleTimeout:    options.IdleTimeout.Build(),
+ 		workersCount:   options.Workers,
+-		urlTestTimeout: options.URLTestTimeout.Build(),
+ 		debounceWindow: options.DebounceWindow.Build(),
+ 		onDemand:       onDemand, //H
+ 
+@@ -336,10 +336,19 @@ func NewOutboundMonitoring(ctx context.Context, logger log.ContextLogger, option
+ 	if service.FromContext[adapter.IPv6Capability](ctx) == nil { //H: what the DNS router and the route ask
+ 		service.MustRegister[adapter.IPv6Capability](ctx, m) //H
+ 	} //H
++	m.urlTestTimeout.Store(int64(options.URLTestTimeout.Build()))
+ 
+ 	return m, nil
+ }
+ 
++// H: SetURLTestTimeout changes how long a URL test may take on the running monitor (a hot reload with the
++// network's own timeout, Wi-Fi or mobile data, which had made every network switch restart the core).
++func (m *OutboundMonitoring) SetURLTestTimeout(timeout time.Duration) {
++	if timeout > 0 {
++		m.urlTestTimeout.Store(int64(timeout))
++	}
++}
++
+ func (m *OutboundMonitoring) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 	if stage == adapter.StartStateInitialize {
+ 		scope.Add(m.Close) // H: closed with the box
+@@ -686,7 +695,7 @@ func (m *OutboundMonitoring) tester(parent context.Context, tag string, interim
+ 	if staged { //H
+ 		delay, err = m.stagedURLTest(parent, m.urls[idx], out.outbound, interim)
+ 	} else {
+-		ctx, cancel := context.WithTimeout(parent, m.urlTestTimeout)
++		ctx, cancel := context.WithTimeout(parent, time.Duration(m.urlTestTimeout.Load()))
+ 		defer cancel()
+ 		delay, err = urltest.URLTest(ctx, m.urls[idx], out.outbound)
+ 	}
+@@ -711,7 +720,7 @@ func (m *OutboundMonitoring) tester(parent context.Context, tag string, interim
+ 	his.IPv6 = m.ipv6Of(parent, out)                              //H
+ 	if out.history.IpInfo == nil || out.history.IpInfoFromCache { //H: until looked up in this run
+ 
+-		ctx, cancel2 := context.WithTimeout(parent, m.urlTestTimeout)
++		ctx, cancel2 := context.WithTimeout(parent, time.Duration(m.urlTestTimeout.Load()))
+ 		defer cancel2()
+ 
+ 		newip, t, err := ipinfo.GetIpInfo(m.logger, ctx, out.outbound, m.ipInfoURL)
+diff --git a/h_box_hotreload.go b/h_box_hotreload.go
+index 5007c9318..77d219f08 100644
+--- a/h_box_hotreload.go
++++ b/h_box_hotreload.go
+@@ -16,6 +16,7 @@ import (
+ 	F "github.com/sagernet/sing/common/format"
+ 	"github.com/sagernet/sing/common/json"
+ 	N "github.com/sagernet/sing/common/network"
++	"github.com/sagernet/sing/service"
+ )
+ 
+ // H: hot reload: apply new options to a running box without restarting it.
+@@ -103,10 +104,22 @@ func (s *Box) HotReloadWithResult(ctx context.Context, options *option.Options)
+ 			", inbounds ", changesSummary(plan.result.Inbounds),
+ 			", route rules ", plan.result.RouteRules, ", dns rules ", plan.result.DNSRules)
+ 	}
++	s.applyURLTestTimeout(options)
+ 	s.runningOptions = *options
+ 	return plan.result, nil
+ }
+ 
++// H: applyURLTestTimeout gives the running monitor the URL test timeout of options (it can't be rebuilt in a hot
++// reload, but it can take a new timeout).
++func (s *Box) applyURLTestTimeout(options *option.Options) {
++	if options.Experimental == nil || options.Experimental.Monitoring == nil {
++		return
++	}
++	if monitor := service.PtrFromContext[monitoring.OutboundMonitoring](s.ctx); monitor != nil {
++		monitor.SetURLTestTimeout(options.Experimental.Monitoring.URLTestTimeout.Build())
++	}
++}
++
+ func changesSummary(changes HotReloadChanges) string {
+ 	return F.ToString(len(changes.Created), " created, ", len(changes.Replaced), " replaced, ", len(changes.Removed), " removed")
+ }
+@@ -119,6 +132,16 @@ func CheckHotReload(ctx context.Context, oldOptions, newOptions option.Options)
+ 	for _, options := range []*option.Options{&oldRest, &newRest} {
+ 		options.Inbounds, options.Outbounds, options.Endpoints, options.DNS, options.Route = nil, nil, nil, nil, nil
+ 	}
++	// H: the URL test timeout (Wi-Fi's and mobile data's differ) goes to the running monitor (applyURLTestTimeout),
++	// so it doesn't make a network switch restart the core; copies, so newOptions stays as it is
++	if oldRest.Experimental != nil && newRest.Experimental != nil &&
++		oldRest.Experimental.Monitoring != nil && newRest.Experimental.Monitoring != nil {
++		experimental := *newRest.Experimental
++		monitoringOptions := *experimental.Monitoring
++		monitoringOptions.URLTestTimeout = oldRest.Experimental.Monitoring.URLTestTimeout
++		experimental.Monitoring = &monitoringOptions
++		newRest.Experimental = &experimental
++	}
+ 	keys, err := changedKeys(ctx, &oldRest, &newRest)
+ 	if err != nil {
+ 		return err
+-- 
+2.55.0.windows.3
+

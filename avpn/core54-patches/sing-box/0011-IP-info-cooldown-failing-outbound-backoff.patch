@@ -1,0 +1,355 @@
+From 925f47003e7c7281f56c4cf50d2ed71e6b91c11b Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Thu, 22 Oct 2026 22:13:18 +0300
+Subject: [PATCH 11/14] IP info cooldown, failing outbound backoff
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ common/monitoring/fail_backoff.go        | 60 ++++++++++++++++++++
+ common/monitoring/fail_backoff_test.go   | 32 +++++++++++
+ common/monitoring/outbound_monitoring.go |  8 +++
+ hiddify/ipinfo/cooldown.go               | 72 ++++++++++++++++++++++++
+ hiddify/ipinfo/cooldown_test.go          | 57 +++++++++++++++++++
+ hiddify/ipinfo/ipinfo.go                 | 21 ++++++-
+ 6 files changed, 248 insertions(+), 2 deletions(-)
+ create mode 100644 common/monitoring/fail_backoff.go
+ create mode 100644 common/monitoring/fail_backoff_test.go
+ create mode 100644 hiddify/ipinfo/cooldown.go
+ create mode 100644 hiddify/ipinfo/cooldown_test.go
+
+diff --git a/common/monitoring/fail_backoff.go b/common/monitoring/fail_backoff.go
+new file mode 100644
+index 000000000..f9e95de74
+--- /dev/null
++++ b/common/monitoring/fail_backoff.go
+@@ -0,0 +1,60 @@
++package monitoring
++
++import (
++	"sync"
++	"time"
++)
++
++// An outbound whose URL test failed again and again (a server that is down, or one whose settings are wrong) is
++// tested less often by the regular rounds: five failures in a row, then it waits two minutes, doubling up to
++// twenty. A test asked for by hand, and one answer, set it right at once.
++const (
++	failBackoffAfter = 5
++	failBackoffFirst = 2 * time.Minute
++	failBackoffMax   = 20 * time.Minute
++)
++
++type failEntry struct {
++	streak int
++	until  time.Time
++}
++
++type failBackoff struct {
++	mu sync.Mutex
++	by map[string]*failEntry
++}
++
++func (b *failBackoff) skip(tag string, now time.Time) bool {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	e := b.by[tag]
++	return e != nil && now.Before(e.until)
++}
++
++func (b *failBackoff) failed(tag string, now time.Time) {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	if b.by == nil {
++		b.by = map[string]*failEntry{}
++	}
++	e := b.by[tag]
++	if e == nil {
++		e = &failEntry{}
++		b.by[tag] = e
++	}
++	e.streak++
++	if e.streak < failBackoffAfter {
++		return
++	}
++	wait := failBackoffFirst << (e.streak - failBackoffAfter)
++	if wait > failBackoffMax || wait <= 0 {
++		wait = failBackoffMax
++	}
++	e.until = now.Add(wait)
++}
++
++func (b *failBackoff) ok(tag string) {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	delete(b.by, tag)
++}
+diff --git a/common/monitoring/fail_backoff_test.go b/common/monitoring/fail_backoff_test.go
+new file mode 100644
+index 000000000..5b402aeb4
+--- /dev/null
++++ b/common/monitoring/fail_backoff_test.go
+@@ -0,0 +1,32 @@
++package monitoring
++
++import (
++	"testing"
++	"time"
++)
++
++func TestFailBackoff(t *testing.T) {
++	var b failBackoff
++	now := time.Now()
++	for i := 0; i < failBackoffAfter-1; i++ {
++		b.failed("s", now)
++		if b.skip("s", now) {
++			t.Fatalf("skipped after %d failures", i+1)
++		}
++	}
++	b.failed("s", now)
++	if !b.skip("s", now.Add(time.Minute)) || b.skip("s", now.Add(3*time.Minute)) {
++		t.Fatal("waits two minutes after the fifth failure")
++	}
++	b.failed("s", now.Add(3*time.Minute))
++	if !b.skip("s", now.Add(6*time.Minute)) || b.skip("s", now.Add(8*time.Minute)) {
++		t.Fatal("waits four minutes after the sixth")
++	}
++	b.ok("s")
++	if b.skip("s", now) {
++		t.Fatal("an answer clears it")
++	}
++	if b.skip("other", now) {
++		t.Fatal("others unaffected")
++	}
++}
+diff --git a/common/monitoring/outbound_monitoring.go b/common/monitoring/outbound_monitoring.go
+index a6c359383..cfad0fad2 100644
+--- a/common/monitoring/outbound_monitoring.go
++++ b/common/monitoring/outbound_monitoring.go
+@@ -78,6 +78,7 @@ type OutboundMonitoring struct {
+ 	pause            pause.Manager
+ 	pauseCallback    *list.Element[pause.Callback]
+ 	started          bool
++	backoff          failBackoff
+ 	urls             []string
+ 	ipInfoURL        string
+ 	ipv6Probe        string // H: see option.MonitoringOptions.IPv6Probe; empty when off
+@@ -686,6 +687,11 @@ func (m *OutboundMonitoring) tester(parent context.Context, tag string, interim
+ 		return adapter.URLTestHistory{Delay: 0}, errors.New("outbound not registered")
+ 	}
+ 
++	// one that failed again and again is left for a while by the regular rounds (a test asked for is made)
++	if !priority && m.backoff.skip(tag, time.Now()) {
++		return adapter.URLTestHistory{Time: time.Now(), Delay: TimeoutDelay}, errors.New("left alone for now: it failed repeatedly")
++	}
++
+ 	idx := m.currentLinkIndex.Load()
+ 
+ 	var ( //H
+@@ -706,9 +712,11 @@ func (m *OutboundMonitoring) tester(parent context.Context, tag string, interim
+ 	}
+ 	if err != nil || delay >= TimeoutDelay {
+ 		his.Delay = TimeoutDelay
++		m.backoff.failed(tag, time.Now())
+ 		m.logger.Warn("outbound ", tag, " URL test failed: ", err)
+ 		return his, err
+ 	}
++	m.backoff.ok(tag)
+ 	select {
+ 	case <-parent.Done():
+ 		return his, parent.Err()
+diff --git a/hiddify/ipinfo/cooldown.go b/hiddify/ipinfo/cooldown.go
+new file mode 100644
+index 000000000..a59bffbda
+--- /dev/null
++++ b/hiddify/ipinfo/cooldown.go
+@@ -0,0 +1,72 @@
++package ipinfo
++
++import (
++	"strings"
++	"sync"
++	"time"
++)
++
++// A provider that keeps failing (a rate limit, a block, a host that doesn't answer) is left alone for a while
++// instead of being tried again for every outbound on every round: the free IP services answered 429 and 403
++// thousands of times an hour. Three failures in a row put a provider aside for a minute, doubling up to a
++// quarter of an hour; a refusal by status (a limit or a block) puts it aside for ten minutes at once. One answer
++// clears it.
++const (
++	cooldownAfter    = 3
++	cooldownFirst    = time.Minute
++	cooldownMax      = 15 * time.Minute
++	cooldownByStatus = 10 * time.Minute
++)
++
++type providerState struct {
++	streak int
++	until  time.Time
++}
++
++type cooldowns struct {
++	mu sync.Mutex
++	by map[string]*providerState
++}
++
++var providerCooldowns = &cooldowns{by: map[string]*providerState{}}
++
++// ready: the provider isn't set aside at now.
++func (c *cooldowns) ready(name string, now time.Time) bool {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	s := c.by[name]
++	return s == nil || !now.Before(s.until)
++}
++
++// failed notes a failure and says whether the provider was just put aside (and for how long).
++func (c *cooldowns) failed(name string, err error, now time.Time) (time.Duration, bool) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	s := c.by[name]
++	if s == nil {
++		s = &providerState{}
++		c.by[name] = s
++	}
++	s.streak++
++	var wait time.Duration
++	switch {
++	case err != nil && strings.Contains(err.Error(), "non-200 response"):
++		wait = cooldownByStatus
++	case s.streak >= cooldownAfter:
++		wait = cooldownFirst << (s.streak - cooldownAfter)
++		if wait > cooldownMax || wait <= 0 {
++			wait = cooldownMax
++		}
++	}
++	if wait == 0 {
++		return 0, false
++	}
++	s.until = now.Add(wait)
++	return wait, true
++}
++
++func (c *cooldowns) ok(name string) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	delete(c.by, name)
++}
+diff --git a/hiddify/ipinfo/cooldown_test.go b/hiddify/ipinfo/cooldown_test.go
+new file mode 100644
+index 000000000..1ec7a91f3
+--- /dev/null
++++ b/hiddify/ipinfo/cooldown_test.go
+@@ -0,0 +1,57 @@
++package ipinfo
++
++import (
++	"errors"
++	"testing"
++	"time"
++)
++
++func TestCooldownAfterFailures(t *testing.T) {
++	c := &cooldowns{by: map[string]*providerState{}}
++	now := time.Now()
++	timeout := errors.New("context deadline exceeded")
++	for i := 0; i < 2; i++ {
++		if _, aside := c.failed("p", timeout, now); aside {
++			t.Fatalf("failure %d should not put the provider aside", i+1)
++		}
++		if !c.ready("p", now) {
++			t.Fatal("still ready after fewer than three failures")
++		}
++	}
++	wait, aside := c.failed("p", timeout, now)
++	if !aside || wait != time.Minute {
++		t.Fatalf("third failure: aside=%v wait=%v", aside, wait)
++	}
++	if c.ready("p", now.Add(30*time.Second)) || !c.ready("p", now.Add(61*time.Second)) {
++		t.Fatal("aside for a minute")
++	}
++	wait, _ = c.failed("p", timeout, now.Add(2*time.Minute))
++	if wait != 2*time.Minute {
++		t.Fatalf("doubles: %v", wait)
++	}
++	c.ok("p")
++	if !c.ready("p", now) {
++		t.Fatal("an answer clears it")
++	}
++}
++
++func TestCooldownByStatusAtOnce(t *testing.T) {
++	c := &cooldowns{by: map[string]*providerState{}}
++	now := time.Now()
++	wait, aside := c.failed("p", errors.New("non-200 response from [x]: 429"), now)
++	if !aside || wait != cooldownByStatus || c.ready("p", now.Add(5*time.Minute)) {
++		t.Fatalf("a refusal by status: aside=%v wait=%v", aside, wait)
++	}
++}
++
++func TestCooldownCap(t *testing.T) {
++	c := &cooldowns{by: map[string]*providerState{}}
++	now := time.Now()
++	var wait time.Duration
++	for i := 0; i < 80; i++ {
++		wait, _ = c.failed("p", errors.New("timeout"), now)
++	}
++	if wait != cooldownMax {
++		t.Fatalf("capped: %v", wait)
++	}
++}
+diff --git a/hiddify/ipinfo/ipinfo.go b/hiddify/ipinfo/ipinfo.go
+index 8f693198a..453c0ff98 100644
+--- a/hiddify/ipinfo/ipinfo.go
++++ b/hiddify/ipinfo/ipinfo.go
+@@ -202,14 +202,22 @@ func GetIpInfo(logger log.Logger, ctx context.Context, detour N.Dialer, customUR
+ 		default:
+ 		}
+ 		provider := providers[(i+startIndex)%len(providers)]
++		if !providerCooldowns.ready(provider.GetName(), time.Now()) {
++			continue
++		}
+ 		testCtx, cancel := context.WithTimeout(ctx, C.TCPTimeout)
+ 		ipInfo, t, err := provider.GetIPInfo(testCtx, detour)
+ 		cancel()
+ 		if err != nil {
+-			logger.Warn("Failed try ", i, " to get IP info: ", provider.GetName(), " ", err)
++			if wait, aside := providerCooldowns.failed(provider.GetName(), err, time.Now()); aside {
++				logger.Warn("IP info from ", provider.GetName(), " failed (", err, "): left alone for ", wait)
++			} else {
++				logger.Debug("Failed try ", i, " to get IP info: ", provider.GetName(), " ", err)
++			}
+ 			lastErr = err
+ 			continue
+ 		}
++		providerCooldowns.ok(provider.GetName())
+ 		return ipInfo, t, nil
+ 	}
+ 	startIndex = rand.Intn(len(fallbackProviders))
+@@ -220,13 +228,22 @@ func GetIpInfo(logger log.Logger, ctx context.Context, detour N.Dialer, customUR
+ 		default:
+ 		}
+ 		provider := fallbackProviders[(i+startIndex)%len(fallbackProviders)]
++		if !providerCooldowns.ready(provider.GetName(), time.Now()) {
++			continue
++		}
+ 		testCtx, cancel := context.WithTimeout(ctx, C.TCPTimeout)
+ 		ipInfo, t, err := provider.GetIPInfo(testCtx, detour)
+ 		cancel()
+ 		if err != nil {
+-			logger.Warn("Failed try ", i, " to get IP info: ", provider.GetName(), " ", err)
++			if wait, aside := providerCooldowns.failed(provider.GetName(), err, time.Now()); aside {
++				logger.Warn("IP info from ", provider.GetName(), " failed (", err, "): left alone for ", wait)
++			} else {
++				logger.Debug("Failed try ", i, " to get IP info: ", provider.GetName(), " ", err)
++			}
++			lastErr = err
+ 			continue
+ 		}
++		providerCooldowns.ok(provider.GetName())
+ 		return ipInfo, t, nil
+ 	}
+ 	return nil, 65535, fmt.Errorf("unable to retrieve IP info: %v", lastErr)
+-- 
+2.55.0.windows.3
+

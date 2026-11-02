@@ -1,0 +1,1204 @@
+From 66636c351404acedd1cc30b347ad1855af16ffcf Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 22:53:28 +0300
+Subject: [PATCH 09/14] urltest: stable_samples, test_timeout
+
+With stable_samples a server counts only after answering that many tests in a
+row, chosen by their average; until one has, the group goes through its warm-up
+detour instead of the first server listed. The warm-up runs that many rounds.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ option/group.go                   |   5 +
+ protocol/group/h_urltest_modes.go | 822 +++++++++++++++---------------
+ protocol/group/urltest.go         | 169 +++++-
+ protocol/group/urltest_test.go    |  55 ++
+ 4 files changed, 627 insertions(+), 424 deletions(-)
+
+diff --git a/option/group.go b/option/group.go
+index f294de5cb..367be6799 100644
+--- a/option/group.go
++++ b/option/group.go
+@@ -24,4 +24,9 @@ type URLTestOutboundOptions struct {
+ 	// WarmUpDetour (the servers' pings and the main choice aren't settled yet), its own tests already running
+ 	WarmUp       badoption.Duration `json:"warm_up,omitempty"`
+ 	WarmUpDetour string             `json:"warm_up_detour,omitempty"`
++	// H: a server is taken only after this many tests in a row answered, by their average; until one has,
++	// everything goes through WarmUpDetour (not through the first server listed)
++	StableSamples int `json:"stable_samples,omitempty"`
++	// H: how long one test may take (0: the TCP timeout, 5 s)
++	TestTimeout badoption.Duration `json:"test_timeout,omitempty"`
+ }
+diff --git a/protocol/group/h_urltest_modes.go b/protocol/group/h_urltest_modes.go
+index 0a3c38be0..4282983f3 100644
+--- a/protocol/group/h_urltest_modes.go
++++ b/protocol/group/h_urltest_modes.go
+@@ -1,411 +1,411 @@
+-package group
+-
+-import (
+-	"context"
+-	"errors"
+-	"net"
+-	"os"
+-	"sync/atomic"
+-	"syscall"
+-	"time"
+-
+-	"github.com/sagernet/sing-box/adapter"
+-	"github.com/sagernet/sing-box/common/monitoring"
+-	"github.com/sagernet/sing-box/common/urltest"
+-	"github.com/sagernet/sing/common"
+-	E "github.com/sagernet/sing/common/exceptions"
+-	M "github.com/sagernet/sing/common/metadata"
+-	N "github.com/sagernet/sing/common/network"
+-)
+-
+-// Hiddify additions to the URL test group, after sing-box-lx (SPEC 054 and 116):
+-//
+-//   - urls: more test URLs. A member is up when any of them answers, so one test URL blocked on a
+-//     network does not mark every member dead.
+-//   - Penalties: a dial that fails because the path is dead (a timeout or an unreachable network)
+-//     gives the member a penalty and makes one more try through the best other member. When that
+-//     works, the group moves to it without closing live connections. A penalty is cleared only by
+-//     proof of life: a dial or a test that works. When the fastest member has
+-//     penaltyThreshold penalties, members are ranked by penalties first, then by delay; when every
+-//     member has them, a test of all members runs at once, at most every penaltyForcedRetestGap.
+-//   - mode failover: keep the selected member until it fails. Each interval tests only the
+-//     selected members; when one fails, all members are tested and the fastest is selected.
+-//     A member that slowed down to more than degradeRatio times the fastest other member, and
+-//     still is on a second test, is left too (SPEC 126): all members are tested and the group
+-//     moves when one is more than degradeMoveRatio times faster.
+-
+-const (
+-	penaltyThreshold       = 3
+-	penaltyForcedRetestGap = 2 * time.Minute
+-	degradeRatio           = 2.0
+-	degradeMoveRatio       = 1.5
+-)
+-
+-// isPathDeadDialError tells a dead path (penalty and one more try) from a refused destination,
+-// which another member would meet too, and from a canceled dial.
+-func isPathDeadDialError(err error) bool {
+-	if err == nil || errors.Is(err, context.Canceled) {
+-		return false
+-	}
+-	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
+-		return true
+-	}
+-	if errors.Is(err, syscall.EHOSTUNREACH) || errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.ETIMEDOUT) {
+-		return true
+-	}
+-	var netErr net.Error
+-	return errors.As(err, &netErr) && netErr.Timeout()
+-}
+-
+-func (g *URLTestGroup) penaltyOf(tag string) int64 {
+-	value, loaded := g.penalties.Load(tag)
+-	if !loaded {
+-		return 0
+-	}
+-	return value.(*atomic.Int64).Load()
+-}
+-
+-func (g *URLTestGroup) penaltyAdd(tag string) {
+-	value, _ := g.penalties.LoadOrStore(tag, new(atomic.Int64))
+-	value.(*atomic.Int64).Add(1)
+-}
+-
+-func (g *URLTestGroup) penaltyReset(tag string) {
+-	if value, loaded := g.penalties.Load(tag); loaded {
+-		value.(*atomic.Int64).Store(0)
+-	}
+-}
+-
+-func (g *URLTestGroup) historyOf(detour adapter.Outbound, network string) *adapter.URLTestHistory {
+-	history := g.history.LoadURLTestHistory(RealTag(detour, network))
+-	if history == nil || history.Delay == urltest.FailedDelay {
+-		return nil
+-	}
+-	return history
+-}
+-
+-// fastestByDelay returns the member with the lowest delay, without tolerance.
+-func (g *URLTestGroup) fastestByDelay(network string) adapter.Outbound {
+-	var minDelay uint16
+-	var minOutbound adapter.Outbound
+-	for _, detour := range g.outbounds {
+-		if !common.Contains(detour.Network(), network) {
+-			continue
+-		}
+-		history := g.historyOf(detour, network)
+-		if history == nil {
+-			continue
+-		}
+-		if minOutbound == nil || history.Delay < minDelay {
+-			minDelay = history.Delay
+-			minOutbound = detour
+-		}
+-	}
+-	return minOutbound
+-}
+-
+-func (g *URLTestGroup) penaltyEmergency(network string) bool {
+-	fastest := g.fastestByDelay(network)
+-	return fastest != nil && g.penaltyOf(fastest.Tag()) >= penaltyThreshold
+-}
+-
+-// penaltyBest ranks the members with history by penalties, then by delay, leaving out exclude.
+-func (g *URLTestGroup) penaltyBest(network string, exclude adapter.Outbound) adapter.Outbound {
+-	var best adapter.Outbound
+-	var bestPenalty int64
+-	var bestDelay uint16
+-	for _, detour := range g.outbounds {
+-		if detour == exclude || !common.Contains(detour.Network(), network) {
+-			continue
+-		}
+-		history := g.historyOf(detour, network)
+-		if history == nil {
+-			continue
+-		}
+-		penalty := g.penaltyOf(detour.Tag())
+-		if best == nil || penalty < bestPenalty || (penalty == bestPenalty && history.Delay < bestDelay) {
+-			best, bestPenalty, bestDelay = detour, penalty, history.Delay
+-		}
+-	}
+-	return best
+-}
+-
+-// selectForUpdate is the selection of performUpdateCheck: failover keeps the selected member,
+-// and penalties rank first when the fastest member has too many.
+-func (g *URLTestGroup) selectForUpdate(network string) (adapter.Outbound, bool) {
+-	if g.penaltyEmergency(network) {
+-		if best := g.penaltyBest(network, nil); best != nil {
+-			return best, true
+-		}
+-	}
+-	if g.failover {
+-		current := g.selectedOutboundTCP
+-		if network == N.NetworkUDP {
+-			current = g.selectedOutboundUDP
+-		}
+-		if current != nil && g.historyOf(current, network) != nil {
+-			if _, degraded := g.degraded.LoadAndDelete(network); degraded {
+-				if fastest := g.fastestByDelay(network); fastest != nil && fastest != current &&
+-					float64(g.historyOf(fastest, network).Delay)*degradeMoveRatio < float64(g.historyOf(current, network).Delay) {
+-					return fastest, true
+-				}
+-			}
+-			return current, true
+-		}
+-		if fastest := g.fastestByDelay(network); fastest != nil {
+-			return fastest, true
+-		}
+-	}
+-	return g.Select(network)
+-}
+-
+-// pickForDial is the member for a new connection: the selected one, unless penalties rank first.
+-func (g *URLTestGroup) pickForDial(network string) adapter.Outbound {
+-	if g.penaltyEmergency(network) {
+-		if best := g.penaltyBest(network, nil); best != nil {
+-			return best
+-		}
+-	}
+-	selected := g.selectedOutboundTCP
+-	if network == N.NetworkUDP {
+-		selected = g.selectedOutboundUDP
+-	}
+-	if selected != nil {
+-		return selected
+-	}
+-	outbound, _ := g.Select(network)
+-	return outbound
+-}
+-
+-// moveSelection moves the group to a member that just proved it works, without closing live
+-// connections.
+-func (g *URLTestGroup) moveSelection(network string, detour adapter.Outbound) {
+-	g.updateAccess.Lock()
+-	var changed bool
+-	switch network {
+-	case N.NetworkTCP:
+-		changed = g.selectedOutboundTCP != detour
+-		g.selectedOutboundTCP = detour
+-	case N.NetworkUDP:
+-		changed = g.selectedOutboundUDP != detour
+-		g.selectedOutboundUDP = detour
+-	}
+-	g.updateAccess.Unlock()
+-	if changed {
+-		g.logger.Info("selection moved to ", detour.Tag(), " after a failed dial")
+-		g.history.NotifyUpdated()
+-	}
+-}
+-
+-// penaltyFailoverDial handles a failed dial: a penalty for a dead path, and one more try through
+-// the best other member. ok is false when there was no other try or it failed too; the caller
+-// then returns the first error.
+-func (g *URLTestGroup) penaltyFailoverDial(ctx context.Context, network string, destination M.Socksaddr, failed adapter.Outbound, dialErr error) (conn net.Conn, ok bool) {
+-	if !isPathDeadDialError(dialErr) {
+-		return nil, false
+-	}
+-	g.penaltyAdd(failed.Tag())
+-	g.maybeForceRetest()
+-	fallback := g.penaltyBest(network, failed)
+-	if fallback == nil {
+-		return nil, false
+-	}
+-	conn, err := fallback.DialContext(ctx, network, destination)
+-	if err != nil {
+-		g.logger.Error(E.Cause(err, "fallback dial via ", fallback.Tag()))
+-		g.history.DeleteURLTestHistory(fallback.Tag())
+-		if isPathDeadDialError(err) {
+-			g.penaltyAdd(fallback.Tag())
+-			g.maybeForceRetest()
+-		}
+-		return nil, false
+-	}
+-	g.penaltyReset(fallback.Tag())
+-	g.moveSelection(network, fallback)
+-	return conn, true
+-}
+-
+-// maybeForceRetest tests all members at once when every member with history has too many
+-// penalties, at most every penaltyForcedRetestGap from the end of the last such test.
+-func (g *URLTestGroup) maybeForceRetest() {
+-	if !g.penaltyTotal(N.NetworkTCP) {
+-		return
+-	}
+-	if last, _ := g.lastForcedRetest.Load().(time.Time); !last.IsZero() && time.Since(last) < penaltyForcedRetestGap {
+-		return
+-	}
+-	if !g.forcedRetestRunning.CompareAndSwap(false, true) {
+-		return
+-	}
+-	g.logger.Warn("all members have failed dials, testing them now")
+-	go func() {
+-		defer g.forcedRetestRunning.Store(false)
+-		g.CheckOutbounds(g.ctx, true)
+-		g.lastForcedRetest.Store(time.Now())
+-	}()
+-}
+-
+-func (g *URLTestGroup) penaltyTotal(network string) bool {
+-	var sawCandidate bool
+-	for _, detour := range g.outbounds {
+-		if !common.Contains(detour.Network(), network) || g.historyOf(detour, network) == nil {
+-			continue
+-		}
+-		sawCandidate = true
+-		if g.penaltyOf(detour.Tag()) < penaltyThreshold {
+-			return false
+-		}
+-	}
+-	return sawCandidate
+-}
+-
+-// failoverHeld returns the selected members, TCP first.
+-func (g *URLTestGroup) failoverHeld() []adapter.Outbound {
+-	held := make([]adapter.Outbound, 0, 2)
+-	if g.selectedOutboundTCP != nil {
+-		held = append(held, g.selectedOutboundTCP)
+-	}
+-	if g.selectedOutboundUDP != nil && g.selectedOutboundUDP != g.selectedOutboundTCP {
+-		held = append(held, g.selectedOutboundUDP)
+-	}
+-	return held
+-}
+-
+-// testMembers tests outbounds with every test URL and clears the penalty of each that answered.
+-func (g *URLTestGroup) testMembers(ctx context.Context, outbounds []adapter.Outbound, force bool) map[string]uint16 {
+-	result := urlTestOutbounds(ctx, g.outbound, g.history, g.logger, outbounds, g.links, g.interval, force)
+-	for tag := range result {
+-		g.penaltyReset(tag)
+-	}
+-	return result
+-}
+-
+-// failoverCheck is the regular test of a failover group: the selected members only, and all
+-// members when one of them failed or none is selected yet.
+-func (g *URLTestGroup) failoverCheck(ctx context.Context) map[string]uint16 {
+-	held := g.failoverHeld()
+-	result := make(map[string]uint16)
+-	if len(held) > 0 {
+-		result = g.testMembers(ctx, held, true)
+-		if ctx.Err() != nil {
+-			return result
+-		}
+-		var failed bool
+-		for _, detour := range held {
+-			if g.history.LoadURLTestHistory(RealTag(detour, N.NetworkTCP)) == nil {
+-				failed = true
+-			}
+-		}
+-		if !failed && !g.failoverDegraded(ctx) {
+-			return result
+-		}
+-	}
+-	others := make([]adapter.Outbound, 0, len(g.outbounds))
+-	for _, detour := range g.outbounds {
+-		if !common.Contains(held, detour) {
+-			others = append(others, detour)
+-		}
+-	}
+-	for tag, delay := range g.testMembers(ctx, others, false) {
+-		result[tag] = delay
+-	}
+-	return result
+-}
+-
+-// failoverDegraded reports whether a selected member is more than degradeRatio times slower than
+-// the fastest other member of its network, on a second test too, and marks that network so the
+-// next selection may move.
+-func (g *URLTestGroup) failoverDegraded(ctx context.Context) bool {
+-	var degraded bool
+-	for _, network := range []string{N.NetworkTCP, N.NetworkUDP} {
+-		current := g.selectedOutboundTCP
+-		if network == N.NetworkUDP {
+-			current = g.selectedOutboundUDP
+-		}
+-		if current == nil || !g.slowerThanBest(current, network) {
+-			continue
+-		}
+-		g.testMembers(ctx, []adapter.Outbound{current}, true) // one slow test is not enough
+-		if ctx.Err() != nil {
+-			return false
+-		}
+-		if g.slowerThanBest(current, network) {
+-			g.degraded.Store(network, struct{}{})
+-			degraded = true
+-		}
+-	}
+-	return degraded
+-}
+-
+-// slowerThanBest reports whether current is more than degradeRatio times slower than the fastest
+-// other member of network.
+-func (g *URLTestGroup) slowerThanBest(current adapter.Outbound, network string) bool {
+-	history := g.historyOf(current, network)
+-	if history == nil {
+-		return false
+-	}
+-	var best uint16
+-	for _, detour := range g.outbounds {
+-		if detour == current || !common.Contains(detour.Network(), network) {
+-			continue
+-		}
+-		if other := g.historyOf(detour, network); other != nil && (best == 0 || other.Delay < best) {
+-			best = other.Delay
+-		}
+-	}
+-	return best > 0 && float64(history.Delay) > degradeRatio*float64(best)
+-}
+-
+-// urlTestLinks tests detour with every link at once; the first that answers gives the delay.
+-func urlTestLinks(ctx context.Context, links []string, detour adapter.Outbound) (uint16, error) {
+-	if len(links) <= 1 {
+-		var link string
+-		if len(links) == 1 {
+-			link = links[0]
+-		}
+-		return urltest.URLTest(ctx, link, detour)
+-	}
+-	ctx, cancel := context.WithCancel(ctx)
+-	defer cancel()
+-	results := make(chan urlTestResult, len(links))
+-	for _, link := range links {
+-		go func() {
+-			delay, err := urltest.URLTest(ctx, link, detour)
+-			results <- urlTestResult{delay, err}
+-		}()
+-	}
+-	var errs []error
+-	for range links {
+-		result := <-results
+-		if result.err == nil {
+-			return result.delay, nil
+-		}
+-		errs = append(errs, result.err)
+-	}
+-	return 0, E.Errors(errs...)
+-}
+-
+-// testLinks joins url and urls without repeats; an empty result tests the default URL.
+-func testLinks(link string, links []string) []string {
+-	var result []string
+-	for _, candidate := range append([]string{link}, links...) {
+-		if candidate != "" && !common.Contains(result, candidate) {
+-			result = append(result, candidate)
+-		}
+-	}
+-	if len(result) == 0 {
+-		return []string{""}
+-	}
+-	return result
+-}
+-
+-// signalSelection tells monitoring that the group moved to another member, as a selector does:
+-// what follows the group (a tunnel through it, the app's list) learns it at once, not at the next
+-// monitoring test.
+-func (g *URLTestGroup) signalSelection() {
+-	if mon := monitoring.Get(g.ctx); mon != nil && g.tag != "" {
+-		if err := mon.SignalChange(g.tag); err != nil {
+-			g.logger.Debug("signal selection change: ", err)
+-		}
+-	}
+-}
++package group
++
++import (
++	"context"
++	"errors"
++	"net"
++	"os"
++	"sync/atomic"
++	"syscall"
++	"time"
++
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/common/monitoring"
++	"github.com/sagernet/sing-box/common/urltest"
++	"github.com/sagernet/sing/common"
++	E "github.com/sagernet/sing/common/exceptions"
++	M "github.com/sagernet/sing/common/metadata"
++	N "github.com/sagernet/sing/common/network"
++)
++
++// Hiddify additions to the URL test group, after sing-box-lx (SPEC 054 and 116):
++//
++//   - urls: more test URLs. A member is up when any of them answers, so one test URL blocked on a
++//     network does not mark every member dead.
++//   - Penalties: a dial that fails because the path is dead (a timeout or an unreachable network)
++//     gives the member a penalty and makes one more try through the best other member. When that
++//     works, the group moves to it without closing live connections. A penalty is cleared only by
++//     proof of life: a dial or a test that works. When the fastest member has
++//     penaltyThreshold penalties, members are ranked by penalties first, then by delay; when every
++//     member has them, a test of all members runs at once, at most every penaltyForcedRetestGap.
++//   - mode failover: keep the selected member until it fails. Each interval tests only the
++//     selected members; when one fails, all members are tested and the fastest is selected.
++//     A member that slowed down to more than degradeRatio times the fastest other member, and
++//     still is on a second test, is left too (SPEC 126): all members are tested and the group
++//     moves when one is more than degradeMoveRatio times faster.
++
++const (
++	penaltyThreshold       = 3
++	penaltyForcedRetestGap = 2 * time.Minute
++	degradeRatio           = 2.0
++	degradeMoveRatio       = 1.5
++)
++
++// isPathDeadDialError tells a dead path (penalty and one more try) from a refused destination,
++// which another member would meet too, and from a canceled dial.
++func isPathDeadDialError(err error) bool {
++	if err == nil || errors.Is(err, context.Canceled) {
++		return false
++	}
++	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
++		return true
++	}
++	if errors.Is(err, syscall.EHOSTUNREACH) || errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.ETIMEDOUT) {
++		return true
++	}
++	var netErr net.Error
++	return errors.As(err, &netErr) && netErr.Timeout()
++}
++
++func (g *URLTestGroup) penaltyOf(tag string) int64 {
++	value, loaded := g.penalties.Load(tag)
++	if !loaded {
++		return 0
++	}
++	return value.(*atomic.Int64).Load()
++}
++
++func (g *URLTestGroup) penaltyAdd(tag string) {
++	value, _ := g.penalties.LoadOrStore(tag, new(atomic.Int64))
++	value.(*atomic.Int64).Add(1)
++}
++
++func (g *URLTestGroup) penaltyReset(tag string) {
++	if value, loaded := g.penalties.Load(tag); loaded {
++		value.(*atomic.Int64).Store(0)
++	}
++}
++
++func (g *URLTestGroup) historyOf(detour adapter.Outbound, network string) *adapter.URLTestHistory {
++	history := g.history.LoadURLTestHistory(RealTag(detour, network))
++	if history == nil || history.Delay == urltest.FailedDelay {
++		return nil
++	}
++	return history
++}
++
++// fastestByDelay returns the member with the lowest delay, without tolerance.
++func (g *URLTestGroup) fastestByDelay(network string) adapter.Outbound {
++	var minDelay uint16
++	var minOutbound adapter.Outbound
++	for _, detour := range g.outbounds {
++		if !common.Contains(detour.Network(), network) {
++			continue
++		}
++		history := g.historyOf(detour, network)
++		if history == nil {
++			continue
++		}
++		if minOutbound == nil || history.Delay < minDelay {
++			minDelay = history.Delay
++			minOutbound = detour
++		}
++	}
++	return minOutbound
++}
++
++func (g *URLTestGroup) penaltyEmergency(network string) bool {
++	fastest := g.fastestByDelay(network)
++	return fastest != nil && g.penaltyOf(fastest.Tag()) >= penaltyThreshold
++}
++
++// penaltyBest ranks the members with history by penalties, then by delay, leaving out exclude.
++func (g *URLTestGroup) penaltyBest(network string, exclude adapter.Outbound) adapter.Outbound {
++	var best adapter.Outbound
++	var bestPenalty int64
++	var bestDelay uint16
++	for _, detour := range g.outbounds {
++		if detour == exclude || !common.Contains(detour.Network(), network) {
++			continue
++		}
++		history := g.historyOf(detour, network)
++		if history == nil {
++			continue
++		}
++		penalty := g.penaltyOf(detour.Tag())
++		if best == nil || penalty < bestPenalty || (penalty == bestPenalty && history.Delay < bestDelay) {
++			best, bestPenalty, bestDelay = detour, penalty, history.Delay
++		}
++	}
++	return best
++}
++
++// selectForUpdate is the selection of performUpdateCheck: failover keeps the selected member,
++// and penalties rank first when the fastest member has too many.
++func (g *URLTestGroup) selectForUpdate(network string) (adapter.Outbound, bool) {
++	if g.penaltyEmergency(network) {
++		if best := g.penaltyBest(network, nil); best != nil {
++			return best, true
++		}
++	}
++	if g.failover {
++		current := g.selectedOutboundTCP
++		if network == N.NetworkUDP {
++			current = g.selectedOutboundUDP
++		}
++		if current != nil && g.historyOf(current, network) != nil {
++			if _, degraded := g.degraded.LoadAndDelete(network); degraded {
++				if fastest := g.fastestByDelay(network); fastest != nil && fastest != current &&
++					float64(g.historyOf(fastest, network).Delay)*degradeMoveRatio < float64(g.historyOf(current, network).Delay) {
++					return fastest, true
++				}
++			}
++			return current, true
++		}
++		if fastest := g.fastestByDelay(network); fastest != nil {
++			return fastest, true
++		}
++	}
++	return g.Select(network)
++}
++
++// pickForDial is the member for a new connection: the selected one, unless penalties rank first.
++func (g *URLTestGroup) pickForDial(network string) adapter.Outbound {
++	if g.penaltyEmergency(network) {
++		if best := g.penaltyBest(network, nil); best != nil {
++			return best
++		}
++	}
++	selected := g.selectedOutboundTCP
++	if network == N.NetworkUDP {
++		selected = g.selectedOutboundUDP
++	}
++	if selected != nil {
++		return selected
++	}
++	outbound, _ := g.Select(network)
++	return outbound
++}
++
++// moveSelection moves the group to a member that just proved it works, without closing live
++// connections.
++func (g *URLTestGroup) moveSelection(network string, detour adapter.Outbound) {
++	g.updateAccess.Lock()
++	var changed bool
++	switch network {
++	case N.NetworkTCP:
++		changed = g.selectedOutboundTCP != detour
++		g.selectedOutboundTCP = detour
++	case N.NetworkUDP:
++		changed = g.selectedOutboundUDP != detour
++		g.selectedOutboundUDP = detour
++	}
++	g.updateAccess.Unlock()
++	if changed {
++		g.logger.Info("selection moved to ", detour.Tag(), " after a failed dial")
++		g.history.NotifyUpdated()
++	}
++}
++
++// penaltyFailoverDial handles a failed dial: a penalty for a dead path, and one more try through
++// the best other member. ok is false when there was no other try or it failed too; the caller
++// then returns the first error.
++func (g *URLTestGroup) penaltyFailoverDial(ctx context.Context, network string, destination M.Socksaddr, failed adapter.Outbound, dialErr error) (conn net.Conn, ok bool) {
++	if !isPathDeadDialError(dialErr) {
++		return nil, false
++	}
++	g.penaltyAdd(failed.Tag())
++	g.maybeForceRetest()
++	fallback := g.penaltyBest(network, failed)
++	if fallback == nil {
++		return nil, false
++	}
++	conn, err := fallback.DialContext(ctx, network, destination)
++	if err != nil {
++		g.logger.Error(E.Cause(err, "fallback dial via ", fallback.Tag()))
++		g.history.DeleteURLTestHistory(fallback.Tag())
++		if isPathDeadDialError(err) {
++			g.penaltyAdd(fallback.Tag())
++			g.maybeForceRetest()
++		}
++		return nil, false
++	}
++	g.penaltyReset(fallback.Tag())
++	g.moveSelection(network, fallback)
++	return conn, true
++}
++
++// maybeForceRetest tests all members at once when every member with history has too many
++// penalties, at most every penaltyForcedRetestGap from the end of the last such test.
++func (g *URLTestGroup) maybeForceRetest() {
++	if !g.penaltyTotal(N.NetworkTCP) {
++		return
++	}
++	if last, _ := g.lastForcedRetest.Load().(time.Time); !last.IsZero() && time.Since(last) < penaltyForcedRetestGap {
++		return
++	}
++	if !g.forcedRetestRunning.CompareAndSwap(false, true) {
++		return
++	}
++	g.logger.Warn("all members have failed dials, testing them now")
++	go func() {
++		defer g.forcedRetestRunning.Store(false)
++		g.CheckOutbounds(g.ctx, true)
++		g.lastForcedRetest.Store(time.Now())
++	}()
++}
++
++func (g *URLTestGroup) penaltyTotal(network string) bool {
++	var sawCandidate bool
++	for _, detour := range g.outbounds {
++		if !common.Contains(detour.Network(), network) || g.historyOf(detour, network) == nil {
++			continue
++		}
++		sawCandidate = true
++		if g.penaltyOf(detour.Tag()) < penaltyThreshold {
++			return false
++		}
++	}
++	return sawCandidate
++}
++
++// failoverHeld returns the selected members, TCP first.
++func (g *URLTestGroup) failoverHeld() []adapter.Outbound {
++	held := make([]adapter.Outbound, 0, 2)
++	if g.selectedOutboundTCP != nil {
++		held = append(held, g.selectedOutboundTCP)
++	}
++	if g.selectedOutboundUDP != nil && g.selectedOutboundUDP != g.selectedOutboundTCP {
++		held = append(held, g.selectedOutboundUDP)
++	}
++	return held
++}
++
++// testMembers tests outbounds with every test URL and clears the penalty of each that answered.
++func (g *URLTestGroup) testMembers(ctx context.Context, outbounds []adapter.Outbound, force bool) map[string]uint16 {
++	result := urlTestOutbounds(ctx, g.outbound, g.history, g.logger, outbounds, g.links, g.interval, force, g.testTimeout)
++	for tag := range result {
++		g.penaltyReset(tag)
++	}
++	return result
++}
++
++// failoverCheck is the regular test of a failover group: the selected members only, and all
++// members when one of them failed or none is selected yet.
++func (g *URLTestGroup) failoverCheck(ctx context.Context) map[string]uint16 {
++	held := g.failoverHeld()
++	result := make(map[string]uint16)
++	if len(held) > 0 {
++		result = g.testMembers(ctx, held, true)
++		if ctx.Err() != nil {
++			return result
++		}
++		var failed bool
++		for _, detour := range held {
++			if g.history.LoadURLTestHistory(RealTag(detour, N.NetworkTCP)) == nil {
++				failed = true
++			}
++		}
++		if !failed && !g.failoverDegraded(ctx) {
++			return result
++		}
++	}
++	others := make([]adapter.Outbound, 0, len(g.outbounds))
++	for _, detour := range g.outbounds {
++		if !common.Contains(held, detour) {
++			others = append(others, detour)
++		}
++	}
++	for tag, delay := range g.testMembers(ctx, others, false) {
++		result[tag] = delay
++	}
++	return result
++}
++
++// failoverDegraded reports whether a selected member is more than degradeRatio times slower than
++// the fastest other member of its network, on a second test too, and marks that network so the
++// next selection may move.
++func (g *URLTestGroup) failoverDegraded(ctx context.Context) bool {
++	var degraded bool
++	for _, network := range []string{N.NetworkTCP, N.NetworkUDP} {
++		current := g.selectedOutboundTCP
++		if network == N.NetworkUDP {
++			current = g.selectedOutboundUDP
++		}
++		if current == nil || !g.slowerThanBest(current, network) {
++			continue
++		}
++		g.testMembers(ctx, []adapter.Outbound{current}, true) // one slow test is not enough
++		if ctx.Err() != nil {
++			return false
++		}
++		if g.slowerThanBest(current, network) {
++			g.degraded.Store(network, struct{}{})
++			degraded = true
++		}
++	}
++	return degraded
++}
++
++// slowerThanBest reports whether current is more than degradeRatio times slower than the fastest
++// other member of network.
++func (g *URLTestGroup) slowerThanBest(current adapter.Outbound, network string) bool {
++	history := g.historyOf(current, network)
++	if history == nil {
++		return false
++	}
++	var best uint16
++	for _, detour := range g.outbounds {
++		if detour == current || !common.Contains(detour.Network(), network) {
++			continue
++		}
++		if other := g.historyOf(detour, network); other != nil && (best == 0 || other.Delay < best) {
++			best = other.Delay
++		}
++	}
++	return best > 0 && float64(history.Delay) > degradeRatio*float64(best)
++}
++
++// urlTestLinks tests detour with every link at once; the first that answers gives the delay.
++func urlTestLinks(ctx context.Context, links []string, detour adapter.Outbound) (uint16, error) {
++	if len(links) <= 1 {
++		var link string
++		if len(links) == 1 {
++			link = links[0]
++		}
++		return urltest.URLTest(ctx, link, detour)
++	}
++	ctx, cancel := context.WithCancel(ctx)
++	defer cancel()
++	results := make(chan urlTestResult, len(links))
++	for _, link := range links {
++		go func() {
++			delay, err := urltest.URLTest(ctx, link, detour)
++			results <- urlTestResult{delay, err}
++		}()
++	}
++	var errs []error
++	for range links {
++		result := <-results
++		if result.err == nil {
++			return result.delay, nil
++		}
++		errs = append(errs, result.err)
++	}
++	return 0, E.Errors(errs...)
++}
++
++// testLinks joins url and urls without repeats; an empty result tests the default URL.
++func testLinks(link string, links []string) []string {
++	var result []string
++	for _, candidate := range append([]string{link}, links...) {
++		if candidate != "" && !common.Contains(result, candidate) {
++			result = append(result, candidate)
++		}
++	}
++	if len(result) == 0 {
++		return []string{""}
++	}
++	return result
++}
++
++// signalSelection tells monitoring that the group moved to another member, as a selector does:
++// what follows the group (a tunnel through it, the app's list) learns it at once, not at the next
++// monitoring test.
++func (g *URLTestGroup) signalSelection() {
++	if mon := monitoring.Get(g.ctx); mon != nil && g.tag != "" {
++		if err := mon.SignalChange(g.tag); err != nil {
++			g.logger.Debug("signal selection change: ", err)
++		}
++	}
++}
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index a0977fe82..c7fd056f1 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -58,6 +58,9 @@ type URLTest struct {
+ 	warmDetourTag string
+ 	warmDetour    adapter.Outbound
+ 	warmUntil     atomic.Int64
++	warmRound     atomic.Int64
++	stableSamples int
++	testTimeout   time.Duration
+ }
+ 
+ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.URLTestOutboundOptions) (adapter.Outbound, error) {
+@@ -80,6 +83,8 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		interruptExternalConnections: options.InterruptExistConnections,
+ 		privateHistory:               options.PrivateHistory,
+ 		warmUp:                       time.Duration(options.WarmUp),
++		stableSamples:                options.StableSamples,
++		testTimeout:                  time.Duration(options.TestTimeout),
+ 		warmDetourTag:                options.WarmUpDetour,
+ 	}
+ 	if len(outbound.tags) == 0 {
+@@ -127,6 +132,8 @@ func (s *URLTest) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 		if s.privateHistory {
+ 			group.history = urltest.NewHistoryStorage()
+ 		}
++		group.stableSamples = s.stableSamples
++		group.testTimeout = s.testTimeout
+ 		s.group = group
+ 	case adapter.StartStateStarted:
+ 		s.warm()
+@@ -138,9 +145,51 @@ func (s *URLTest) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 
+ // H: warm starts (or starts again) the warm-up: after the start and after a network change.
+ func (s *URLTest) warm() {
+-	if s.warmDetour != nil {
+-		s.warmUntil.Store(time.Now().Add(s.warmUp).UnixNano())
++	if s.warmDetour == nil {
++		return
++	}
++	s.warmUntil.Store(time.Now().Add(s.warmUp).UnixNano())
++	group := s.group
++	if group == nil || group.stableSamples <= 0 {
++		return
++	}
++	// another network (or a fresh start): what was measured before says nothing now
++	group.resetSamples()
++	// as many rounds as a server needs answered, spread over the warm-up: chosen when it ends
++	round := s.warmRound.Add(1)
++	step := s.warmUp / time.Duration(group.stableSamples)
++	go func() {
++		for i := 0; i < group.stableSamples; i++ {
++			if s.warmRound.Load() != round || s.ctx.Err() != nil {
++				return
++			}
++			// a round already running (the start's own) would make this one a no-op: wait for it
++			for group.checking.Load() && s.ctx.Err() == nil {
++				time.Sleep(300 * time.Millisecond)
++			}
++			group.CheckOutbounds(s.ctx, true)
++			select {
++			case <-time.After(step):
++			case <-s.ctx.Done():
++				return
++			}
++		}
++	}()
++}
++
++// H: active is the outbound a connection goes through: the warm-up's detour while it lasts; with stable
++// samples the steadiest server, or the warm-up's detour while none has answered enough; nil: the usual choice.
++func (s *URLTest) active(network string) adapter.Outbound {
++	if detour := s.warming(); detour != nil {
++		return detour
++	}
++	if s.group == nil || s.group.stableSamples <= 0 {
++		return nil
++	}
++	if outbound, ok := s.group.Select(network); ok {
++		return outbound
+ 	}
++	return s.warmDetour
+ }
+ 
+ // H: warming: the outbound everything goes through while the warm-up lasts, or nil after it.
+@@ -156,7 +205,7 @@ func (s *URLTest) All() []string {
+ }
+ 
+ func (s *URLTest) Selected(network string) adapter.Outbound {
+-	if detour := s.warming(); detour != nil {
++	if detour := s.active(network); detour != nil {
+ 		return detour
+ 	}
+ 	var outbound adapter.Outbound
+@@ -225,7 +274,7 @@ func (s *URLTest) InterfaceUpdated(ctx context.Context) {
+ 
+ func (s *URLTest) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+ 	s.group.Touch()
+-	if detour := s.warming(); detour != nil {
++	if detour := s.active(N.NetworkName(network)); detour != nil {
+ 		return detour.DialContext(ctx, network, destination)
+ 	}
+ 	network = N.NetworkName(network)                        //H
+@@ -251,7 +300,7 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
+ 
+ func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
+ 	s.group.Touch()
+-	if detour := s.warming(); detour != nil {
++	if detour := s.active(N.NetworkUDP); detour != nil {
+ 		return detour.ListenPacket(ctx, destination)
+ 	}
+ 	outbound := s.group.pickForDial(N.NetworkUDP) //H
+@@ -293,11 +342,16 @@ type URLTestGroup struct {
+ 	interruptGroup               *interrupt.Group
+ 	interruptExternalConnections bool
+ 	access                       sync.Mutex
+-	updateAccess                 sync.Mutex
+-	ticker                       *time.Ticker
+-	close                        chan struct{}
+-	started                      bool
+-	lastActive                   common.TypedValue[time.Time]
++	// H: the last stableSamples results of each server (0: no answer), when the group goes by its steadiest
++	stableSamples int
++	testTimeout   time.Duration
++	samples       map[string][]uint16
++	samplesAccess sync.Mutex
++	updateAccess  sync.Mutex
++	ticker        *time.Ticker
++	close         chan struct{}
++	started       bool
++	lastActive    common.TypedValue[time.Time]
+ }
+ 
+ func NewURLTestGroup(ctx context.Context, outboundManager adapter.OutboundManager, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, tolerance uint16, idleTimeout time.Duration, interruptExternalConnections bool) (*URLTestGroup, error) {
+@@ -376,6 +430,9 @@ func (g *URLTestGroup) Close() error {
+ }
+ 
+ func (g *URLTestGroup) Select(network string) (adapter.Outbound, bool) {
++	if g.stableSamples > 0 {
++		return g.selectStable(network)
++	}
+ 	var minDelay uint16
+ 	var minOutbound adapter.Outbound
+ 	switch network {
+@@ -460,12 +517,19 @@ func (g *URLTestGroup) urlTest(ctx context.Context, force bool) (map[string]uint
+ 		return make(map[string]uint16), nil
+ 	}
+ 	defer g.checking.Store(false)
++	// H: with stable samples every round tests every server, so each gets one result a round
++	if g.stableSamples > 0 {
++		force = true
++	}
+ 	var result map[string]uint16 //H
+ 	if g.failover && !force {    //H: only the selected members, unless one failed
+ 		result = g.failoverCheck(ctx) //H
+ 	} else { //H
+ 		result = g.testMembers(ctx, g.outbounds, force) //H
+ 	} //H
++	if g.stableSamples > 0 && ctx.Err() == nil {
++		g.recordSamples(result)
++	}
+ 	g.performUpdateCheck()
+ 	return result, nil
+ }
+@@ -485,13 +549,17 @@ type urlTestBatch struct {
+ 	groups   []adapter.OutboundGroup
+ 	access   sync.Mutex
+ 	result   map[string]uint16
++	timeout  time.Duration // H
+ }
+ 
+ func URLTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
+-	return urlTestOutbounds(ctx, outboundManager, history, logger, outbounds, testLinks(link, nil), interval, force) //H
++	return urlTestOutbounds(ctx, outboundManager, history, logger, outbounds, testLinks(link, nil), interval, force, 0) //H
+ }
+ 
+-func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, links []string, interval time.Duration, force bool) map[string]uint16 { //H: more test URLs
++func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, links []string, interval time.Duration, force bool, timeout time.Duration) map[string]uint16 { //H: more test URLs; timeout: how long one test may take (0: the TCP timeout)
++	if timeout <= 0 {
++		timeout = C.TCPTimeout
++	}
+ 	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](10))
+ 	testBatch := &urlTestBatch{
+ 		ctx:      ctx,
+@@ -501,6 +569,7 @@ func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManag
+ 		batch:    b,
+ 		checked:  make(map[string]bool),
+ 		result:   make(map[string]uint16),
++		timeout:  timeout,
+ 	}
+ 	testBatch.test(outbounds, links, interval, force) //H
+ 	b.Wait()
+@@ -544,7 +613,7 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, links []string, interv
+ 			}
+ 			b.checked[tag] = true
+ 			b.batch.Go(tag, func() (any, error) {
+-				testCtx, cancel := context.WithTimeout(b.ctx, C.TCPTimeout)
++				testCtx, cancel := context.WithTimeout(b.ctx, b.timeout)
+ 				defer cancel()
+ 				testChan := make(chan urlTestResult, 1)
+ 				go func() {
+@@ -608,3 +677,77 @@ func (g *URLTestGroup) performUpdateCheck() {
+ 		g.history.NotifyUpdated()
+ 	}
+ }
++
++// H: resetSamples forgets every server's results (a fresh start or another network).
++func (g *URLTestGroup) resetSamples() {
++	g.samplesAccess.Lock()
++	g.samples = nil
++	g.samplesAccess.Unlock()
++}
++
++// H: recordSamples adds a round's results: each server's delay, 0 for one that didn't answer.
++func (g *URLTestGroup) recordSamples(result map[string]uint16) {
++	g.samplesAccess.Lock()
++	defer g.samplesAccess.Unlock()
++	if g.samples == nil {
++		g.samples = make(map[string][]uint16)
++	}
++	for _, detour := range g.outbounds {
++		tag := detour.Tag()
++		list := append(g.samples[tag], result[tag])
++		if len(list) > g.stableSamples {
++			list = list[len(list)-g.stableSamples:]
++		}
++		g.samples[tag] = list
++	}
++}
++
++// H: stableDelay is a server's average over its last results, when it answered every one of them.
++func (g *URLTestGroup) stableDelay(tag string) (uint32, bool) {
++	g.samplesAccess.Lock()
++	defer g.samplesAccess.Unlock()
++	list := g.samples[tag]
++	if len(list) < g.stableSamples {
++		return 0, false
++	}
++	var sum uint32
++	for _, delay := range list {
++		if delay == 0 || delay == 65535 {
++			return 0, false
++		}
++		sum += uint32(delay)
++	}
++	return sum / uint32(len(list)), true
++}
++
++// H: selectStable takes the server with the lowest steady delay, keeping the one in use unless another is
++// sooner by the tolerance; none answered enough: nil, false.
++func (g *URLTestGroup) selectStable(network string) (adapter.Outbound, bool) {
++	var best adapter.Outbound
++	var bestDelay uint32
++	for _, detour := range g.outbounds {
++		if !common.Contains(detour.Network(), network) {
++			continue
++		}
++		delay, ok := g.stableDelay(detour.Tag())
++		if !ok {
++			continue
++		}
++		if best == nil || delay < bestDelay {
++			best, bestDelay = detour, delay
++		}
++	}
++	if best == nil {
++		return nil, false
++	}
++	current := g.selectedOutboundTCP
++	if network == N.NetworkUDP {
++		current = g.selectedOutboundUDP
++	}
++	if current != nil && current != best {
++		if delay, ok := g.stableDelay(current.Tag()); ok && delay <= bestDelay+uint32(g.tolerance) {
++			return current, true
++		}
++	}
++	return best, true
++}
+diff --git a/protocol/group/urltest_test.go b/protocol/group/urltest_test.go
+index 73af3dd9d..9b6d4fdfb 100644
+--- a/protocol/group/urltest_test.go
++++ b/protocol/group/urltest_test.go
+@@ -76,3 +76,58 @@ func TestURLTestWarmUp(t *testing.T) {
+ 		t.Fatalf("a group without a warm-up never warms")
+ 	}
+ }
++
++// H: with stable samples a server counts only after answering every one of its last tests, by their average;
++// none has: no choice (the wrapper then takes the main one, never the first listed).
++func TestURLTestStableSamples(t *testing.T) {
++	ee := &selectionOutbound{tag: "ee"}
++	pl := &selectionOutbound{tag: "pl"}
++	de := &selectionOutbound{tag: "de"}
++	g := &URLTestGroup{outbounds: []adapter.Outbound{ee, pl, de}, stableSamples: 3, tolerance: 50}
++	if _, ok := g.Select(N.NetworkTCP); ok {
++		t.Fatalf("nothing measured: no choice")
++	}
++	// ee never answers, pl answers steadily, de is the fastest once but drops one test
++	g.recordSamples(map[string]uint16{"pl": 120, "de": 40})
++	g.recordSamples(map[string]uint16{"pl": 130})
++	if _, ok := g.Select(N.NetworkTCP); ok {
++		t.Fatalf("two rounds: no server has answered three tests yet")
++	}
++	g.recordSamples(map[string]uint16{"pl": 110, "de": 45})
++	if got, ok := g.Select(N.NetworkTCP); !ok || got.Tag() != "pl" {
++		t.Fatalf("pl answered all three, de dropped one: got %v %v", got, ok)
++	}
++	g.selectedOutboundTCP = pl
++	// de steady now and sooner, but not by the tolerance: pl stays
++	g.recordSamples(map[string]uint16{"pl": 120, "de": 90})
++	g.recordSamples(map[string]uint16{"pl": 120, "de": 90})
++	g.recordSamples(map[string]uint16{"pl": 120, "de": 90})
++	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "pl" {
++		t.Fatalf("de only 30 ms sooner: pl must stay, got %s", got.Tag())
++	}
++	// pl misses one: it no longer counts, de takes over
++	g.recordSamples(map[string]uint16{"de": 90})
++	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "de" {
++		t.Fatalf("pl dropped a test: de must take over, got %s", got.Tag())
++	}
++	g.resetSamples()
++	if _, ok := g.Select(N.NetworkTCP); ok {
++		t.Fatalf("after a reset nothing counts")
++	}
++}
++
++// H: while no server has answered enough the wrapper sends everything through the main choice.
++func TestURLTestStableFallsBackToMain(t *testing.T) {
++	main := &selectionOutbound{tag: "select"}
++	g := &URLTestGroup{outbounds: []adapter.Outbound{&selectionOutbound{tag: "ee"}}, stableSamples: 3}
++	s := &URLTest{group: g, warmDetour: main}
++	if got := s.active(N.NetworkTCP); got == nil || got.Tag() != "select" {
++		t.Fatalf("nothing steady: the main choice, got %v", got)
++	}
++	g.recordSamples(map[string]uint16{"ee": 100})
++	g.recordSamples(map[string]uint16{"ee": 100})
++	g.recordSamples(map[string]uint16{"ee": 100})
++	if got := s.active(N.NetworkTCP); got == nil || got.Tag() != "ee" {
++		t.Fatalf("ee steady: ee, got %v", got)
++	}
++}
+-- 
+2.55.0.windows.3
+

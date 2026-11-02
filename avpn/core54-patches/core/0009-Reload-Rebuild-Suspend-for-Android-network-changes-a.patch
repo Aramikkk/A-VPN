@@ -1,0 +1,1006 @@
+From f01028cc1cae2a3e2de394ca76192cf1b5bd9c21 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 19 Oct 2026 12:31:06 +0300
+Subject: [PATCH 09/26] Reload/Rebuild/Suspend for Android network changes and
+ auto-pause, gRPC secret, per-network URL test timeout, fake IP kept
+
+Work done in another session (16-18.10.2026, A-VPN 5.9.27-5.9.46), committed as it was tested. The Android AAR
+in the app was built at 10:08 on 17.10, before the last builder.go edit (10:10): rebuild the core at the next
+release so the binaries match these sources.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ platform/mobile/mobile.go            |  21 +++
+ v2/config/builder.go                 |  38 ++++-
+ v2/config/builder_tolerance_test.go  |  41 +++++
+ v2/config/fakeip_persistence_test.go |  52 ++++++
+ v2/config/hiddify_option.go          |   2 +
+ v2/config/input_route_rules_test.go  |  17 +-
+ v2/hcore/grpc_auth.go                |  43 +++++
+ v2/hcore/grpc_auth_test.go           |  82 ++++++++++
+ v2/hcore/grpc_server.go              |  18 ++-
+ v2/hcore/hotreload.go                |  89 +++++++++++
+ v2/hcore/hotreload_select_test.go    |  74 +++++++++
+ v2/hcore/hotreload_test.go           | 228 +++++++++++++++++++++++++++
+ v2/hcore/lifecycle_test.go           |  24 +++
+ v2/hcore/pause.go                    |  12 ++
+ 14 files changed, 728 insertions(+), 13 deletions(-)
+ create mode 100644 v2/config/builder_tolerance_test.go
+ create mode 100644 v2/config/fakeip_persistence_test.go
+ create mode 100644 v2/hcore/grpc_auth.go
+ create mode 100644 v2/hcore/grpc_auth_test.go
+ create mode 100644 v2/hcore/hotreload_select_test.go
+ create mode 100644 v2/hcore/hotreload_test.go
+ create mode 100644 v2/hcore/lifecycle_test.go
+
+diff --git a/platform/mobile/mobile.go b/platform/mobile/mobile.go
+index a15b9f9..e7c8133 100644
+--- a/platform/mobile/mobile.go
++++ b/platform/mobile/mobile.go
+@@ -57,6 +57,24 @@ func Stop() error {
+ 	return err
+ }
+ 
++// Reload keeps the running tunnel and its DNS address mappings on network changes.
++// An incompatible configuration returns an error without stopping the old core.
++func Reload(configPath string, configContent string) error {
++	_, err := hcore.HotReloadRunning(libbox.BaseContext(nil), &hcore.StartRequest{
++		ConfigPath:    configPath,
++		ConfigContent: configContent,
++	})
++	return err
++}
++
++func Rebuild(configPath string, configContent string) error {
++	_, err := hcore.RebuildService(libbox.BaseContext(nil), &hcore.StartRequest{
++		ConfigPath:    configPath,
++		ConfigContent: configContent,
++	})
++	return err
++}
++
+ func GetServerPublicKey() []byte {
+ 	return hcore.GetGrpcServerPublicKey()
+ }
+@@ -80,3 +98,6 @@ func Pause() {
+ func Wake() {
+ 	hcore.Wake()
+ }
++
++// Suspend closes the tunnel but retains its daemon and logical session.
++func Suspend() error { return hcore.SuspendService() }
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 7914e85..ff007b9 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -69,6 +69,13 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 	}
+ 
+ 	var options option.Options
++	// Carry only the app-prepared monitoring timeout, never an input API listener or secret.
++	if input.Experimental != nil && input.Experimental.Monitoring != nil {
++		value := input.Experimental.Monitoring.URLTestTimeout
++		if value.Build() >= time.Second && value.Build() <= 30*time.Second {
++			options.Experimental = &option.ExperimentalOptions{Monitoring: &option.MonitoringOptions{URLTestTimeout: value}}
++		}
++	}
+ 	if hopts.EnableFullConfig {
+ 		options.Inbounds = input.Inbounds
+ 		options.DNS = input.DNS
+@@ -274,7 +281,7 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 			// URLs:      opt.ConnectionTestUrls,
+ 			// Interval:  badoption.Duration(opt.URLTestInterval.Duration()),
+ 			// IdleTimeout: badoption.Duration(opt.URLTestIdleTimeout.Duration()),
+-			Tolerance: balancerTolerance(opt),
++			Tolerance: balancerTolerance(opt, false),
+ 			// IdleTimeout:               badoption.Duration(opt.URLTestInterval.Duration().Nanoseconds() * 3),
+ 			InterruptExistConnections: !opt.BalancerKeepConnections,
+ 		},
+@@ -291,7 +298,7 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 			// URLs:      opt.ConnectionTestUrls,
+ 			// Interval:  badoption.Duration(opt.URLTestInterval.Duration()),
+ 			// IdleTimeout: badoption.Duration(opt.URLTestIdleTimeout.Duration()),
+-			Tolerance: balancerTolerance(opt),
++			Tolerance: balancerTolerance(opt, false),
+ 			// IdleTimeout:               badoption.Duration(opt.URLTestInterval.Duration().Nanoseconds() * 3),
+ 			InterruptExistConnections: !opt.BalancerKeepConnections,
+ 		},
+@@ -373,6 +380,14 @@ func contains(slice []string, item string) bool {
+ }
+ 
+ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
++	timeout := badoption.Duration(hopt.URLTestTimeout.Duration())
++	if options.Experimental != nil && options.Experimental.Monitoring != nil {
++		candidate := options.Experimental.Monitoring.URLTestTimeout
++		if candidate.Build() >= time.Second && candidate.Build() <= 30*time.Second {
++			timeout = candidate
++		}
++	}
++
+ 	if len(hopt.ConnectionTestUrls) == 0 {
+ 		hopt.ConnectionTestUrls = []string{hopt.ConnectionTestUrl, "http://captive.apple.com/generate_204", "https://cp.cloudflare.com", "https://google.com/generate_204"}
+ 		if isBlockedConnectionTestUrl(hopt.ConnectionTestUrl) {
+@@ -393,8 +408,11 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
+ 			},
+ 
+ 			CacheFile: &option.CacheFileOptions{
+-				Enabled: true, // WARP and MASQUE devices are stored by default
+-				Path:    "data/clash.db",
++				Enabled: true,
++				// Android retains DNS answers across a core restart on network changes.
++				StoreFakeIP:     true,
++				StoreWARPConfig: true,
++				Path:            "data/clash.db",
+ 			},
+ 
+ 			Monitoring: &option.MonitoringOptions{
+@@ -402,7 +420,7 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
+ 				IpInfoURL:      hopt.IpInfoUrl,
+ 				Interval:       badoption.Duration(hopt.URLTestInterval.Duration()),
+ 				DebounceWindow: badoption.Duration(time.Millisecond * 500),
+-				URLTestTimeout: badoption.Duration(hopt.URLTestTimeout.Duration()),
++				URLTestTimeout: timeout,
+ 				IdleTimeout:    badoption.Duration(hopt.URLTestInterval.Duration().Nanoseconds() * 3),
+ 			},
+ 		}
+@@ -1044,7 +1062,7 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
+ 			Strategy: dnsStrategy(hopt.DirectDnsDomainStrategy, hopt.IPv6Mode),
+ 		},
+ 		// OverrideAndroidVPN: hopt.EnableTun && C.IsAndroid,
+-		RuleSet:     rulesets,
++		RuleSet: rulesets,
+ 		// A-VPN: each connection's app, for the app's Connections tab
+ 		FindProcess: true,
+ 		// GeoIP: &option.GeoIPOptions{
+@@ -1284,7 +1302,13 @@ func generateRandomString(length int) string {
+ }
+ 
+ // balancerTolerance is the configured tolerance, or the old 1 ms (always the fastest) when none is set.
+-func balancerTolerance(opt *HiddifyOptions) uint16 {
++func balancerTolerance(opt *HiddifyOptions, mobile bool) uint16 {
++	if mobile && opt.BalancerToleranceMobile > 1 {
++		return opt.BalancerToleranceMobile
++	}
++	if !mobile && opt.BalancerToleranceWifi > 1 {
++		return opt.BalancerToleranceWifi
++	}
+ 	if opt.BalancerTolerance > 1 {
+ 		return opt.BalancerTolerance
+ 	}
+diff --git a/v2/config/builder_tolerance_test.go b/v2/config/builder_tolerance_test.go
+new file mode 100644
+index 0000000..30d58c7
+--- /dev/null
++++ b/v2/config/builder_tolerance_test.go
+@@ -0,0 +1,41 @@
++package config
++
++import (
++	"encoding/json"
++	"testing"
++)
++
++func TestNetworkSpecificBalancerTolerance(t *testing.T) {
++	options := DefaultHiddifyOptions()
++	options.BalancerTolerance = 150
++	options.BalancerToleranceWifi = 150
++	options.BalancerToleranceMobile = 50
++
++	if got := balancerTolerance(options, false); got != 150 {
++		t.Fatalf("Wi-Fi tolerance = %d, want 150", got)
++	}
++	if got := balancerTolerance(options, true); got != 50 {
++		t.Fatalf("LTE tolerance = %d, want 50", got)
++	}
++
++	options.BalancerToleranceWifi = 0
++	options.BalancerToleranceMobile = 0
++	if got := balancerTolerance(options, true); got != 150 {
++		t.Fatalf("legacy LTE tolerance = %d, want 150", got)
++	}
++
++	encoded, err := json.Marshal(struct {
++		Wifi   uint16 `json:"balancer-tolerance-wifi"`
++		Mobile uint16 `json:"balancer-tolerance-mobile"`
++	}{150, 50})
++	if err != nil {
++		t.Fatal(err)
++	}
++	var decoded URLTestOptions
++	if err := json.Unmarshal(encoded, &decoded); err != nil {
++		t.Fatal(err)
++	}
++	if decoded.BalancerToleranceWifi != 150 || decoded.BalancerToleranceMobile != 50 {
++		t.Fatalf("network tolerance JSON not retained: Wi-Fi=%d LTE=%d", decoded.BalancerToleranceWifi, decoded.BalancerToleranceMobile)
++	}
++}
+diff --git a/v2/config/fakeip_persistence_test.go b/v2/config/fakeip_persistence_test.go
+new file mode 100644
+index 0000000..f04272c
+--- /dev/null
++++ b/v2/config/fakeip_persistence_test.go
+@@ -0,0 +1,52 @@
++package config
++
++import (
++	"context"
++	"net/netip"
++	"path/filepath"
++	"testing"
++
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/dns/transport/fakeip"
++	"github.com/sagernet/sing-box/experimental/cachefile"
++	"github.com/sagernet/sing-box/experimental/libbox"
++	"github.com/sagernet/sing/common/logger"
++	"github.com/sagernet/sing/service"
++	"github.com/stretchr/testify/require"
++)
++
++func TestFakeIPMappingsSurviveRestart(t *testing.T) {
++	options := DefaultHiddifyOptions()
++	options.EnableFakeDNS = true
++	options.EnableClashApi = true
++	built, err := BuildConfig(libbox.BaseContext(nil), options, &ReadOptions{Content: `{"outbounds":[{"type":"socks","tag":"proxy","server":"127.0.0.1","server_port":1080}]}`})
++	require.NoError(t, err)
++	cacheOptions := *built.Experimental.CacheFile
++	cacheOptions.Path = filepath.Join(t.TempDir(), "cache.db")
++	open := func() (*fakeip.Store, *cachefile.CacheFile) {
++		t.Helper()
++		ctx := context.Background()
++		cache := cachefile.New(ctx, logger.NOP(), cacheOptions)
++		require.NoError(t, cache.Start(adapter.StartStateInitialize))
++		ctx = service.ContextWith[adapter.CacheFile](ctx, cache)
++		store := fakeip.NewStore(ctx, logger.NOP(), netip.MustParsePrefix("198.18.0.0/15"), netip.MustParsePrefix("fc00::/18"))
++		require.NoError(t, store.Start())
++		return store, cache
++	}
++	store, cache := open()
++	ip4, err := store.Create("cached-v4.example", false)
++	require.NoError(t, err)
++	ip6, err := store.Create("cached-v6.example", true)
++	require.NoError(t, err)
++	require.NoError(t, store.Close())
++	require.NoError(t, cache.Close())
++	store, cache = open()
++	defer cache.Close()
++	defer store.Close()
++	name4, found4 := store.Lookup(ip4)
++	name6, found6 := store.Lookup(ip6)
++	require.True(t, found4, "cached IPv4 fake address lost after restart")
++	require.True(t, found6, "cached IPv6 fake address lost after restart")
++	require.Equal(t, "cached-v4.example", name4)
++	require.Equal(t, "cached-v6.example", name6)
++}
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index 3dadf7b..1a8255b 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -76,6 +76,8 @@ type URLTestOptions struct {
+ 	// A-VPN: automatic server choice keeps the current server unless another is faster by this many ms
+ 	// (0 = always take the fastest), and with BalancerKeepConnections a switch doesn't cut open connections
+ 	BalancerTolerance       uint16 `json:"balancer-tolerance,omitempty" overridable:"true"`
++	BalancerToleranceWifi   uint16 `json:"balancer-tolerance-wifi,omitempty" overridable:"true"`
++	BalancerToleranceMobile uint16 `json:"balancer-tolerance-mobile,omitempty" overridable:"true"`
+ 	BalancerKeepConnections bool   `json:"balancer-keep-connections,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+diff --git a/v2/config/input_route_rules_test.go b/v2/config/input_route_rules_test.go
+index 85da4fa..5f7517a 100644
+--- a/v2/config/input_route_rules_test.go
++++ b/v2/config/input_route_rules_test.go
+@@ -1,6 +1,7 @@
+ package config
+ 
+ import (
++	"fmt"
+ 	"strings"
+ 	"testing"
+ 	"time"
+@@ -120,7 +121,6 @@ func TestServerModeSendsEverythingElseDirect(t *testing.T) {
+ 	}
+ }
+ 
+-
+ // A-VPN's ping timeout setting reaches the core's server monitoring.
+ func TestURLTestTimeoutReachesMonitoring(t *testing.T) {
+ 	hopt := DefaultHiddifyOptions()
+@@ -157,3 +157,18 @@ func TestBlockedOnlyRules(t *testing.T) {
+ 		t.Fatalf("rules out of order: %+v", rules[2:7])
+ 	}
+ }
++
++func TestNetworkPingTimeoutOverridesMonitoring(t *testing.T) {
++	hopt := DefaultHiddifyOptions()
++	hopt.URLTestTimeout = 5
++	for _, seconds := range []int{1, 30} {
++		content := strings.Replace(homeNetworkProfile, `"outbounds":`, fmt.Sprintf(`"experimental":{"monitoring":{"url_test_timeout":"%ds"}},"outbounds":`, seconds), 1)
++		options, err := BuildConfig(libbox.BaseContext(nil), hopt, &ReadOptions{Content: content})
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got := options.Experimental.Monitoring.URLTestTimeout.Build(); got != time.Duration(seconds)*time.Second {
++			t.Fatalf("network timeout=%v, want %ds", got, seconds)
++		}
++	}
++}
+diff --git a/v2/hcore/grpc_auth.go b/v2/hcore/grpc_auth.go
+new file mode 100644
+index 0000000..1008995
+--- /dev/null
++++ b/v2/hcore/grpc_auth.go
+@@ -0,0 +1,43 @@
++package hcore
++
++import (
++	"context"
++	"crypto/subtle"
++	"fmt"
++
++	"google.golang.org/grpc"
++	"google.golang.org/grpc/codes"
++	"google.golang.org/grpc/metadata"
++	"google.golang.org/grpc/status"
++)
++
++// Plaintext loopback is shared with other local applications. Every RPC needs
++// the install secret, including hello and server-streaming subscriptions.
++func grpcAuthenticationOptions(secrets ...string) ([]grpc.ServerOption, error) {
++	if len(secrets) != 1 || len(secrets[0]) < 32 {
++		return nil, fmt.Errorf("gRPC requires an authentication secret of at least 32 bytes")
++	}
++	expected := "Bearer " + secrets[0]
++	authenticate := func(ctx context.Context) error {
++		md, _ := metadata.FromIncomingContext(ctx)
++		values := md.Get("authorization")
++		if len(values) != 1 || subtle.ConstantTimeCompare([]byte(values[0]), []byte(expected)) != 1 {
++			return status.Error(codes.Unauthenticated, "invalid gRPC credentials")
++		}
++		return nil
++	}
++	return []grpc.ServerOption{
++		grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
++			if err := authenticate(ctx); err != nil {
++				return nil, err
++			}
++			return handler(ctx, req)
++		}),
++		grpc.StreamInterceptor(func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
++			if err := authenticate(stream.Context()); err != nil {
++				return err
++			}
++			return handler(srv, stream)
++		}),
++	}, nil
++}
+diff --git a/v2/hcore/grpc_auth_test.go b/v2/hcore/grpc_auth_test.go
+new file mode 100644
+index 0000000..c9e257c
+--- /dev/null
++++ b/v2/hcore/grpc_auth_test.go
+@@ -0,0 +1,82 @@
++package hcore
++
++import (
++	"context"
++	"net"
++	"testing"
++	"time"
++
++	"github.com/hiddify/hiddify-core/v2/hcommon"
++	"github.com/hiddify/hiddify-core/v2/hello"
++	"google.golang.org/grpc"
++	"google.golang.org/grpc/codes"
++	"google.golang.org/grpc/credentials/insecure"
++	"google.golang.org/grpc/metadata"
++	"google.golang.org/grpc/status"
++)
++
++func TestInsecureGrpcRejectsUnauthenticatedRPCs(t *testing.T) {
++	for _, mode := range []SetupMode{SetupMode_GRPC_NORMAL_INSECURE, SetupMode_GRPC_BACKGROUND_INSECURE} {
++		t.Run(mode.String(), func(t *testing.T) {
++			listener, err := net.Listen("tcp", "127.0.0.1:0")
++			if err != nil {
++				t.Fatal(err)
++			}
++			address := listener.Addr().String()
++			listener.Close()
++			secret := "test-secret-with-at-least-32-random-bytes"
++			server, err := StartGrpcServerByMode(address, mode, secret)
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer server.Stop()
++			defer delete(grpcServer, mode)
++			conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer conn.Close()
++			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
++			defer cancel()
++			_, err = hello.NewHelloClient(conn).SayHello(ctx, &hello.HelloRequest{Name: "test"})
++			if status.Code(err) != codes.Unauthenticated {
++				t.Errorf("unary RPC: want Unauthenticated, got %v", err)
++			}
++			wrong := metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer wrong")
++			_, err = hello.NewHelloClient(conn).SayHello(wrong, &hello.HelloRequest{Name: "test"})
++			if status.Code(err) != codes.Unauthenticated {
++				t.Errorf("wrong token: got %v", err)
++			}
++			stream, err := NewCoreClient(conn).GetSystemInfoStream(ctx, &hcommon.Empty{})
++			if err == nil {
++				_, err = stream.Recv()
++			}
++			if status.Code(err) != codes.Unauthenticated {
++				t.Errorf("stream RPC: want Unauthenticated, got %v", err)
++			}
++			valid := metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+secret)
++			if _, err := hello.NewHelloClient(conn).SayHello(valid, &hello.HelloRequest{Name: "test"}); err != nil {
++				t.Fatalf("authenticated unary: %v", err)
++			}
++			info, err := NewCoreClient(conn).CoreInfoListener(valid, &hcommon.Empty{})
++			if err == nil {
++				_, err = info.Recv()
++			}
++			if err != nil {
++				t.Fatalf("authenticated stream: %v", err)
++			}
++		})
++	}
++}
++
++func TestGrpcAuthenticationRequiresSecret(t *testing.T) {
++	if _, err := grpcAuthenticationOptions(); err == nil {
++		t.Fatal("missing secret accepted")
++	}
++	if _, err := grpcAuthenticationOptions(""); err == nil {
++		t.Fatal("empty secret accepted")
++	}
++	if _, err := grpcAuthenticationOptions("short"); err == nil {
++		t.Fatal("short secret accepted")
++	}
++}
+diff --git a/v2/hcore/grpc_server.go b/v2/hcore/grpc_server.go
+index 9ae455d..b4e9439 100644
+--- a/v2/hcore/grpc_server.go
++++ b/v2/hcore/grpc_server.go
+@@ -114,7 +114,7 @@ func Setup(params *SetupRequest, platformInterface libbox.PlatformInterface) err
+ 		statusPropagationPort = int64(params.FlutterStatusPort)
+ 	// case SetupMode_GRPC_BACKGROUND_INSECURE:
+ 	default:
+-		_, err := StartGrpcServerByMode(params.Listen, params.Mode)
++		_, err := StartGrpcServerByMode(params.Listen, params.Mode, params.Secret)
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -145,13 +145,17 @@ func Setup(params *SetupRequest, platformInterface libbox.PlatformInterface) err
+ 	return InitHiddifyService()
+ }
+ 
+-func StartGrpcServer(listenAddressG string, service string) (*grpc.Server, error) {
++func StartGrpcServer(listenAddressG string, service string, secrets ...string) (*grpc.Server, error) {
++	auth, err := grpcAuthenticationOptions(secrets...)
++	if err != nil {
++		return nil, err
++	}
+ 	lis, err := net.Listen("tcp", listenAddressG)
+ 	if err != nil {
+ 		log.Error("failed to listen: %v", err)
+ 		return nil, err
+ 	}
+-	s := grpc.NewServer()
++	s := grpc.NewServer(auth...)
+ 	if service == "core" {
+ 		// Setup("./tmp/", "./tmp", "./tmp", 11111, false)
+ 		RegisterCoreServer(s, &CoreService{})
+@@ -190,7 +194,7 @@ var (
+ )
+ 
+ // StartGrpcServerByMode starts a gRPC server on the specified address with mTLS.
+-func StartGrpcServerByMode(listenAddressG string, mode SetupMode) (*grpc.Server, error) {
++func StartGrpcServerByMode(listenAddressG string, mode SetupMode, secrets ...string) (*grpc.Server, error) {
+ 	// Validate the listen address
+ 	if !strings.Contains(listenAddressG, ":") {
+ 		return nil, fmt.Errorf("invalid listen address (no port): %s", listenAddressG)
+@@ -211,7 +215,11 @@ func StartGrpcServerByMode(listenAddressG string, mode SetupMode) (*grpc.Server,
+ 	}
+ 
+ 	if mode == SetupMode_GRPC_BACKGROUND_INSECURE || mode == SetupMode_GRPC_NORMAL_INSECURE {
+-		grpcServer[mode] = grpc.NewServer()
++		auth, err := grpcAuthenticationOptions(secrets...)
++		if err != nil {
++			return nil, err
++		}
++		grpcServer[mode] = grpc.NewServer(auth...)
+ 	} else {
+ 		table := db.GetTable[hcommon.AppSettings]()
+ 		Log(LogLevel_DEBUG, LogType_CORE, table)
+diff --git a/v2/hcore/hotreload.go b/v2/hcore/hotreload.go
+index 502aad8..df26e16 100644
+--- a/v2/hcore/hotreload.go
++++ b/v2/hcore/hotreload.go
+@@ -9,6 +9,7 @@ import (
+ 	"github.com/hiddify/hiddify-core/v2/config"
+ 	service_manager "github.com/hiddify/hiddify-core/v2/service_manager"
+ 	"github.com/sagernet/sing-box/experimental/libbox"
++	"github.com/sagernet/sing/common/json"
+ )
+ 
+ // HotReload waits for the outcome, unlike Start and Stop: on HOT_RELOAD_FAILED the caller has to
+@@ -36,13 +37,101 @@ func HotReload(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error)
+ 	return wait(result)
+ }
+ 
++// HotReloadRunning never starts a stopped core, including when Stop won the queue.
++func HotReloadRunning(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error) {
++	queue.Lock()
++	ctx = withStopSignalLocked(ctx)
++	setCoreStatusIf(append([]CoreStates{CoreStates_HOT_RELOADING}, running...), CoreStates_HOT_RELOADING, MessageType_EMPTY, "")
++	result := enqueueLocked(operationStart, "hotreload", func() (coreResponse *CoreInfoResponse, err error) {
++		defer config.DeferPanicToError("hotreload", func(recovered_err error) {
++			coreResponse, err = hotReloadError(MessageType_UNEXPECTED_ERROR, recovered_err)
++		})
++		return hotReloadLockedMode(ctx, in, true)
++	})
++	queue.Unlock()
++	return wait(result)
++}
++
++// RebuildService replaces an incompatible box inside the same logical session.
++// Unlike Stop/Start, the daemon retains its original session start time.
++func RebuildService(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error) {
++	queue.Lock()
++	ctx = withStopSignalLocked(ctx)
++	result := enqueueLocked(operationStart, "rebuild", func() (coreResponse *CoreInfoResponse, err error) {
++		defer config.DeferPanicToError("rebuild", func(recovered_err error) {
++			coreResponse, err = hotReloadError(MessageType_UNEXPECTED_ERROR, recovered_err)
++		})
++		return rebuildLocked(ctx, in)
++	})
++	queue.Unlock()
++	return wait(result)
++}
++
++// rebuildLocked is RebuildService; static.lock must be held.
++func rebuildLocked(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error) {
++	state := currentCoreState()
++	if !isRunningState(state) || static.StartedService == nil {
++		return hotReloadError(MessageType_HOT_RELOAD_FAILED, fmt.Errorf("core is %s", state))
++	}
++	in, err := loadLastStartRequestIfNeeded(in)
++	if err != nil {
++		return hotReloadError(MessageType_ERROR_BUILDING_CONFIG, err)
++	}
++	options, err := BuildConfig(ctx, in)
++	if err != nil {
++		return hotReloadError(MessageType_ERROR_BUILDING_CONFIG, err)
++	}
++	if err = service_manager.OnMainServicePreStart(options); err != nil {
++		return hotReloadError(MessageType_ERROR_EXTENSION, err)
++	}
++	if err = libbox.CheckConfigOptions(options); err != nil {
++		return hotReloadError(MessageType_ERROR_BUILDING_CONFIG, err)
++	}
++	content, err := json.MarshalContext(ctx, options)
++	if err != nil {
++		return hotReloadError(MessageType_ERROR_BUILDING_CONFIG, err)
++	}
++	SetCoreStatus(CoreStates_HOT_RELOADING, MessageType_EMPTY, "")
++	if err = static.StartedService.StartOrReloadService(ctx, string(content), nil); err != nil {
++		// Keep the daemon so the caller can rebuild the previous configuration
++		// without losing the session after a failed replacement.
++		setCoreStatusIf([]CoreStates{CoreStates_HOT_RELOADING}, static.connectedState(), MessageType_EMPTY, "")
++		return hotReloadError(MessageType_START_SERVICE, err)
++	}
++	static.previousStartRequest = in
++	saveLastStartRequest(in)
++	config.SaveCurrentConfig(ctx, filepath.Join(sWorkingPath, "data/current-config.json"), *options)
++	if response, ok := setCoreStatusIf([]CoreStates{CoreStates_HOT_RELOADING}, CoreStates_WAITING, MessageType_EMPTY, ""); ok {
++		startConnectivityWatcher()
++		return response, nil
++	}
++	return &CoreInfoResponse{CoreState: currentCoreState(), MessageType: MessageType_EMPTY}, nil
++}
++
++func isRunningState(state CoreStates) bool {
++	for _, candidate := range running {
++		if candidate == state {
++			return true
++		}
++	}
++	return false
++}
++
+ // hotReloadLocked is HotReload; static.lock must be held.
+ func hotReloadLocked(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error) {
++	return hotReloadLockedMode(ctx, in, false)
++}
++
++// hotReloadLockedMode is hotReloadLocked; runningOnly refuses to start a stopped core.
++func hotReloadLockedMode(ctx context.Context, in *StartRequest, runningOnly bool) (*CoreInfoResponse, error) {
+ 	if err := contextErr(ctx); err != nil {
+ 		return hotReloadError(MessageType_HOT_RELOAD_FAILED, fmt.Errorf("hot reload cancelled: %w", err))
+ 	}
+ 	switch currentCoreState() {
+ 	case CoreStates_STOPPED:
++		if runningOnly {
++			return hotReloadError(MessageType_HOT_RELOAD_FAILED, fmt.Errorf("core is %s", CoreStates_STOPPED))
++		}
+ 		return startServiceLocked(ctx, in)
+ 	case CoreStates_WAITING, CoreStates_STARTED, CoreStates_NO_AVAILABLE_PROXIES, CoreStates_HOT_RELOADING:
+ 		// HOT_RELOADING may already be set when the call was accepted (shown at once)
+diff --git a/v2/hcore/hotreload_select_test.go b/v2/hcore/hotreload_select_test.go
+new file mode 100644
+index 0000000..e5a5dce
+--- /dev/null
++++ b/v2/hcore/hotreload_select_test.go
+@@ -0,0 +1,74 @@
++package hcore
++
++import (
++	"os"
++	"path/filepath"
++	"runtime/debug"
++	"testing"
++	"time"
++
++	"github.com/hiddify/hiddify-core/v2/config"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/common/monitoring"
++	N "github.com/sagernet/sing/common/network"
++	"github.com/stretchr/testify/require"
++)
++
++func selectedTag(t *testing.T) string {
++	t.Helper()
++	outbound, loaded := static.Box().Outbound().Outbound(config.OutboundSelectTag)
++	require.True(t, loaded)
++	return outbound.(adapter.OutboundGroup).Selected(N.NetworkTCP).Tag()
++}
++
++func reportedSelected(t *testing.T) string {
++	t.Helper()
++	info := static.GetAllProxiesInfo(monitoring.Get(static.Context()).OutboundsHistory(""), true)
++	for _, group := range info.Items {
++		if group.Tag == config.OutboundSelectTag {
++			return group.Selected
++		}
++	}
++	return ""
++}
++
++// after a hot reload, selecting a proxy changes the selector and what the app is told
++func TestHotReloadThenSelect(t *testing.T) {
++	dir := t.TempDir()
++	previousDir, err := os.Getwd()
++	require.NoError(t, err)
++	t.Cleanup(func() {
++		require.NoError(t, debug.SetCrashOutput(nil, debug.CrashOptions{}))
++		require.NoError(t, os.Chdir(previousDir))
++	})
++	require.NoError(t, os.MkdirAll(filepath.Join(dir, "data"), 0o755))
++	require.NoError(t, Setup(&SetupRequest{BasePath: dir, WorkingDir: dir, TempDir: dir, Mode: SetupMode_OLD}, nil))
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: hotReloadSettings(t, freeTCPPort(t), "warn")}, false)
++	require.NoError(t, err)
++	t.Cleanup(func() { Stop() })
++
++	_, err = StartService(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 1081))})
++	require.NoError(t, err)
++	_, err = HotReload(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081), socks("proxy-c", 1082))})
++	require.NoError(t, err)
++
++	// the app selects in the first group of the proxy list (its main group): replaced groups must
++	// keep their place, otherwise another group (e.g. the balancer) comes first after a hot reload
++	groups := static.GetAllProxiesInfo(monitoring.Get(static.Context()).OutboundsHistory(""), false)
++	require.NotEmpty(t, groups.Items)
++	mainGroup := groups.Items[0].Tag
++	require.Equal(t, config.OutboundSelectTag, mainGroup, "the main group stays first after a hot reload")
++
++	target := runningOutbound(t, "proxy-c").Tag()
++	events, err := monitoring.Get(static.Context()).SubscribeGroup("")
++	require.NoError(t, err)
++	_, err = static.SelectOutbound(&SelectOutboundRequest{GroupTag: mainGroup, OutboundTag: target})
++	require.NoError(t, err)
++	require.Equal(t, target, selectedTag(t), "the selector uses the selection")
++	select {
++	case <-events:
++	case <-time.After(5 * time.Second):
++		t.Fatal("no group event after selecting: the app's proxy list is not refreshed")
++	}
++	require.Equal(t, target, reportedSelected(t), "the app is told the new selection")
++}
+diff --git a/v2/hcore/hotreload_test.go b/v2/hcore/hotreload_test.go
+new file mode 100644
+index 0000000..99e68fa
+--- /dev/null
++++ b/v2/hcore/hotreload_test.go
+@@ -0,0 +1,228 @@
++package hcore
++
++import (
++	"fmt"
++	"net"
++	"os"
++	"path/filepath"
++	"runtime/debug"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/stretchr/testify/require"
++)
++
++func freeTCPPort(t *testing.T) int {
++	t.Helper()
++	listener, err := net.Listen("tcp", "127.0.0.1:0")
++	require.NoError(t, err)
++	defer listener.Close()
++	return listener.Addr().(*net.TCPAddr).Port
++}
++
++var clashPort int
++
++var otherPorts []int
++
++func hotReloadSettings(t *testing.T, mixedPort int, logLevel string) string {
++	if clashPort == 0 {
++		clashPort = freeTCPPort(t)
++		otherPorts = []int{freeTCPPort(t), freeTCPPort(t), freeTCPPort(t)}
++	}
++	return fmt.Sprintf(`{"mixed-port":%d,"tproxy-port":%d,"redirect-port":%d,"direct-port":%d,"clash-api-port":%d,"log-level":%q}`,
++		mixedPort, otherPorts[0], otherPorts[1], otherPorts[2], clashPort, logLevel)
++}
++
++func listening(port int) bool {
++	conn, err := net.DialTimeout("tcp", fmt.Sprint("127.0.0.1:", port), time.Second)
++	if err != nil {
++		return false
++	}
++	conn.Close()
++	return true
++}
++
++func profile(outbounds ...string) string {
++	return `{"outbounds":[` + strings.Join(outbounds, ",") + `]}`
++}
++
++func socks(tag string, port int) string {
++	return fmt.Sprintf(`{"type":"socks","tag":%q,"server":"127.0.0.1","server_port":%d}`, tag, port)
++}
++
++func runningOutbound(t *testing.T, name string) adapter.Outbound {
++	t.Helper()
++	for _, outbound := range static.StartedService.Instance().Box().Outbound().Outbounds() {
++		if strings.HasPrefix(outbound.Tag(), name) {
++			return outbound
++		}
++	}
++	return nil
++}
++
++func TestHotReload(t *testing.T) {
++	dir := t.TempDir()
++	previousDir, err := os.Getwd()
++	require.NoError(t, err)
++	require.NoError(t, os.MkdirAll(filepath.Join(dir, "data"), 0o755))
++	require.NoError(t, Setup(&SetupRequest{BasePath: dir, WorkingDir: dir, TempDir: dir, Mode: SetupMode_OLD}, nil))
++	// Release the runtime's crash-report handle before TempDir cleanup on Windows.
++	t.Cleanup(func() {
++		debug.SetCrashOutput(nil, debug.CrashOptions{})
++		require.NoError(t, os.Chdir(previousDir))
++	})
++	mixedPort := freeTCPPort(t)
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: hotReloadSettings(t, mixedPort, "warn")}, false)
++	require.NoError(t, err)
++	t.Cleanup(func() { Stop() })
++
++	// hot reload while stopped starts normally
++	response, err := HotReload(static.BaseContext, &StartRequest{
++		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 1081)),
++	})
++	require.NoError(t, err)
++	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	instance := static.StartedService.Instance()
++	proxyA := runningOutbound(t, "proxy-a")
++	proxyB := runningOutbound(t, "proxy-b")
++	require.NotNil(t, proxyA)
++	require.NotNil(t, proxyB)
++	require.Nil(t, runningOutbound(t, "proxy-c"))
++
++	// only outbounds change: applied to the running core, reported as HOT_RELOADING meanwhile
++	states := static.coreInfoObserver.Subscribe(16)
++	defer static.coreInfoObserver.Unsubscribe(states)
++	response, err = HotReload(static.BaseContext, &StartRequest{
++		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081), socks("proxy-c", 1082)),
++	})
++	require.NoError(t, err)
++	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.Equal(t, MessageType_EMPTY, response.MessageType)
++	require.Same(t, instance, static.StartedService.Instance(), "the core was not restarted")
++	require.Same(t, proxyA, runningOutbound(t, "proxy-a"), "an unchanged outbound keeps running")
++	require.NotSame(t, proxyB, runningOutbound(t, "proxy-b"), "a changed outbound is replaced")
++	require.NotNil(t, runningOutbound(t, "proxy-c"), "a new outbound is added")
++	var seen []CoreStates
++	for len(seen) == 0 || seen[len(seen)-1] != CoreStates_STARTED {
++		select {
++		case info := <-states:
++			seen = append(seen, info.CoreState)
++		case <-time.After(5 * time.Second):
++			t.Fatalf("core states seen: %v", seen)
++		}
++	}
++	require.Equal(t, CoreStates_HOT_RELOADING, seen[0], "states: %v", seen)
++
++	// a normal start while started is still refused
++	response, err = StartService(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080))})
++	require.NoError(t, err)
++	require.Equal(t, MessageType_ALREADY_STARTED, response.MessageType)
++
++	// an inbound changes (the mixed port setting): applied too
++	newMixedPort := freeTCPPort(t)
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: hotReloadSettings(t, newMixedPort, "warn")}, false)
++	require.NoError(t, err)
++	require.True(t, listening(mixedPort))
++	response, err = HotReload(static.BaseContext, &StartRequest{
++		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081), socks("proxy-c", 1082)),
++	})
++	require.NoError(t, err)
++	require.Equal(t, MessageType_EMPTY, response.MessageType)
++	require.Same(t, instance, static.StartedService.Instance())
++	require.Same(t, proxyA, runningOutbound(t, "proxy-a"))
++	require.True(t, listening(newMixedPort), "the inbound moved to the new port")
++	require.False(t, listening(mixedPort))
++
++	// something that cannot be hot reloaded changes (the log level): refused, core unchanged
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: hotReloadSettings(t, newMixedPort, "error")}, false)
++	require.NoError(t, err)
++	proxyC := runningOutbound(t, "proxy-c")
++	response, err = HotReload(static.BaseContext, &StartRequest{
++		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081)),
++	})
++	require.Error(t, err)
++	require.Contains(t, err.Error(), "hot reload cannot change: log")
++	require.Equal(t, MessageType_HOT_RELOAD_FAILED, response.MessageType)
++	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.Equal(t, CoreStates_STARTED, static.CoreState)
++	require.Same(t, instance, static.StartedService.Instance())
++	require.Same(t, proxyC, runningOutbound(t, "proxy-c"), "nothing was applied")
++
++	// A network handoff may need a full rebuild. It must keep the logical
++	// session even when the box itself cannot be hot reloaded.
++	sessionStart := static.StartedService.StartedAt()
++	sessionService := static.StartedService
++	response, err = RebuildService(static.BaseContext, &StartRequest{
++		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081), socks("proxy-c", 1082)),
++	})
++	require.NoError(t, err)
++	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.Same(t, sessionService, static.StartedService)
++	require.Equal(t, sessionStart, static.StartedService.StartedAt())
++	require.NotSame(t, instance, static.StartedService.Instance())
++	instance = static.StartedService.Instance()
++
++	// A failed replacement followed by rollback is still the same session.
++	occupied, err := net.Listen("tcp", "127.0.0.1:0")
++	require.NoError(t, err)
++	t.Cleanup(func() { occupied.Close() })
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: hotReloadSettings(t, occupied.Addr().(*net.TCPAddr).Port, "warn")}, false)
++	require.NoError(t, err)
++	_, err = RebuildService(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080))})
++	require.Error(t, err)
++	require.Same(t, sessionService, static.StartedService, "failed rebuild must retain the logical session")
++	require.Equal(t, CoreStates_HOT_RELOADING, static.CoreState)
++	response, err = RebuildService(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080))})
++	require.Error(t, err)
++	require.Equal(t, CoreStates_HOT_RELOADING, response.CoreState, "failed rollback must not claim a running instance")
++	require.Nil(t, static.StartedService.Instance())
++
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: hotReloadSettings(t, newMixedPort, "warn")}, false)
++	require.NoError(t, err)
++	_, err = RebuildService(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080))})
++	require.NoError(t, err)
++	require.Equal(t, sessionStart, static.StartedService.StartedAt(), "rollback must retain the session start")
++	instance = static.StartedService.Instance()
++
++	// Auto-pause releases the instance, retaining the logical session.
++	require.NoError(t, SuspendService())
++	require.Nil(t, static.StartedService.Instance())
++	require.Equal(t, sessionStart, static.StartedService.StartedAt())
++	_, err = RebuildService(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080))})
++	require.NoError(t, err)
++	require.Equal(t, sessionStart, static.StartedService.StartedAt())
++	instance = static.StartedService.Instance()
++
++	// the TUN inbound changes (here: TUN is turned on): refused so the app restarts instead
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: strings.Replace(hotReloadSettings(t, newMixedPort, "warn"), "{", `{"enable-tun":true,`, 1)}, false)
++	require.NoError(t, err)
++	response, err = HotReload(static.BaseContext, &StartRequest{
++		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081), socks("proxy-c", 1082)),
++	})
++	require.Error(t, err)
++	require.Contains(t, err.Error(), "tun inbound has changed, hot reload can not be applied")
++	require.Equal(t, MessageType_HOT_RELOAD_FAILED, response.MessageType)
++	require.Equal(t, CoreStates_STARTED, static.CoreState)
++	require.Same(t, instance, static.StartedService.Instance())
++
++	response, err = Stop()
++	require.NoError(t, err)
++	require.Equal(t, CoreStates_STOPPED, response.CoreState)
++	_, err = HotReloadRunning(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080))})
++	require.Error(t, err, "a handoff must not revive a manually stopped core")
++	_, err = RebuildService(static.BaseContext, &StartRequest{ConfigContent: profile(socks("proxy-a", 1080))})
++	require.Error(t, err, "a fallback must not revive a manually stopped core")
++	require.Nil(t, static.StartedService)
++	require.Equal(t, CoreStates_STOPPED, static.CoreState)
++
++	_, err = ChangeHiddifySettings(&ChangeHiddifySettingsRequest{HiddifySettingsJson: hotReloadSettings(t, newMixedPort, "warn")}, false)
++	require.NoError(t, err)
++	response, err = StartService(static.BaseContext, &StartRequest{
++		ConfigContent: profile(socks("proxy-a", 1080)),
++	})
++	require.NoError(t, err)
++	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.NotEqual(t, sessionStart, static.StartedService.StartedAt(), "manual Stop/Start starts a new session")
++}
+diff --git a/v2/hcore/lifecycle_test.go b/v2/hcore/lifecycle_test.go
+new file mode 100644
+index 0000000..f2d9120
+--- /dev/null
++++ b/v2/hcore/lifecycle_test.go
+@@ -0,0 +1,24 @@
++package hcore
++
++import (
++	"context"
++	"github.com/stretchr/testify/require"
++	"testing"
++)
++
++func TestRebuildCannotStartStoppedCore(t *testing.T) {
++	static.CoreState = CoreStates_STOPPED
++	response, err := RebuildService(context.Background(), &StartRequest{ConfigContent: `{"outbounds":[]}`})
++	require.Error(t, err)
++	require.Contains(t, err.Error(), "core is STOPPED")
++	require.Equal(t, CoreStates_STOPPED, response.CoreState)
++	require.Equal(t, CoreStates_STOPPED, static.CoreState)
++	require.Nil(t, static.StartedService)
++}
++
++func TestHotReloadRunningCannotStartStoppedCore(t *testing.T) {
++	static.CoreState = CoreStates_STOPPED
++	_, err := HotReloadRunning(context.Background(), &StartRequest{})
++	require.ErrorContains(t, err, "core is STOPPED")
++	require.Equal(t, CoreStates_STOPPED, static.CoreState)
++}
+diff --git a/v2/hcore/pause.go b/v2/hcore/pause.go
+index 85f3363..b499726 100644
+--- a/v2/hcore/pause.go
++++ b/v2/hcore/pause.go
+@@ -2,6 +2,7 @@ package hcore
+ 
+ import (
+ 	"context"
++	"fmt"
+ 	"time"
+ 
+ 	hcommon "github.com/hiddify/hiddify-core/v2/hcommon"
+@@ -47,3 +48,14 @@ func Wake() {
+ 	}
+ 
+ }
++
++// SuspendService retains the daemon so RebuildService resumes the same session.
++func SuspendService() error {
++	static.lock.Lock()
++	defer static.lock.Unlock()
++	if static.CoreState != CoreStates_STARTED || static.StartedService == nil {
++		return fmt.Errorf("core is %s", static.CoreState)
++	}
++	SetCoreStatus(CoreStates_HOT_RELOADING, MessageType_EMPTY, "")
++	return static.StartedService.SuspendService()
++}
+-- 
+2.55.0.windows.3
+

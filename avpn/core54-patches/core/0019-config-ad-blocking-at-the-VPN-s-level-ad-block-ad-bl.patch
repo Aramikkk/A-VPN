@@ -1,0 +1,306 @@
+From 4d5b3d1eafac3d813e6d78d6f79f1867b097e6cf Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 02:07:29 +0300
+Subject: [PATCH 19/26] config: ad blocking at the VPN's level (ad-block,
+ ad-block-allow)
+
+Four remote lists, each cached by itself; a name refused in DNS as a name that
+doesn't exist, the route rule right after sniff and the DNS hijack; the user's
+exceptions turn both into 'listed and not excepted'.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ v2/config/adblock.go        | 140 ++++++++++++++++++++++++++++++++++++
+ v2/config/adblock_test.go   |  85 ++++++++++++++++++++++
+ v2/config/builder.go        |   1 +
+ v2/config/hiddify_option.go |  23 +++---
+ 4 files changed, 239 insertions(+), 10 deletions(-)
+ create mode 100644 v2/config/adblock.go
+ create mode 100644 v2/config/adblock_test.go
+
+diff --git a/v2/config/adblock.go b/v2/config/adblock.go
+new file mode 100644
+index 0000000..f7b426c
+--- /dev/null
++++ b/v2/config/adblock.go
+@@ -0,0 +1,140 @@
++package config
++
++import (
++	"net/url"
++	"strings"
++	"time"
++
++	sdns "github.com/miekg/dns"
++	C "github.com/sagernet/sing-box/constant"
++	"github.com/sagernet/sing-box/option"
++	"github.com/sagernet/sing/common/json/badoption"
++)
++
++// H: ad blocking at the VPN's level (Settings → Ad blocking). Domains the lists name are refused in DNS (as a name
++// that doesn't exist, so an app doesn't retry) and, for a connection by address or a cached name, at the route.
++// Several lists, each downloaded and cached by itself: a list that can't be had (its host down or blocked) leaves
++// the others working, and a cached copy serves until the next download. The user's own list of exceptions (domains
++// and their subdomains) is left out of both rules.
++
++const adBlockBase = "https://raw.githubusercontent.com/"
++
++// the lists: Hiddify's large one first (it carries the adblock filters' domains), two mirrors of the community's
++// ad domain list behind it, and a list of malware domains
++var adBlockLists = []struct{ tag, url string }{
++	{"adblock-hiddify", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-category-ads-all.srs"},
++	{"adblock-sagernet", adBlockBase + "SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"},
++	{"adblock-meta", adBlockBase + "MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ads-all.srs"},
++	{"adblock-malware", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-malware.srs"},
++}
++
++// adBlockDomain turns what the user typed ("https://www.Example.com/page", "*.example.com") into a domain.
++func adBlockDomain(s string) string {
++	s = strings.ToLower(strings.TrimSpace(s))
++	if strings.Contains(s, "://") {
++		if u, err := url.Parse(s); err == nil && u.Hostname() != "" {
++			s = u.Hostname()
++		}
++	}
++	if i := strings.IndexAny(s, "/?#"); i >= 0 {
++		s = s[:i]
++	}
++	s = strings.TrimPrefix(strings.TrimPrefix(s, "*."), ".")
++	s = strings.TrimSuffix(s, ".")
++	if strings.ContainsAny(s, " \t,;") || !strings.Contains(s, ".") {
++		return ""
++	}
++	return s
++}
++
++// applyAdBlock adds the lists, the refusals and the exceptions when the option is on.
++func applyAdBlock(options *option.Options, hopt *HiddifyOptions) {
++	if !hopt.AdBlock || options.Route == nil {
++		return
++	}
++	var allow []string
++	seen := map[string]bool{}
++	for _, entry := range hopt.AdBlockAllow {
++		if d := adBlockDomain(entry); d != "" && !seen[d] {
++			seen[d] = true
++			allow = append(allow, d)
++		}
++	}
++	tags := make([]string, 0, len(adBlockLists))
++	for _, list := range adBlockLists {
++		tags = append(tags, list.tag)
++		options.Route.RuleSet = append(options.Route.RuleSet, option.RuleSet{
++			Type:   C.RuleSetTypeRemote,
++			Tag:    badoption.Listable[string]{list.tag},
++			Format: C.RuleSetFormatBinary,
++			RemoteOptions: option.RemoteRuleSet{
++				URL: list.url,
++				// every day; a failed update keeps the cached copy
++				UpdateInterval: badoption.Duration(24 * time.Hour),
++				DownloadDetour: OutboundSelectTag,
++			},
++		})
++	}
++
++	// the route rule: refused at once (past 50 refusals in 30 s sing-box would drop silently, and an app trying
++	// QUIC would wait for a timeout before falling back)
++	reject := option.RuleAction{
++		Action: C.RuleActionTypeReject,
++		RejectOptions: option.RejectActionOptions{
++			Method: C.RuleActionRejectMethodDefault,
++			NoDrop: true,
++		},
++	}
++	listed := option.DefaultRule{RawDefaultRule: option.RawDefaultRule{RuleSet: tags}}
++	routeRule := option.Rule{Type: C.RuleTypeDefault, DefaultOptions: option.DefaultRule{RawDefaultRule: listed.RawDefaultRule, RuleAction: reject}}
++	if len(allow) > 0 {
++		routeRule = option.Rule{
++			Type: C.RuleTypeLogical,
++			LogicalOptions: option.LogicalRule{
++				RawLogicalRule: option.RawLogicalRule{
++					Mode: C.LogicalTypeAnd,
++					Rules: []option.Rule{
++						{Type: C.RuleTypeDefault, DefaultOptions: listed},
++						{Type: C.RuleTypeDefault, DefaultOptions: option.DefaultRule{RawDefaultRule: option.RawDefaultRule{DomainSuffix: allow, Invert: true}}},
++					},
++				},
++				RuleAction: reject,
++			},
++		}
++	}
++	// right after sniffing and the DNS hijack, before every other rule
++	at := min(2, len(options.Route.Rules))
++	rules := make([]option.Rule, 0, len(options.Route.Rules)+1)
++	rules = append(rules, options.Route.Rules[:at]...)
++	rules = append(rules, routeRule)
++	rules = append(rules, options.Route.Rules[at:]...)
++	options.Route.Rules = rules
++
++	// the DNS rule: the name doesn't exist
++	if options.DNS == nil {
++		return
++	}
++	nameError := option.DNSRCode(sdns.RcodeNameError)
++	refuse := option.DNSRuleAction{
++		Action:            C.RuleActionTypePredefined,
++		PredefinedOptions: option.DNSRouteActionPredefined{Rcode: &nameError},
++	}
++	dnsListed := option.DefaultDNSRule{RawDefaultDNSRule: option.RawDefaultDNSRule{RuleSet: tags}}
++	dnsRule := option.DNSRule{Type: C.RuleTypeDefault, DefaultOptions: option.DefaultDNSRule{RawDefaultDNSRule: dnsListed.RawDefaultDNSRule, DNSRuleAction: refuse}}
++	if len(allow) > 0 {
++		dnsRule = option.DNSRule{
++			Type: C.RuleTypeLogical,
++			LogicalOptions: option.LogicalDNSRule{
++				RawLogicalDNSRule: option.RawLogicalDNSRule{
++					Mode: C.LogicalTypeAnd,
++					Rules: []option.DNSRule{
++						{Type: C.RuleTypeDefault, DefaultOptions: dnsListed},
++						{Type: C.RuleTypeDefault, DefaultOptions: option.DefaultDNSRule{RawDefaultDNSRule: option.RawDefaultDNSRule{DomainSuffix: allow, Invert: true}}},
++					},
++				},
++				DNSRuleAction: refuse,
++			},
++		}
++	}
++	options.DNS.Rules = append([]option.DNSRule{dnsRule}, options.DNS.Rules...)
++}
+diff --git a/v2/config/adblock_test.go b/v2/config/adblock_test.go
+new file mode 100644
+index 0000000..be5080e
+--- /dev/null
++++ b/v2/config/adblock_test.go
+@@ -0,0 +1,85 @@
++package config
++
++import (
++	"testing"
++
++	C "github.com/sagernet/sing-box/constant"
++	"github.com/sagernet/sing-box/experimental/libbox"
++	"github.com/sagernet/sing-box/option"
++)
++
++func TestAdBlockDomain(t *testing.T) {
++	for in, want := range map[string]string{
++		"Example.com":                  "example.com",
++		" https://www.Example.com/a?b": "www.example.com",
++		"*.example.com":                "example.com",
++		".example.com.":                "example.com",
++		"example.com/page":             "example.com",
++		"localhost":                    "",
++		"two words.com":                "",
++		"":                             "",
++	} {
++		if got := adBlockDomain(in); got != want {
++			t.Errorf("adBlockDomain(%q) = %q, want %q", in, got, want)
++		}
++	}
++}
++
++func TestAdBlockOffChangesNothing(t *testing.T) {
++	options := siteGroupsTestOptions()
++	applyAdBlock(options, &HiddifyOptions{})
++	if len(options.Route.Rules) != 4 || len(options.Route.RuleSet) != 0 {
++		t.Fatalf("off: %d rules, %d rule sets", len(options.Route.Rules), len(options.Route.RuleSet))
++	}
++}
++
++// With the option on: every list is a remote rule set, the reject rule comes right after sniffing and the DNS
++// hijack (index 2), and the DNS rule is first; the user's exceptions turn both into "listed and not excepted".
++func TestAdBlockRules(t *testing.T) {
++	options := siteGroupsTestOptions()
++	options.DNS = &option.DNSOptions{}
++	applyAdBlock(options, &HiddifyOptions{AdBlock: true, AdBlockAllow: []string{"https://Allowed.example/x", "bad", "allowed.example"}})
++	if len(options.Route.RuleSet) != len(adBlockLists) {
++		t.Fatalf("%d rule sets, want %d", len(options.Route.RuleSet), len(adBlockLists))
++	}
++	rule := options.Route.Rules[2]
++	if rule.Type != C.RuleTypeLogical || rule.LogicalOptions.Action != C.RuleActionTypeReject || len(rule.LogicalOptions.Rules) != 2 {
++		t.Fatalf("the reject rule must come after sniff and hijack: %+v", rule)
++	}
++	except := rule.LogicalOptions.Rules[1].DefaultOptions
++	if !except.Invert || len(except.DomainSuffix) != 1 || except.DomainSuffix[0] != "allowed.example" {
++		t.Fatalf("one exception, inverted: %+v", except)
++	}
++	if got := options.Route.Rules[3].DefaultOptions.RouteOptions.Outbound; got != OutboundDirectTag {
++		t.Fatalf("the other rules stay behind it: %q", got)
++	}
++	if len(options.DNS.Rules) != 1 || options.DNS.Rules[0].Type != C.RuleTypeLogical {
++		t.Fatalf("the DNS rule: %+v", options.DNS.Rules)
++	}
++}
++
++func TestAdBlockNoExceptionsIsPlain(t *testing.T) {
++	options := siteGroupsTestOptions()
++	options.DNS = &option.DNSOptions{}
++	applyAdBlock(options, &HiddifyOptions{AdBlock: true})
++	if rule := options.Route.Rules[2]; rule.Type != C.RuleTypeDefault || rule.DefaultOptions.Action != C.RuleActionTypeReject {
++		t.Fatalf("a plain reject rule: %+v", rule)
++	}
++}
++
++// The whole config with it on: sing-box takes it.
++func TestAdBlockBuiltConfigChecks(t *testing.T) {
++	profile := `{"outbounds": [
++  {"type": "socks", "tag": "pl", "server": "127.0.0.1", "server_port": 1080},
++  {"type": "socks", "tag": "fi", "server": "127.0.0.1", "server_port": 1081}]}`
++	hopts := DefaultHiddifyOptions()
++	hopts.AdBlock = true
++	hopts.AdBlockAllow = []string{"example.org"}
++	options, err := BuildConfig(libbox.BaseContext(nil), hopts, &ReadOptions{Content: profile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the config: %v", err)
++	}
++}
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 6f38d3d..278628c 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -109,6 +109,7 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 	}
+ 	prependInputRouteRules(&options, input)
+ 	applySiteGroups(&options, hopts)
++	applyAdBlock(&options, hopts)
+ 
+ 	return &options, nil
+ }
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index b05fd1e..f06682a 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -11,16 +11,19 @@ import (
+ )
+ 
+ type HiddifyOptions struct {
+-	EnableFullConfig        bool   `json:"enable-full-config,omitempty" overridable:"true"`
+-	LogLevel                string `json:"log-level,omitempty"`
+-	LogFile                 string `json:"log-file,omitempty"`
+-	EnableClashApi          bool   `json:"enable-clash-api,omitempty"`
+-	ClashApiPort            uint16 `json:"clash-api-port,omitempty"`
+-	ClashApiSecret          string `json:"web-secret,omitempty"`
+-	Region                  string `json:"region,omitempty"`
+-	BlockAds                bool   `json:"block-ads,omitempty" overridable:"true"`
+-	UseXrayCoreWhenPossible bool   `json:"use-xray-core-when-possible,omitempty" overridable:"true"`
+-	BalancerStrategy        string `json:"balancer-strategy,omitempty" overridable:"true"`
++	EnableFullConfig bool   `json:"enable-full-config,omitempty" overridable:"true"`
++	LogLevel         string `json:"log-level,omitempty"`
++	LogFile          string `json:"log-file,omitempty"`
++	EnableClashApi   bool   `json:"enable-clash-api,omitempty"`
++	ClashApiPort     uint16 `json:"clash-api-port,omitempty"`
++	ClashApiSecret   string `json:"web-secret,omitempty"`
++	Region           string `json:"region,omitempty"`
++	BlockAds         bool   `json:"block-ads,omitempty" overridable:"true"`
++	// H: ad blocking at the VPN's level, with the user's exceptions (domains): see applyAdBlock
++	AdBlock                 bool     `json:"ad-block,omitempty" overridable:"true"`
++	AdBlockAllow            []string `json:"ad-block-allow,omitempty" overridable:"true"`
++	UseXrayCoreWhenPossible bool     `json:"use-xray-core-when-possible,omitempty" overridable:"true"`
++	BalancerStrategy        string   `json:"balancer-strategy,omitempty" overridable:"true"`
+ 	// GeoIPPath        string      `json:"geoip-path"`
+ 	// GeoSitePath      string      `json:"geosite-path"`
+ 	Rules []Rule `json:"rules,omitempty" overridable:"true"`
+-- 
+2.55.0.windows.3
+

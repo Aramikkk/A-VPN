@@ -1,0 +1,34 @@
+From c4f4e12a5f6013f057519c2c15572c20a24e1d4f Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 13 Oct 2026 11:26:35 +0300
+Subject: [PATCH 07/26] front setup no longer wipes the VPN service's platform
+ interface (open /dev/tun: permission denied)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/hcore/grpc_server.go | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/v2/hcore/grpc_server.go b/v2/hcore/grpc_server.go
+index c3cfbef..9ae455d 100644
+--- a/v2/hcore/grpc_server.go
++++ b/v2/hcore/grpc_server.go
+@@ -55,9 +55,13 @@ func Setup(params *SetupRequest, platformInterface libbox.PlatformInterface) err
+ 		Log(LogLevel_WARNING, LogType_CORE, "grpcServer already started")
+ 		return nil
+ 	}
+-	static.BaseContext = libbox.BaseContext(platformInterface)
++	// A-VPN: the app's own (front) setup has no platform interface; when it runs after the VPN service's, it
++	// must not wipe the service's out, or the core opens /dev/tun itself and Android refuses ("permission denied")
++	if platformInterface != nil || static.globalPlatformInterface == nil {
++		static.BaseContext = libbox.BaseContext(platformInterface)
++		static.globalPlatformInterface = platformInterface
++	}
+ 	static.debug = params.Debug
+-	static.globalPlatformInterface = platformInterface
+ 	tcpConn := true // runtime.GOOS == "windows" // TODO add TVOS
+ 	libbox.Setup(
+ 		&libbox.SetupOptions{
+-- 
+2.55.0.windows.3
+

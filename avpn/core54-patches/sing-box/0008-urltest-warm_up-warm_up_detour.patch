@@ -1,0 +1,177 @@
+From 7892292af489d10ac91c26180c0cee241f09a60d Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 22:18:49 +0300
+Subject: [PATCH 08/14] urltest: warm_up / warm_up_detour
+
+For warm_up after the start and after every network change the group sends
+everything through warm_up_detour while its own tests run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ option/group.go                |  4 +++
+ protocol/group/urltest.go      | 47 +++++++++++++++++++++++++++++++++-
+ protocol/group/urltest_test.go | 24 +++++++++++++++++
+ 3 files changed, 74 insertions(+), 1 deletion(-)
+
+diff --git a/option/group.go b/option/group.go
+index c414d3d67..f294de5cb 100644
+--- a/option/group.go
++++ b/option/group.go
+@@ -20,4 +20,8 @@ type URLTestOutboundOptions struct {
+ 	// H: the group keeps its delays to itself, not in the shared history the other groups and the app read
+ 	// (a group testing another URL than theirs)
+ 	PrivateHistory bool `json:"private_history,omitempty"`
++	// H: for this long after the start and after every network change the group sends everything through
++	// WarmUpDetour (the servers' pings and the main choice aren't settled yet), its own tests already running
++	WarmUp       badoption.Duration `json:"warm_up,omitempty"`
++	WarmUpDetour string             `json:"warm_up_detour,omitempty"`
+ }
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index 553c376b7..a0977fe82 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -53,11 +53,20 @@ type URLTest struct {
+ 	checkAccess                  sync.Mutex
+ 	interruptExternalConnections bool
+ 	privateHistory               bool // H
++	// H: the warm-up: until warmUntil (unix ns) everything goes through warmDetour
++	warmUp        time.Duration
++	warmDetourTag string
++	warmDetour    adapter.Outbound
++	warmUntil     atomic.Int64
+ }
+ 
+ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.URLTestOutboundOptions) (adapter.Outbound, error) {
++	dependencies := options.Outbounds
++	if options.WarmUpDetour != "" {
++		dependencies = append(append([]string{}, options.Outbounds...), options.WarmUpDetour)
++	}
+ 	outbound := &URLTest{
+-		Adapter:                      outbound.NewAdapter(C.TypeURLTest, tag, []string{N.NetworkTCP, N.NetworkUDP}, options.Outbounds),
++		Adapter:                      outbound.NewAdapter(C.TypeURLTest, tag, []string{N.NetworkTCP, N.NetworkUDP}, dependencies),
+ 		ctx:                          ctx,
+ 		outbound:                     service.FromContext[adapter.OutboundManager](ctx),
+ 		logger:                       logger,
+@@ -70,6 +79,8 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		idleTimeout:                  time.Duration(options.IdleTimeout),
+ 		interruptExternalConnections: options.InterruptExistConnections,
+ 		privateHistory:               options.PrivateHistory,
++		warmUp:                       time.Duration(options.WarmUp),
++		warmDetourTag:                options.WarmUpDetour,
+ 	}
+ 	if len(outbound.tags) == 0 {
+ 		return nil, E.New("missing tags")
+@@ -105,23 +116,49 @@ func (s *URLTest) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 		group.links = s.links       //H
+ 		group.failover = s.failover //H
+ 		group.tag = s.Tag()         //H
++		if s.warmUp > 0 && s.warmDetourTag != "" {
++			detour, loaded := s.outbound.Outbound(s.warmDetourTag)
++			if !loaded {
++				return E.New("warm-up outbound not found: ", s.warmDetourTag)
++			}
++			s.warmDetour = detour
++		}
+ 		// H: its delays its own (another URL than the rest test), not in the history shared with the others
+ 		if s.privateHistory {
+ 			group.history = urltest.NewHistoryStorage()
+ 		}
+ 		s.group = group
+ 	case adapter.StartStateStarted:
++		s.warm()
+ 		s.group.PostStart()
+ 		scope.Add(s.group.Close)
+ 	}
+ 	return nil
+ }
+ 
++// H: warm starts (or starts again) the warm-up: after the start and after a network change.
++func (s *URLTest) warm() {
++	if s.warmDetour != nil {
++		s.warmUntil.Store(time.Now().Add(s.warmUp).UnixNano())
++	}
++}
++
++// H: warming: the outbound everything goes through while the warm-up lasts, or nil after it.
++func (s *URLTest) warming() adapter.Outbound {
++	if s.warmDetour == nil || time.Now().UnixNano() >= s.warmUntil.Load() {
++		return nil
++	}
++	return s.warmDetour
++}
++
+ func (s *URLTest) All() []string {
+ 	return s.tags
+ }
+ 
+ func (s *URLTest) Selected(network string) adapter.Outbound {
++	if detour := s.warming(); detour != nil {
++		return detour
++	}
+ 	var outbound adapter.Outbound
+ 	if network == N.NetworkUDP {
+ 		outbound = s.group.selectedOutboundUDP
+@@ -171,6 +208,8 @@ func (s *URLTest) InterfaceUpdated(ctx context.Context) {
+ 	if group == nil {
+ 		return
+ 	}
++	// H: another network: the main choice first again, for the warm-up
++	s.warm()
+ 	if group.pause.IsDevicePaused() || group.pause.IsNetworkPaused() {
+ 		return
+ 	}
+@@ -186,6 +225,9 @@ func (s *URLTest) InterfaceUpdated(ctx context.Context) {
+ 
+ func (s *URLTest) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+ 	s.group.Touch()
++	if detour := s.warming(); detour != nil {
++		return detour.DialContext(ctx, network, destination)
++	}
+ 	network = N.NetworkName(network)                        //H
+ 	if network != N.NetworkTCP && network != N.NetworkUDP { //H
+ 		return nil, E.Extend(N.ErrUnknownNetwork, network)
+@@ -209,6 +251,9 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
+ 
+ func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
+ 	s.group.Touch()
++	if detour := s.warming(); detour != nil {
++		return detour.ListenPacket(ctx, destination)
++	}
+ 	outbound := s.group.pickForDial(N.NetworkUDP) //H
+ 	if outbound == nil {
+ 		return nil, E.New("missing supported outbound")
+diff --git a/protocol/group/urltest_test.go b/protocol/group/urltest_test.go
+index 05eea956d..73af3dd9d 100644
+--- a/protocol/group/urltest_test.go
++++ b/protocol/group/urltest_test.go
+@@ -52,3 +52,27 @@ func TestURLTestSelectionStability(t *testing.T) {
+ 		}
+ 	}
+ }
++
++// H: the warm-up sends everything through its detour, then lets the group choose; a network change starts it again.
++func TestURLTestWarmUp(t *testing.T) {
++	detour := &selectionOutbound{tag: "select"}
++	s := &URLTest{warmUp: 50 * time.Millisecond, warmDetour: detour}
++	if s.warming() != nil {
++		t.Fatalf("no warm-up before the start")
++	}
++	s.warm()
++	if got := s.warming(); got == nil || got.Tag() != "select" {
++		t.Fatalf("warming up: got %v", got)
++	}
++	time.Sleep(70 * time.Millisecond)
++	if s.warming() != nil {
++		t.Fatalf("the warm-up must end")
++	}
++	s.warm()
++	if s.warming() == nil {
++		t.Fatalf("warm() must start it again")
++	}
++	if (&URLTest{}).warming() != nil {
++		t.Fatalf("a group without a warm-up never warms")
++	}
++}
+-- 
+2.55.0.windows.3
+

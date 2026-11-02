@@ -1,0 +1,82 @@
+From 5167f15dcb20d3ec42ca411c5d1e0990d1598c73 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 20:56:29 +0300
+Subject: [PATCH 12/26] config: site groups' switch threshold from the app
+ (site-groups-tolerance)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/hiddify_option.go   |  2 ++
+ v2/config/site_groups.go      |  8 ++++++--
+ v2/config/site_groups_test.go | 12 +++++++++++-
+ 3 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index 6001ec0..e9df983 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -81,6 +81,8 @@ type URLTestOptions struct {
+ 	BalancerKeepConnections bool   `json:"balancer-keep-connections,omitempty" overridable:"true"`
+ 	// H: an Auto of its own for each service the app times (Instagram, Telegram...): see applySiteGroups
+ 	SiteGroups bool `json:"site-groups,omitempty" overridable:"true"`
++	// H: how much sooner (ms) another server must answer a service before its group moves to it (0 = 80)
++	SiteGroupsTolerance uint16 `json:"site-groups-tolerance,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+ 
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index d512f7c..c41cbde 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -75,6 +75,10 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 	if len(servers) < 2 {
+ 		return
+ 	}
++	tolerance := hopt.SiteGroupsTolerance
++	if tolerance == 0 {
++		tolerance = 80
++	}
+ 	groups := make([]option.Outbound, 0, len(siteGroups))
+ 	rules := make([]option.Rule, 0, len(siteGroups))
+ 	for _, site := range siteGroups {
+@@ -88,8 +92,8 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 				// tested every five minutes, and only while the service is used (idle half an hour: no tests)
+ 				Interval:    badoption.Duration(5 * time.Minute),
+ 				IdleTimeout: badoption.Duration(30 * time.Minute),
+-				// another server only when it's clearly sooner, so the service doesn't hop between two
+-				Tolerance: 80,
++				// another server only when it's sooner by this much (the app's setting), so the service doesn't hop
++				Tolerance: tolerance,
+ 				// what's open stays where it is (a call, a video); new connections go through the new one
+ 				InterruptExistConnections: false,
+ 				// its own results: they mustn't take the place of the servers' pings the app shows
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index 78d51b3..6c72426 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -66,7 +66,7 @@ func TestSiteGroupsAddGroupsAndRules(t *testing.T) {
+ 		}
+ 		groups++
+ 		urlTest := out.Options.(*option.URLTestOutboundOptions)
+-		if !urlTest.PrivateHistory || urlTest.InterruptExistConnections || urlTest.URL == "" {
++		if !urlTest.PrivateHistory || urlTest.InterruptExistConnections || urlTest.URL == "" || urlTest.Tolerance != 80 {
+ 			t.Fatalf("%s: %+v", out.Tag, urlTest)
+ 		}
+ 		if len(urlTest.Outbounds) != 3 || urlTest.Outbounds[0] != "pl" {
+@@ -125,3 +125,13 @@ func TestSiteGroupsBuiltConfigChecks(t *testing.T) {
+ 		t.Fatalf("the main group must stay first, got %q", options.Outbounds[0].Tag)
+ 	}
+ }
++
++func TestSiteGroupsTolerance(t *testing.T) {
++	options := siteGroupsTestOptions()
++	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{SiteGroups: true, SiteGroupsTolerance: 150}})
++	for _, out := range options.Outbounds {
++		if out.Type == C.TypeURLTest && out.Options.(*option.URLTestOutboundOptions).Tolerance != 150 {
++			t.Fatalf("%s: tolerance %d, want 150", out.Tag, out.Options.(*option.URLTestOutboundOptions).Tolerance)
++		}
++	}
++}
+-- 
+2.55.0.windows.3
+

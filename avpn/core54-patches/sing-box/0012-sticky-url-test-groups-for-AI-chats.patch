@@ -1,0 +1,227 @@
+From 41f5a3ed7dd94b4411b946ffdad3144267dfb294 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Sat, 24 Oct 2026 10:11:59 +0300
+Subject: [PATCH 12/14] sticky url-test groups for AI chats
+
+---
+ option/group.go                   |  3 ++
+ protocol/group/h_urltest_modes.go | 18 ++++++++++-
+ protocol/group/sticky_test.go     | 32 +++++++++++++++++++
+ protocol/group/urltest.go         | 51 +++++++++++++++++++++++++++++--
+ 4 files changed, 100 insertions(+), 4 deletions(-)
+ create mode 100644 protocol/group/sticky_test.go
+
+diff --git a/option/group.go b/option/group.go
+index 7537613e8..37d88faba 100644
+--- a/option/group.go
++++ b/option/group.go
+@@ -32,6 +32,9 @@ type URLTestOutboundOptions struct {
+ 	// H: with several urls a server is tested against all of them, the slowest answer is its delay and one that
+ 	// fails fails it (the default is the first answer)
+ 	StrictURLs bool `json:"strict_urls,omitempty"`
++	// H: the server in use is kept until it stops answering (three tests in a row) or is a second slower than the
++	// best: for services that dislike a changed address (the AI chats)
++	Sticky bool `json:"sticky,omitempty"`
+ 	// H: how long one test may take (0: the TCP timeout, 5 s)
+ 	TestTimeout badoption.Duration `json:"test_timeout,omitempty"`
+ }
+diff --git a/protocol/group/h_urltest_modes.go b/protocol/group/h_urltest_modes.go
+index 4282983f3..5cede32b1 100644
+--- a/protocol/group/h_urltest_modes.go
++++ b/protocol/group/h_urltest_modes.go
+@@ -273,7 +273,7 @@ func (g *URLTestGroup) failoverHeld() []adapter.Outbound {
+ 
+ // testMembers tests outbounds with every test URL and clears the penalty of each that answered.
+ func (g *URLTestGroup) testMembers(ctx context.Context, outbounds []adapter.Outbound, force bool) map[string]uint16 {
+-	result := urlTestOutbounds(ctx, g.outbound, g.history, g.logger, outbounds, g.links, g.interval, force, g.testTimeout)
++	result := urlTestOutbounds(ctx, g.outbound, g.history, g.logger, outbounds, g.links, g.interval, force, g.testTimeout, g.strictURLs)
+ 	for tag := range result {
+ 		g.penaltyReset(tag)
+ 	}
+@@ -385,6 +385,22 @@ func urlTestLinks(ctx context.Context, links []string, detour adapter.Outbound)
+ 	return 0, E.Errors(errs...)
+ }
+ 
++// urlTestEveryLink tests detour with every link one after the other: the slowest answer is the delay, and a link
++// that fails fails the outbound (a service's own hosts: its page, its API, its media).
++func urlTestEveryLink(ctx context.Context, links []string, detour adapter.Outbound) (uint16, error) {
++	var slowest uint16
++	for _, link := range links {
++		delay, err := urltest.URLTest(ctx, link, detour)
++		if err != nil {
++			return 0, err
++		}
++		if delay > slowest {
++			slowest = delay
++		}
++	}
++	return slowest, nil
++}
++
+ // testLinks joins url and urls without repeats; an empty result tests the default URL.
+ func testLinks(link string, links []string) []string {
+ 	var result []string
+diff --git a/protocol/group/sticky_test.go b/protocol/group/sticky_test.go
+new file mode 100644
+index 000000000..7d816e062
+--- /dev/null
++++ b/protocol/group/sticky_test.go
+@@ -0,0 +1,32 @@
++package group
++
++import "testing"
++
++func TestStickyGivesUp(t *testing.T) {
++	g := &URLTestGroup{stableSamples: 3, samples: map[string][]uint16{}}
++	set := func(results ...uint16) { g.samples["a"] = results }
++
++	set(120, 130)
++	if g.stickyGivesUp("a", 100) {
++		t.Fatal("too few results to judge: it stays")
++	}
++	set(120, 0, 130)
++	if g.stickyGivesUp("a", 100) {
++		t.Fatal("one failed test in three is not enough to leave")
++	}
++	set(0, 65535, 0)
++	if !g.stickyGivesUp("a", 100) {
++		t.Fatal("none of three answered: it leaves")
++	}
++	set(1300, 1400, 1500)
++	if !g.stickyGivesUp("a", 100) {
++		t.Fatal("a second slower than the best: it leaves")
++	}
++	set(400, 450, 500)
++	if g.stickyGivesUp("a", 100) {
++		t.Fatal("slower but not by a second: it stays")
++	}
++	if g.stickyGivesUp("unknown", 100) {
++		t.Fatal("a server with no results stays")
++	}
++}
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index 114d6dbbd..8d07f2be8 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -55,6 +55,8 @@ type URLTest struct {
+ 	privateHistory               bool          // H
+ 	links                        []string      // H: URLs tested together (the slowest counts)
+ 	minDwell                     time.Duration // H
++	strictURLs                   bool          // H
++	sticky                       bool          // H
+ 	// H: the warm-up: until warmUntil (unix ns) everything goes through warmDetour
+ 	warmUp        time.Duration
+ 	warmDetourTag string
+@@ -86,6 +88,8 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		privateHistory:               options.PrivateHistory,
+ 		links:                        options.URLs,
+ 		minDwell:                     time.Duration(options.MinDwell),
++		strictURLs:                   options.StrictURLs,
++		sticky:                       options.Sticky,
+ 		warmUp:                       time.Duration(options.WarmUp),
+ 		stableSamples:                options.StableSamples,
+ 		testTimeout:                  time.Duration(options.TestTimeout),
+@@ -137,6 +141,9 @@ func (s *URLTest) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 			group.history = urltest.NewHistoryStorage()
+ 		}
+ 		group.stableSamples = s.stableSamples
++		group.minDwell = s.minDwell
++		group.sticky = s.sticky
++		group.strictURLs = s.strictURLs
+ 		group.testTimeout = s.testTimeout
+ 		s.group = group
+ 	case adapter.StartStateStarted:
+@@ -351,6 +358,8 @@ type URLTestGroup struct {
+ 	testTimeout   time.Duration
+ 	links         []string      // H: each server is tested against all of them
+ 	minDwell      time.Duration // H
++	strictURLs    bool          // H
++	sticky        bool          // H
+ 	switchedAt    atomic.Int64  // H: when the server was last changed (unix ns)
+ 	samples       map[string][]uint16
+ 	samplesAccess sync.Mutex
+@@ -557,14 +566,14 @@ type urlTestBatch struct {
+ 	access   sync.Mutex
+ 	result   map[string]uint16
+ 	timeout  time.Duration // H
+-	links    []string      // H: every URL is tested, the slowest answer counts, one that fails fails the server
++	strict   bool          // H: every URL must answer, the slowest counts (else the first answer)
+ }
+ 
+ func URLTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
+-	return urlTestOutbounds(ctx, outboundManager, history, logger, outbounds, testLinks(link, nil), interval, force, 0) //H
++	return urlTestOutbounds(ctx, outboundManager, history, logger, outbounds, testLinks(link, nil), interval, force, 0, false) //H
+ }
+ 
+-func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, links []string, interval time.Duration, force bool, timeout time.Duration) map[string]uint16 { //H: more test URLs; timeout: how long one test may take (0: the TCP timeout)
++func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, links []string, interval time.Duration, force bool, timeout time.Duration, strict bool) map[string]uint16 { //H: more test URLs; strict: all of them must answer; timeout: how long one test may take (0: the TCP timeout)
+ 	if timeout <= 0 {
+ 		timeout = C.TCPTimeout
+ 	}
+@@ -578,6 +587,7 @@ func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManag
+ 		checked:  make(map[string]bool),
+ 		result:   make(map[string]uint16),
+ 		timeout:  timeout,
++		strict:   strict,
+ 		links:    links,
+ 	}
+ 	testBatch.test(outbounds, links, interval, force) //H
+@@ -626,6 +636,11 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, links []string, interv
+ 				defer cancel()
+ 				testChan := make(chan urlTestResult, 1)
+ 				go func() {
++					if b.strict {
++						delay, testErr := urlTestEveryLink(testCtx, links, detour) //H
++						testChan <- urlTestResult{delay, testErr}
++						return
++					}
+ 					delay, testErr := urlTestLinks(testCtx, links, detour) //H
+ 					testChan <- urlTestResult{delay, testErr}
+ 				}()
+@@ -748,6 +763,31 @@ func (g *URLTestGroup) stableDelay(tag string) (uint32, bool) {
+ 	return sum / uint32(len(list)), true
+ }
+ 
++// stickyDown: a server is down when it has the results of a whole window and none of them answered.
++const stickyExtra = 1000
++
++// H: stickyGivesUp says a sticky group should leave its current server: none of its last tests answered (it needs a
++// whole window of results to say so), or its average is [stickyExtra] ms over the best one's.
++func (g *URLTestGroup) stickyGivesUp(tag string, bestDelay uint32) bool {
++	g.samplesAccess.Lock()
++	list := append([]uint16(nil), g.samples[tag]...)
++	g.samplesAccess.Unlock()
++	if len(list) < g.stableSamples || len(list) == 0 {
++		return false
++	}
++	var sum, answered uint32
++	for _, delay := range list {
++		if delay != 0 && delay != 65535 {
++			sum += uint32(delay)
++			answered++
++		}
++	}
++	if answered == 0 {
++		return true
++	}
++	return answered == uint32(len(list)) && sum/answered > bestDelay+stickyExtra
++}
++
+ // H: selectStable takes the server with the lowest steady delay, keeping the one in use unless another is
+ // sooner by the tolerance; none answered enough: nil, false.
+ func (g *URLTestGroup) selectStable(network string) (adapter.Outbound, bool) {
+@@ -772,6 +812,11 @@ func (g *URLTestGroup) selectStable(network string) (adapter.Outbound, bool) {
+ 	if network == N.NetworkUDP {
+ 		current = g.selectedOutboundUDP
+ 	}
++	// H: a sticky group (the AI chats, which dislike a changed address) keeps the server in use until it is really
++	// bad: it answered none of its last tests, or it is a second slower than the best
++	if g.sticky && current != nil && current != best && !g.stickyGivesUp(current.Tag(), bestDelay) {
++		return current, true
++	}
+ 	if current != nil && current != best {
+ 		if delay, ok := g.stableDelay(current.Tag()); ok {
+ 			// not sooner by the tolerance, or the server was changed not long ago and still answers everything: it stays
+-- 
+2.55.0.windows.3
+

@@ -1,0 +1,370 @@
+From a73e2b9afcd710348979bf112d1493ff2cbe79e2 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 20:25:11 +0300
+Subject: [PATCH 11/26] config: site groups (beta), an Auto of its own for each
+ service
+
+With site-groups on, Instagram, WhatsApp, Telegram, ChatGPT and YouTube each get a
+URL test group over the same servers as Auto, testing the service's own page, and
+a route rule before the first VPN rule (direct rules still win).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/builder.go          |   1 +
+ v2/config/hiddify_option.go   |   2 +
+ v2/config/site_groups.go      | 183 ++++++++++++++++++++++++++++++++++
+ v2/config/site_groups_test.go | 127 +++++++++++++++++++++++
+ 4 files changed, 313 insertions(+)
+ create mode 100644 v2/config/site_groups.go
+ create mode 100644 v2/config/site_groups_test.go
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index ff007b9..7f7706f 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -100,6 +100,7 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 		return nil, err
+ 	}
+ 	prependInputRouteRules(&options, input)
++	applySiteGroups(&options, hopts)
+ 
+ 	return &options, nil
+ }
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index 1a8255b..6001ec0 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -79,6 +79,8 @@ type URLTestOptions struct {
+ 	BalancerToleranceWifi   uint16 `json:"balancer-tolerance-wifi,omitempty" overridable:"true"`
+ 	BalancerToleranceMobile uint16 `json:"balancer-tolerance-mobile,omitempty" overridable:"true"`
+ 	BalancerKeepConnections bool   `json:"balancer-keep-connections,omitempty" overridable:"true"`
++	// H: an Auto of its own for each service the app times (Instagram, Telegram...): see applySiteGroups
++	SiteGroups bool `json:"site-groups,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+ 
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+new file mode 100644
+index 0000000..d512f7c
+--- /dev/null
++++ b/v2/config/site_groups.go
+@@ -0,0 +1,183 @@
++package config
++
++import (
++	"strings"
++	"time"
++
++	C "github.com/sagernet/sing-box/constant"
++	"github.com/sagernet/sing-box/option"
++	"github.com/sagernet/sing/common/json/badoption"
++)
++
++// H: an Auto of its own for each of the services the app's home screen times (Settings → Ping, beta): a URL test
++// group that picks, out of the same servers as Auto, the one answering that service's own page soonest, and a
++// route rule sending the service's names and addresses to it. A service slow or failing through one server then
++// goes through another, the rest of the traffic as before.
++
++// SiteGroupTagPrefix starts the tag of a service's group: "site-" and the service's key (the app's site tiles).
++const SiteGroupTagPrefix = "site-"
++
++type siteGroup struct {
++	key          string
++	url          string
++	domainSuffix []string
++	ipCIDR       []string
++}
++
++var siteGroups = []siteGroup{
++	{
++		key:          "instagram",
++		url:          "https://www.instagram.com/",
++		domainSuffix: []string{"instagram.com", "cdninstagram.com", "instagr.am", "ig.me", "fbcdn.net"},
++	},
++	{
++		key:          "whatsapp",
++		url:          "https://web.whatsapp.com/",
++		domainSuffix: []string{"whatsapp.com", "whatsapp.net", "wa.me"},
++	},
++	{
++		key: "telegram",
++		url: "https://telegram.org/",
++		domainSuffix: []string{
++			"telegram.org", "t.me", "telegram.me", "telesco.pe", "telegra.ph", "tdesktop.com", "cdn-telegram.org",
++		},
++		// Telegram's apps reach its data centres by address, not by name
++		ipCIDR: []string{
++			"91.105.192.0/23", "91.108.4.0/22", "91.108.8.0/22", "91.108.12.0/22", "91.108.16.0/22", "91.108.20.0/22",
++			"91.108.56.0/22", "95.161.64.0/20", "149.154.160.0/20", "185.76.151.0/24",
++			"2001:67c:4e8::/48", "2001:b28:f23c::/47", "2001:b28:f23f::/48", "2a0a:f280::/32",
++		},
++	},
++	{
++		key: "chatgpt",
++		// Cloudflare's small page: the site's own front, without its redirect
++		url:          "https://chatgpt.com/cdn-cgi/trace",
++		domainSuffix: []string{"chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com", "sora.com"},
++	},
++	{
++		key: "youtube",
++		url: "https://www.youtube.com/generate_204",
++		domainSuffix: []string{
++			"youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "ggpht.com", "youtube-nocookie.com",
++			"youtubei.googleapis.com",
++		},
++	},
++}
++
++// applySiteGroups adds the services' groups and their rules when the option is on and there's a choice of servers.
++// The rules go before the first one sending traffic through the VPN, so the rules sending something direct or
++// blocking it (the user's apps, the local network) still come first.
++func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
++	if !hopt.SiteGroups || options.Route == nil {
++		return
++	}
++	servers := siteGroupServers(options)
++	if len(servers) < 2 {
++		return
++	}
++	groups := make([]option.Outbound, 0, len(siteGroups))
++	rules := make([]option.Rule, 0, len(siteGroups))
++	for _, site := range siteGroups {
++		tag := SiteGroupTagPrefix + site.key
++		groups = append(groups, option.Outbound{
++			Type: C.TypeURLTest,
++			Tag:  tag,
++			Options: &option.URLTestOutboundOptions{
++				Outbounds: servers,
++				URL:       site.url,
++				// tested every five minutes, and only while the service is used (idle half an hour: no tests)
++				Interval:    badoption.Duration(5 * time.Minute),
++				IdleTimeout: badoption.Duration(30 * time.Minute),
++				// another server only when it's clearly sooner, so the service doesn't hop between two
++				Tolerance: 80,
++				// what's open stays where it is (a call, a video); new connections go through the new one
++				InterruptExistConnections: false,
++				// its own results: they mustn't take the place of the servers' pings the app shows
++				PrivateHistory: true,
++			},
++		})
++		rules = append(rules, option.Rule{
++			Type: C.RuleTypeDefault,
++			DefaultOptions: option.DefaultRule{
++				RawDefaultRule: option.RawDefaultRule{
++					DomainSuffix: site.domainSuffix,
++					IPCIDR:       site.ipCIDR,
++				},
++				RuleAction: option.RuleAction{
++					Action:       C.RuleActionTypeRoute,
++					RouteOptions: option.RouteActionOptions{Outbound: tag},
++				},
++			},
++		})
++	}
++	// after the main group (the app takes the first group as the server list), before the direct ones
++	at := len(options.Outbounds)
++	for i, out := range options.Outbounds {
++		if out.Tag == OutboundDirectTag {
++			at = i
++			break
++		}
++	}
++	outbounds := make([]option.Outbound, 0, len(options.Outbounds)+len(groups))
++	outbounds = append(outbounds, options.Outbounds[:at]...)
++	outbounds = append(outbounds, groups...)
++	outbounds = append(outbounds, options.Outbounds[at:]...)
++	options.Outbounds = outbounds
++
++	at = len(options.Route.Rules)
++	for i, rule := range options.Route.Rules {
++		if rule.Type != C.RuleTypeDefault || rule.DefaultOptions.RuleAction.Action != C.RuleActionTypeRoute {
++			continue
++		}
++		if siteGroupProxied(rule.DefaultOptions.RuleAction.RouteOptions.Outbound) && !internalSubnetRule(rule) {
++			at = i
++			break
++		}
++	}
++	routeRules := make([]option.Rule, 0, len(options.Route.Rules)+len(rules))
++	routeRules = append(routeRules, options.Route.Rules[:at]...)
++	routeRules = append(routeRules, rules...)
++	routeRules = append(routeRules, options.Route.Rules[at:]...)
++	options.Route.Rules = routeRules
++}
++
++// siteGroupServers: the servers the main group chooses among, without its own groups (Auto, round robin).
++func siteGroupServers(options *option.Options) []string {
++	for _, out := range options.Outbounds {
++		if out.Tag != OutboundSelectTag {
++			continue
++		}
++		selector, ok := out.Options.(*option.SelectorOutboundOptions)
++		if !ok {
++			return nil
++		}
++		servers := make([]string, 0, len(selector.Outbounds))
++		for _, tag := range selector.Outbounds {
++			if tag == OutboundURLTestTag || tag == OutboundRoundRobinTag || strings.Contains(tag, "§hide§") {
++				continue
++			}
++			servers = append(servers, tag)
++		}
++		return servers
++	}
++	return nil
++}
++
++// siteGroupProxied: a rule's outbound that sends traffic through the VPN (not direct, not blocked).
++func siteGroupProxied(tag string) bool {
++	switch tag {
++	case "", "block", OutboundDirectTag, OutboundBypassTag, OutboundDirectFragmentTag:
++		return false
++	}
++	return true
++}
++
++// internalSubnetRule: the core's own rule for its internal subnet, which comes before everything.
++func internalSubnetRule(rule option.Rule) bool {
++	for _, cidr := range rule.DefaultOptions.RawDefaultRule.IPCIDR {
++		if cidr == "10.10.34.0/24" {
++			return true
++		}
++	}
++	return false
++}
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+new file mode 100644
+index 0000000..78d51b3
+--- /dev/null
++++ b/v2/config/site_groups_test.go
+@@ -0,0 +1,127 @@
++package config
++
++import (
++	"testing"
++
++	C "github.com/sagernet/sing-box/constant"
++	"github.com/sagernet/sing-box/experimental/libbox"
++	"github.com/sagernet/sing-box/option"
++)
++
++func siteGroupsTestOptions() *option.Options {
++	route := func(cidr []string, suffix []string, outbound string) option.Rule {
++		return option.Rule{
++			Type: C.RuleTypeDefault,
++			DefaultOptions: option.DefaultRule{
++				RawDefaultRule: option.RawDefaultRule{IPCIDR: cidr, DomainSuffix: suffix},
++				RuleAction:     option.RuleAction{Action: C.RuleActionTypeRoute, RouteOptions: option.RouteActionOptions{Outbound: outbound}},
++			},
++		}
++	}
++	return &option.Options{
++		Outbounds: []option.Outbound{
++			{Type: C.TypeSelector, Tag: OutboundSelectTag, Options: &option.SelectorOutboundOptions{
++				Outbounds: []string{OutboundURLTestTag, OutboundRoundRobinTag, "pl", "fi", "lv"},
++			}},
++			{Type: C.TypeBalancer, Tag: OutboundRoundRobinTag},
++			{Type: C.TypeBalancer, Tag: OutboundURLTestTag},
++			{Type: C.TypeVLESS, Tag: "pl"},
++			{Type: C.TypeVLESS, Tag: "fi"},
++			{Type: C.TypeVLESS, Tag: "lv"},
++			{Type: C.TypeDirect, Tag: OutboundDirectTag},
++		},
++		Route: &option.RouteOptions{
++			Rules: []option.Rule{
++				{Type: C.RuleTypeDefault, DefaultOptions: option.DefaultRule{RuleAction: option.RuleAction{Action: C.RuleActionTypeSniff}}},
++				route([]string{"10.10.34.0/24"}, nil, OutboundSelectTag),
++				route(nil, []string{"ru"}, OutboundDirectTag),
++				route(nil, []string{"blocked.example"}, OutboundSelectTag),
++			},
++			Final: OutboundSelectTag,
++		},
++	}
++}
++
++func TestSiteGroupsOffChangesNothing(t *testing.T) {
++	options := siteGroupsTestOptions()
++	applySiteGroups(options, &HiddifyOptions{})
++	if len(options.Outbounds) != 7 || len(options.Route.Rules) != 4 {
++		t.Fatalf("off: %d outbounds, %d rules", len(options.Outbounds), len(options.Route.Rules))
++	}
++}
++
++func TestSiteGroupsAddGroupsAndRules(t *testing.T) {
++	options := siteGroupsTestOptions()
++	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{SiteGroups: true}})
++	if options.Outbounds[0].Tag != OutboundSelectTag {
++		t.Fatalf("the main group must stay first, got %q", options.Outbounds[0].Tag)
++	}
++	if got := options.Outbounds[len(options.Outbounds)-1].Tag; got != OutboundDirectTag {
++		t.Fatalf("the direct outbound must stay last, got %q", got)
++	}
++	groups := 0
++	for _, out := range options.Outbounds {
++		if out.Type != C.TypeURLTest {
++			continue
++		}
++		groups++
++		urlTest := out.Options.(*option.URLTestOutboundOptions)
++		if !urlTest.PrivateHistory || urlTest.InterruptExistConnections || urlTest.URL == "" {
++			t.Fatalf("%s: %+v", out.Tag, urlTest)
++		}
++		if len(urlTest.Outbounds) != 3 || urlTest.Outbounds[0] != "pl" {
++			t.Fatalf("%s must choose among the servers only: %v", out.Tag, urlTest.Outbounds)
++		}
++	}
++	if groups != len(siteGroups) {
++		t.Fatalf("%d groups, want %d", groups, len(siteGroups))
++	}
++	rules := options.Route.Rules
++	// sniff, the internal subnet, direct .ru, then the services, then the blocked list through the VPN
++	if got := rules[2].DefaultOptions.RouteOptions.Outbound; got != OutboundDirectTag {
++		t.Fatalf("the direct rule must stay ahead, got %q", got)
++	}
++	if got := rules[3].DefaultOptions.RouteOptions.Outbound; got != SiteGroupTagPrefix+"instagram" {
++		t.Fatalf("the services' rules must come before the first VPN rule, got %q", got)
++	}
++	if got := rules[len(rules)-1].DefaultOptions.RouteOptions.Outbound; got != OutboundSelectTag {
++		t.Fatalf("the blocked list's rule must come after, got %q", got)
++	}
++}
++
++func TestSiteGroupsNeedAChoice(t *testing.T) {
++	options := siteGroupsTestOptions()
++	options.Outbounds[0].Options = &option.SelectorOutboundOptions{Outbounds: []string{"pl"}}
++	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{SiteGroups: true}})
++	if len(options.Route.Rules) != 4 {
++		t.Fatalf("one server: nothing to choose, got %d rules", len(options.Route.Rules))
++	}
++}
++
++// The whole config built with the services' groups on, as the app starts the core with it: sing-box takes it.
++func TestSiteGroupsBuiltConfigChecks(t *testing.T) {
++	profile := `{"outbounds": [
++  {"type": "socks", "tag": "🇵🇱 Польша", "server": "127.0.0.1", "server_port": 1080},
++  {"type": "socks", "tag": "🇫🇮 Финляндия", "server": "127.0.0.1", "server_port": 1081}]}`
++	hopts := DefaultHiddifyOptions()
++	hopts.SiteGroups = true
++	options, err := BuildConfig(libbox.BaseContext(nil), hopts, &ReadOptions{Content: profile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the config: %v", err)
++	}
++	found := false
++	for _, out := range options.Outbounds {
++		if out.Tag == SiteGroupTagPrefix+"telegram" {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatalf("the telegram group is missing")
++	}
++	if options.Outbounds[0].Tag != OutboundSelectTag {
++		t.Fatalf("the main group must stay first, got %q", options.Outbounds[0].Tag)
++	}
++}
+-- 
+2.55.0.windows.3
+

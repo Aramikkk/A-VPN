@@ -1,0 +1,160 @@
+From 2f5a1685da253613edfe31a6b22c53c1d6fd8a89 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 19:11:17 +0300
+Subject: [PATCH 22/26] ad block sections: level, phishing, miners
+
+---
+ v2/config/adblock.go        | 49 +++++++++++++++++++++++++++++--------
+ v2/config/adblock_test.go   | 42 +++++++++++++++++++++++++++++--
+ v2/config/hiddify_option.go |  4 +++
+ 3 files changed, 83 insertions(+), 12 deletions(-)
+
+diff --git a/v2/config/adblock.go b/v2/config/adblock.go
+index f7b426c..c84628e 100644
+--- a/v2/config/adblock.go
++++ b/v2/config/adblock.go
+@@ -19,13 +19,41 @@ import (
+ 
+ const adBlockBase = "https://raw.githubusercontent.com/"
+ 
+-// the lists: Hiddify's large one first (it carries the adblock filters' domains), two mirrors of the community's
+-// ad domain list behind it, and a list of malware domains
+-var adBlockLists = []struct{ tag, url string }{
+-	{"adblock-hiddify", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-category-ads-all.srs"},
+-	{"adblock-sagernet", adBlockBase + "SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"},
+-	{"adblock-meta", adBlockBase + "MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ads-all.srs"},
+-	{"adblock-malware", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-malware.srs"},
++// the lists, in sections. Ads, by strictness: Hiddify's large one (it carries the adblock filters' domains), then
++// a mirror of the community's ad domain list, then another mirror (the more lists, the more it refuses, and the
++// more sites that lean on an ad host break). Protection: malware and phishing domains. Miners: cryptominers.
++type adBlockList struct{ tag, url string }
++
++var (
++	adListsMild   = []adBlockList{{"adblock-hiddify", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-category-ads-all.srs"}}
++	adListsNormal = []adBlockList{{"adblock-sagernet", adBlockBase + "SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"}}
++	adListsStrict = []adBlockList{{"adblock-meta", adBlockBase + "MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ads-all.srs"}}
++	protectLists  = []adBlockList{
++		{"adblock-malware", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-malware.srs"},
++		{"adblock-phishing", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-phishing.srs"},
++	}
++	minerLists = []adBlockList{{"adblock-miners", adBlockBase + "hiddify/hiddify-geo/rule-set/block/geosite-cryptominers.srs"}}
++)
++
++// adBlockSelected: the lists the options ask for.
++func adBlockSelected(hopt *HiddifyOptions) []adBlockList {
++	var lists []adBlockList
++	if hopt.AdBlock {
++		lists = append(lists, adListsMild...)
++		if hopt.AdBlockLevel != 1 {
++			lists = append(lists, adListsNormal...)
++		}
++		if hopt.AdBlockLevel >= 3 {
++			lists = append(lists, adListsStrict...)
++		}
++	}
++	if hopt.BlockPhishing {
++		lists = append(lists, protectLists...)
++	}
++	if hopt.BlockMiners {
++		lists = append(lists, minerLists...)
++	}
++	return lists
+ }
+ 
+ // adBlockDomain turns what the user typed ("https://www.Example.com/page", "*.example.com") into a domain.
+@@ -49,7 +77,8 @@ func adBlockDomain(s string) string {
+ 
+ // applyAdBlock adds the lists, the refusals and the exceptions when the option is on.
+ func applyAdBlock(options *option.Options, hopt *HiddifyOptions) {
+-	if !hopt.AdBlock || options.Route == nil {
++	selected := adBlockSelected(hopt)
++	if len(selected) == 0 || options.Route == nil {
+ 		return
+ 	}
+ 	var allow []string
+@@ -60,8 +89,8 @@ func applyAdBlock(options *option.Options, hopt *HiddifyOptions) {
+ 			allow = append(allow, d)
+ 		}
+ 	}
+-	tags := make([]string, 0, len(adBlockLists))
+-	for _, list := range adBlockLists {
++	tags := make([]string, 0, len(selected))
++	for _, list := range selected {
+ 		tags = append(tags, list.tag)
+ 		options.Route.RuleSet = append(options.Route.RuleSet, option.RuleSet{
+ 			Type:   C.RuleSetTypeRemote,
+diff --git a/v2/config/adblock_test.go b/v2/config/adblock_test.go
+index be5080e..7a3c1aa 100644
+--- a/v2/config/adblock_test.go
++++ b/v2/config/adblock_test.go
+@@ -39,8 +39,8 @@ func TestAdBlockRules(t *testing.T) {
+ 	options := siteGroupsTestOptions()
+ 	options.DNS = &option.DNSOptions{}
+ 	applyAdBlock(options, &HiddifyOptions{AdBlock: true, AdBlockAllow: []string{"https://Allowed.example/x", "bad", "allowed.example"}})
+-	if len(options.Route.RuleSet) != len(adBlockLists) {
+-		t.Fatalf("%d rule sets, want %d", len(options.Route.RuleSet), len(adBlockLists))
++	if want := len(adListsMild) + len(adListsNormal); len(options.Route.RuleSet) != want {
++		t.Fatalf("%d rule sets, want %d (the ads at the normal level)", len(options.Route.RuleSet), want)
+ 	}
+ 	rule := options.Route.Rules[2]
+ 	if rule.Type != C.RuleTypeLogical || rule.LogicalOptions.Action != C.RuleActionTypeReject || len(rule.LogicalOptions.Rules) != 2 {
+@@ -83,3 +83,41 @@ func TestAdBlockBuiltConfigChecks(t *testing.T) {
+ 		t.Fatalf("sing-box rejects the config: %v", err)
+ 	}
+ }
++
++// The sections and the strictness pick the lists.
++func TestAdBlockSelectedLists(t *testing.T) {
++	count := func(h HiddifyOptions) int { return len(adBlockSelected(&h)) }
++	if count(HiddifyOptions{}) != 0 {
++		t.Fatal("nothing asked, nothing loaded")
++	}
++	mild := count(HiddifyOptions{AdBlock: true, AdBlockLevel: 1})
++	normal := count(HiddifyOptions{AdBlock: true})
++	strict := count(HiddifyOptions{AdBlock: true, AdBlockLevel: 3})
++	if !(mild < normal && normal < strict) {
++		t.Fatalf("mild %d, normal %d, strict %d: each must hold more", mild, normal, strict)
++	}
++	if count(HiddifyOptions{BlockPhishing: true}) != len(protectLists) || count(HiddifyOptions{BlockMiners: true}) != len(minerLists) {
++		t.Fatal("protection and miners are lists of their own, without the ads")
++	}
++	seen := map[string]bool{}
++	for _, l := range adBlockSelected(&HiddifyOptions{AdBlock: true, AdBlockLevel: 3, BlockPhishing: true, BlockMiners: true}) {
++		if seen[l.tag] {
++			t.Fatalf("tag %s twice", l.tag)
++		}
++		seen[l.tag] = true
++	}
++}
++
++func TestAdBlockProtectionAloneBuildsAndChecks(t *testing.T) {
++	profile := `{"outbounds": [
++  {"type": "socks", "tag": "pl", "server": "127.0.0.1", "server_port": 1080}]}`
++	hopts := DefaultHiddifyOptions()
++	hopts.BlockPhishing = true
++	options, err := BuildConfig(libbox.BaseContext(nil), hopts, &ReadOptions{Content: profile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the config: %v", err)
++	}
++}
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index f06682a..802ffea 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -22,6 +22,10 @@ type HiddifyOptions struct {
+ 	// H: ad blocking at the VPN's level, with the user's exceptions (domains): see applyAdBlock
+ 	AdBlock                 bool     `json:"ad-block,omitempty" overridable:"true"`
+ 	AdBlockAllow            []string `json:"ad-block-allow,omitempty" overridable:"true"`
++	// the ad lists' strictness (1 mild, 2 normal, 3 strict; 0 is normal), and the other sections: phishing and malware, miners
++	AdBlockLevel  int  `json:"ad-block-level,omitempty" overridable:"true"`
++	BlockPhishing bool `json:"block-phishing,omitempty" overridable:"true"`
++	BlockMiners   bool `json:"block-miners,omitempty" overridable:"true"`
+ 	UseXrayCoreWhenPossible bool     `json:"use-xray-core-when-possible,omitempty" overridable:"true"`
+ 	BalancerStrategy        string   `json:"balancer-strategy,omitempty" overridable:"true"`
+ 	// GeoIPPath        string      `json:"geoip-path"`
+-- 
+2.55.0.windows.3
+

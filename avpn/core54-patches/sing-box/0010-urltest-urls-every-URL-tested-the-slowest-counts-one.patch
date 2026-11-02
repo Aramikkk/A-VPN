@@ -1,0 +1,173 @@
+From 11d8f0a1513eefd3796e65f61170705b2e982d14 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 11:03:40 +0300
+Subject: [PATCH 10/14] urltest: urls (every URL tested, the slowest counts,
+ one failing fails the server) and min_dwell
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ option/group.go                |  5 ++++
+ protocol/group/urltest.go      | 48 +++++++++++++++++++++++++++++-----
+ protocol/group/urltest_test.go | 25 ++++++++++++++++++
+ 3 files changed, 71 insertions(+), 7 deletions(-)
+
+diff --git a/option/group.go b/option/group.go
+index 367be6799..7537613e8 100644
+--- a/option/group.go
++++ b/option/group.go
+@@ -27,6 +27,11 @@ type URLTestOutboundOptions struct {
+ 	// H: a server is taken only after this many tests in a row answered, by their average; until one has,
+ 	// everything goes through WarmUpDetour (not through the first server listed)
+ 	StableSamples int `json:"stable_samples,omitempty"`
++	// H: a server in use is kept at least this long after the last switch while it still answers every test
++	MinDwell badoption.Duration `json:"min_dwell,omitempty"`
++	// H: with several urls a server is tested against all of them, the slowest answer is its delay and one that
++	// fails fails it (the default is the first answer)
++	StrictURLs bool `json:"strict_urls,omitempty"`
+ 	// H: how long one test may take (0: the TCP timeout, 5 s)
+ 	TestTimeout badoption.Duration `json:"test_timeout,omitempty"`
+ }
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index c7fd056f1..114d6dbbd 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -52,7 +52,9 @@ type URLTest struct {
+ 	group                        *URLTestGroup
+ 	checkAccess                  sync.Mutex
+ 	interruptExternalConnections bool
+-	privateHistory               bool // H
++	privateHistory               bool          // H
++	links                        []string      // H: URLs tested together (the slowest counts)
++	minDwell                     time.Duration // H
+ 	// H: the warm-up: until warmUntil (unix ns) everything goes through warmDetour
+ 	warmUp        time.Duration
+ 	warmDetourTag string
+@@ -82,6 +84,8 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		idleTimeout:                  time.Duration(options.IdleTimeout),
+ 		interruptExternalConnections: options.InterruptExistConnections,
+ 		privateHistory:               options.PrivateHistory,
++		links:                        options.URLs,
++		minDwell:                     time.Duration(options.MinDwell),
+ 		warmUp:                       time.Duration(options.WarmUp),
+ 		stableSamples:                options.StableSamples,
+ 		testTimeout:                  time.Duration(options.TestTimeout),
+@@ -345,6 +349,9 @@ type URLTestGroup struct {
+ 	// H: the last stableSamples results of each server (0: no answer), when the group goes by its steadiest
+ 	stableSamples int
+ 	testTimeout   time.Duration
++	links         []string      // H: each server is tested against all of them
++	minDwell      time.Duration // H
++	switchedAt    atomic.Int64  // H: when the server was last changed (unix ns)
+ 	samples       map[string][]uint16
+ 	samplesAccess sync.Mutex
+ 	updateAccess  sync.Mutex
+@@ -550,6 +557,7 @@ type urlTestBatch struct {
+ 	access   sync.Mutex
+ 	result   map[string]uint16
+ 	timeout  time.Duration // H
++	links    []string      // H: every URL is tested, the slowest answer counts, one that fails fails the server
+ }
+ 
+ func URLTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
+@@ -570,6 +578,7 @@ func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManag
+ 		checked:  make(map[string]bool),
+ 		result:   make(map[string]uint16),
+ 		timeout:  timeout,
++		links:    links,
+ 	}
+ 	testBatch.test(outbounds, links, interval, force) //H
+ 	b.Wait()
+@@ -621,10 +630,28 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, links []string, interv
+ 					testChan <- urlTestResult{delay, testErr}
+ 				}()
+ 				var testResult urlTestResult
+-				select {
+-				case testResult = <-testChan:
+-				case <-testCtx.Done():
+-					testResult.err = testCtx.Err()
++				for _, one := range urls {
++					one := one
++					testCtx, cancel := context.WithTimeout(b.ctx, b.timeout)
++					testChan := make(chan urlTestResult, 1)
++					go func() {
++						delay, testErr := urltest.URLTest(testCtx, one, detour)
++						testChan <- urlTestResult{delay, testErr}
++					}()
++					var one1 urlTestResult
++					select {
++					case one1 = <-testChan:
++					case <-testCtx.Done():
++						one1.err = testCtx.Err()
++					}
++					cancel()
++					if one1.err != nil {
++						testResult = one1
++						break
++					}
++					if one1.delay > testResult.delay {
++						testResult.delay = one1.delay
++					}
+ 				}
+ 				if testResult.err != nil {
+ 					if b.ctx.Err() != nil {
+@@ -670,6 +697,7 @@ func (g *URLTestGroup) performUpdateCheck() {
+ 		selected = true
+ 	}
+ 	if updated {
++		g.switchedAt.Store(time.Now().UnixNano())
+ 		g.interruptGroup.Interrupt(g.interruptExternalConnections)
+ 		g.signalSelection() //H
+ 	}
+@@ -745,8 +773,14 @@ func (g *URLTestGroup) selectStable(network string) (adapter.Outbound, bool) {
+ 		current = g.selectedOutboundUDP
+ 	}
+ 	if current != nil && current != best {
+-		if delay, ok := g.stableDelay(current.Tag()); ok && delay <= bestDelay+uint32(g.tolerance) {
+-			return current, true
++		if delay, ok := g.stableDelay(current.Tag()); ok {
++			// not sooner by the tolerance, or the server was changed not long ago and still answers everything: it stays
++			if delay <= bestDelay+uint32(g.tolerance) {
++				return current, true
++			}
++			if g.minDwell > 0 && time.Since(time.Unix(0, g.switchedAt.Load())) < g.minDwell {
++				return current, true
++			}
+ 		}
+ 	}
+ 	return best, true
+diff --git a/protocol/group/urltest_test.go b/protocol/group/urltest_test.go
+index 9b6d4fdfb..2f187ecde 100644
+--- a/protocol/group/urltest_test.go
++++ b/protocol/group/urltest_test.go
+@@ -131,3 +131,28 @@ func TestURLTestStableFallsBackToMain(t *testing.T) {
+ 		t.Fatalf("ee steady: ee, got %v", got)
+ 	}
+ }
++
++// H: a server in use stays for min_dwell after the last switch while it still answers every test, whoever is sooner.
++func TestURLTestStableMinDwell(t *testing.T) {
++	ee := &selectionOutbound{tag: "ee"}
++	lv := &selectionOutbound{tag: "lv"}
++	g := &URLTestGroup{outbounds: []adapter.Outbound{ee, lv}, stableSamples: 3, tolerance: 50, minDwell: time.Hour}
++	for i := 0; i < 3; i++ {
++		g.recordSamples(map[string]uint16{"ee": 200, "lv": 60})
++	}
++	g.selectedOutboundTCP = ee
++	g.switchedAt.Store(time.Now().UnixNano())
++	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "ee" {
++		t.Fatalf("switched a moment ago and still answering: ee stays, got %s", got.Tag())
++	}
++	g.switchedAt.Store(time.Now().Add(-2 * time.Hour).UnixNano())
++	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "lv" {
++		t.Fatalf("the dwell is over: lv is 140 ms sooner, got %s", got.Tag())
++	}
++	// ee stops answering: it's left at once, dwell or not
++	g.switchedAt.Store(time.Now().UnixNano())
++	g.recordSamples(map[string]uint16{"lv": 60})
++	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "lv" {
++		t.Fatalf("ee missed a test: lv at once, got %s", got.Tag())
++	}
++}
+-- 
+2.55.0.windows.3
+

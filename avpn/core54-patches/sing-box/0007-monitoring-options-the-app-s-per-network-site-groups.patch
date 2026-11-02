@@ -1,0 +1,27 @@
+From bc6b172bd1cdf6006bcfa6a7cf6de65f6bf8edb5 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 21:43:56 +0300
+Subject: [PATCH 07/14] monitoring options: the app's per-network site groups
+ choice (read by the config builder)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ option/monitoring.go | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/option/monitoring.go b/option/monitoring.go
+index 2c87d244f..e6c69883c 100644
+--- a/option/monitoring.go
++++ b/option/monitoring.go
+@@ -19,4 +19,8 @@ type MonitoringOptions struct {
+ 	// rule ipv6_by_outbound, rule ipv6_unavailable_via). Empty is [2606:4700:4700::1111]:443; "none"
+ 	// turns the probe off.
+ 	IPv6Probe string `json:"ipv6_probe,omitempty"` //H
++	// H: the app's choice for the network the config is made for (Wi-Fi or mobile data): the site groups on or
++	// off and their switch threshold. Read by hiddify-core's config builder, not by the monitor.
++	SiteGroups          bool   `json:"site_groups,omitempty"`
++	SiteGroupsTolerance uint16 `json:"site_groups_tolerance,omitempty"`
+ }
+-- 
+2.55.0.windows.3
+

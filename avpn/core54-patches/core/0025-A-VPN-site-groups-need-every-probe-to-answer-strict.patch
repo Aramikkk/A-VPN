@@ -1,0 +1,26 @@
+From 36228648c136da27adc4ec857fb3d1f165cbf028 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 15:45:14 +0300
+Subject: [PATCH 25/26] A-VPN: site groups need every probe to answer
+ (strict_urls)
+
+---
+ v2/config/site_groups.go | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index 303f2a7..4b2e8a8 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -281,6 +281,8 @@ func siteGroupOutbound(tag, url string, probes []string, servers []string, toler
+ 			Outbounds: servers,
+ 			URL:       url,
+ 			URLs:      probes,
++			// every one of the service's own hosts must answer, the slowest counts
++			StrictURLs: true,
+ 			// tested every two minutes, and only while the service is used (idle half an hour: no tests)
+ 			Interval:    badoption.Duration(2 * time.Minute),
+ 			IdleTimeout: badoption.Duration(30 * time.Minute),
+-- 
+2.55.0.windows.3
+

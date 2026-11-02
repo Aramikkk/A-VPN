@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
@@ -60,6 +61,8 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
     return List.generate(length, (_) => characters[random.nextInt(characters.length)]).join();
   }
 
+  ClientChannel? _channel;
+
   static final String secret = generateRandomPassword(100);
 
   @override
@@ -70,14 +73,12 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
     // throw Exception('stop: $err');
     final authOptions = CallOptions(metadata: {'authorization': 'Bearer $secret'});
     const channelOption = ChannelCredentials.insecure();
-    final helloClient = HelloClient(
-      options: authOptions,
-      ClientChannel(
-        '127.0.0.1',
-        port: port,
-        options: const ChannelOptions(credentials: channelOption),
-      ),
+    final helloChannel = ClientChannel(
+      '127.0.0.1',
+      port: port,
+      options: const ChannelOptions(credentials: channelOption),
     );
+    final helloClient = HelloClient(options: authOptions, helloChannel);
 
     try {
       await helloClient.sayHello(HelloRequest(name: "test"));
@@ -102,21 +103,18 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
       }
       final res = await helloClient.sayHello(HelloRequest(name: "test"));
       loggy.info(res.toString());
+    } finally {
+      unawaited(helloChannel.shutdown());
     }
-    bgClient = fgClient = CoreClient(
-      options: authOptions,
-      ClientChannel(
-        'localhost',
-        port: port,
-        options: const ChannelOptions(
-          credentials: ChannelCredentials.insecure(),
-          // credentials: ChannelCredentials.secure(
-          //   password: secret,
-          //   onBadCertificate: (certificate, host) => true,
-          // ),
-        ),
-      ),
+    // setup runs again on every resume: the channel it replaces used to stay open until its idle timeout
+    final previousChannel = _channel;
+    _channel = ClientChannel(
+      'localhost',
+      port: port,
+      options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );
+    bgClient = fgClient = CoreClient(options: authOptions, _channel!);
+    unawaited(previousChannel?.shutdown());
 
     return "";
   }

@@ -1,0 +1,31 @@
+From 8c75e04323ca8f3948ffd3e3063a7f32a4c16ec7 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 19 Oct 2026 12:58:18 +0300
+Subject: [PATCH 10/26] Suspend failure leaves the core STARTED (it stuck in
+ HOT_RELOADING); naive panel links skipped when not built
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/hcore/pause.go | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/v2/hcore/pause.go b/v2/hcore/pause.go
+index b499726..dc81cb1 100644
+--- a/v2/hcore/pause.go
++++ b/v2/hcore/pause.go
+@@ -57,5 +57,11 @@ func SuspendService() error {
+ 		return fmt.Errorf("core is %s", static.CoreState)
+ 	}
+ 	SetCoreStatus(CoreStates_HOT_RELOADING, MessageType_EMPTY, "")
+-	return static.StartedService.SuspendService()
++	if err := static.StartedService.SuspendService(); err != nil {
++		// A-VPN: not suspended, so still running: back to STARTED, or every later reload and start was refused
++		// as "core is HOT_RELOADING" until the app was killed
++		SetCoreStatus(CoreStates_STARTED, MessageType_EMPTY, "")
++		return err
++	}
++	return nil
+ }
+-- 
+2.55.0.windows.3
+

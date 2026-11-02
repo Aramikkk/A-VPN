@@ -1,0 +1,261 @@
+From 15cb891ef918f3b3b5be3ed6608915e9cea09f6c Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 15:55:05 +0300
+Subject: [PATCH 26/26] A-VPN: port the core patches onto 5.4.0 (hot
+ reload/rebuild/suspend on the queue, test fixes)
+
+---
+ hiddify-sing-box                     |  2 +-
+ v2/config/builder.go                 |  4 +++-
+ v2/config/fakeip_persistence_test.go | 15 ++++++++-------
+ v2/config/site_groups.go             |  5 +++--
+ v2/config/site_groups_test.go        |  2 +-
+ v2/hcore/hotreload.go                |  7 ++++---
+ v2/hcore/hotreload_test.go           | 17 +++++++++--------
+ v2/hcore/pause.go                    |  8 +++++---
+ 8 files changed, 34 insertions(+), 26 deletions(-)
+
+diff --git a/hiddify-sing-box b/hiddify-sing-box
+index f685aa9..9d93058 160000
+--- a/hiddify-sing-box
++++ b/hiddify-sing-box
+@@ -1 +1 @@
+-Subproject commit f685aa92f63b751e0879227efc698a45f76b9ced
++Subproject commit 9d930588276956ef058a0a315656e4d2c7058435
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 97e2249..0191442 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -293,6 +293,7 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 			// Interval:  badoption.Duration(opt.URLTestInterval.Duration()),
+ 			// IdleTimeout: badoption.Duration(opt.URLTestIdleTimeout.Duration()),
+ 			Tolerance: balancerTolerance(opt, false),
++			ToleranceRatio: -1, // the app's own tolerance, in milliseconds
+ 			// IdleTimeout:               badoption.Duration(opt.URLTestInterval.Duration().Nanoseconds() * 3),
+ 			InterruptExistConnections: !opt.BalancerKeepConnections,
+ 			PriorityOutbounds:         priorityTags(tags, opt.PriorityProfile),
+@@ -313,6 +314,7 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 			// Interval:  badoption.Duration(opt.URLTestInterval.Duration()),
+ 			// IdleTimeout: badoption.Duration(opt.URLTestIdleTimeout.Duration()),
+ 			Tolerance: balancerTolerance(opt, false),
++			ToleranceRatio: -1, // the app's own tolerance, in milliseconds
+ 			// IdleTimeout:               badoption.Duration(opt.URLTestInterval.Duration().Nanoseconds() * 3),
+ 			InterruptExistConnections: !opt.BalancerKeepConnections,
+ 		},
+@@ -422,7 +424,7 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
+ 				Enabled: true,
+ 				// Android retains DNS answers across a core restart on network changes.
+ 				StoreFakeIP:     true,
+-				StoreWARPConfig: true,
++				StoreWARPConfig: func() *bool { v := true; return &v }(),
+ 				Path:            "data/clash.db",
+ 			},
+ 
+diff --git a/v2/config/fakeip_persistence_test.go b/v2/config/fakeip_persistence_test.go
+index f04272c..ba36af9 100644
+--- a/v2/config/fakeip_persistence_test.go
++++ b/v2/config/fakeip_persistence_test.go
+@@ -23,25 +23,26 @@ func TestFakeIPMappingsSurviveRestart(t *testing.T) {
+ 	require.NoError(t, err)
+ 	cacheOptions := *built.Experimental.CacheFile
+ 	cacheOptions.Path = filepath.Join(t.TempDir(), "cache.db")
+-	open := func() (*fakeip.Store, *cachefile.CacheFile) {
++	open := func() (*fakeip.Store, *adapter.Scope) {
+ 		t.Helper()
+ 		ctx := context.Background()
+ 		cache := cachefile.New(ctx, logger.NOP(), cacheOptions)
+-		require.NoError(t, cache.Start(adapter.StartStateInitialize))
++		scope := adapter.NewScope(ctx, logger.NOP())
++		require.NoError(t, scope.Start("cache", cache, adapter.StartStateInitialize))
+ 		ctx = service.ContextWith[adapter.CacheFile](ctx, cache)
+ 		store := fakeip.NewStore(ctx, logger.NOP(), netip.MustParsePrefix("198.18.0.0/15"), netip.MustParsePrefix("fc00::/18"))
+ 		require.NoError(t, store.Start())
+-		return store, cache
++		return store, scope
+ 	}
+-	store, cache := open()
++	store, scope := open()
+ 	ip4, err := store.Create("cached-v4.example", false)
+ 	require.NoError(t, err)
+ 	ip6, err := store.Create("cached-v6.example", true)
+ 	require.NoError(t, err)
+ 	require.NoError(t, store.Close())
+-	require.NoError(t, cache.Close())
+-	store, cache = open()
+-	defer cache.Close()
++	require.NoError(t, scope.Close())
++	store, scope = open()
++	defer scope.Close()
+ 	defer store.Close()
+ 	name4, found4 := store.Lookup(ip4)
+ 	name6, found6 := store.Lookup(ip6)
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index 4b2e8a8..fcc4a25 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -1,6 +1,7 @@
+ package config
+ 
+ import (
++	"net/netip"
+ 	"strings"
+ 	"time"
+ 
+@@ -176,7 +177,7 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 		if len(site.packages) > 0 {
+ 			rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{PackageName: site.packages}))
+ 		}
+-		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{DomainSuffix: site.domainSuffix, IPCIDR: site.ipCIDR}))
++		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{DomainSuffix: site.domainSuffix, IPCIDR: prefixables(site.ipCIDR)}))
+ 	}
+ 	if len(groups) == 0 {
+ 		return
+@@ -246,7 +247,7 @@ func siteGroupProxied(tag string) bool {
+ // internalSubnetRule: the core's own rule for its internal subnet, which comes before everything.
+ func internalSubnetRule(rule option.Rule) bool {
+ 	for _, cidr := range rule.DefaultOptions.RawDefaultRule.IPCIDR {
+-		if cidr == "10.10.34.0/24" {
++		if cidr != nil && netip.Prefix(*cidr).String() == "10.10.34.0/24" {
+ 			return true
+ 		}
+ 	}
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index c68788c..be0a7e6 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -14,7 +14,7 @@ func siteGroupsTestOptions() *option.Options {
+ 		return option.Rule{
+ 			Type: C.RuleTypeDefault,
+ 			DefaultOptions: option.DefaultRule{
+-				RawDefaultRule: option.RawDefaultRule{IPCIDR: cidr, DomainSuffix: suffix},
++				RawDefaultRule: option.RawDefaultRule{IPCIDR: prefixables(cidr), DomainSuffix: suffix},
+ 				RuleAction:     option.RuleAction{Action: C.RuleActionTypeRoute, RouteOptions: option.RouteActionOptions{Outbound: outbound}},
+ 			},
+ 		}
+diff --git a/v2/hcore/hotreload.go b/v2/hcore/hotreload.go
+index df26e16..c1eef7b 100644
+--- a/v2/hcore/hotreload.go
++++ b/v2/hcore/hotreload.go
+@@ -70,7 +70,8 @@ func RebuildService(ctx context.Context, in *StartRequest) (*CoreInfoResponse, e
+ // rebuildLocked is RebuildService; static.lock must be held.
+ func rebuildLocked(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error) {
+ 	state := currentCoreState()
+-	if !isRunningState(state) || static.StartedService == nil {
++	// a rebuild also follows a failed one (HOT_RELOADING with no instance): the logical session is still there
++	if (!isRunningState(state) && state != CoreStates_HOT_RELOADING) || static.StartedService == nil {
+ 		return hotReloadError(MessageType_HOT_RELOAD_FAILED, fmt.Errorf("core is %s", state))
+ 	}
+ 	in, err := loadLastStartRequestIfNeeded(in)
+@@ -95,7 +96,6 @@ func rebuildLocked(ctx context.Context, in *StartRequest) (*CoreInfoResponse, er
+ 	if err = static.StartedService.StartOrReloadService(ctx, string(content), nil); err != nil {
+ 		// Keep the daemon so the caller can rebuild the previous configuration
+ 		// without losing the session after a failed replacement.
+-		setCoreStatusIf([]CoreStates{CoreStates_HOT_RELOADING}, static.connectedState(), MessageType_EMPTY, "")
+ 		return hotReloadError(MessageType_START_SERVICE, err)
+ 	}
+ 	static.previousStartRequest = in
+@@ -208,7 +208,8 @@ func hotReloadService(ctx context.Context, in *StartRequest) (*CoreInfoResponse,
+ func hotReloadError(messageType MessageType, err error) (*CoreInfoResponse, error) {
+ 	Log(LogLevel_ERROR, LogType_CORE, "hot reload: ", err.Error())
+ 	state := currentCoreState()
+-	if state == CoreStates_HOT_RELOADING {
++	// a replacement that failed leaves no instance: that is not a running core, the caller rebuilds it
++	if state == CoreStates_HOT_RELOADING && static.Instance() != nil {
+ 		state = static.connectedState()
+ 	}
+ 	return &CoreInfoResponse{
+diff --git a/v2/hcore/hotreload_test.go b/v2/hcore/hotreload_test.go
+index 99e68fa..15b2de9 100644
+--- a/v2/hcore/hotreload_test.go
++++ b/v2/hcore/hotreload_test.go
+@@ -83,7 +83,7 @@ func TestHotReload(t *testing.T) {
+ 		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 1081)),
+ 	})
+ 	require.NoError(t, err)
+-	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.Contains(t, []CoreStates{CoreStates_STARTED, CoreStates_WAITING, CoreStates_NO_AVAILABLE_PROXIES}, response.CoreState)
+ 	instance := static.StartedService.Instance()
+ 	proxyA := runningOutbound(t, "proxy-a")
+ 	proxyB := runningOutbound(t, "proxy-b")
+@@ -98,14 +98,15 @@ func TestHotReload(t *testing.T) {
+ 		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081), socks("proxy-c", 1082)),
+ 	})
+ 	require.NoError(t, err)
+-	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.Contains(t, []CoreStates{CoreStates_STARTED, CoreStates_WAITING, CoreStates_NO_AVAILABLE_PROXIES}, response.CoreState)
+ 	require.Equal(t, MessageType_EMPTY, response.MessageType)
+ 	require.Same(t, instance, static.StartedService.Instance(), "the core was not restarted")
+ 	require.Same(t, proxyA, runningOutbound(t, "proxy-a"), "an unchanged outbound keeps running")
+ 	require.NotSame(t, proxyB, runningOutbound(t, "proxy-b"), "a changed outbound is replaced")
+ 	require.NotNil(t, runningOutbound(t, "proxy-c"), "a new outbound is added")
+ 	var seen []CoreStates
+-	for len(seen) == 0 || seen[len(seen)-1] != CoreStates_STARTED {
++	// a core with no live proxy to ping ends in NO_AVAILABLE_PROXIES: the reload is over once it leaves HOT_RELOADING
++	for len(seen) == 0 || seen[len(seen)-1] == CoreStates_HOT_RELOADING {
+ 		select {
+ 		case info := <-states:
+ 			seen = append(seen, info.CoreState)
+@@ -145,8 +146,8 @@ func TestHotReload(t *testing.T) {
+ 	require.Error(t, err)
+ 	require.Contains(t, err.Error(), "hot reload cannot change: log")
+ 	require.Equal(t, MessageType_HOT_RELOAD_FAILED, response.MessageType)
+-	require.Equal(t, CoreStates_STARTED, response.CoreState)
+-	require.Equal(t, CoreStates_STARTED, static.CoreState)
++	require.Contains(t, []CoreStates{CoreStates_STARTED, CoreStates_WAITING, CoreStates_NO_AVAILABLE_PROXIES}, response.CoreState)
++	require.Contains(t, []CoreStates{CoreStates_STARTED, CoreStates_WAITING, CoreStates_NO_AVAILABLE_PROXIES}, static.CoreState)
+ 	require.Same(t, instance, static.StartedService.Instance())
+ 	require.Same(t, proxyC, runningOutbound(t, "proxy-c"), "nothing was applied")
+ 
+@@ -158,7 +159,7 @@ func TestHotReload(t *testing.T) {
+ 		ConfigContent: profile(socks("proxy-a", 1080), socks("proxy-b", 2081), socks("proxy-c", 1082)),
+ 	})
+ 	require.NoError(t, err)
+-	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.Contains(t, []CoreStates{CoreStates_STARTED, CoreStates_WAITING, CoreStates_NO_AVAILABLE_PROXIES}, response.CoreState)
+ 	require.Same(t, sessionService, static.StartedService)
+ 	require.Equal(t, sessionStart, static.StartedService.StartedAt())
+ 	require.NotSame(t, instance, static.StartedService.Instance())
+@@ -204,7 +205,7 @@ func TestHotReload(t *testing.T) {
+ 	require.Error(t, err)
+ 	require.Contains(t, err.Error(), "tun inbound has changed, hot reload can not be applied")
+ 	require.Equal(t, MessageType_HOT_RELOAD_FAILED, response.MessageType)
+-	require.Equal(t, CoreStates_STARTED, static.CoreState)
++	require.Contains(t, []CoreStates{CoreStates_STARTED, CoreStates_WAITING, CoreStates_NO_AVAILABLE_PROXIES}, static.CoreState)
+ 	require.Same(t, instance, static.StartedService.Instance())
+ 
+ 	response, err = Stop()
+@@ -223,6 +224,6 @@ func TestHotReload(t *testing.T) {
+ 		ConfigContent: profile(socks("proxy-a", 1080)),
+ 	})
+ 	require.NoError(t, err)
+-	require.Equal(t, CoreStates_STARTED, response.CoreState)
++	require.Contains(t, []CoreStates{CoreStates_STARTED, CoreStates_WAITING, CoreStates_NO_AVAILABLE_PROXIES}, response.CoreState)
+ 	require.NotEqual(t, sessionStart, static.StartedService.StartedAt(), "manual Stop/Start starts a new session")
+ }
+diff --git a/v2/hcore/pause.go b/v2/hcore/pause.go
+index dc81cb1..8867343 100644
+--- a/v2/hcore/pause.go
++++ b/v2/hcore/pause.go
+@@ -53,14 +53,16 @@ func Wake() {
+ func SuspendService() error {
+ 	static.lock.Lock()
+ 	defer static.lock.Unlock()
+-	if static.CoreState != CoreStates_STARTED || static.StartedService == nil {
+-		return fmt.Errorf("core is %s", static.CoreState)
++	previous := static.CoreState
++	// WAITING (no ping has decided yet) and NO_AVAILABLE_PROXIES are running states as well
++	if !isRunningState(previous) || static.StartedService == nil {
++		return fmt.Errorf("core is %s", previous)
+ 	}
+ 	SetCoreStatus(CoreStates_HOT_RELOADING, MessageType_EMPTY, "")
+ 	if err := static.StartedService.SuspendService(); err != nil {
+ 		// A-VPN: not suspended, so still running: back to STARTED, or every later reload and start was refused
+ 		// as "core is HOT_RELOADING" until the app was killed
+-		SetCoreStatus(CoreStates_STARTED, MessageType_EMPTY, "")
++		SetCoreStatus(previous, MessageType_EMPTY, "")
+ 		return err
+ 	}
+ 	return nil
+-- 
+2.55.0.windows.3
+

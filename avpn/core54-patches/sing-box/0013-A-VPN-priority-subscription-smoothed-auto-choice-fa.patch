@@ -1,0 +1,1089 @@
+From f685aa92f63b751e0879227efc698a45f76b9ced Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Wed, 28 Oct 2026 10:54:00 +0300
+Subject: [PATCH 13/14] A-VPN: priority subscription, smoothed auto choice,
+ failure watch, hot-reloadable priority, switch log
+
+---
+ common/failwatch/failwatch.go              |  68 +++++++
+ common/failwatch/failwatch_test.go         |  53 ++++++
+ common/monitoring/h_ipinfo_refresh.go      |  17 ++
+ common/monitoring/h_ipinfo_refresh_test.go |  26 +++
+ h_box_hotreload.go                         |   4 +
+ h_box_hotreload_test.go                    |  12 ++
+ option/balancer.go                         |   7 +
+ option/group.go                            |   8 +
+ option/monitoring.go                       |   5 +
+ protocol/group/balancer/balancer.go        |  16 +-
+ protocol/group/balancer/h_strategy_test.go |  72 +++++++
+ protocol/group/balancer/lowest_delay.go    | 209 ++++++++++++++++++---
+ protocol/group/urltest.go                  | 125 +++++++++++-
+ protocol/group/urltest_test.go             |  88 +++++++--
+ 14 files changed, 668 insertions(+), 42 deletions(-)
+ create mode 100644 common/failwatch/failwatch.go
+ create mode 100644 common/failwatch/failwatch_test.go
+ create mode 100644 common/monitoring/h_ipinfo_refresh.go
+ create mode 100644 common/monitoring/h_ipinfo_refresh_test.go
+
+diff --git a/common/failwatch/failwatch.go b/common/failwatch/failwatch.go
+new file mode 100644
+index 000000000..975aed3fd
+--- /dev/null
++++ b/common/failwatch/failwatch.go
+@@ -0,0 +1,68 @@
++// Package failwatch tells a group that the server it uses stops letting connections through: several dials in a
++// row failing on it, with none succeeding between. It costs nothing while connections work.
++package failwatch
++
++import (
++	"sync"
++	"time"
++)
++
++type Watch struct {
++	mu sync.Mutex
++	// how many failures in a row, within how long, make [Failed] true; and how long it stays quiet after that
++	threshold int
++	window    time.Duration
++	cooldown  time.Duration
++	servers   map[string]*record
++	now       func() time.Time
++}
++
++type record struct {
++	failures  []time.Time
++	triggered time.Time
++}
++
++// New is a watch that reports after three failures in twenty seconds, and not again for thirty.
++func New() *Watch {
++	return &Watch{threshold: 3, window: 20 * time.Second, cooldown: 30 * time.Second, servers: map[string]*record{}, now: time.Now}
++}
++
++// Failed notes one failed dial through the server tag and reports whether the group should test its servers now.
++func (w *Watch) Failed(tag string) bool {
++	if w == nil {
++		return false
++	}
++	w.mu.Lock()
++	defer w.mu.Unlock()
++	now := w.now()
++	r := w.servers[tag]
++	if r == nil {
++		r = &record{}
++		w.servers[tag] = r
++	}
++	kept := r.failures[:0]
++	for _, at := range r.failures {
++		if now.Sub(at) <= w.window {
++			kept = append(kept, at)
++		}
++	}
++	r.failures = append(kept, now)
++	if len(r.failures) < w.threshold || (!r.triggered.IsZero() && now.Sub(r.triggered) < w.cooldown) {
++		return false
++	}
++	r.triggered = now
++	r.failures = r.failures[:0]
++	return true
++}
++
++// Worked notes a dial through the server that went through: the failures before it are no streak.
++func (w *Watch) Worked(tag string) {
++	if w == nil {
++		return
++	}
++	w.mu.Lock()
++	defer w.mu.Unlock()
++	if r := w.servers[tag]; r != nil {
++		r.failures = r.failures[:0]
++	}
++}
+diff --git a/common/failwatch/failwatch_test.go b/common/failwatch/failwatch_test.go
+new file mode 100644
+index 000000000..f361f374c
+--- /dev/null
++++ b/common/failwatch/failwatch_test.go
+@@ -0,0 +1,53 @@
++package failwatch
++
++import (
++	"testing"
++	"time"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestFailedInARow(t *testing.T) {
++	now := time.Now()
++	w := New()
++	w.now = func() time.Time { return now }
++	require.False(t, w.Failed("a"))
++	require.False(t, w.Failed("a"))
++	require.True(t, w.Failed("a"), "the third in a row")
++	// quiet for the cooldown, however many fail
++	for i := 0; i < 5; i++ {
++		require.False(t, w.Failed("a"))
++	}
++	now = now.Add(31 * time.Second)
++	require.False(t, w.Failed("a"))
++	require.False(t, w.Failed("a"))
++	require.True(t, w.Failed("a"))
++}
++
++func TestSuccessBreaksTheStreak(t *testing.T) {
++	w := New()
++	w.Failed("a")
++	w.Failed("a")
++	w.Worked("a")
++	require.False(t, w.Failed("a"))
++	require.False(t, w.Failed("a"))
++	require.True(t, w.Failed("a"))
++	// another server's failures are its own
++	require.False(t, w.Failed("b"))
++}
++
++func TestOldFailuresExpire(t *testing.T) {
++	now := time.Now()
++	w := New()
++	w.now = func() time.Time { return now }
++	w.Failed("a")
++	w.Failed("a")
++	now = now.Add(21 * time.Second)
++	require.False(t, w.Failed("a"), "the first two are too old")
++}
++
++func TestNilWatchIsQuiet(t *testing.T) {
++	var w *Watch
++	require.False(t, w.Failed("a"))
++	w.Worked("a")
++}
+diff --git a/common/monitoring/h_ipinfo_refresh.go b/common/monitoring/h_ipinfo_refresh.go
+new file mode 100644
+index 000000000..b6f8daebf
+--- /dev/null
++++ b/common/monitoring/h_ipinfo_refresh.go
+@@ -0,0 +1,17 @@
++package monitoring
++
++import "time"
++
++// ipInfoMaxAge is how old an IP/country record from the cache may be before it is fetched again.
++const ipInfoMaxAge = 12 * time.Hour
++
++// H: needIpInfo says whether a server's IP record is to be fetched in this test. It is when there is none; a record
++// kept from an earlier run stays as it is for ipInfoMaxAge. Fetching it again at every start of the core was a
++// TLS handshake through each of the dozens of servers at once (over half of the processor's work in the first
++// minutes after a start), for a record that hardly ever changes.
++func needIpInfo(has, fromCache bool, age time.Duration) bool {
++	if !has {
++		return true
++	}
++	return fromCache && age > ipInfoMaxAge
++}
+diff --git a/common/monitoring/h_ipinfo_refresh_test.go b/common/monitoring/h_ipinfo_refresh_test.go
+new file mode 100644
+index 000000000..2376726f1
+--- /dev/null
++++ b/common/monitoring/h_ipinfo_refresh_test.go
+@@ -0,0 +1,26 @@
++package monitoring
++
++import (
++	"testing"
++	"time"
++)
++
++func TestNeedIpInfo(t *testing.T) {
++	for _, tc := range []struct {
++		name      string
++		has       bool
++		fromCache bool
++		age       time.Duration
++		want      bool
++	}{
++		{"none yet", false, false, 0, true},
++		{"none, from the cache", false, true, time.Minute, true},
++		{"fresh record from the cache is kept", true, true, time.Hour, false},
++		{"old record from the cache is fetched again", true, true, 13 * time.Hour, true},
++		{"record of this run is kept", true, false, 100 * time.Hour, false},
++	} {
++		if got := needIpInfo(tc.has, tc.fromCache, tc.age); got != tc.want {
++			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
++		}
++	}
++}
+diff --git a/h_box_hotreload.go b/h_box_hotreload.go
+index 77d219f08..e60d8c3d6 100644
+--- a/h_box_hotreload.go
++++ b/h_box_hotreload.go
+@@ -139,6 +139,10 @@ func CheckHotReload(ctx context.Context, oldOptions, newOptions option.Options)
+ 		experimental := *newRest.Experimental
+ 		monitoringOptions := *experimental.Monitoring
+ 		monitoringOptions.URLTestTimeout = oldRest.Experimental.Monitoring.URLTestTimeout
++		// A-VPN: the priority subscription is in the main group's options too (a reload replaces that group): the
++		// copy here only keeps it from counting as a change of the experimental block
++		monitoringOptions.PriorityProfile = oldRest.Experimental.Monitoring.PriorityProfile
++		monitoringOptions.PriorityMargin = oldRest.Experimental.Monitoring.PriorityMargin
+ 		experimental.Monitoring = &monitoringOptions
+ 		newRest.Experimental = &experimental
+ 	}
+diff --git a/h_box_hotreload_test.go b/h_box_hotreload_test.go
+index 82fdb3067..73c3fda98 100644
+--- a/h_box_hotreload_test.go
++++ b/h_box_hotreload_test.go
+@@ -420,3 +420,15 @@ func TestH_HotReloadInbounds(t *testing.T) {
+ 	require.True(t, listening(port2))
+ 	require.False(t, listening(port3))
+ }
++
++// A-VPN: the priority subscription is no change of the experimental block (the main group is replaced instead),
++// while another change in it still is one.
++func TestH_HotReloadPriorityIsNoExperimentalChange(t *testing.T) {
++	oldOptions := option.Options{Experimental: &option.ExperimentalOptions{Monitoring: &option.MonitoringOptions{SiteGroups: true}}}
++	newOptions := option.Options{Experimental: &option.ExperimentalOptions{Monitoring: &option.MonitoringOptions{
++		SiteGroups: true, PriorityProfile: 2, PriorityMargin: 100,
++	}}}
++	require.NoError(t, box.CheckHotReload(context.Background(), oldOptions, newOptions))
++	newOptions.Experimental.Monitoring.SiteGroups = false
++	require.ErrorContains(t, box.CheckHotReload(context.Background(), oldOptions, newOptions), "experimental")
++}
+diff --git a/option/balancer.go b/option/balancer.go
+index ea2ddd4e3..2fef6dce8 100644
+--- a/option/balancer.go
++++ b/option/balancer.go
+@@ -17,4 +17,11 @@ type BalancerOutboundOptions struct {
+ 	Pool          int                        `json:"pool,omitempty"`           //H
+ 	PoolTolerance uint16                     `json:"pool_tolerance,omitempty"` //H
+ 	StickyHash    badoption.Listable[string] `json:"sticky_hash,omitempty"`    //H
++	MaxRetry                  int                `json:"max_retry,omitempty"` //not implemented yet
++	// A-VPN: servers of the priority subscription, and how many ms slower than the others they may be and still win
++	PriorityOutbounds []string `json:"priority_outbounds,omitempty"`
++	PriorityMargin    uint16   `json:"priority_margin,omitempty"`
++	// A-VPN: the lowest-delay choice goes by the last this many test results of each server (their average, a failed
++	// one costing extra), not by the latest alone; 0 = the latest alone
++	SmoothSamples int `json:"smooth_samples,omitempty"`
+ }
+diff --git a/option/group.go b/option/group.go
+index 37d88faba..a4ed3fccc 100644
+--- a/option/group.go
++++ b/option/group.go
+@@ -37,4 +37,12 @@ type URLTestOutboundOptions struct {
+ 	Sticky bool `json:"sticky,omitempty"`
+ 	// H: how long one test may take (0: the TCP timeout, 5 s)
+ 	TestTimeout badoption.Duration `json:"test_timeout,omitempty"`
++	// H: the background checks test this many servers at a time, StartGap apart, instead of every server at once
++	// (the start, and every round after): the radio and the processor aren't hit by a hundred tests together.
++	// 0: all at once. A test the user asks for is always all at once.
++	StartBatch int                `json:"start_batch,omitempty"`
++	// H: the group tests only this many servers, the best by the shared pings (its own tests, one URL or more through
++	// each server, aren't cheap: a TLS handshake each). 0: every server.
++	Candidates int `json:"candidates,omitempty"`
++	StartGap   badoption.Duration `json:"start_gap,omitempty"`
+ }
+diff --git a/option/monitoring.go b/option/monitoring.go
+index e6c69883c..b37bc95d8 100644
+--- a/option/monitoring.go
++++ b/option/monitoring.go
+@@ -23,4 +23,9 @@ type MonitoringOptions struct {
+ 	// off and their switch threshold. Read by hiddify-core's config builder, not by the monitor.
+ 	SiteGroups          bool   `json:"site_groups,omitempty"`
+ 	SiteGroupsTolerance uint16 `json:"site_groups_tolerance,omitempty"`
++	// A-VPN: the priority subscription of the merged config (1 = the active profile, 2 = the first added...; 0 =
++	// none) and the milliseconds the other subscriptions' servers must be faster by before the automatic choice
++	// leaves it. Read by hiddify-core's config builder.
++	PriorityProfile int    `json:"priority_profile,omitempty"`
++	PriorityMargin  uint16 `json:"priority_margin,omitempty"`
+ }
+diff --git a/protocol/group/balancer/balancer.go b/protocol/group/balancer/balancer.go
+index d69741578..4c4b8219a 100644
+--- a/protocol/group/balancer/balancer.go
++++ b/protocol/group/balancer/balancer.go
+@@ -1,6 +1,7 @@
+ package balancer
+ 
+ import (
++	"github.com/sagernet/sing-box/common/failwatch"
+ 	"context"
+ 	"io"
+ 	"net"
+@@ -52,6 +53,8 @@ type Balancer struct {
+ 	interruptExternalConnections bool
+ 
+ 	monitor *monitoring.OutboundMonitoring
++	// A-VPN: dials failing in a row on one server
++	failures *failwatch.Watch
+ 
+ 	availbleOutbounds []adapter.Outbound
+ 	close             chan struct{}
+@@ -76,6 +79,7 @@ func NewLoadBalance(ctx context.Context, router adapter.Router, logger log.Conte
+ 		options:                      options,
+ 		interruptGroup:               interrupt.NewGroup(),
+ 		close:                        make(chan struct{}),
++		failures:                     failwatch.New(),
+ 	}
+ 	if len(outbound.tags) == 0 {
+ 		return nil, E.New("missing tags")
+@@ -120,7 +124,11 @@ func (s *Balancer) Start() error {
+ 	case StrategyStickySessions:
+ 		s.strategyFn = NewStickySession(outbounds, s.options)
+ 	case StrategyLowestDelay:
+-		s.strategyFn = NewLowestDelay(outbounds, s.options)
++		lowest := NewLowestDelay(outbounds, s.options)
++		lowest.SetOnSwitch(func(from, to, detail string) {
++			s.logger.Info("auto choice moved: ", detail)
++		})
++		s.strategyFn = lowest
+ 	case StrategyPool: //H
+ 		pool, err := NewPool(outbounds, s.options) //H
+ 		if err != nil {                            //H
+@@ -223,10 +231,16 @@ func (s *Balancer) DialContext(ctx context.Context, network string, destination
+ 
+ 	conn, err := outbound.DialContext(ctx, network, destination)
+ 	if err == nil {
++		s.failures.Worked(outbound.Tag())
+ 		return s.memberGroup(outbound.Tag()).NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
+ 	}
+ 	s.logger.ErrorContext(ctx, err)
+ 	s.monitor.InvalidateTest(outbound.Tag())
++	// A-VPN: several dials in a row failing on the server in use: it is tested at once, so the choice moves off it
++	if ctx.Err() == nil && s.failures.Failed(outbound.Tag()) {
++		s.logger.Info("dials through ", outbound.Tag(), " keep failing: testing it now")
++		_ = s.monitor.TestNow(outbound.Tag())
++	}
+ 
+ 	return nil, err
+ }
+diff --git a/protocol/group/balancer/h_strategy_test.go b/protocol/group/balancer/h_strategy_test.go
+index e28bd152b..9035cbab7 100644
+--- a/protocol/group/balancer/h_strategy_test.go
++++ b/protocol/group/balancer/h_strategy_test.go
+@@ -388,3 +388,75 @@ func TestH_BalancerNetworkSpecificTolerance(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// A-VPN: the priority subscription's server wins unless another is faster by more than the margin; when it
++// doesn't answer, another takes over at once.
++func TestH_BalancerLowestDelayPriority(t *testing.T) {
++	p, o := newFake("p"), newFake("o")
++	s := NewLowestDelay(outs(o, p), option.BalancerOutboundOptions{PriorityOutbounds: []string{"p"}, PriorityMargin: 100})
++
++	// o is faster by 60 ms: less than the margin, p stays
++	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"p": his(160), "o": his(100)})
++	require.Equal(t, "p", s.Now())
++
++	// o is faster by 150 ms: more than the margin, o takes over
++	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"p": his(300), "o": his(150)})
++	require.Equal(t, "o", s.Now())
++
++	// p answers well again
++	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"p": his(130), "o": his(100)})
++	require.Equal(t, "p", s.Now())
++
++	// p does not answer: o at once
++	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"p": his(monitoring.TimeoutDelay), "o": his(900)})
++	require.Equal(t, "o", s.Now())
++
++	// no priority: the plain fastest
++	plain := NewLowestDelay(outs(o, p), option.BalancerOutboundOptions{})
++	plain.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"p": his(160), "o": his(100)})
++	require.Equal(t, "o", plain.Now())
++}
++
++// A-VPN: a server's lucky first answer doesn't hold the place; the choice goes by the last results, and a server
++// that drops out now and then loses to a steady one.
++func TestH_BalancerLowestDelaySmoothed(t *testing.T) {
++	pl, ee := newFake("pl"), newFake("ee")
++	s := NewLowestDelay(outs(ee, pl), option.BalancerOutboundOptions{Tolerance: 150, SmoothSamples: 3})
++	at := time.Now()
++	round := func(plDelay, eeDelay uint16) {
++		at = at.Add(10 * time.Second)
++		s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{
++			"pl": {Delay: plDelay, Time: at},
++			"ee": {Delay: eeDelay, Time: at},
++		})
++	}
++	// ee answers first with a lucky 40 ms, pl 90: ee in front for now (both have one result)
++	round(90, 40)
++	require.Equal(t, "ee", s.Now())
++	// ee then fails once, pl is steady: pl, although tolerance would have kept ee if it were settled
++	round(90, monitoring.TimeoutDelay)
++	require.Equal(t, "pl", s.Now())
++	round(95, 60)
++	require.Equal(t, "pl", s.Now())
++	// the single-result ranking is kept out of it: no tolerance holds an unsettled server
++	fresh := NewLowestDelay(outs(ee, pl), option.BalancerOutboundOptions{Tolerance: 150, SmoothSamples: 3})
++	fresh.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"ee": {Delay: 50, Time: at}, "pl": {Delay: 80, Time: at}})
++	require.Equal(t, "ee", fresh.Now())
++	at = at.Add(10 * time.Second)
++	fresh.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"ee": {Delay: 300, Time: at}, "pl": {Delay: 80, Time: at}})
++	require.Equal(t, "pl", fresh.Now())
++}
++
++// A-VPN: a move of the choice is told with the delays it went by.
++func TestH_BalancerLowestDelayTellsSwitch(t *testing.T) {
++	a, b := newFake("a"), newFake("b")
++	s := NewLowestDelay(outs(a, b), option.BalancerOutboundOptions{PriorityOutbounds: []string{"a"}, PriorityMargin: 10})
++	var told []string
++	s.SetOnSwitch(func(from, to, detail string) { told = append(told, from+">"+to+": "+detail) })
++	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"a": his(50), "b": his(200)})
++	require.Empty(t, told, "the first choice is no move")
++	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"a": his(400), "b": his(90)})
++	require.Len(t, told, 1)
++	require.Contains(t, told[0], "a>b")
++	require.Contains(t, told[0], "priority")
++}
+diff --git a/protocol/group/balancer/lowest_delay.go b/protocol/group/balancer/lowest_delay.go
+index bdb1caa4d..3a4bb1bb8 100644
+--- a/protocol/group/balancer/lowest_delay.go
++++ b/protocol/group/balancer/lowest_delay.go
+@@ -1,7 +1,10 @@
+ package balancer
+ 
+ import (
++	"fmt"
++	"strconv"
+ 	"sync"
++	"time"
+ 
+ 	"github.com/sagernet/sing-box/adapter"
+ 	"github.com/sagernet/sing-box/common/monitoring"
+@@ -13,30 +16,35 @@ type LowestDelay struct {
+ 	outbounds        map[string][]adapter.Outbound
+ 	udpOutbounds     []adapter.Outbound
+ 	selectedOutbound map[string]adapter.Outbound
+-	tolerance        uint16  // a member takes the selection when faster by more than this ...
+-	toleranceRatio   float64 // ... and than this share of the selected member's delay
++	// A-VPN: the current server is kept until it stops answering or another one is faster by more than this
++	// many milliseconds, so the choice doesn't flip between countries on every ping jitter
++	tolerance uint16
++	// A-VPN: the priority subscription's servers count as faster than they are by this many ms next to the others
++	// (the others are slower by it), so the others take over only when they are clearly better
++	priority       map[string]bool
++	priorityMargin uint16
++	// A-VPN: the last results of each server (0 = no answer), by the time of the test they came from
++	smooth  int
++	samples map[string]*sampleList
++	// told when the choice moves from one server to another: from, to and what the choice went by
++	onSwitch func(from, to, detail string)
+ 
+ 	mu sync.Mutex
+ }
+ 
+ func NewLowestDelay(outbounds []adapter.Outbound, options option.BalancerOutboundOptions) *LowestDelay {
+ 	couts := convertOutbounds(outbounds)
+-	tolerance := options.Tolerance
+-	if tolerance == 0 {
+-		tolerance = defaultTolerance
+-	}
+-	ratio := options.ToleranceRatio
+-	if ratio <= 0 {
+-		ratio = defaultToleranceRatio
+-	}
+ 	return &LowestDelay{
+ 		outbounds: couts,
++		tolerance: options.Tolerance,
++		priority:       priorityMap(options.PriorityOutbounds),
++		priorityMargin: options.PriorityMargin,
++		smooth:         options.SmoothSamples,
++		samples:        map[string]*sampleList{},
+ 		selectedOutbound: map[string]adapter.Outbound{
+ 			N.NetworkUDP: couts[N.NetworkUDP][0],
+ 			N.NetworkTCP: couts[N.NetworkTCP][0],
+ 		},
+-		tolerance:      tolerance,
+-		toleranceRatio: ratio,
+ 	}
+ }
+ 
+@@ -54,31 +62,49 @@ func (s *LowestDelay) Now() string {
+ 
+ 	return s.selectedOutbound[N.NetworkTCP].Tag()
+ }
+-
+-// UpdateOutboundsInfo keeps the selected member while it answers, unless another one is faster
+-// by more than the tolerance and than tolerance_ratio of the selected member's delay. A selected member that failed its test is left for the fastest
+-// live one; when no member is live, the selection stays.
+ func (s *LowestDelay) UpdateOutboundsInfo(history map[string]*adapter.URLTestHistory) bool {
+-	min, delays := getMinDelay(s.outbounds, history)
++	history = s.withPriority(s.smoothed(history))
++	min, _ := getMinDelay(s.outbounds, history)
+ 
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+ 	changed := false
+-	for net, best := range min {
++	for net, out := range min {
+ 		current := s.selectedOutbound[net]
+-		if best == nil || best.Tag() == current.Tag() || delays[net] >= monitoring.TimeoutDelay {
++		if current != nil && current.Tag() != out.Tag() && s.keepCurrent(current, out, history) {
+ 			continue
+ 		}
+-		currentDelay := getTagDelay(current.Tag(), history)
+-		threshold := switchThreshold(measuredDelay(history[current.Tag()]), s.tolerance, s.toleranceRatio)
+-		if currentDelay < monitoring.TimeoutDelay && uint32(delays[net])+threshold >= uint32(currentDelay) {
+-			continue
++		if net == N.NetworkTCP && current != nil && out.Tag() != current.Tag() && s.onSwitch != nil {
++			s.onSwitch(current.Tag(), out.Tag(), s.describe(history, current.Tag(), out.Tag()))
+ 		}
+-		s.selectedOutbound[net] = best
+-		changed = true
++		changed = changed || current == nil || out.Tag() != current.Tag()
++		s.selectedOutbound[net] = out
+ 	}
+ 	return changed
+ }
++
++// keepCurrent reports whether current is still good enough next to best: it answers, and best isn't faster by
++// more than the tolerance. A tolerance of 0 or 1 keeps the old behaviour of always taking the fastest.
++func (s *LowestDelay) keepCurrent(current, best adapter.Outbound, history map[string]*adapter.URLTestHistory) bool {
++	if s.tolerance <= 1 {
++		return false
++	}
++	// a server with few results behind it is no steady choice yet: the one that answered first (or luckily) must not
++	// hold the place against the others
++	if s.smooth > 0 && !s.settled(current.Tag()) {
++		return false
++	}
++	// Wait for the current server's probe before comparing a cached result with fresh results.
++	if currentHistory := history[current.Tag()]; currentHistory != nil && currentHistory.IsFromCache && currentHistory.Delay > 0 && currentHistory.Delay < monitoring.TimeoutDelay {
++		return true
++	}
++	currentDelay := getTagDelay(current.Tag(), history)
++	if currentDelay >= monitoring.TimeoutDelay {
++		return false
++	}
++	return uint32(currentDelay) <= uint32(getTagDelay(best.Tag(), history))+uint32(s.tolerance)
++}
++
+ func (s *LowestDelay) Select(metadata adapter.InboundContext, net string, touch bool) adapter.Outbound {
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+@@ -88,3 +114,136 @@ func (s *LowestDelay) Select(metadata adapter.InboundContext, net string, touch
+ 	return s.selectedOutbound[net]
+ 
+ }
++
++func priorityMap(tags []string) map[string]bool {
++	if len(tags) == 0 {
++		return nil
++	}
++	m := make(map[string]bool, len(tags))
++	for _, tag := range tags {
++		m[tag] = true
++	}
++	return m
++}
++
++// withPriority is the history with the margin added to the delay of every server that is not of the priority
++// subscription (one that did not answer stays as it is). With no priority it is the history itself.
++func (s *LowestDelay) withPriority(history map[string]*adapter.URLTestHistory) map[string]*adapter.URLTestHistory {
++	if len(s.priority) == 0 || s.priorityMargin == 0 {
++		return history
++	}
++	adjusted := make(map[string]*adapter.URLTestHistory, len(history))
++	for tag, his := range history {
++		if his == nil || s.priority[tag] || his.Delay == 0 || his.Delay >= monitoring.TimeoutDelay {
++			adjusted[tag] = his
++			continue
++		}
++		copied := *his
++		sum := uint32(copied.Delay) + uint32(s.priorityMargin)
++		if sum >= uint32(monitoring.TimeoutDelay) {
++			sum = uint32(monitoring.TimeoutDelay) - 1
++		}
++		copied.Delay = uint16(sum)
++		adjusted[tag] = &copied
++	}
++	return adjusted
++}
++
++type sampleList struct {
++	last    time.Time
++	results []uint16
++}
++
++const (
++	// a failed test among the last results costs this many ms, so a server that drops out now and then loses to a
++	// steady one that is a little slower
++	failurePenalty = 300
++	// a server with fewer results than needed counts this many ms slower: its first answer may be a lucky one
++	unsettledPenalty = 40
++)
++
++// settled reports whether a server has all the results the choice goes by.
++func (s *LowestDelay) settled(tag string) bool {
++	list := s.samples[tag]
++	return list != nil && len(list.results) >= s.smooth
++}
++
++// smoothed is the history with each server's delay replaced by the average of its last results (a failed one costs
++// extra). Results from the cache aren't tests of now and don't count. With smoothing off it is the history itself.
++func (s *LowestDelay) smoothed(history map[string]*adapter.URLTestHistory) map[string]*adapter.URLTestHistory {
++	if s.smooth <= 0 {
++		return history
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	adjusted := make(map[string]*adapter.URLTestHistory, len(history))
++	for tag, his := range history {
++		if his == nil || his.IsFromCache {
++			adjusted[tag] = his
++			continue
++		}
++		list := s.samples[tag]
++		if list == nil {
++			list = &sampleList{}
++			s.samples[tag] = list
++		}
++		if his.Time.After(list.last) || len(list.results) == 0 {
++			list.last = his.Time
++			result := his.Delay
++			if result >= monitoring.TimeoutDelay {
++				result = 0
++			}
++			list.results = append(list.results, result)
++			if len(list.results) > s.smooth {
++				list.results = list.results[len(list.results)-s.smooth:]
++			}
++		}
++		var sum, answered, failed uint32
++		for _, r := range list.results {
++			if r == 0 {
++				failed++
++			} else {
++				sum += uint32(r)
++				answered++
++			}
++		}
++		copied := *his
++		if answered == 0 {
++			copied.Delay = monitoring.TimeoutDelay
++		} else {
++			value := sum/answered + failed*failurePenalty
++			if len(list.results) < s.smooth {
++				value += unsettledPenalty
++			}
++			if value >= uint32(monitoring.TimeoutDelay) {
++				value = uint32(monitoring.TimeoutDelay) - 1
++			}
++			copied.Delay = uint16(value)
++		}
++		adjusted[tag] = &copied
++	}
++	return adjusted
++}
++
++// SetOnSwitch sets what is told when the choice moves from one server to another.
++func (s *LowestDelay) SetOnSwitch(f func(from, to, detail string)) {
++	s.mu.Lock()
++	s.onSwitch = f
++	s.mu.Unlock()
++}
++
++// describe says what the choice between two servers went by: each one's delay as counted (smoothed, with the
++// priority margin), its last results, and whether it is of the priority subscription.
++func (s *LowestDelay) describe(history map[string]*adapter.URLTestHistory, from, to string) string {
++	one := func(tag string) string {
++		text := tag + " " + strconv.Itoa(int(getTagDelay(tag, history))) + " ms"
++		if list := s.samples[tag]; list != nil {
++			text += " " + fmt.Sprint(list.results)
++		}
++		if s.priority[tag] {
++			text += " priority"
++		}
++		return text
++	}
++	return one(from) + " -> " + one(to)
++}
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index 8d07f2be8..2687d756f 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -1,6 +1,8 @@
+ package group
+ 
+ import (
++	"github.com/sagernet/sing-box/common/failwatch"
++	"sort"
+ 	"context"
+ 	"io"
+ 	"maps"
+@@ -53,6 +55,7 @@ type URLTest struct {
+ 	checkAccess                  sync.Mutex
+ 	interruptExternalConnections bool
+ 	privateHistory               bool          // H
++	failures                     *failwatch.Watch // H: dials failing in a row on the server in use
+ 	links                        []string      // H: URLs tested together (the slowest counts)
+ 	minDwell                     time.Duration // H
+ 	strictURLs                   bool          // H
+@@ -65,6 +68,9 @@ type URLTest struct {
+ 	warmRound     atomic.Int64
+ 	stableSamples int
+ 	testTimeout   time.Duration
++	startBatch    int           // H
++	startGap      time.Duration // H
++	candidates    int           // H
+ }
+ 
+ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.URLTestOutboundOptions) (adapter.Outbound, error) {
+@@ -86,6 +92,7 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		idleTimeout:                  time.Duration(options.IdleTimeout),
+ 		interruptExternalConnections: options.InterruptExistConnections,
+ 		privateHistory:               options.PrivateHistory,
++		failures:                     failwatch.New(),
+ 		links:                        options.URLs,
+ 		minDwell:                     time.Duration(options.MinDwell),
+ 		strictURLs:                   options.StrictURLs,
+@@ -93,6 +100,9 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		warmUp:                       time.Duration(options.WarmUp),
+ 		stableSamples:                options.StableSamples,
+ 		testTimeout:                  time.Duration(options.TestTimeout),
++		startBatch:                   options.StartBatch,
++		candidates:                   options.Candidates,
++		startGap:                     time.Duration(options.StartGap),
+ 		warmDetourTag:                options.WarmUpDetour,
+ 	}
+ 	if len(outbound.tags) == 0 {
+@@ -136,11 +146,15 @@ func (s *URLTest) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 			}
+ 			s.warmDetour = detour
+ 		}
++		group.rank = group.history // the shared pings rank the servers it tests
+ 		// H: its delays its own (another URL than the rest test), not in the history shared with the others
+ 		if s.privateHistory {
+ 			group.history = urltest.NewHistoryStorage()
+ 		}
+ 		group.stableSamples = s.stableSamples
++		group.candidates = s.candidates
++		group.startBatch = s.startBatch
++		group.startGap = s.startGap
+ 		group.minDwell = s.minDwell
+ 		group.sticky = s.sticky
+ 		group.strictURLs = s.strictURLs
+@@ -216,6 +230,10 @@ func (s *URLTest) All() []string {
+ }
+ 
+ func (s *URLTest) Selected(network string) adapter.Outbound {
++	// the group is made in Start: before that (a config being loaded, listed from outside) there is nothing selected
++	if s.group == nil {
++		return nil
++	}
+ 	if detour := s.active(network); detour != nil {
+ 		return detour
+ 	}
+@@ -252,14 +270,23 @@ func (s *URLTest) References() []string {
+ }
+ 
+ func (s *URLTest) URLTest(ctx context.Context) (map[string]uint16, error) {
++	if s.group == nil {
++		return nil, E.New("group not started")
++	}
+ 	return s.group.URLTest(ctx)
+ }
+ 
+ func (s *URLTest) CheckOutbounds() {
++	if s.group == nil {
++		return
++	}
+ 	s.group.CheckOutbounds(s.group.ctx, true) //H
+ }
+ 
+ func (s *URLTest) PerformUpdateCheck() {
++	if s.group == nil {
++		return
++	}
+ 	s.group.performUpdateCheck()
+ }
+ 
+@@ -299,10 +326,17 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
+ 	conn, err := outbound.DialContext(ctx, network, destination)
+ 	if err == nil {
+ 		s.group.penaltyReset(outbound.Tag()) //H: proof of life
++		s.failures.Worked(outbound.Tag())
+ 		return s.group.interruptGroup.NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
+ 	}
+ 	s.logger.ErrorContext(ctx, err)
+ 	s.group.history.DeleteURLTestHistory(outbound.Tag())
++	// H: several dials in a row failing (not ones the caller gave up on): the servers are tested now, not at the next
++	// round, so the group moves off a server that stopped letting connections through
++	if ctx.Err() == nil && s.failures.Failed(outbound.Tag()) {
++		s.logger.Info("dials through ", outbound.Tag(), " keep failing: testing the servers now")
++		go s.group.CheckOutbounds(s.ctx, true)
++	}
+ 	if conn, ok := s.group.penaltyFailoverDial(ctx, network, destination, outbound, err); ok { //H: one more try through the best other member
+ 		return s.group.interruptGroup.NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil //H
+ 	} //H
+@@ -348,6 +382,11 @@ type URLTestGroup struct {
+ 	idleTimeout                  time.Duration
+ 	history                      *urltest.HistoryStorage
+ 	checking                     atomic.Bool
++	spreading                    atomic.Bool // H: a spread round is running
++	rank                         *urltest.HistoryStorage // H: the shared pings
++	candidates                   int                     // H
++	startBatch                   int         // H
++	startGap                     time.Duration // H
+ 	selectedOutboundTCP          adapter.Outbound
+ 	selectedOutboundUDP          adapter.Outbound
+ 	interruptGroup               *interrupt.Group
+@@ -521,9 +560,50 @@ func (g *URLTestGroup) loopCheck(ticker *time.Ticker, closeChan <-chan struct{})
+ }
+ 
+ func (g *URLTestGroup) CheckOutbounds(ctx context.Context, force bool) {
++	if g.spreadable() {
++		g.spreadTest(ctx, force)
++		return
++	}
+ 	_, _ = g.urlTest(ctx, force)
+ }
+ 
++// H: spreadable: the background checks go a few servers at a time (a group that goes by its samples tests every
++// server each round, so it isn't spread).
++func (g *URLTestGroup) spreadable() bool {
++	return g.startBatch > 0 && g.stableSamples == 0 && len(g.outbounds) > g.startBatch
++}
++
++// H: spreadTest tests the servers startBatch at a time, startGap apart (a part with nothing to test, its results
++// still fresh, costs no wait), and sorts the choice out after each part, so the best so far is used meanwhile.
++func (g *URLTestGroup) spreadTest(ctx context.Context, force bool) {
++	if g.checking.Load() || g.spreading.Swap(true) {
++		return
++	}
++	defer g.spreading.Store(false)
++	gap := g.startGap
++	if gap <= 0 {
++		gap = 15 * time.Second
++	}
++	for from := 0; from < len(g.outbounds); from += g.startBatch {
++		to := from + g.startBatch
++		if to > len(g.outbounds) {
++			to = len(g.outbounds)
++		}
++		result := urlTestOutbounds(ctx, g.outbound, g.history, g.logger, g.outbounds[from:to], g.link, g.interval, force, g.testTimeout, g.links)
++		if ctx.Err() != nil {
++			return
++		}
++		g.performUpdateCheck()
++		if to < len(g.outbounds) && len(result) > 0 {
++			select {
++			case <-ctx.Done():
++				return
++			case <-time.After(gap):
++			}
++		}
++	}
++}
++
+ func (g *URLTestGroup) URLTest(ctx context.Context) (map[string]uint16, error) {
+ 	return g.urlTest(ctx, true)
+ }
+@@ -541,10 +621,10 @@ func (g *URLTestGroup) urlTest(ctx context.Context, force bool) (map[string]uint
+ 	if g.failover && !force {    //H: only the selected members, unless one failed
+ 		result = g.failoverCheck(ctx) //H
+ 	} else { //H
+-		result = g.testMembers(ctx, g.outbounds, force) //H
++		result = g.testMembers(ctx, g.testSet(), force) //H
+ 	} //H
+ 	if g.stableSamples > 0 && ctx.Err() == nil {
+-		g.recordSamples(result)
++		g.recordSamples(set, result)
+ 	}
+ 	g.performUpdateCheck()
+ 	return result, nil
+@@ -721,6 +801,43 @@ func (g *URLTestGroup) performUpdateCheck() {
+ 	}
+ }
+ 
++// H: testSet: the servers a round tests. With candidates set, the best ones by the shared pings (the servers with no
++// ping yet fill the rest), so the group's own tests (a handshake per server per URL) don't run against dozens of servers.
++func (g *URLTestGroup) testSet() []adapter.Outbound {
++	if g.candidates <= 0 || g.rank == nil || len(g.outbounds) <= g.candidates {
++		return g.outbounds
++	}
++	type ranked struct {
++		out   adapter.Outbound
++		delay uint16
++	}
++	known := make([]ranked, 0, len(g.outbounds))
++	unknown := make([]adapter.Outbound, 0)
++	for _, detour := range g.outbounds {
++		h := g.rank.LoadURLTestHistory(RealTag(detour, N.NetworkTCP))
++		if h == nil || h.Delay == 0 || h.Delay >= 65535 {
++			unknown = append(unknown, detour)
++			continue
++		}
++		known = append(known, ranked{detour, h.Delay})
++	}
++	sort.SliceStable(known, func(i, j int) bool { return known[i].delay < known[j].delay })
++	set := make([]adapter.Outbound, 0, g.candidates)
++	for _, k := range known {
++		if len(set) == g.candidates {
++			return set
++		}
++		set = append(set, k.out)
++	}
++	for _, u := range unknown {
++		if len(set) == g.candidates {
++			break
++		}
++		set = append(set, u)
++	}
++	return set
++}
++
+ // H: resetSamples forgets every server's results (a fresh start or another network).
+ func (g *URLTestGroup) resetSamples() {
+ 	g.samplesAccess.Lock()
+@@ -729,13 +846,13 @@ func (g *URLTestGroup) resetSamples() {
+ }
+ 
+ // H: recordSamples adds a round's results: each server's delay, 0 for one that didn't answer.
+-func (g *URLTestGroup) recordSamples(result map[string]uint16) {
++func (g *URLTestGroup) recordSamples(tested []adapter.Outbound, result map[string]uint16) {
+ 	g.samplesAccess.Lock()
+ 	defer g.samplesAccess.Unlock()
+ 	if g.samples == nil {
+ 		g.samples = make(map[string][]uint16)
+ 	}
+-	for _, detour := range g.outbounds {
++	for _, detour := range tested {
+ 		tag := detour.Tag()
+ 		list := append(g.samples[tag], result[tag])
+ 		if len(list) > g.stableSamples {
+diff --git a/protocol/group/urltest_test.go b/protocol/group/urltest_test.go
+index 2f187ecde..62eb8ce75 100644
+--- a/protocol/group/urltest_test.go
++++ b/protocol/group/urltest_test.go
+@@ -88,25 +88,25 @@ func TestURLTestStableSamples(t *testing.T) {
+ 		t.Fatalf("nothing measured: no choice")
+ 	}
+ 	// ee never answers, pl answers steadily, de is the fastest once but drops one test
+-	g.recordSamples(map[string]uint16{"pl": 120, "de": 40})
+-	g.recordSamples(map[string]uint16{"pl": 130})
++	g.recordSamples(g.outbounds, map[string]uint16{"pl": 120, "de": 40})
++	g.recordSamples(g.outbounds, map[string]uint16{"pl": 130})
+ 	if _, ok := g.Select(N.NetworkTCP); ok {
+ 		t.Fatalf("two rounds: no server has answered three tests yet")
+ 	}
+-	g.recordSamples(map[string]uint16{"pl": 110, "de": 45})
++	g.recordSamples(g.outbounds, map[string]uint16{"pl": 110, "de": 45})
+ 	if got, ok := g.Select(N.NetworkTCP); !ok || got.Tag() != "pl" {
+ 		t.Fatalf("pl answered all three, de dropped one: got %v %v", got, ok)
+ 	}
+ 	g.selectedOutboundTCP = pl
+ 	// de steady now and sooner, but not by the tolerance: pl stays
+-	g.recordSamples(map[string]uint16{"pl": 120, "de": 90})
+-	g.recordSamples(map[string]uint16{"pl": 120, "de": 90})
+-	g.recordSamples(map[string]uint16{"pl": 120, "de": 90})
++	g.recordSamples(g.outbounds, map[string]uint16{"pl": 120, "de": 90})
++	g.recordSamples(g.outbounds, map[string]uint16{"pl": 120, "de": 90})
++	g.recordSamples(g.outbounds, map[string]uint16{"pl": 120, "de": 90})
+ 	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "pl" {
+ 		t.Fatalf("de only 30 ms sooner: pl must stay, got %s", got.Tag())
+ 	}
+ 	// pl misses one: it no longer counts, de takes over
+-	g.recordSamples(map[string]uint16{"de": 90})
++	g.recordSamples(g.outbounds, map[string]uint16{"de": 90})
+ 	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "de" {
+ 		t.Fatalf("pl dropped a test: de must take over, got %s", got.Tag())
+ 	}
+@@ -124,9 +124,9 @@ func TestURLTestStableFallsBackToMain(t *testing.T) {
+ 	if got := s.active(N.NetworkTCP); got == nil || got.Tag() != "select" {
+ 		t.Fatalf("nothing steady: the main choice, got %v", got)
+ 	}
+-	g.recordSamples(map[string]uint16{"ee": 100})
+-	g.recordSamples(map[string]uint16{"ee": 100})
+-	g.recordSamples(map[string]uint16{"ee": 100})
++	g.recordSamples(g.outbounds, map[string]uint16{"ee": 100})
++	g.recordSamples(g.outbounds, map[string]uint16{"ee": 100})
++	g.recordSamples(g.outbounds, map[string]uint16{"ee": 100})
+ 	if got := s.active(N.NetworkTCP); got == nil || got.Tag() != "ee" {
+ 		t.Fatalf("ee steady: ee, got %v", got)
+ 	}
+@@ -138,7 +138,7 @@ func TestURLTestStableMinDwell(t *testing.T) {
+ 	lv := &selectionOutbound{tag: "lv"}
+ 	g := &URLTestGroup{outbounds: []adapter.Outbound{ee, lv}, stableSamples: 3, tolerance: 50, minDwell: time.Hour}
+ 	for i := 0; i < 3; i++ {
+-		g.recordSamples(map[string]uint16{"ee": 200, "lv": 60})
++		g.recordSamples(g.outbounds, map[string]uint16{"ee": 200, "lv": 60})
+ 	}
+ 	g.selectedOutboundTCP = ee
+ 	g.switchedAt.Store(time.Now().UnixNano())
+@@ -151,8 +151,72 @@ func TestURLTestStableMinDwell(t *testing.T) {
+ 	}
+ 	// ee stops answering: it's left at once, dwell or not
+ 	g.switchedAt.Store(time.Now().UnixNano())
+-	g.recordSamples(map[string]uint16{"lv": 60})
++	g.recordSamples(g.outbounds, map[string]uint16{"lv": 60})
+ 	if got, _ := g.Select(N.NetworkTCP); got.Tag() != "lv" {
+ 		t.Fatalf("ee missed a test: lv at once, got %s", got.Tag())
+ 	}
+ }
++
++// H: the background checks are spread only when asked for, with more servers than one part and no samples to keep.
++func TestURLTestSpreadable(t *testing.T) {
++	outs := func(n int) []adapter.Outbound {
++		list := make([]adapter.Outbound, n)
++		for i := range list {
++			list[i] = &selectionOutbound{tag: string(rune('a' + i))}
++		}
++		return list
++	}
++	for _, tc := range []struct {
++		name   string
++		group  URLTestGroup
++		spread bool
++	}{
++		{"not asked for", URLTestGroup{outbounds: outs(20)}, false},
++		{"many servers", URLTestGroup{outbounds: outs(20), startBatch: 8}, true},
++		{"few servers (mobile data)", URLTestGroup{outbounds: outs(4), startBatch: 8}, false},
++		{"samples kept", URLTestGroup{outbounds: outs(20), startBatch: 8, stableSamples: 3}, false},
++	} {
++		if got := tc.group.spreadable(); got != tc.spread {
++			t.Errorf("%s: spreadable = %v, want %v", tc.name, got, tc.spread)
++		}
++	}
++}
++
++// H: a group with candidates tests only the best servers by the shared pings; the ones with no ping fill the rest.
++func TestURLTestCandidates(t *testing.T) {
++	outs := []adapter.Outbound{
++		&selectionOutbound{tag: "a"}, &selectionOutbound{tag: "b"}, &selectionOutbound{tag: "c"},
++		&selectionOutbound{tag: "d"}, &selectionOutbound{tag: "e"},
++	}
++	rank := urltest.NewHistoryStorage()
++	rank.StoreURLTestHistory("a", &adapter.URLTestHistory{Delay: 300, Time: time.Now()})
++	rank.StoreURLTestHistory("b", &adapter.URLTestHistory{Delay: 50, Time: time.Now()})
++	rank.StoreURLTestHistory("c", &adapter.URLTestHistory{Delay: 65535, Time: time.Now()}) // failed
++	rank.StoreURLTestHistory("d", &adapter.URLTestHistory{Delay: 120, Time: time.Now()})
++	// e: no ping yet
++	g := &URLTestGroup{outbounds: outs, rank: rank, candidates: 3}
++	got := g.testSet()
++	want := []string{"b", "d", "a"}
++	if len(got) != len(want) {
++		t.Fatalf("got %d servers, want %d", len(got), len(want))
++	}
++	for i, tag := range want {
++		if got[i].Tag() != tag {
++			t.Errorf("place %d: %s, want %s", i, got[i].Tag(), tag)
++		}
++	}
++	// more candidates than known pings: the ones with none fill the rest (the failed one is not "known")
++	g.candidates = 4
++	if set := g.testSet(); len(set) != 4 || set[3].Tag() != "c" && set[3].Tag() != "e" {
++		t.Errorf("fill: got %v", set)
++	}
++	// not set, or no more servers than candidates: all of them
++	g.candidates = 0
++	if len(g.testSet()) != 5 {
++		t.Error("without candidates every server is tested")
++	}
++	g.candidates = 9
++	if len(g.testSet()) != 5 {
++		t.Error("with room for all, every server is tested")
++	}
++}
+-- 
+2.55.0.windows.3
+

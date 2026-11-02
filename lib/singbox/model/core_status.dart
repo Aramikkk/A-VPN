@@ -31,7 +31,9 @@ sealed class CoreStatus with _$CoreStatus {
 
       case "Starting":
         return const CoreStarting();
-      case "Started":
+      // the 5.4 core says "Waiting" until the first ping decides and "NoAvailableProxies" when every ping failed:
+      // the tunnel is up in both, and the connect button must not hang in "connecting" for it
+      case "Started" || "Waiting" || "NoAvailableProxies":
         return const CoreStarted();
       case "Stopping":
         return const CoreStopping();
@@ -68,7 +70,8 @@ sealed class CoreStatus with _$CoreStatus {
         return CoreStatus.stopped(alert: alert, message: event.message);
       case CoreStates.STARTING:
         return const CoreStarting();
-      case CoreStates.STARTED:
+      // WAITING (no ping has decided yet) and NO_AVAILABLE_PROXIES (every ping failed) are up as well
+      case CoreStates.STARTED || CoreStates.WAITING || CoreStates.NO_AVAILABLE_PROXIES:
         return const CoreStarted();
       case CoreStates.STOPPING:
         return const CoreStopping();

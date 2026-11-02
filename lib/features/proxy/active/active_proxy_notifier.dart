@@ -17,11 +17,11 @@ import 'package:hiddify/features/proxy/model/proxy_failure.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/hiddifycore/init_signal.dart';
 
 import 'package:hiddify/utils/riverpod_utils.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:rxdart/rxdart.dart';
 
 part 'active_proxy_notifier.g.dart';
 
@@ -86,6 +86,9 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
   Stream<OutboundInfo> build() {
     // ref.disposeDelay(const Duration(seconds: 20));
     final serviceRunning = ref.watch(serviceRunningProvider);
+    // the core is set up again on a new gRPC channel when the app comes back from the background: the stream below
+    // lived on the old one, and serviceRunning stays true throughout, so only this signal opens it again
+    ref.watch(coreRestartSignalProvider);
     _wasConnectionValid = false;
     if (!serviceRunning) {
       return Stream.error(const ServiceNotRunning());
@@ -165,7 +168,11 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     });
     // the light background work: the safety net looks three times less often
     final safetyNet = Timer.periodic(
-      Duration(seconds: ref.read(superLightProvider) ? 120 : (ref.read(lightBackgroundProvider) || ref.read(nightModeProvider) ? 45 : 15)),
+      Duration(
+        seconds: ref.read(superLightProvider)
+            ? 120
+            : (ref.read(lightBackgroundProvider) || ref.read(nightModeProvider) ? 45 : 15),
+      ),
       (_) => refilterIfNetworkChanged(),
     );
     // back on screen after the night mode let the checks sleep: the servers are pinged again at once (at most every
@@ -187,11 +194,47 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
       networkChanges.cancel();
       back.dispose();
     });
-    return _proxyRepo
-        .watchActiveProxies()
-        .map((event) => event.getOrElse((l) => List<OutboundGroup>.empty()))
-        .map((event) => event.firstOrNull?.items.first ?? OutboundInfo())
-        .doOnData((info) => _handleConnectionHaptic(info.urlTestDelay));
+    ref.onDispose(() => _reopenTimer?.cancel());
+    return _watchActive();
+  }
+
+  Timer? _reopenTimer;
+
+  /// A pause that the provider's disposal cancels: a plain Future.delayed would outlive it.
+  Future<void> _pause(Duration duration) {
+    final done = Completer<void>();
+    _reopenTimer = Timer(duration, done.complete);
+    return done.future;
+  }
+
+  /// The active outbound, kept alive: gRPC ends or fails the stream when the app is suspended (the phone locked for a
+  /// few minutes), and a failure used to become an empty outbound with no delay, which the connect button shows as a
+  /// "connecting" that never clears while the tunnel is fine. A failed event is dropped (the last outbound stays),
+  /// and an ended stream is opened again, after 2 s and then twice as long up to 30 s while it keeps failing.
+  Stream<OutboundInfo> _watchActive() async* {
+    const shortest = Duration(seconds: 2);
+    const longest = Duration(seconds: 30);
+    var wait = shortest;
+    while (true) {
+      var received = 0;
+      try {
+        await for (final event in _proxyRepo.watchActiveProxies()) {
+          if (event.isLeft()) continue;
+          final groups = event.getOrElse((l) => List<OutboundGroup>.empty());
+          final info = groups.firstOrNull?.items.firstOrNull ?? OutboundInfo();
+          // the first event is the core service's cached list, sent even when the call fails: only a later one shows
+          // that the stream really works
+          if (++received > 1) wait = shortest;
+          _handleConnectionHaptic(info.urlTestDelay);
+          yield info;
+        }
+      } catch (e) {
+        loggy.debug("active proxy stream failed: $e");
+      }
+      loggy.debug("active proxy stream ended, opening it again in ${wait.inSeconds} s");
+      await _pause(wait);
+      wait = wait * 2 > longest ? longest : wait * 2;
+    }
   }
 
   ProxyRepository get _proxyRepo => ref.read(proxyRepositoryProvider);

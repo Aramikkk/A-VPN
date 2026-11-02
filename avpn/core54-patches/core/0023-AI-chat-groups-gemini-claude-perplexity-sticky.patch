@@ -1,0 +1,158 @@
+From aa650866aaf35b50fa28693ce22745dd912584d8 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Sat, 24 Oct 2026 10:11:59 +0300
+Subject: [PATCH 23/26] AI chat groups: gemini, claude, perplexity; sticky
+
+---
+ v2/config/site_groups.go      | 53 ++++++++++++++++++++++++++++++++---
+ v2/config/site_groups_test.go | 23 ++++++++++++---
+ 2 files changed, 68 insertions(+), 8 deletions(-)
+
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index 5df9199..e58302c 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -25,6 +25,12 @@ type siteGroup struct {
+ 	probes       []string
+ 	domainSuffix []string
+ 	ipCIDR       []string
++	// H: the server in use is kept until it is really bad (the AI chats dislike a changed address)
++	sticky bool
++	// H: a group of its own whatever apps the phone chose (the phone makes a service's group only for a chosen app)
++	always bool
++	// H: the service's phone apps, through its group
++	packages []string
+ }
+ 
+ var siteGroups = []siteGroup{
+@@ -60,6 +66,40 @@ var siteGroups = []siteGroup{
+ 		url:          "https://chatgpt.com/cdn-cgi/trace",
+ 		probes:       []string{"https://chatgpt.com/cdn-cgi/trace", "https://api.openai.com/"},
+ 		domainSuffix: []string{"chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com", "sora.com"},
++		// the AI chats dislike a changed address: always a group of their own, the server kept until it is really bad
++		sticky:   true,
++		always:   true,
++		packages: []string{"com.openai.chatgpt"},
++	},
++	{
++		key:    "gemini",
++		url:    "https://gemini.google.com/",
++		probes: []string{"https://gemini.google.com/", "https://generativelanguage.googleapis.com/"},
++		domainSuffix: []string{
++			"gemini.google.com", "bard.google.com", "aistudio.google.com", "generativelanguage.googleapis.com",
++			"notebooklm.google.com", "makersuite.google.com", "ai.google.dev", "deepmind.google", "labs.google",
++		},
++		sticky:   true,
++		always:   true,
++		packages: []string{"com.google.android.apps.bard"},
++	},
++	{
++		key:          "claude",
++		url:          "https://claude.ai/",
++		probes:       []string{"https://claude.ai/", "https://api.anthropic.com/"},
++		domainSuffix: []string{"claude.ai", "claude.com", "anthropic.com", "claudeusercontent.com"},
++		sticky:       true,
++		always:       true,
++		packages:     []string{"com.anthropic.claude"},
++	},
++	{
++		key:          "perplexity",
++		url:          "https://www.perplexity.ai/",
++		probes:       []string{"https://www.perplexity.ai/", "https://api.perplexity.ai/"},
++		domainSuffix: []string{"perplexity.ai", "perplexity.com", "pplx.ai"},
++		sticky:       true,
++		always:       true,
++		packages:     []string{"ai.perplexity.app.android"},
+ 	},
+ 	{
+ 		key:          "gdrive",
+@@ -121,18 +161,21 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 		tag := AppGroupTagPrefix + app
+ 		// any other app: its hosts aren't known, so a few common endpoints, that a server that can't reach the
+ 		// usual internet fails
+-		groups = append(groups, siteGroupOutbound(tag, url, genericProbes(url), servers, tolerance))
++		groups = append(groups, siteGroupOutbound(tag, url, genericProbes(url), servers, tolerance, false))
+ 		apps = append(apps, chosenApp{app, tag})
+ 	}
+ 	for _, app := range apps {
+ 		rules = append(rules, siteGroupRule(app.tag, option.RawDefaultRule{PackageName: []string{app.pkg}}))
+ 	}
+ 	for _, site := range siteGroups {
+-		if hopt.SiteGroupAppsOnly && !services[site.key] {
++		if hopt.SiteGroupAppsOnly && !services[site.key] && !site.always {
+ 			continue
+ 		}
+ 		tag := SiteGroupTagPrefix + site.key
+-		groups = append(groups, siteGroupOutbound(tag, site.url, site.probes, servers, tolerance))
++		groups = append(groups, siteGroupOutbound(tag, site.url, site.probes, servers, tolerance, site.sticky))
++		if len(site.packages) > 0 {
++			rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{PackageName: site.packages}))
++		}
+ 		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{DomainSuffix: site.domainSuffix, IPCIDR: site.ipCIDR}))
+ 	}
+ 	if len(groups) == 0 {
+@@ -230,7 +273,7 @@ var siteGroupAppServices = map[string]string{
+ }
+ 
+ // siteGroupOutbound is a service's or an app's group: a URL test over the servers against [url].
+-func siteGroupOutbound(tag, url string, probes []string, servers []string, tolerance uint16) option.Outbound {
++func siteGroupOutbound(tag, url string, probes []string, servers []string, tolerance uint16, sticky bool) option.Outbound {
+ 	return option.Outbound{
+ 		Type: C.TypeURLTest,
+ 		Tag:  tag,
+@@ -259,6 +302,8 @@ func siteGroupOutbound(tag, url string, probes []string, servers []string, toler
+ 			MinDwell: badoption.Duration(10 * time.Minute),
+ 			// a test through a whitelist server on mobile data takes longer than the 5 s default
+ 			TestTimeout: badoption.Duration(10 * time.Second),
++			// the AI chats: the server stays until it stops answering
++			Sticky: sticky,
+ 		},
+ 	}
+ }
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index 03aa1f3..f17b7c7 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -197,8 +197,14 @@ func TestSiteGroupApps(t *testing.T) {
+ 			urls[out.Tag] = out.Options.(*option.URLTestOutboundOptions).URL
+ 		}
+ 	}
+-	if len(urls) != 2 {
+-		t.Fatalf("only Instagram's group and the bank's: %v", urls)
++	// Instagram's and the bank's, and the AI chats' (always, whatever the phone chose)
++	if len(urls) != 6 {
++		t.Fatalf("Instagram's group, the bank's and the four AI chats': %v", urls)
++	}
++	for _, key := range []string{"chatgpt", "gemini", "claude", "perplexity"} {
++		if urls[SiteGroupTagPrefix+key] == "" {
++			t.Fatalf("the %s group is always there: %v", key, urls)
++		}
+ 	}
+ 	if urls[SiteGroupTagPrefix+"instagram"] != "https://www.instagram.com/" {
+ 		t.Fatalf("Instagram's group tests Instagram: %v", urls)
+@@ -218,11 +224,20 @@ func TestSiteGroupApps(t *testing.T) {
+ 	}
+ }
+ 
+-// Nothing chosen on the phone: no groups at all.
++// Nothing chosen on the phone: only the AI chats' groups (sticky, always), each with a rule for its app and one for
++// its names.
+ func TestSiteGroupAppsNoneChosen(t *testing.T) {
+ 	options := siteGroupsTestOptions()
+ 	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{SiteGroups: true, SiteGroupAppsOnly: true}})
+-	if len(options.Outbounds) != 7 || len(options.Route.Rules) != 4 {
++	if len(options.Outbounds) != 7+4 || len(options.Route.Rules) != 4+8 {
+ 		t.Fatalf("nothing chosen: %d outbounds, %d rules", len(options.Outbounds), len(options.Route.Rules))
+ 	}
++	for _, out := range options.Outbounds {
++		if out.Type != C.TypeURLTest {
++			continue
++		}
++		if !out.Options.(*option.URLTestOutboundOptions).Sticky {
++			t.Fatalf("an AI chat's group is sticky: %s", out.Tag)
++		}
++	}
+ }
+-- 
+2.55.0.windows.3
+

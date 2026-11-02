@@ -1,0 +1,53 @@
+From 8b37f83033d670e09b85cbfbb6ee29595c05c9c7 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 17:02:55 +0300
+Subject: [PATCH 01/14] Keep the session start time across reloads; expose it
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ daemon/h_hiddify.go       | 8 ++++++++
+ daemon/started_service.go | 5 ++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/daemon/h_hiddify.go b/daemon/h_hiddify.go
+index d7612e848..dbb7ba87b 100644
+--- a/daemon/h_hiddify.go
++++ b/daemon/h_hiddify.go
+@@ -5,6 +5,7 @@ package daemon
+ 
+ import (
+ 	"context"
++	"time"
+ 
+ 	"github.com/sagernet/sing-box/adapter"
+ 	"github.com/sagernet/sing-box/common/urltest"
+@@ -25,3 +26,10 @@ func (i *Instance) CacheFile() adapter.CacheFile {
+ func (s *StartedService) ReadStatus() *Status {
+ 	return s.readStatus()
+ }
++
++// StartedAt is when the running session started (zero when stopped); reloads keep it.
++func (s *StartedService) StartedAt() time.Time {
++	s.serviceAccess.RLock()
++	defer s.serviceAccess.RUnlock()
++	return s.startedAt
++}
+diff --git a/daemon/started_service.go b/daemon/started_service.go
+index f84113bb5..893766821 100644
+--- a/daemon/started_service.go
++++ b/daemon/started_service.go
+@@ -320,7 +320,10 @@ func (s *StartedService) StartOrReloadService(ctx context.Context, profileConten
+ 		runtimeDebug.FreeOSMemory()
+ 		return err
+ 	}
+-	s.startedAt = time.Now()
++	// A-VPN: a reload (network or server change) keeps the session's start time //H
++	if oldInstance == nil || s.startedAt.IsZero() {
++		s.startedAt = time.Now()
++	}
+ 	s.updateStatus(ServiceStatus_STARTED)
+ 	s.serviceAccess.Unlock()
+ 	runtimeDebug.FreeOSMemory()
+-- 
+2.55.0.windows.3
+

@@ -1,0 +1,52 @@
+From a4d45d74ed93fce15f53ef890f5e889e86a5c978 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 22:18:49 +0300
+Subject: [PATCH 15/26] config: site groups go through the main choice for
+ their first minute
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/site_groups.go      | 4 ++++
+ v2/config/site_groups_test.go | 4 +++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index cf9cb65..0295de3 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -103,6 +103,10 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 				InterruptExistConnections: false,
+ 				// its own results: they mustn't take the place of the servers' pings the app shows
+ 				PrivateHistory: true,
++				// the first minute after the start, a network change or a pause: through the main choice (the servers'
++				// pings and Auto settle first), the group's own tests already running
++				WarmUp:       badoption.Duration(time.Minute),
++				WarmUpDetour: OutboundSelectTag,
+ 			},
+ 		})
+ 		rules = append(rules, option.Rule{
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index 8d52a8c..04ddd83 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -2,6 +2,7 @@ package config
+ 
+ import (
+ 	"testing"
++	"time"
+ 
+ 	C "github.com/sagernet/sing-box/constant"
+ 	"github.com/sagernet/sing-box/experimental/libbox"
+@@ -66,7 +67,8 @@ func TestSiteGroupsAddGroupsAndRules(t *testing.T) {
+ 		}
+ 		groups++
+ 		urlTest := out.Options.(*option.URLTestOutboundOptions)
+-		if !urlTest.PrivateHistory || urlTest.InterruptExistConnections || urlTest.URL == "" || urlTest.Tolerance != 80 {
++		if !urlTest.PrivateHistory || urlTest.InterruptExistConnections || urlTest.URL == "" || urlTest.Tolerance != 80 ||
++			urlTest.WarmUpDetour != OutboundSelectTag || urlTest.WarmUp.Build() != time.Minute {
+ 			t.Fatalf("%s: %+v", out.Tag, urlTest)
+ 		}
+ 		if len(urlTest.Outbounds) != 3 || urlTest.Outbounds[0] != "pl" {
+-- 
+2.55.0.windows.3
+

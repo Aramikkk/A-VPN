@@ -1,0 +1,158 @@
+From 8b99d9a8b50ee503bf70e21012d9be525b705911 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 22:16:23 +0300
+Subject: [PATCH 03/14] traffic: per-outbound session totals from the daemon's
+ own connection tracker
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ common/trafficcontrol/h_outbound_totals.go    | 47 ++++++++++++++++++
+ .../trafficcontrol/h_outbound_totals_test.go  | 49 +++++++++++++++++++
+ common/trafficcontrol/manager.go              |  7 ++-
+ 3 files changed, 99 insertions(+), 4 deletions(-)
+ create mode 100644 common/trafficcontrol/h_outbound_totals.go
+ create mode 100644 common/trafficcontrol/h_outbound_totals_test.go
+
+diff --git a/common/trafficcontrol/h_outbound_totals.go b/common/trafficcontrol/h_outbound_totals.go
+new file mode 100644
+index 000000000..ee0219770
+--- /dev/null
++++ b/common/trafficcontrol/h_outbound_totals.go
+@@ -0,0 +1,47 @@
++package trafficcontrol
++
++import "github.com/gofrs/uuid/v5"
++
++// A-VPN: the session's traffic by the outbound that carried it, counted from the same connections as Total, so
++// a split such as "through the VPN" and "direct" always adds up to the session's total.
++
++type outboundUsage struct {
++	outboundType string
++	up, down     int64
++}
++
++// fold adds a closed connection that is leaving the closed list to the running totals. Called under
++// closedConnectionsAccess.
++func (m *Manager) fold(metadata *TrackerMetadata) {
++	up, down := metadata.Upload.Load(), metadata.Download.Load()
++	m.closedUploadTotal += up
++	m.closedDownloadTotal += down
++	if m.closedByOutbound == nil {
++		m.closedByOutbound = make(map[string]*outboundUsage)
++	}
++	usage := m.closedByOutbound[metadata.Outbound]
++	if usage == nil {
++		usage = &outboundUsage{outboundType: metadata.OutboundType}
++		m.closedByOutbound[metadata.Outbound] = usage
++	}
++	usage.up += up
++	usage.down += down
++}
++
++// OutboundTotals calls add with every outbound's traffic this session: the folded closed connections, the closed
++// list and the open ones (an outbound can come up more than once).
++func (m *Manager) OutboundTotals(add func(outboundType, outbound string, up, down int64)) {
++	m.closedConnectionsAccess.Lock()
++	defer m.closedConnectionsAccess.Unlock()
++	for outbound, usage := range m.closedByOutbound {
++		add(usage.outboundType, outbound, usage.up, usage.down)
++	}
++	for element := m.closedConnections.Front(); element != nil; element = element.Next() {
++		add(element.Value.OutboundType, element.Value.Outbound, element.Value.Upload.Load(), element.Value.Download.Load())
++	}
++	m.connections.Range(func(_ uuid.UUID, tracker Tracker) bool {
++		metadata := tracker.Metadata()
++		add(metadata.OutboundType, metadata.Outbound, metadata.Upload.Load(), metadata.Download.Load())
++		return true
++	})
++}
+diff --git a/common/trafficcontrol/h_outbound_totals_test.go b/common/trafficcontrol/h_outbound_totals_test.go
+new file mode 100644
+index 000000000..511e29846
+--- /dev/null
++++ b/common/trafficcontrol/h_outbound_totals_test.go
+@@ -0,0 +1,49 @@
++package trafficcontrol
++
++import (
++	"sync/atomic"
++	"testing"
++)
++
++func closed(outbound, outboundType string, up, down int64) TrackerMetadata {
++	u, d := new(atomic.Int64), new(atomic.Int64)
++	u.Store(up)
++	d.Store(down)
++	return TrackerMetadata{Outbound: outbound, OutboundType: outboundType, Upload: u, Download: d}
++}
++
++func TestOutboundTotalsAddUpToTotal(t *testing.T) {
++	m := NewManager()
++	m.closedConnectionsAccess.Lock()
++	for i := 0; i < closedConnectionsLimit+50; i++ {
++		meta := closed("se", "vless", 3, 7)
++		if i%2 == 1 {
++			meta = closed("direct", "direct", 1, 2)
++		}
++		if m.closedConnections.Len() >= closedConnectionsLimit {
++			evicted := m.closedConnections.PopFront()
++			m.fold(&evicted)
++		}
++		m.closedConnections.PushBack(meta)
++	}
++	m.closedConnectionsAccess.Unlock()
++	m.Clear()
++
++	var up, down, vpnUp, vpnDown int64
++	m.OutboundTotals(func(outboundType, outbound string, u, d int64) {
++		up += u
++		down += d
++		if outboundType == "vless" {
++			vpnUp += u
++			vpnDown += d
++		}
++	})
++	totalUp, totalDown := m.Total()
++	if up != totalUp || down != totalDown {
++		t.Fatalf("by outbound %d/%d, total %d/%d", up, down, totalUp, totalDown)
++	}
++	half := int64(closedConnectionsLimit+50) / 2
++	if vpnUp != 3*half || vpnDown != 7*half {
++		t.Fatalf("vpn %d/%d", vpnUp, vpnDown)
++	}
++}
+diff --git a/common/trafficcontrol/manager.go b/common/trafficcontrol/manager.go
+index 5e938cf6f..3da542a03 100644
+--- a/common/trafficcontrol/manager.go
++++ b/common/trafficcontrol/manager.go
+@@ -40,6 +40,7 @@ type Manager struct {
+ 	closedConnections       list.List[TrackerMetadata]
+ 	closedUploadTotal       int64
+ 	closedDownloadTotal     int64
++	closedByOutbound        map[string]*outboundUsage // A-VPN
+ 
+ 	eventSubscriber *observable.Subscriber[ConnectionEvent]
+ 	eventObserver   *observable.Observer[ConnectionEvent]
+@@ -99,8 +100,7 @@ func (m *Manager) leave(tracker Tracker) {
+ 	metadataCopy := *metadata
+ 	if m.closedConnections.Len() >= closedConnectionsLimit {
+ 		evicted := m.closedConnections.PopFront()
+-		m.closedUploadTotal += evicted.Upload.Load()
+-		m.closedDownloadTotal += evicted.Download.Load()
++		m.fold(&evicted)
+ 	}
+ 	m.closedConnections.PushBack(metadataCopy)
+ 	m.closedConnectionsAccess.Unlock()
+@@ -176,8 +176,7 @@ func (m *Manager) Clear() {
+ 	m.closedConnectionsAccess.Lock()
+ 	defer m.closedConnectionsAccess.Unlock()
+ 	for element := m.closedConnections.Front(); element != nil; element = element.Next() {
+-		m.closedUploadTotal += element.Value.Upload.Load()
+-		m.closedDownloadTotal += element.Value.Download.Load()
++		m.fold(&element.Value)
+ 	}
+ 	m.closedConnections.Init()
+ }
+-- 
+2.55.0.windows.3
+

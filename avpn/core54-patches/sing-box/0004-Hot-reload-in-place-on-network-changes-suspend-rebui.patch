@@ -1,0 +1,330 @@
+From 91b75e03a6b31a26041cc548cc6c50a5594c7426 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 19 Oct 2026 12:31:05 +0300
+Subject: [PATCH 04/14] Hot reload in place on network changes, suspend/rebuild
+ for auto-pause, balancer tolerance per network
+
+Work done in another session (16-18.10.2026, A-VPN 5.9.27-5.9.46), committed as it was tested.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ daemon/started_service.go                  | 13 ++++-
+ h_box_hotreload.go                         | 27 +++++++++
+ h_box_hotreload_test.go                    | 35 +++++++++++
+ protocol/group/balancer/h_strategy_test.go | 68 ++++++++++++++++++++++
+ protocol/group/balancer/lowest_delay.go    |  8 ++-
+ protocol/group/urltest_test.go             | 54 +++++++++++++++++
+ 6 files changed, 201 insertions(+), 4 deletions(-)
+ create mode 100644 protocol/group/urltest_test.go
+
+diff --git a/daemon/started_service.go b/daemon/started_service.go
+index 893766821..cabc2f50c 100644
+--- a/daemon/started_service.go
++++ b/daemon/started_service.go
+@@ -321,7 +321,7 @@ func (s *StartedService) StartOrReloadService(ctx context.Context, profileConten
+ 		return err
+ 	}
+ 	// A-VPN: a reload (network or server change) keeps the session's start time //H
+-	if oldInstance == nil || s.startedAt.IsZero() {
++	if s.startedAt.IsZero() {
+ 		s.startedAt = time.Now()
+ 	}
+ 	s.updateStatus(ServiceStatus_STARTED)
+@@ -341,7 +341,12 @@ func (s *StartedService) Close() {
+ 	s.notificationSubscriber.Close()
+ }
+ 
+-func (s *StartedService) CloseService() error {
++func (s *StartedService) CloseService() error { return s.closeService(false) }
++
++// SuspendService releases the tunnel without ending the logical session.
++func (s *StartedService) SuspendService() error { return s.closeService(true) }
++
++func (s *StartedService) closeService(preserveSession bool) error {
+ 	s.interruptStart()
+ 	s.lifecycleAccess.Lock()
+ 	defer s.lifecycleAccess.Unlock()
+@@ -358,7 +363,9 @@ func (s *StartedService) CloseService() error {
+ 		_ = instance.Close()
+ 	}
+ 	s.serviceAccess.Lock()
+-	s.startedAt = time.Time{}
++	if !preserveSession {
++		s.startedAt = time.Time{}
++	}
+ 	s.updateStatus(ServiceStatus_IDLE)
+ 	s.serviceAccess.Unlock()
+ 	runtimeDebug.FreeOSMemory()
+diff --git a/h_box_hotreload.go b/h_box_hotreload.go
+index 6f0333dc5..5007c9318 100644
+--- a/h_box_hotreload.go
++++ b/h_box_hotreload.go
+@@ -3,6 +3,7 @@ package box
+ import (
+ 	"bytes"
+ 	"context"
++	"errors"
+ 	"sort"
+ 	"strings"
+ 
+@@ -68,7 +69,33 @@ func (s *Box) HotReloadWithResult(ctx context.Context, options *option.Options)
+ 		return HotReloadResult{}, err
+ 	}
+ 	if !plan.result.IsEmpty() {
++		selections := make(map[string]string)
++		for _, outbound := range s.outbound.Outbounds() {
++			if selector, ok := outbound.(hotReloadSelector); ok {
++				if selected := selector.Selected(N.NetworkTCP); selected != nil {
++					selections[outbound.Tag()] = selected.Tag()
++				}
++			}
++		}
+ 		if err = s.applyHotReload(ctx, plan); err != nil {
++			// A resource can fail after earlier managers were already updated.
++			// Reapply the inverse diff, rather than leaving runtime and runningOptions divergent.
++			rollback, rollbackErr := planHotReload(s.ctx, *options, s.runningOptions)
++			if rollbackErr == nil {
++				recoveryCtx, cancel := context.WithTimeout(s.ctx, C.StartTimeout)
++				rollbackErr = s.applyHotReload(recoveryCtx, rollback)
++				cancel()
++			}
++			if rollbackErr != nil {
++				return plan.result, E.Cause(errors.Join(err, rollbackErr), "hot reload and rollback failed")
++			}
++			for tag, selected := range selections {
++				if outbound, loaded := s.outbound.Outbound(tag); loaded {
++					if selector, ok := outbound.(hotReloadSelector); ok {
++						selector.SelectOutbound(selected)
++					}
++				}
++			}
+ 			return plan.result, err
+ 		}
+ 		s.logger.Info("hot reloaded: outbounds ", changesSummary(plan.result.Outbounds),
+diff --git a/h_box_hotreload_test.go b/h_box_hotreload_test.go
+index d717e3319..82fdb3067 100644
+--- a/h_box_hotreload_test.go
++++ b/h_box_hotreload_test.go
+@@ -4,8 +4,11 @@ import (
+ 	"context"
+ 	"io"
+ 	"net"
++	"net/http"
++	"net/http/httptest"
+ 	"sort"
+ 	"strconv"
++	"strings"
+ 	"testing"
+ 	"time"
+ 
+@@ -151,6 +154,38 @@ func TestH_HotReloadOutbounds(t *testing.T) {
+ 	require.True(t, result.IsEmpty())
+ }
+ 
++func TestH_HotReloadRuleSetFailureKeepsLiveOutbounds(t *testing.T) {
++	instance, ctx, _ := hStartReloadBox(t)
++	keep := hOutbound(t, instance, "keep")
++	selector := hOutbound(t, instance, "select").(interface{ SelectOutbound(string) bool })
++	require.True(t, selector.SelectOutbound("b"))
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		w.WriteHeader(http.StatusServiceUnavailable)
++	}))
++	defer server.Close()
++	content := strings.Replace(hReloadBase, `"type": "direct", "tag": "b"`, `"type": "block", "tag": "b"`, 1)
++	content = strings.Replace(content, `"route": {"final": "select"}`, `"route": {"final": "select", "rule_set": [{"type": "remote", "tag": "unavailable", "format": "source", "url": "`+server.URL+`", "download_detour": "a", "http_client": {"detour": "a"}}]}`, 1)
++	options := hParseOptions(t, ctx, content)
++	reloadCtx, cancel := context.WithTimeout(context.Background(), time.Second)
++	defer cancel()
++	_, err := instance.HotReloadWithResult(reloadCtx, &options)
++	require.Error(t, err)
++	require.Equal(t, "direct", hOutbound(t, instance, "b").Type(), "failed rule-set startup must restore the previous outbound configuration")
++	require.Same(t, keep, hOutbound(t, instance, "keep"), "rollback must leave unchanged outbounds running")
++	require.Equal(t, "b", hOutbound(t, instance, "select").(adapter.OutboundGroup).Selected(N.NetworkTCP).Tag(), "rollback must restore the user's selection")
++}
++
++func TestH_HotReloadDNSFailureRollsBackOutbounds(t *testing.T) {
++	instance, ctx, _ := hStartReloadBox(t)
++	content := strings.Replace(hReloadBase, `"type": "direct", "tag": "b"`, `"type": "block", "tag": "b"`, 1)
++	content = strings.Replace(content, `"route": {"final": "select"}`, `"dns": {"servers": [{"type": "fakeip", "tag": "invalid-fakeip"}]}, "route": {"final": "select"}`, 1)
++	options := hParseOptions(t, ctx, content)
++	_, err := instance.HotReloadWithResult(context.Background(), &options)
++	require.Error(t, err)
++	require.NotContains(t, err.Error(), "rollback failed")
++	require.Equal(t, "direct", hOutbound(t, instance, "b").Type())
++}
++
+ func TestH_HotReloadDetourFollowsReplacedOutbound(t *testing.T) {
+ 	instance, ctx, _ := hStartReloadBox(t)
+ 	options := hParseOptions(t, ctx, `{
+diff --git a/protocol/group/balancer/h_strategy_test.go b/protocol/group/balancer/h_strategy_test.go
+index 1447491c7..e28bd152b 100644
+--- a/protocol/group/balancer/h_strategy_test.go
++++ b/protocol/group/balancer/h_strategy_test.go
+@@ -320,3 +320,71 @@ func TestH_BalancerDefaultRatio(t *testing.T) {
+ 	require.True(t, s.Alive(o[0], N.NetworkTCP))
+ 	require.True(t, s.Alive(o[1], N.NetworkTCP))
+ }
++
++func TestH_BalancerLowestDelayMobileTolerance(t *testing.T) {
++	for _, tc := range []struct {
++		name                           string
++		current, candidate             uint16
++		cachedCurrent, cachedCandidate bool
++		want                           string
++	}{
++		{"ten milliseconds", 200, 190, false, false, "current"},
++		{"twenty milliseconds", 200, 180, false, false, "current"},
++		{"at tolerance", 300, 150, false, false, "current"},
++		{"beyond tolerance", 301, 150, false, false, "candidate"},
++		{"dead current", 65535, 200, false, false, "candidate"},
++		{"dead candidate", 200, 65535, false, false, "current"},
++		{"cached challenger", 200, 180, false, true, "current"},
++		{"fresh challenger waits for cached current", 200, 180, true, false, "current"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			current, candidate := newFake("current"), newFake("candidate")
++			strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: 150})
++			history := map[string]*adapter.URLTestHistory{
++				"current":   {Delay: tc.current, IsFromCache: tc.cachedCurrent},
++				"candidate": {Delay: tc.candidate, IsFromCache: tc.cachedCandidate},
++			}
++			strategy.UpdateOutboundsInfo(history)
++			require.Equal(t, tc.want, strategy.Now())
++			for _, network := range []string{N.NetworkTCP, N.NetworkUDP} {
++				require.Equal(t, tc.want, strategy.Select(adapter.InboundContext{}, network, false).Tag())
++			}
++		})
++	}
++}
++
++func TestH_BalancerLowestDelayWaitsForCurrentProbe(t *testing.T) {
++	current, candidate := newFake("current"), newFake("candidate")
++	strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: 150})
++	history := map[string]*adapter.URLTestHistory{
++		"current":   {Delay: 200, IsFromCache: true},
++		"candidate": {Delay: 20},
++	}
++	require.False(t, strategy.UpdateOutboundsInfo(history))
++	require.Equal(t, "current", strategy.Now())
++	history["current"] = &adapter.URLTestHistory{Delay: monitoring.TimeoutDelay}
++	require.True(t, strategy.UpdateOutboundsInfo(history))
++	require.Equal(t, "candidate", strategy.Now())
++}
++
++func TestH_BalancerNetworkSpecificTolerance(t *testing.T) {
++	for _, tc := range []struct {
++		name      string
++		tolerance uint16
++		want      string
++	}{
++		{"wifi keeps current across 130ms jitter", 150, "current"},
++		{"lte switches for 130ms improvement", 50, "candidate"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			current, candidate := newFake("current"), newFake("candidate")
++			strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: tc.tolerance})
++			history := map[string]*adapter.URLTestHistory{
++				"current":   {Delay: 228},
++				"candidate": {Delay: 98},
++			}
++			strategy.UpdateOutboundsInfo(history)
++			require.Equal(t, tc.want, strategy.Now())
++		})
++	}
++}
+diff --git a/protocol/group/balancer/lowest_delay.go b/protocol/group/balancer/lowest_delay.go
+index bc586d188..bdb1caa4d 100644
+--- a/protocol/group/balancer/lowest_delay.go
++++ b/protocol/group/balancer/lowest_delay.go
+@@ -40,6 +40,12 @@ func NewLowestDelay(outbounds []adapter.Outbound, options option.BalancerOutboun
+ 	}
+ }
+ 
++func (s *LowestDelay) SetTolerance(tolerance uint16) {
++	s.mu.Lock()
++	s.tolerance = tolerance
++	s.mu.Unlock()
++}
++
+ var _ Strategy = (*LowestDelay)(nil)
+ 
+ func (s *LowestDelay) Now() string {
+@@ -56,6 +62,7 @@ func (s *LowestDelay) UpdateOutboundsInfo(history map[string]*adapter.URLTestHis
+ 	min, delays := getMinDelay(s.outbounds, history)
+ 
+ 	s.mu.Lock()
++	defer s.mu.Unlock()
+ 	changed := false
+ 	for net, best := range min {
+ 		current := s.selectedOutbound[net]
+@@ -70,7 +77,6 @@ func (s *LowestDelay) UpdateOutboundsInfo(history map[string]*adapter.URLTestHis
+ 		s.selectedOutbound[net] = best
+ 		changed = true
+ 	}
+-	s.mu.Unlock()
+ 	return changed
+ }
+ func (s *LowestDelay) Select(metadata adapter.InboundContext, net string, touch bool) adapter.Outbound {
+diff --git a/protocol/group/urltest_test.go b/protocol/group/urltest_test.go
+new file mode 100644
+index 000000000..05eea956d
+--- /dev/null
++++ b/protocol/group/urltest_test.go
+@@ -0,0 +1,54 @@
++package group
++
++import (
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/common/urltest"
++	N "github.com/sagernet/sing/common/network"
++	"testing"
++	"time"
++)
++
++type selectionOutbound struct {
++	adapter.Outbound
++	tag string
++}
++
++func (o *selectionOutbound) Tag() string       { return o.tag }
++func (o *selectionOutbound) Network() []string { return []string{N.NetworkTCP, N.NetworkUDP} }
++
++func TestURLTestSelectionStability(t *testing.T) {
++	for _, network := range []string{N.NetworkTCP, N.NetworkUDP} {
++		for _, tc := range []struct {
++			name               string
++			current, candidate uint16
++			wantCandidate      bool
++		}{
++			{"ten milliseconds faster", 200, 190, false},
++			{"twenty milliseconds faster", 200, 180, false},
++			{"at tolerance", 300, 150, false},
++			{"beyond tolerance", 301, 150, true},
++			{"failed candidate", 200, 65535, false},
++			{"unknown candidate", 200, 0, false},
++			{"failed current", 65535, 65400, true},
++			{"unknown current", 0, 200, true},
++			{"large valid candidate", 65450, 65400, false},
++		} {
++			t.Run(network+"/"+tc.name, func(t *testing.T) {
++				current := &selectionOutbound{tag: "current"}
++				candidate := &selectionOutbound{tag: "candidate"}
++				history := urltest.NewHistoryStorage()
++				history.StoreURLTestHistory(current.Tag(), &adapter.URLTestHistory{Delay: tc.current, Time: time.Now()})
++				history.StoreURLTestHistory(candidate.Tag(), &adapter.URLTestHistory{Delay: tc.candidate, Time: time.Now()})
++				group := &URLTestGroup{outbounds: []adapter.Outbound{current, candidate}, history: history, tolerance: 150, selectedOutboundTCP: current, selectedOutboundUDP: current}
++				got, available := group.Select(network)
++				want := current
++				if tc.wantCandidate {
++					want = candidate
++				}
++				if got != want || !available {
++					t.Fatalf("selected %v available=%v; want %s available=true", got.Tag(), available, want.Tag())
++				}
++			})
++		}
++	}
++}
+-- 
+2.55.0.windows.3
+

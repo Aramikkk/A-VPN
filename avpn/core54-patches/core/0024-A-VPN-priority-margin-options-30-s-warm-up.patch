@@ -1,0 +1,170 @@
+From 940cec71abb3bbdd8fd186ea5e631033bddf3caa Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Wed, 28 Oct 2026 10:54:00 +0300
+Subject: [PATCH 24/26] A-VPN: priority/margin options, 30 s warm-up
+
+---
+ v2/config/builder.go          | 40 ++++++++++++++++++++++++++++++++++-
+ v2/config/h_priority_test.go  | 15 +++++++++++++
+ v2/config/hiddify_option.go   |  3 +++
+ v2/config/site_groups.go      |  9 +++++---
+ v2/config/site_groups_test.go |  2 +-
+ 5 files changed, 64 insertions(+), 5 deletions(-)
+ create mode 100644 v2/config/h_priority_test.go
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index b438272..97e2249 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -8,6 +8,8 @@ import (
+ 	"net"
+ 	"net/netip"
+ 	"net/url"
++	"regexp"
++	"strconv"
+ 	"strings"
+ 	sync "sync"
+ 	"time"
+@@ -78,6 +80,8 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 		if tolerance := input.Experimental.Monitoring.SiteGroupsTolerance; tolerance > 0 {
+ 			local.SiteGroupsTolerance = tolerance
+ 		}
++		local.PriorityProfile = input.Experimental.Monitoring.PriorityProfile
++		local.PriorityMargin = input.Experimental.Monitoring.PriorityMargin
+ 		hopts = &local
+ 		value := input.Experimental.Monitoring.URLTestTimeout
+ 		if value.Build() >= time.Second && value.Build() <= 30*time.Second {
+@@ -291,6 +295,9 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 			Tolerance: balancerTolerance(opt, false),
+ 			// IdleTimeout:               badoption.Duration(opt.URLTestInterval.Duration().Nanoseconds() * 3),
+ 			InterruptExistConnections: !opt.BalancerKeepConnections,
++			PriorityOutbounds:         priorityTags(tags, opt.PriorityProfile),
++			PriorityMargin:            opt.PriorityMargin,
++			SmoothSamples:             3,
+ 		},
+ 	}
+ 
+@@ -390,7 +397,7 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
+ 	timeout := badoption.Duration(hopt.URLTestTimeout.Duration())
+ 	if options.Experimental != nil && options.Experimental.Monitoring != nil {
+ 		candidate := options.Experimental.Monitoring.URLTestTimeout
+-		if candidate.Build() >= time.Second && candidate.Build() <= 30*time.Second {
++		if candidate.Build() >= time.Second && candidate.Build() <= 120*time.Second {
+ 			timeout = candidate
+ 		}
+ 	}
+@@ -1318,3 +1325,34 @@ func balancerTolerance(opt *HiddifyOptions, mobile bool) uint16 {
+ 	}
+ 	return 1
+ }
++
++// profileStep is how far apart the app numbers the servers of the merged subscriptions (profile_merge.dart): the
++// first added profile's servers end in § 1001..., the second's in § 2001...
++const profileStep = 1000
++
++var tagEnding = regexp.MustCompile(`§\s*(\d+)\s*$`)
++
++// profileOfTag is which subscription of the merged config a server is from: 1 the active profile's, 2 the first
++// added, and so on.
++func profileOfTag(tag string) int {
++	if m := tagEnding.FindStringSubmatch(tag); m != nil {
++		if n, err := strconv.Atoi(m[1]); err == nil {
++			return n/profileStep + 1
++		}
++	}
++	return 1
++}
++
++// priorityTags are the servers of the priority subscription (profile, 1-based; 0 = none).
++func priorityTags(tags []string, profile int) []string {
++	if profile <= 0 {
++		return nil
++	}
++	var res []string
++	for _, tag := range tags {
++		if profileOfTag(tag) == profile {
++			res = append(res, tag)
++		}
++	}
++	return res
++}
+diff --git a/v2/config/h_priority_test.go b/v2/config/h_priority_test.go
+new file mode 100644
+index 0000000..d3d5e2f
+--- /dev/null
++++ b/v2/config/h_priority_test.go
+@@ -0,0 +1,15 @@
++package config
++
++import (
++	"testing"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestPriorityTags(t *testing.T) {
++	tags := []string{"PL § 3", "DE § 12", "PL § 1003", "EE § 1001", "NL § 2005", "plain"}
++	require.Equal(t, []string{"PL § 3", "DE § 12", "plain"}, priorityTags(tags, 1))
++	require.Equal(t, []string{"PL § 1003", "EE § 1001"}, priorityTags(tags, 2))
++	require.Equal(t, []string{"NL § 2005"}, priorityTags(tags, 3))
++	require.Nil(t, priorityTags(tags, 0))
++}
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index 802ffea..6f3d5ed 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -86,6 +86,9 @@ type URLTestOptions struct {
+ 	BalancerToleranceWifi   uint16 `json:"balancer-tolerance-wifi,omitempty" overridable:"true"`
+ 	BalancerToleranceMobile uint16 `json:"balancer-tolerance-mobile,omitempty" overridable:"true"`
+ 	BalancerKeepConnections bool   `json:"balancer-keep-connections,omitempty" overridable:"true"`
++	// A-VPN: the priority subscription (1 = the active profile, 2 = the first added; 0 = none) and its margin in ms
++	PriorityProfile int    `json:"priority-profile,omitempty" overridable:"true"`
++	PriorityMargin  uint16 `json:"priority-margin,omitempty" overridable:"true"`
+ 	// H: an Auto of its own for each service the app times (Instagram, Telegram...): see applySiteGroups
+ 	SiteGroups bool `json:"site-groups,omitempty" overridable:"true"`
+ 	// H: how much sooner (ms) another server must answer a service before its group moves to it (0 = 80)
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index e58302c..303f2a7 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -290,11 +290,11 @@ func siteGroupOutbound(tag, url string, probes []string, servers []string, toler
+ 			InterruptExistConnections: false,
+ 			// its own results: they mustn't take the place of the servers' pings the app shows
+ 			PrivateHistory: true,
+-			// the first minute after the start, a network change or a pause: through the main choice (the servers'
++			// the first half minute after the start, a network change or a pause: through the main choice (the servers'
+ 			// pings and Auto settle first), the group's own tests already running
+-			WarmUp:       badoption.Duration(time.Minute),
++			WarmUp:       badoption.Duration(30 * time.Second),
+ 			WarmUpDetour: OutboundSelectTag,
+-			// a server only after three tests in a row answered (three in the warm-up minute, then one each
++			// a server only after three tests in a row answered (three in the warm-up half minute, then one each
+ 			// round), by their average; until one has, the main choice, never the first server listed
+ 			StableSamples: 3,
+ 			// a server in use stays at least ten minutes after the last switch while it answers every test: a service
+@@ -304,6 +304,9 @@ func siteGroupOutbound(tag, url string, probes []string, servers []string, toler
+ 			TestTimeout: badoption.Duration(10 * time.Second),
+ 			// the AI chats: the server stays until it stops answering
+ 			Sticky: sticky,
++			// only the five best servers by the shared pings are tested (a handshake per server per URL each round: over
++			// forty servers took five times the processor of the whole core in the first minutes)
++			Candidates: 5,
+ 		},
+ 	}
+ }
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index f17b7c7..c68788c 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -68,7 +68,7 @@ func TestSiteGroupsAddGroupsAndRules(t *testing.T) {
+ 		groups++
+ 		urlTest := out.Options.(*option.URLTestOutboundOptions)
+ 		if !urlTest.PrivateHistory || urlTest.InterruptExistConnections || urlTest.URL == "" || urlTest.Tolerance != 80 ||
+-			urlTest.WarmUpDetour != OutboundSelectTag || urlTest.WarmUp.Build() != time.Minute || len(urlTest.URLs) == 0 ||
++			urlTest.WarmUpDetour != OutboundSelectTag || urlTest.WarmUp.Build() != 30*time.Second || len(urlTest.URLs) == 0 ||
+ 			urlTest.MinDwell.Build() != 10*time.Minute {
+ 			t.Fatalf("%s: %+v", out.Tag, urlTest)
+ 		}
+-- 
+2.55.0.windows.3
+

@@ -1,0 +1,152 @@
+From d9eb1665bfea39f2dd09a1bb1dc03ffb710382ac Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 11:03:41 +0300
+Subject: [PATCH 20/26] config: site groups probe the service's own hosts and
+ keep a server for ten minutes
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ v2/config/site_groups.go      | 44 ++++++++++++++++++++++++++++-------
+ v2/config/site_groups_test.go |  3 ++-
+ 2 files changed, 37 insertions(+), 10 deletions(-)
+
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index 57dee48..5df9199 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -18,8 +18,11 @@ import (
+ const SiteGroupTagPrefix = "site-"
+ 
+ type siteGroup struct {
+-	key          string
+-	url          string
++	key string
++	url string
++	// every host the service's app uses that a server can fail on: its page, its API, its media; a server is tested
++	// against all of them (the slowest answer counts, one that fails fails the server)
++	probes       []string
+ 	domainSuffix []string
+ 	ipCIDR       []string
+ }
+@@ -28,16 +31,19 @@ var siteGroups = []siteGroup{
+ 	{
+ 		key:          "instagram",
+ 		url:          "https://www.instagram.com/",
++		probes:       []string{"https://www.instagram.com/", "https://i.instagram.com/", "https://scontent.cdninstagram.com/"},
+ 		domainSuffix: []string{"instagram.com", "cdninstagram.com", "instagr.am", "ig.me", "fbcdn.net"},
+ 	},
+ 	{
+ 		key:          "whatsapp",
+ 		url:          "https://web.whatsapp.com/",
++		probes:       []string{"https://web.whatsapp.com/", "https://mmg.whatsapp.net/"},
+ 		domainSuffix: []string{"whatsapp.com", "whatsapp.net", "wa.me"},
+ 	},
+ 	{
+-		key: "telegram",
+-		url: "https://telegram.org/",
++		key:    "telegram",
++		url:    "https://telegram.org/",
++		probes: []string{"https://telegram.org/", "https://api.telegram.org/"},
+ 		domainSuffix: []string{
+ 			"telegram.org", "t.me", "telegram.me", "telesco.pe", "telegra.ph", "tdesktop.com", "cdn-telegram.org",
+ 		},
+@@ -52,16 +58,19 @@ var siteGroups = []siteGroup{
+ 		key: "chatgpt",
+ 		// Cloudflare's small page: the site's own front, without its redirect
+ 		url:          "https://chatgpt.com/cdn-cgi/trace",
++		probes:       []string{"https://chatgpt.com/cdn-cgi/trace", "https://api.openai.com/"},
+ 		domainSuffix: []string{"chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com", "sora.com"},
+ 	},
+ 	{
+ 		key:          "gdrive",
+ 		url:          "https://drive.google.com/",
++		probes:       []string{"https://drive.google.com/", "https://www.googleapis.com/"},
+ 		domainSuffix: []string{"drive.google.com", "docs.google.com", "drive.usercontent.google.com"},
+ 	},
+ 	{
+-		key: "youtube",
+-		url: "https://www.youtube.com/generate_204",
++		key:    "youtube",
++		url:    "https://www.youtube.com/generate_204",
++		probes: []string{"https://www.youtube.com/generate_204", "https://i.ytimg.com/", "https://youtubei.googleapis.com/"},
+ 		domainSuffix: []string{
+ 			"youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "ggpht.com", "youtube-nocookie.com",
+ 			"youtubei.googleapis.com",
+@@ -110,7 +119,9 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 			url = "https://www.gstatic.com/generate_204"
+ 		}
+ 		tag := AppGroupTagPrefix + app
+-		groups = append(groups, siteGroupOutbound(tag, url, servers, tolerance))
++		// any other app: its hosts aren't known, so a few common endpoints, that a server that can't reach the
++		// usual internet fails
++		groups = append(groups, siteGroupOutbound(tag, url, genericProbes(url), servers, tolerance))
+ 		apps = append(apps, chosenApp{app, tag})
+ 	}
+ 	for _, app := range apps {
+@@ -121,7 +132,7 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 			continue
+ 		}
+ 		tag := SiteGroupTagPrefix + site.key
+-		groups = append(groups, siteGroupOutbound(tag, site.url, servers, tolerance))
++		groups = append(groups, siteGroupOutbound(tag, site.url, site.probes, servers, tolerance))
+ 		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{DomainSuffix: site.domainSuffix, IPCIDR: site.ipCIDR}))
+ 	}
+ 	if len(groups) == 0 {
+@@ -219,13 +230,14 @@ var siteGroupAppServices = map[string]string{
+ }
+ 
+ // siteGroupOutbound is a service's or an app's group: a URL test over the servers against [url].
+-func siteGroupOutbound(tag, url string, servers []string, tolerance uint16) option.Outbound {
++func siteGroupOutbound(tag, url string, probes []string, servers []string, tolerance uint16) option.Outbound {
+ 	return option.Outbound{
+ 		Type: C.TypeURLTest,
+ 		Tag:  tag,
+ 		Options: &option.URLTestOutboundOptions{
+ 			Outbounds: servers,
+ 			URL:       url,
++			URLs:      probes,
+ 			// tested every two minutes, and only while the service is used (idle half an hour: no tests)
+ 			Interval:    badoption.Duration(2 * time.Minute),
+ 			IdleTimeout: badoption.Duration(30 * time.Minute),
+@@ -242,6 +254,9 @@ func siteGroupOutbound(tag, url string, servers []string, tolerance uint16) opti
+ 			// a server only after three tests in a row answered (three in the warm-up minute, then one each
+ 			// round), by their average; until one has, the main choice, never the first server listed
+ 			StableSamples: 3,
++			// a server in use stays at least ten minutes after the last switch while it answers every test: a service
++			// hopping between servers every couple of minutes split its connections between them
++			MinDwell: badoption.Duration(10 * time.Minute),
+ 			// a test through a whitelist server on mobile data takes longer than the 5 s default
+ 			TestTimeout: badoption.Duration(10 * time.Second),
+ 		},
+@@ -261,3 +276,14 @@ func siteGroupRule(tag string, match option.RawDefaultRule) option.Rule {
+ 		},
+ 	}
+ }
++
++// genericProbes: the address the servers' pings use and two common endpoints beside it.
++func genericProbes(url string) []string {
++	probes := []string{url}
++	for _, extra := range []string{"https://www.gstatic.com/generate_204", "https://cp.cloudflare.com/"} {
++		if extra != url {
++			probes = append(probes, extra)
++		}
++	}
++	return probes
++}
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index 166a67d..03aa1f3 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -68,7 +68,8 @@ func TestSiteGroupsAddGroupsAndRules(t *testing.T) {
+ 		groups++
+ 		urlTest := out.Options.(*option.URLTestOutboundOptions)
+ 		if !urlTest.PrivateHistory || urlTest.InterruptExistConnections || urlTest.URL == "" || urlTest.Tolerance != 80 ||
+-			urlTest.WarmUpDetour != OutboundSelectTag || urlTest.WarmUp.Build() != time.Minute {
++			urlTest.WarmUpDetour != OutboundSelectTag || urlTest.WarmUp.Build() != time.Minute || len(urlTest.URLs) == 0 ||
++			urlTest.MinDwell.Build() != 10*time.Minute {
+ 			t.Fatalf("%s: %+v", out.Tag, urlTest)
+ 		}
+ 		if len(urlTest.Outbounds) != 3 || urlTest.Outbounds[0] != "pl" {
+-- 
+2.55.0.windows.3
+

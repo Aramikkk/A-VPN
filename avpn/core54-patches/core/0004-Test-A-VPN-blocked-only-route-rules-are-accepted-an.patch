@@ -1,0 +1,46 @@
+From 011d1bb7a80f77451b48395369b32e14e07efcfa Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 19:41:04 +0300
+Subject: [PATCH 04/26] Test: A-VPN blocked-only route rules are accepted and
+ kept in order
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/input_route_rules_test.go | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/v2/config/input_route_rules_test.go b/v2/config/input_route_rules_test.go
+index b6d23a8..85da4fa 100644
+--- a/v2/config/input_route_rules_test.go
++++ b/v2/config/input_route_rules_test.go
+@@ -133,3 +133,27 @@ func TestURLTestTimeoutReachesMonitoring(t *testing.T) {
+ 		t.Fatalf("url test timeout = %v, want 3s", got)
+ 	}
+ }
++
++// A-VPN's "only blocked through the VPN" rules, as the app writes them: private networks direct, QUIC to
++// blocked sites rejected, blocked domains and ranges through the selector, everything else direct.
++func TestBlockedOnlyRules(t *testing.T) {
++	profile := strings.Replace(homeNetworkProfile,
++		`"route": {"rules": [{"ip_cidr": ["192.168.1.0/24", "192.168.88.1/32"], "action": "route", "outbound": "home §hide§"}]}`,
++		`"route": {"rules": [
++		  {"ip_is_private": true, "action": "route", "outbound": "direct §hide§"},
++		  {"domain_suffix": ["youtube.com", "ua"], "protocol": "quic", "action": "reject"},
++		  {"domain_suffix": ["youtube.com", "ua"], "action": "route", "outbound": "select"},
++		  {"ip_cidr": ["91.108.4.0/22"], "action": "route", "outbound": "select"},
++		  {"network": ["tcp", "udp"], "action": "route", "outbound": "direct §hide§"}]}`, 1)
++	options, err := BuildConfig(libbox.BaseContext(nil), DefaultHiddifyOptions(), &ReadOptions{Content: profile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the blocked-only rules: %v", err)
++	}
++	rules := options.Route.Rules
++	if rules[4].DefaultOptions.RouteOptions.Outbound != OutboundSelectTag || rules[6].DefaultOptions.RouteOptions.Outbound != OutboundDirectTag {
++		t.Fatalf("rules out of order: %+v", rules[2:7])
++	}
++}
+-- 
+2.55.0.windows.3
+

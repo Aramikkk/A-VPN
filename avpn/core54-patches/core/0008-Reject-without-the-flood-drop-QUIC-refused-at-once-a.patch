@@ -1,0 +1,53 @@
+From 331ed3a178a607874af56329eab133b36e73573e Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Fri, 16 Oct 2026 00:40:49 +0300
+Subject: [PATCH 08/26] Reject without the flood drop: QUIC refused at once,
+ apps fall back to TCP without a timeout
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/builder.go     | 6 ++++++
+ v2/config/route_rules.go | 3 ++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 18d311a..7914e85 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -905,6 +905,9 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
+ 					Action: C.RuleActionTypeReject,
+ 					RejectOptions: option.RejectActionOptions{
+ 						Method: C.RuleActionRejectMethodDefault,
++						// A-VPN: always refuse at once; past 50 refusals in 30 s sing-box drops silently, and an
++						// app trying QUIC (Instagram, YouTube) then waits for a timeout before falling back to TCP
++						NoDrop: true,
+ 					},
+ 				},
+ 			},
+@@ -1024,6 +1027,9 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
+ 					Action: C.RuleActionTypeReject,
+ 					RejectOptions: option.RejectActionOptions{
+ 						Method: C.RuleActionRejectMethodDefault,
++						// A-VPN: always refuse at once; past 50 refusals in 30 s sing-box drops silently, and an
++						// app trying QUIC (Instagram, YouTube) then waits for a timeout before falling back to TCP
++						NoDrop: true,
+ 					},
+ 				},
+ 			},
+diff --git a/v2/config/route_rules.go b/v2/config/route_rules.go
+index b919943..4dc97c6 100644
+--- a/v2/config/route_rules.go
++++ b/v2/config/route_rules.go
+@@ -155,7 +155,8 @@ func (b *appRouteRules) add(rule *Rule) {
+ 	case Outbound_block:
+ 		action = option.RuleAction{
+ 			Action:        C.RuleActionTypeReject,
+-			RejectOptions: option.RejectActionOptions{Method: C.RuleActionRejectMethodDefault},
++			// A-VPN: refused at once every time (see builder.go), never dropped silently for "flooding"
++			RejectOptions: option.RejectActionOptions{Method: C.RuleActionRejectMethodDefault, NoDrop: true},
+ 		}
+ 	default:
+ 		action.RouteOptions.Outbound = OutboundMainDetour
+-- 
+2.55.0.windows.3
+

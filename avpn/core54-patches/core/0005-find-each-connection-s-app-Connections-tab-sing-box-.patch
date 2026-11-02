@@ -1,0 +1,28 @@
+From d609086e5264ae81619328b23f73de3f6887dbd1 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 14:50:47 +0300
+Subject: [PATCH 05/26] find each connection's app (Connections tab); sing-box:
+ balancer chains
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/builder.go | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index e2879de..18d311a 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -1039,7 +1039,8 @@ func setRoutingOptions(options *option.Options, hopt *HiddifyOptions) error {
+ 		},
+ 		// OverrideAndroidVPN: hopt.EnableTun && C.IsAndroid,
+ 		RuleSet:     rulesets,
+-		FindProcess: false,
++		// A-VPN: each connection's app, for the app's Connections tab
++		FindProcess: true,
+ 		// GeoIP: &option.GeoIPOptions{
+ 		// 	Path: opt.GeoIPPath,
+ 		// },
+-- 
+2.55.0.windows.3
+

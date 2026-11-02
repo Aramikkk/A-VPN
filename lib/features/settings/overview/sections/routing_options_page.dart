@@ -605,6 +605,7 @@ class _MenuOption<T> extends HookWidget {
     required this.choices,
     required this.present,
     required this.onSelected,
+    this.describe,
   });
 
   final String title;
@@ -613,6 +614,9 @@ class _MenuOption<T> extends HookWidget {
   final String Function(T value) present;
   final ValueChanged<T> onSelected;
 
+  /// a line under the row that says what the selected choice does
+  final String Function(T value)? describe;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -620,6 +624,7 @@ class _MenuOption<T> extends HookWidget {
     final menu = useMemoized(GlobalKey<PopupMenuButtonState<T>>.new);
     return ListTile(
       title: Text(title),
+      subtitle: describe == null ? null : Text(describe!(selected)),
       // the row takes the tap, so all of it ripples
       onTap: () => menu.currentState?.showButtonMenu(),
       trailing: IgnorePointer(

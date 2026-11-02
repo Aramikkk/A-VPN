@@ -1,0 +1,154 @@
+From 7a26dff80d8a02dbbe63ee270400386f3c3801f8 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 00:40:14 +0300
+Subject: [PATCH 18/26] config: on the phone the chosen apps are the whole site
+ groups choice
+
+A service's group only when its app is chosen; a chosen service app goes through
+its service's group (its tile's flag), any other through a group of its own.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/hiddify_option.go   |  2 ++
+ v2/config/site_groups.go      | 31 +++++++++++++++++++++----------
+ v2/config/site_groups_test.go | 35 ++++++++++++++++++++++++++---------
+ 3 files changed, 49 insertions(+), 19 deletions(-)
+
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index 8b135c4..b05fd1e 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -85,6 +85,8 @@ type URLTestOptions struct {
+ 	SiteGroupsTolerance uint16 `json:"site-groups-tolerance,omitempty" overridable:"true"`
+ 	// H: apps (package names) with a group of their own when the site groups are on
+ 	SiteGroupApps []string `json:"site-group-apps,omitempty" overridable:"true"`
++	// H: the chosen apps are the whole choice (the phone): a service only when its app is chosen
++	SiteGroupAppsOnly bool `json:"site-group-apps-only,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+ 
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index 8ffd3f2..57dee48 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -86,36 +86,47 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 	}
+ 	groups := make([]option.Outbound, 0, len(siteGroups)+len(hopt.SiteGroupApps))
+ 	rules := make([]option.Rule, 0, len(siteGroups)+len(hopt.SiteGroupApps))
+-	// the apps the user chose (Settings → Sites): all of an app's traffic through a group of its own, tested
+-	// against its service's page when it's one the app knows, else against the servers' own test address; their
+-	// rules first, so a chosen app's connections to the services' names go through its own group too
++	// the apps the user chose (Settings → Sites). With SiteGroupAppsOnly (the phone) they are the whole choice: a
++	// service's group (its names and addresses, from any app, its tile's flag) only when its app is chosen, and a
++	// chosen service app through that group; any other chosen app through a group of its own, tested against the
++	// servers' own address. Their rules first, so a chosen app's traffic goes through its group whatever it opens.
++	services := map[string]bool{}
+ 	seen := map[string]bool{}
++	type chosenApp struct{ pkg, tag string }
++	var apps []chosenApp
+ 	for _, app := range hopt.SiteGroupApps {
+ 		app = strings.TrimSpace(app)
+ 		if app == "" || seen[app] {
+ 			continue
+ 		}
+ 		seen[app] = true
+-		url := hopt.ConnectionTestUrl
+ 		if key, known := siteGroupAppServices[app]; known {
+-			for _, site := range siteGroups {
+-				if site.key == key {
+-					url = site.url
+-				}
+-			}
++			services[key] = true
++			apps = append(apps, chosenApp{app, SiteGroupTagPrefix + key})
++			continue
+ 		}
++		url := hopt.ConnectionTestUrl
+ 		if url == "" {
+ 			url = "https://www.gstatic.com/generate_204"
+ 		}
+ 		tag := AppGroupTagPrefix + app
+ 		groups = append(groups, siteGroupOutbound(tag, url, servers, tolerance))
+-		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{PackageName: []string{app}}))
++		apps = append(apps, chosenApp{app, tag})
++	}
++	for _, app := range apps {
++		rules = append(rules, siteGroupRule(app.tag, option.RawDefaultRule{PackageName: []string{app.pkg}}))
+ 	}
+ 	for _, site := range siteGroups {
++		if hopt.SiteGroupAppsOnly && !services[site.key] {
++			continue
++		}
+ 		tag := SiteGroupTagPrefix + site.key
+ 		groups = append(groups, siteGroupOutbound(tag, site.url, servers, tolerance))
+ 		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{DomainSuffix: site.domainSuffix, IPCIDR: site.ipCIDR}))
+ 	}
++	if len(groups) == 0 {
++		return
++	}
+ 	// after the main group (the app takes the first group as the server list), before the direct ones
+ 	at := len(options.Outbounds)
+ 	for i, out := range options.Outbounds {
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index 9659f7b..166a67d 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -180,11 +180,13 @@ func TestSiteGroupsPerNetworkFromInput(t *testing.T) {
+ 	}
+ }
+ 
+-// The apps the user chose get groups of their own, their rules first; a known service's app tests its page.
++// The apps the user chose: a service app through its service's group, another app through a group of its own;
++// with SiteGroupAppsOnly only the chosen services have groups; their rules come first.
+ func TestSiteGroupApps(t *testing.T) {
+ 	options := siteGroupsTestOptions()
+ 	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{
+ 		SiteGroups:        true,
++		SiteGroupAppsOnly: true,
+ 		SiteGroupApps:     []string{"com.instagram.android", "ru.example.bank", "com.instagram.android"},
+ 		ConnectionTestUrl: "http://cp.cloudflare.com/",
+ 	}})
+@@ -194,17 +196,32 @@ func TestSiteGroupApps(t *testing.T) {
+ 			urls[out.Tag] = out.Options.(*option.URLTestOutboundOptions).URL
+ 		}
+ 	}
+-	if len(urls) != len(siteGroups)+2 {
+-		t.Fatalf("%d groups, want %d (a chosen app once)", len(urls), len(siteGroups)+2)
++	if len(urls) != 2 {
++		t.Fatalf("only Instagram's group and the bank's: %v", urls)
+ 	}
+-	if urls[AppGroupTagPrefix+"com.instagram.android"] != "https://www.instagram.com/" {
+-		t.Fatalf("Instagram's app tests Instagram: %q", urls[AppGroupTagPrefix+"com.instagram.android"])
++	if urls[SiteGroupTagPrefix+"instagram"] != "https://www.instagram.com/" {
++		t.Fatalf("Instagram's group tests Instagram: %v", urls)
+ 	}
+ 	if urls[AppGroupTagPrefix+"ru.example.bank"] != "http://cp.cloudflare.com/" {
+-		t.Fatalf("another app tests the servers' address: %q", urls[AppGroupTagPrefix+"ru.example.bank"])
++		t.Fatalf("another app tests the servers' address: %v", urls)
+ 	}
+-	rule := options.Route.Rules[3].DefaultOptions
+-	if rule.RouteOptions.Outbound != AppGroupTagPrefix+"com.instagram.android" || rule.PackageName[0] != "com.instagram.android" {
+-		t.Fatalf("the apps' rules come first: %+v", rule)
++	rules := options.Route.Rules
++	if r := rules[3].DefaultOptions; r.RouteOptions.Outbound != SiteGroupTagPrefix+"instagram" || r.PackageName[0] != "com.instagram.android" {
++		t.Fatalf("Instagram's app through Instagram's group, first: %+v", r)
++	}
++	if r := rules[4].DefaultOptions; r.RouteOptions.Outbound != AppGroupTagPrefix+"ru.example.bank" {
++		t.Fatalf("the bank's rule next: %+v", r)
++	}
++	if r := rules[5].DefaultOptions; r.RouteOptions.Outbound != SiteGroupTagPrefix+"instagram" || len(r.DomainSuffix) == 0 {
++		t.Fatalf("then Instagram's names: %+v", r)
++	}
++}
++
++// Nothing chosen on the phone: no groups at all.
++func TestSiteGroupAppsNoneChosen(t *testing.T) {
++	options := siteGroupsTestOptions()
++	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{SiteGroups: true, SiteGroupAppsOnly: true}})
++	if len(options.Outbounds) != 7 || len(options.Route.Rules) != 4 {
++		t.Fatalf("nothing chosen: %d outbounds, %d rules", len(options.Outbounds), len(options.Route.Rules))
+ 	}
+ }
+-- 
+2.55.0.windows.3
+

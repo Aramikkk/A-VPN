@@ -1,0 +1,124 @@
+From 8b19205eb853fbe571020c5a0be16475ba3181d6 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Thu, 22 Oct 2026 13:34:09 +0300
+Subject: [PATCH 21/26] =?UTF-8?q?=D0=90=D0=B4=D1=80=D0=B5=D1=81=D0=B0=20?=
+ =?UTF-8?q?=D0=B7=D0=B0=D0=BC=D0=B5=D1=80=D0=B0=20=D0=BF=D0=B8=D0=BD=D0=B3?=
+ =?UTF-8?q?=D0=B0=20=D0=BE=D0=B4=D0=BD=D0=B8=D0=BC=20=D0=BC=D0=B5=D1=82?=
+ =?UTF-8?q?=D0=BE=D0=B4=D0=BE=D0=BC=20(HTTP/HTTPS)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ v2/config/builder.go        | 10 ++--------
+ v2/config/test_urls.go      | 24 ++++++++++++++++++++++++
+ v2/config/test_urls_test.go | 37 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 63 insertions(+), 8 deletions(-)
+ create mode 100644 v2/config/test_urls.go
+ create mode 100644 v2/config/test_urls_test.go
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 278628c..b438272 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -261,10 +261,7 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 	}
+ 	chooseTLSEngines(outbounds, systemEngine)
+ 	if len(opt.ConnectionTestUrls) == 0 {
+-		opt.ConnectionTestUrls = []string{opt.ConnectionTestUrl, "https://www.google.com/generate_204", "http://captive.apple.com/generate_204", "https://cp.cloudflare.com"}
+-		if isBlockedConnectionTestUrl(opt.ConnectionTestUrl) {
+-			opt.ConnectionTestUrls = []string{opt.ConnectionTestUrl}
+-		}
++		opt.ConnectionTestUrls = defaultTestURLs(opt.ConnectionTestUrl)
+ 	}
+ 	// urlTest := option.Outbound{
+ 	// 	Type: C.TypeURLTest,
+@@ -399,10 +396,7 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
+ 	}
+ 
+ 	if len(hopt.ConnectionTestUrls) == 0 {
+-		hopt.ConnectionTestUrls = []string{hopt.ConnectionTestUrl, "http://captive.apple.com/generate_204", "https://cp.cloudflare.com", "https://google.com/generate_204"}
+-		if isBlockedConnectionTestUrl(hopt.ConnectionTestUrl) {
+-			hopt.ConnectionTestUrls = []string{hopt.ConnectionTestUrl}
+-		}
++		hopt.ConnectionTestUrls = defaultTestURLs(hopt.ConnectionTestUrl)
+ 	}
+ 	if hopt.EnableClashApi {
+ 		if hopt.ClashApiSecret == "" {
+diff --git a/v2/config/test_urls.go b/v2/config/test_urls.go
+new file mode 100644
+index 0000000..ec3b0b9
+--- /dev/null
++++ b/v2/config/test_urls.go
+@@ -0,0 +1,24 @@
++package config
++
++import "strings"
++
++// defaultTestURLs: the addresses the servers' pings go to. The one the user chose first, then a few known ones, all by the
++// same method (HTTPS when the chosen one is, else HTTP): the pings are one kind of measurement. (Before, the extra ones
++// were fixed and one of them plain HTTP, so a ping the user set to HTTPS was partly measured over HTTP.) A chosen address
++// on a blocked domain is the only one.
++func defaultTestURLs(primary string) []string {
++	if isBlockedConnectionTestUrl(primary) {
++		return []string{primary}
++	}
++	scheme := "https://"
++	if strings.HasPrefix(primary, "http://") {
++		scheme = "http://"
++	}
++	urls := []string{primary}
++	for _, rest := range []string{"www.google.com/generate_204", "captive.apple.com/generate_204", "cp.cloudflare.com/generate_204"} {
++		if candidate := scheme + rest; candidate != primary {
++			urls = append(urls, candidate)
++		}
++	}
++	return urls
++}
+diff --git a/v2/config/test_urls_test.go b/v2/config/test_urls_test.go
+new file mode 100644
+index 0000000..c16a3af
+--- /dev/null
++++ b/v2/config/test_urls_test.go
+@@ -0,0 +1,37 @@
++package config
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestDefaultTestURLsFollowTheChosenMethod(t *testing.T) {
++	for _, tc := range []struct {
++		primary string
++		scheme  string
++	}{
++		{"https://www.gstatic.com/generate_204", "https://"},
++		{"http://www.gstatic.com/generate_204", "http://"},
++		{"https://cp.cloudflare.com/generate_204", "https://"},
++	} {
++		urls := defaultTestURLs(tc.primary)
++		if urls[0] != tc.primary {
++			t.Fatalf("the chosen address first: %v", urls)
++		}
++		if len(urls) < 3 {
++			t.Fatalf("a few known ones beside it: %v", urls)
++		}
++		for _, u := range urls {
++			if !strings.HasPrefix(u, tc.scheme) {
++				t.Fatalf("%s: %s is not %s", tc.primary, u, tc.scheme)
++			}
++		}
++		seen := map[string]bool{}
++		for _, u := range urls {
++			if seen[u] {
++				t.Fatalf("%s twice in %v", u, urls)
++			}
++			seen[u] = true
++		}
++	}
++}
+-- 
+2.55.0.windows.3
+

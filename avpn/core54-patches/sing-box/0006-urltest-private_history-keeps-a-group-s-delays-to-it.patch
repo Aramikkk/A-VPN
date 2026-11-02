@@ -1,0 +1,61 @@
+From d4d3bf91cf879e9f6031479ff24f23321e591941 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 20:25:11 +0300
+Subject: [PATCH 06/14] urltest: private_history keeps a group's delays to
+ itself
+
+A group testing another URL than the rest (one per service) mustn't overwrite the
+shared history the other groups and the app read.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ option/group.go           | 3 +++
+ protocol/group/urltest.go | 6 ++++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/option/group.go b/option/group.go
+index 7a4ff4a5a..c414d3d67 100644
+--- a/option/group.go
++++ b/option/group.go
+@@ -17,4 +17,7 @@ type URLTestOutboundOptions struct {
+ 	Tolerance                 uint16             `json:"tolerance,omitempty"`
+ 	IdleTimeout               badoption.Duration `json:"idle_timeout,omitempty"`
+ 	InterruptExistConnections bool               `json:"interrupt_exist_connections,omitempty"`
++	// H: the group keeps its delays to itself, not in the shared history the other groups and the app read
++	// (a group testing another URL than theirs)
++	PrivateHistory bool `json:"private_history,omitempty"`
+ }
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index ac067c7a7..553c376b7 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -52,6 +52,7 @@ type URLTest struct {
+ 	group                        *URLTestGroup
+ 	checkAccess                  sync.Mutex
+ 	interruptExternalConnections bool
++	privateHistory               bool // H
+ }
+ 
+ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.URLTestOutboundOptions) (adapter.Outbound, error) {
+@@ -68,6 +69,7 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		tolerance:                    options.Tolerance,
+ 		idleTimeout:                  time.Duration(options.IdleTimeout),
+ 		interruptExternalConnections: options.InterruptExistConnections,
++		privateHistory:               options.PrivateHistory,
+ 	}
+ 	if len(outbound.tags) == 0 {
+ 		return nil, E.New("missing tags")
+@@ -103,6 +105,10 @@ func (s *URLTest) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 		group.links = s.links       //H
+ 		group.failover = s.failover //H
+ 		group.tag = s.Tag()         //H
++		// H: its delays its own (another URL than the rest test), not in the history shared with the others
++		if s.privateHistory {
++			group.history = urltest.NewHistoryStorage()
++		}
+ 		s.group = group
+ 	case adapter.StartStateStarted:
+ 		s.group.PostStart()
+-- 
+2.55.0.windows.3
+

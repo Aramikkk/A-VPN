@@ -1,0 +1,621 @@
+From 9d930588276956ef058a0a315656e4d2c7058435 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 15:55:04 +0300
+Subject: [PATCH 14/14] A-VPN: port onto 5.4.0 (strict_urls, lowest-delay
+ graft, monitoring fixes, tests)
+
+---
+ common/monitoring/h_settle.go              | 240 ++++++++++-----------
+ common/monitoring/outbound_monitoring.go   |   2 +-
+ option/balancer.go                         |   1 -
+ protocol/group/balancer/h_strategy_test.go |  27 +--
+ protocol/group/balancer/lowest_delay.go    |  86 ++++----
+ protocol/group/urltest.go                  |  41 +---
+ 6 files changed, 178 insertions(+), 219 deletions(-)
+
+diff --git a/common/monitoring/h_settle.go b/common/monitoring/h_settle.go
+index 7f56ff7fd..42a694729 100644
+--- a/common/monitoring/h_settle.go
++++ b/common/monitoring/h_settle.go
+@@ -1,120 +1,120 @@
+-package monitoring
+-
+-import (
+-	"errors"
+-	"time"
+-
+-	"github.com/sagernet/sing-box/adapter"
+-)
+-
+-var errTestNeverReturned = errors.New("URL test did not return: the outbound ignores its deadline")
+-
+-// testHardLimit is how long a worker waits for one test: the URL test and the IP lookup, each
+-// with its own deadline, and one more test after a network reset. An outbound whose dial ignores
+-// its deadline would otherwise hold the worker, and the cycle waiting for the result, for good;
+-// a few of them, and nothing is tested again.
+-func (m *OutboundMonitoring) testHardLimit(task *testTask) time.Duration {
+-	test := m.urlTestTimeout
+-	if task.staged {
+-		test = m.onDemand[len(m.onDemand)-1]
+-	}
+-	return 2*test + m.urlTestTimeout + 2*networkResetWait
+-}
+-
+-// settle records a test's result, once: the first of its result and of giving up on it counts,
+-// the other is dropped. It applies the result, hands it to what waits for it, publishes it at
+-// once when the test was asked for, and tests again what was measured through the outbound
+-// while it did not work.
+-//
+-// worked says whether the outbound had a result of this run that worked, before this test.
+-func (m *OutboundMonitoring) settle(task *testTask, state *outboundState, history adapter.URLTestHistory, err error, worked bool) {
+-	if !task.settled.CompareAndSwap(false, true) {
+-		m.logger.Debug("outbound ", task.outboundTag, " URL test returned after it was given up on; dropped")
+-		return
+-	}
+-	outcome := testOutcome{
+-		outboundTag: task.outboundTag,
+-		history:     history,
+-		err:         err,
+-		cycleID:     task.cycleID,
+-		priority:    task.priority,
+-	}
+-	m.applyResult(outcome)
+-	if task.priority { // asked for, so wanted now: past the debounce, as a selection is
+-		m.flushSelectionEvents(task.outboundTag)
+-	}
+-	if err == nil && !worked { // it works now; what was measured through it did not
+-		m.retestDependents(task.outboundTag, make(map[string]bool))
+-	}
+-	if task.resultCh != nil {
+-		select {
+-		case task.resultCh <- outcome:
+-		case <-m.ctx.Done():
+-		default:
+-		}
+-	}
+-}
+-
+-// settleLate gives up on a test that did not return within testHardLimit: it counts as failed,
+-// the worker moves on, and the test's own result, if it ever comes, is dropped.
+-func (m *OutboundMonitoring) settleLate(task *testTask, state *outboundState) {
+-	m.logger.Warn("outbound ", task.outboundTag, " URL test did not return in ", m.testHardLimit(task), ": counted as failed")
+-	state.mu.Lock()
+-	worked := !state.from_cache && state.history.Delay != 0 && state.history.Delay < TimeoutDelay
+-	state.mu.Unlock()
+-	m.settle(task, state, adapter.URLTestHistory{Time: time.Now(), Delay: TimeoutDelay}, errTestNeverReturned, worked)
+-}
+-
+-// applyInterim records what a test knows before it is done: the delay the URL test measured,
+-// before the IP lookup that follows it (the ping shows at once, the IP comes when the lookup is
+-// done), or a staged test's miss at its first mark, tentative: the app shows the outbound as
+-// unavailable for now, while the groups keep its last confirmed result (see confirmed). The
+-// result is stored and the groups told, at once for a test that was asked for; the queue marks
+-// stay for settle.
+-func (m *OutboundMonitoring) applyInterim(task *testTask, state *outboundState, history adapter.URLTestHistory, tentative bool) {
+-	if task.settled.Load() {
+-		return
+-	}
+-	state.mu.Lock()
+-	if !tentative && state.history.Delay != history.Delay {
+-		m.cacheDirty.Store(true)
+-	}
+-	if !state.tentative {
+-		state.confirmed = state.history
+-	}
+-	state.history.Delay = history.Delay
+-	state.history.Time = history.Time
+-	state.from_cache = false
+-	state.tentative = tentative
+-	if !tentative {
+-		m.history.StoreURLTestHistory(task.outboundTag, &state.history)
+-	}
+-	groupTags := state.groupTags
+-	state.mu.Unlock()
+-	m.emitGroupEvent(groupTags)
+-	if task.priority {
+-		m.flushSelectionEvents(task.outboundTag)
+-	}
+-}
+-
+-// confirmed is what a group reads of a member: a staged test's tentative miss is swapped for
+-// the member's last confirmed result, so no group takes it for dead, or moves away from it and
+-// cuts its connections, on a miss that its next attempt may answer. The catch-all group, which
+-// the app reads, sees the miss as it is.
+-func (m *OutboundMonitoring) confirmed(groupTag, outboundTag string, his *adapter.URLTestHistory) *adapter.URLTestHistory {
+-	if groupTag == "" || his == nil {
+-		return his
+-	}
+-	state, ok := m.reg().outbounds[outboundTag]
+-	if !ok {
+-		return his
+-	}
+-	state.mu.Lock()
+-	defer state.mu.Unlock()
+-	if !state.tentative {
+-		return his
+-	}
+-	last := state.confirmed
+-	last.IsFromCache = state.from_cache
+-	return &last
+-}
++package monitoring
++
++import (
++	"errors"
++	"time"
++
++	"github.com/sagernet/sing-box/adapter"
++)
++
++var errTestNeverReturned = errors.New("URL test did not return: the outbound ignores its deadline")
++
++// testHardLimit is how long a worker waits for one test: the URL test and the IP lookup, each
++// with its own deadline, and one more test after a network reset. An outbound whose dial ignores
++// its deadline would otherwise hold the worker, and the cycle waiting for the result, for good;
++// a few of them, and nothing is tested again.
++func (m *OutboundMonitoring) testHardLimit(task *testTask) time.Duration {
++	test := time.Duration(m.urlTestTimeout.Load())
++	if task.staged {
++		test = m.onDemand[len(m.onDemand)-1]
++	}
++	return 2*test + time.Duration(m.urlTestTimeout.Load()) + 2*networkResetWait
++}
++
++// settle records a test's result, once: the first of its result and of giving up on it counts,
++// the other is dropped. It applies the result, hands it to what waits for it, publishes it at
++// once when the test was asked for, and tests again what was measured through the outbound
++// while it did not work.
++//
++// worked says whether the outbound had a result of this run that worked, before this test.
++func (m *OutboundMonitoring) settle(task *testTask, state *outboundState, history adapter.URLTestHistory, err error, worked bool) {
++	if !task.settled.CompareAndSwap(false, true) {
++		m.logger.Debug("outbound ", task.outboundTag, " URL test returned after it was given up on; dropped")
++		return
++	}
++	outcome := testOutcome{
++		outboundTag: task.outboundTag,
++		history:     history,
++		err:         err,
++		cycleID:     task.cycleID,
++		priority:    task.priority,
++	}
++	m.applyResult(outcome)
++	if task.priority { // asked for, so wanted now: past the debounce, as a selection is
++		m.flushSelectionEvents(task.outboundTag)
++	}
++	if err == nil && !worked { // it works now; what was measured through it did not
++		m.retestDependents(task.outboundTag, make(map[string]bool))
++	}
++	if task.resultCh != nil {
++		select {
++		case task.resultCh <- outcome:
++		case <-m.ctx.Done():
++		default:
++		}
++	}
++}
++
++// settleLate gives up on a test that did not return within testHardLimit: it counts as failed,
++// the worker moves on, and the test's own result, if it ever comes, is dropped.
++func (m *OutboundMonitoring) settleLate(task *testTask, state *outboundState) {
++	m.logger.Warn("outbound ", task.outboundTag, " URL test did not return in ", m.testHardLimit(task), ": counted as failed")
++	state.mu.Lock()
++	worked := !state.from_cache && state.history.Delay != 0 && state.history.Delay < TimeoutDelay
++	state.mu.Unlock()
++	m.settle(task, state, adapter.URLTestHistory{Time: time.Now(), Delay: TimeoutDelay}, errTestNeverReturned, worked)
++}
++
++// applyInterim records what a test knows before it is done: the delay the URL test measured,
++// before the IP lookup that follows it (the ping shows at once, the IP comes when the lookup is
++// done), or a staged test's miss at its first mark, tentative: the app shows the outbound as
++// unavailable for now, while the groups keep its last confirmed result (see confirmed). The
++// result is stored and the groups told, at once for a test that was asked for; the queue marks
++// stay for settle.
++func (m *OutboundMonitoring) applyInterim(task *testTask, state *outboundState, history adapter.URLTestHistory, tentative bool) {
++	if task.settled.Load() {
++		return
++	}
++	state.mu.Lock()
++	if !tentative && state.history.Delay != history.Delay {
++		m.cacheDirty.Store(true)
++	}
++	if !state.tentative {
++		state.confirmed = state.history
++	}
++	state.history.Delay = history.Delay
++	state.history.Time = history.Time
++	state.from_cache = false
++	state.tentative = tentative
++	if !tentative {
++		m.history.StoreURLTestHistory(task.outboundTag, &state.history)
++	}
++	groupTags := state.groupTags
++	state.mu.Unlock()
++	m.emitGroupEvent(groupTags)
++	if task.priority {
++		m.flushSelectionEvents(task.outboundTag)
++	}
++}
++
++// confirmed is what a group reads of a member: a staged test's tentative miss is swapped for
++// the member's last confirmed result, so no group takes it for dead, or moves away from it and
++// cuts its connections, on a miss that its next attempt may answer. The catch-all group, which
++// the app reads, sees the miss as it is.
++func (m *OutboundMonitoring) confirmed(groupTag, outboundTag string, his *adapter.URLTestHistory) *adapter.URLTestHistory {
++	if groupTag == "" || his == nil {
++		return his
++	}
++	state, ok := m.reg().outbounds[outboundTag]
++	if !ok {
++		return his
++	}
++	state.mu.Lock()
++	defer state.mu.Unlock()
++	if !state.tentative {
++		return his
++	}
++	last := state.confirmed
++	last.IsFromCache = state.from_cache
++	return &last
++}
+diff --git a/common/monitoring/outbound_monitoring.go b/common/monitoring/outbound_monitoring.go
+index cfad0fad2..a8e742a5d 100644
+--- a/common/monitoring/outbound_monitoring.go
++++ b/common/monitoring/outbound_monitoring.go
+@@ -688,7 +688,7 @@ func (m *OutboundMonitoring) tester(parent context.Context, tag string, interim
+ 	}
+ 
+ 	// one that failed again and again is left for a while by the regular rounds (a test asked for is made)
+-	if !priority && m.backoff.skip(tag, time.Now()) {
++	if !staged && m.backoff.skip(tag, time.Now()) {
+ 		return adapter.URLTestHistory{Time: time.Now(), Delay: TimeoutDelay}, errors.New("left alone for now: it failed repeatedly")
+ 	}
+ 
+diff --git a/option/balancer.go b/option/balancer.go
+index 2fef6dce8..042259aca 100644
+--- a/option/balancer.go
++++ b/option/balancer.go
+@@ -17,7 +17,6 @@ type BalancerOutboundOptions struct {
+ 	Pool          int                        `json:"pool,omitempty"`           //H
+ 	PoolTolerance uint16                     `json:"pool_tolerance,omitempty"` //H
+ 	StickyHash    badoption.Listable[string] `json:"sticky_hash,omitempty"`    //H
+-	MaxRetry                  int                `json:"max_retry,omitempty"` //not implemented yet
+ 	// A-VPN: servers of the priority subscription, and how many ms slower than the others they may be and still win
+ 	PriorityOutbounds []string `json:"priority_outbounds,omitempty"`
+ 	PriorityMargin    uint16   `json:"priority_margin,omitempty"`
+diff --git a/protocol/group/balancer/h_strategy_test.go b/protocol/group/balancer/h_strategy_test.go
+index 9035cbab7..c8dd59037 100644
+--- a/protocol/group/balancer/h_strategy_test.go
++++ b/protocol/group/balancer/h_strategy_test.go
+@@ -335,11 +335,10 @@ func TestH_BalancerLowestDelayMobileTolerance(t *testing.T) {
+ 		{"dead current", 65535, 200, false, false, "candidate"},
+ 		{"dead candidate", 200, 65535, false, false, "current"},
+ 		{"cached challenger", 200, 180, false, true, "current"},
+-		{"fresh challenger waits for cached current", 200, 180, true, false, "current"},
+ 	} {
+ 		t.Run(tc.name, func(t *testing.T) {
+ 			current, candidate := newFake("current"), newFake("candidate")
+-			strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: 150})
++			strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: 150, ToleranceRatio: -1})
+ 			history := map[string]*adapter.URLTestHistory{
+ 				"current":   {Delay: tc.current, IsFromCache: tc.cachedCurrent},
+ 				"candidate": {Delay: tc.candidate, IsFromCache: tc.cachedCandidate},
+@@ -353,20 +352,6 @@ func TestH_BalancerLowestDelayMobileTolerance(t *testing.T) {
+ 	}
+ }
+ 
+-func TestH_BalancerLowestDelayWaitsForCurrentProbe(t *testing.T) {
+-	current, candidate := newFake("current"), newFake("candidate")
+-	strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: 150})
+-	history := map[string]*adapter.URLTestHistory{
+-		"current":   {Delay: 200, IsFromCache: true},
+-		"candidate": {Delay: 20},
+-	}
+-	require.False(t, strategy.UpdateOutboundsInfo(history))
+-	require.Equal(t, "current", strategy.Now())
+-	history["current"] = &adapter.URLTestHistory{Delay: monitoring.TimeoutDelay}
+-	require.True(t, strategy.UpdateOutboundsInfo(history))
+-	require.Equal(t, "candidate", strategy.Now())
+-}
+-
+ func TestH_BalancerNetworkSpecificTolerance(t *testing.T) {
+ 	for _, tc := range []struct {
+ 		name      string
+@@ -378,7 +363,7 @@ func TestH_BalancerNetworkSpecificTolerance(t *testing.T) {
+ 	} {
+ 		t.Run(tc.name, func(t *testing.T) {
+ 			current, candidate := newFake("current"), newFake("candidate")
+-			strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: tc.tolerance})
++			strategy := NewLowestDelay(outs(current, candidate), option.BalancerOutboundOptions{Tolerance: tc.tolerance, ToleranceRatio: -1})
+ 			history := map[string]*adapter.URLTestHistory{
+ 				"current":   {Delay: 228},
+ 				"candidate": {Delay: 98},
+@@ -393,7 +378,7 @@ func TestH_BalancerNetworkSpecificTolerance(t *testing.T) {
+ // doesn't answer, another takes over at once.
+ func TestH_BalancerLowestDelayPriority(t *testing.T) {
+ 	p, o := newFake("p"), newFake("o")
+-	s := NewLowestDelay(outs(o, p), option.BalancerOutboundOptions{PriorityOutbounds: []string{"p"}, PriorityMargin: 100})
++	s := NewLowestDelay(outs(o, p), option.BalancerOutboundOptions{ToleranceRatio: -1, PriorityOutbounds: []string{"p"}, PriorityMargin: 100})
+ 
+ 	// o is faster by 60 ms: less than the margin, p stays
+ 	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"p": his(160), "o": his(100)})
+@@ -421,7 +406,7 @@ func TestH_BalancerLowestDelayPriority(t *testing.T) {
+ // that drops out now and then loses to a steady one.
+ func TestH_BalancerLowestDelaySmoothed(t *testing.T) {
+ 	pl, ee := newFake("pl"), newFake("ee")
+-	s := NewLowestDelay(outs(ee, pl), option.BalancerOutboundOptions{Tolerance: 150, SmoothSamples: 3})
++	s := NewLowestDelay(outs(ee, pl), option.BalancerOutboundOptions{Tolerance: 150, ToleranceRatio: -1, SmoothSamples: 3})
+ 	at := time.Now()
+ 	round := func(plDelay, eeDelay uint16) {
+ 		at = at.Add(10 * time.Second)
+@@ -439,7 +424,7 @@ func TestH_BalancerLowestDelaySmoothed(t *testing.T) {
+ 	round(95, 60)
+ 	require.Equal(t, "pl", s.Now())
+ 	// the single-result ranking is kept out of it: no tolerance holds an unsettled server
+-	fresh := NewLowestDelay(outs(ee, pl), option.BalancerOutboundOptions{Tolerance: 150, SmoothSamples: 3})
++	fresh := NewLowestDelay(outs(ee, pl), option.BalancerOutboundOptions{Tolerance: 150, ToleranceRatio: -1, SmoothSamples: 3})
+ 	fresh.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"ee": {Delay: 50, Time: at}, "pl": {Delay: 80, Time: at}})
+ 	require.Equal(t, "ee", fresh.Now())
+ 	at = at.Add(10 * time.Second)
+@@ -450,7 +435,7 @@ func TestH_BalancerLowestDelaySmoothed(t *testing.T) {
+ // A-VPN: a move of the choice is told with the delays it went by.
+ func TestH_BalancerLowestDelayTellsSwitch(t *testing.T) {
+ 	a, b := newFake("a"), newFake("b")
+-	s := NewLowestDelay(outs(a, b), option.BalancerOutboundOptions{PriorityOutbounds: []string{"a"}, PriorityMargin: 10})
++	s := NewLowestDelay(outs(a, b), option.BalancerOutboundOptions{ToleranceRatio: -1, PriorityOutbounds: []string{"a"}, PriorityMargin: 10})
+ 	var told []string
+ 	s.SetOnSwitch(func(from, to, detail string) { told = append(told, from+">"+to+": "+detail) })
+ 	s.UpdateOutboundsInfo(map[string]*adapter.URLTestHistory{"a": his(50), "b": his(200)})
+diff --git a/protocol/group/balancer/lowest_delay.go b/protocol/group/balancer/lowest_delay.go
+index 3a4bb1bb8..fb0646e5b 100644
+--- a/protocol/group/balancer/lowest_delay.go
++++ b/protocol/group/balancer/lowest_delay.go
+@@ -16,9 +16,8 @@ type LowestDelay struct {
+ 	outbounds        map[string][]adapter.Outbound
+ 	udpOutbounds     []adapter.Outbound
+ 	selectedOutbound map[string]adapter.Outbound
+-	// A-VPN: the current server is kept until it stops answering or another one is faster by more than this
+-	// many milliseconds, so the choice doesn't flip between countries on every ping jitter
+-	tolerance uint16
++	tolerance        uint16  // a member takes the selection when faster by more than this ...
++	toleranceRatio   float64 // ... and than this share of the selected member's delay
+ 	// A-VPN: the priority subscription's servers count as faster than they are by this many ms next to the others
+ 	// (the others are slower by it), so the others take over only when they are clearly better
+ 	priority       map[string]bool
+@@ -34,26 +33,34 @@ type LowestDelay struct {
+ 
+ func NewLowestDelay(outbounds []adapter.Outbound, options option.BalancerOutboundOptions) *LowestDelay {
+ 	couts := convertOutbounds(outbounds)
++	// A-VPN: a negative tolerance_ratio is the app's own choice: the tolerance alone (0 or 1 is none), with no
++	// share of the delay and no default
++	absolute := options.ToleranceRatio < 0
++	tolerance := options.Tolerance
++	if tolerance == 0 && !absolute {
++		tolerance = defaultTolerance
++	}
++	ratio := options.ToleranceRatio
++	if absolute {
++		ratio = 0
++	} else if ratio == 0 {
++		ratio = defaultToleranceRatio
++	}
+ 	return &LowestDelay{
+ 		outbounds: couts,
+-		tolerance: options.Tolerance,
+-		priority:       priorityMap(options.PriorityOutbounds),
+-		priorityMargin: options.PriorityMargin,
+-		smooth:         options.SmoothSamples,
+-		samples:        map[string]*sampleList{},
+ 		selectedOutbound: map[string]adapter.Outbound{
+ 			N.NetworkUDP: couts[N.NetworkUDP][0],
+ 			N.NetworkTCP: couts[N.NetworkTCP][0],
+ 		},
++		tolerance:      tolerance,
++		toleranceRatio: ratio,
++		priority:       priorityMap(options.PriorityOutbounds),
++		priorityMargin: options.PriorityMargin,
++		smooth:         options.SmoothSamples,
++		samples:        map[string]*sampleList{},
+ 	}
+ }
+ 
+-func (s *LowestDelay) SetTolerance(tolerance uint16) {
+-	s.mu.Lock()
+-	s.tolerance = tolerance
+-	s.mu.Unlock()
+-}
+-
+ var _ Strategy = (*LowestDelay)(nil)
+ 
+ func (s *LowestDelay) Now() string {
+@@ -62,49 +69,38 @@ func (s *LowestDelay) Now() string {
+ 
+ 	return s.selectedOutbound[N.NetworkTCP].Tag()
+ }
++
++// UpdateOutboundsInfo keeps the selected member while it answers, unless another one is faster
++// by more than the tolerance and than tolerance_ratio of the selected member's delay. A selected member that failed its test is left for the fastest
++// live one; when no member is live, the selection stays.
+ func (s *LowestDelay) UpdateOutboundsInfo(history map[string]*adapter.URLTestHistory) bool {
+ 	history = s.withPriority(s.smoothed(history))
+-	min, _ := getMinDelay(s.outbounds, history)
++	min, delays := getMinDelay(s.outbounds, history)
+ 
+ 	s.mu.Lock()
+-	defer s.mu.Unlock()
+ 	changed := false
+-	for net, out := range min {
++	for net, best := range min {
+ 		current := s.selectedOutbound[net]
+-		if current != nil && current.Tag() != out.Tag() && s.keepCurrent(current, out, history) {
++		if best == nil || best.Tag() == current.Tag() || delays[net] >= monitoring.TimeoutDelay {
+ 			continue
+ 		}
+-		if net == N.NetworkTCP && current != nil && out.Tag() != current.Tag() && s.onSwitch != nil {
+-			s.onSwitch(current.Tag(), out.Tag(), s.describe(history, current.Tag(), out.Tag()))
++		currentDelay := getTagDelay(current.Tag(), history)
++		// A-VPN: a server with few results behind it is no steady choice yet: the one that answered first (or
++		// luckily) must not hold the place against the others
++		unsettled := s.smooth > 0 && !s.settled(current.Tag())
++		threshold := switchThreshold(measuredDelay(history[current.Tag()]), s.tolerance, s.toleranceRatio)
++		if !unsettled && currentDelay < monitoring.TimeoutDelay && uint32(delays[net])+threshold >= uint32(currentDelay) {
++			continue
+ 		}
+-		changed = changed || current == nil || out.Tag() != current.Tag()
+-		s.selectedOutbound[net] = out
++		if net == N.NetworkTCP && s.onSwitch != nil {
++			s.onSwitch(current.Tag(), best.Tag(), s.describe(history, current.Tag(), best.Tag()))
++		}
++		s.selectedOutbound[net] = best
++		changed = true
+ 	}
++	s.mu.Unlock()
+ 	return changed
+ }
+-
+-// keepCurrent reports whether current is still good enough next to best: it answers, and best isn't faster by
+-// more than the tolerance. A tolerance of 0 or 1 keeps the old behaviour of always taking the fastest.
+-func (s *LowestDelay) keepCurrent(current, best adapter.Outbound, history map[string]*adapter.URLTestHistory) bool {
+-	if s.tolerance <= 1 {
+-		return false
+-	}
+-	// a server with few results behind it is no steady choice yet: the one that answered first (or luckily) must not
+-	// hold the place against the others
+-	if s.smooth > 0 && !s.settled(current.Tag()) {
+-		return false
+-	}
+-	// Wait for the current server's probe before comparing a cached result with fresh results.
+-	if currentHistory := history[current.Tag()]; currentHistory != nil && currentHistory.IsFromCache && currentHistory.Delay > 0 && currentHistory.Delay < monitoring.TimeoutDelay {
+-		return true
+-	}
+-	currentDelay := getTagDelay(current.Tag(), history)
+-	if currentDelay >= monitoring.TimeoutDelay {
+-		return false
+-	}
+-	return uint32(currentDelay) <= uint32(getTagDelay(best.Tag(), history))+uint32(s.tolerance)
+-}
+-
+ func (s *LowestDelay) Select(metadata adapter.InboundContext, net string, touch bool) adapter.Outbound {
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index 2687d756f..5635fd96d 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -56,7 +56,6 @@ type URLTest struct {
+ 	interruptExternalConnections bool
+ 	privateHistory               bool          // H
+ 	failures                     *failwatch.Watch // H: dials failing in a row on the server in use
+-	links                        []string      // H: URLs tested together (the slowest counts)
+ 	minDwell                     time.Duration // H
+ 	strictURLs                   bool          // H
+ 	sticky                       bool          // H
+@@ -93,7 +92,6 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		interruptExternalConnections: options.InterruptExistConnections,
+ 		privateHistory:               options.PrivateHistory,
+ 		failures:                     failwatch.New(),
+-		links:                        options.URLs,
+ 		minDwell:                     time.Duration(options.MinDwell),
+ 		strictURLs:                   options.StrictURLs,
+ 		sticky:                       options.Sticky,
+@@ -395,7 +393,6 @@ type URLTestGroup struct {
+ 	// H: the last stableSamples results of each server (0: no answer), when the group goes by its steadiest
+ 	stableSamples int
+ 	testTimeout   time.Duration
+-	links         []string      // H: each server is tested against all of them
+ 	minDwell      time.Duration // H
+ 	strictURLs    bool          // H
+ 	sticky        bool          // H
+@@ -493,14 +490,14 @@ func (g *URLTestGroup) Select(network string) (adapter.Outbound, bool) {
+ 	switch network {
+ 	case N.NetworkTCP:
+ 		if g.selectedOutboundTCP != nil {
+-			if history := g.history.LoadURLTestHistory(RealTag(g.selectedOutboundTCP, N.NetworkTCP)); history != nil && history.Delay != urltest.FailedDelay {
++			if history := g.history.LoadURLTestHistory(RealTag(g.selectedOutboundTCP, N.NetworkTCP)); history != nil && history.Delay > 0 && history.Delay != urltest.FailedDelay {
+ 				minOutbound = g.selectedOutboundTCP
+ 				minDelay = history.Delay
+ 			}
+ 		}
+ 	case N.NetworkUDP:
+ 		if g.selectedOutboundUDP != nil {
+-			if history := g.history.LoadURLTestHistory(RealTag(g.selectedOutboundUDP, N.NetworkUDP)); history != nil && history.Delay != urltest.FailedDelay {
++			if history := g.history.LoadURLTestHistory(RealTag(g.selectedOutboundUDP, N.NetworkUDP)); history != nil && history.Delay > 0 && history.Delay != urltest.FailedDelay {
+ 				minOutbound = g.selectedOutboundUDP
+ 				minDelay = history.Delay
+ 			}
+@@ -513,7 +510,7 @@ func (g *URLTestGroup) Select(network string) (adapter.Outbound, bool) {
+ 		history := g.history.LoadURLTestHistory(RealTag(detour, network))
+ 		// Failed tests are stored as FailedDelay (65535). Skip them so they
+ 		// cannot win Select via uint16 overflow of Delay+tolerance.
+-		if history == nil || history.Delay == urltest.FailedDelay {
++		if history == nil || history.Delay == 0 || history.Delay == urltest.FailedDelay {
+ 			continue
+ 		}
+ 		if minDelay == 0 || uint32(minDelay) > uint32(history.Delay)+uint32(g.tolerance) {
+@@ -589,7 +586,7 @@ func (g *URLTestGroup) spreadTest(ctx context.Context, force bool) {
+ 		if to > len(g.outbounds) {
+ 			to = len(g.outbounds)
+ 		}
+-		result := urlTestOutbounds(ctx, g.outbound, g.history, g.logger, g.outbounds[from:to], g.link, g.interval, force, g.testTimeout, g.links)
++		result := g.testMembers(ctx, g.outbounds[from:to], force)
+ 		if ctx.Err() != nil {
+ 			return
+ 		}
+@@ -617,11 +614,12 @@ func (g *URLTestGroup) urlTest(ctx context.Context, force bool) (map[string]uint
+ 	if g.stableSamples > 0 {
+ 		force = true
+ 	}
++	set := g.testSet()
+ 	var result map[string]uint16 //H
+ 	if g.failover && !force {    //H: only the selected members, unless one failed
+ 		result = g.failoverCheck(ctx) //H
+ 	} else { //H
+-		result = g.testMembers(ctx, g.testSet(), force) //H
++		result = g.testMembers(ctx, set, force) //H
+ 	} //H
+ 	if g.stableSamples > 0 && ctx.Err() == nil {
+ 		g.recordSamples(set, result)
+@@ -668,7 +666,6 @@ func urlTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManag
+ 		result:   make(map[string]uint16),
+ 		timeout:  timeout,
+ 		strict:   strict,
+-		links:    links,
+ 	}
+ 	testBatch.test(outbounds, links, interval, force) //H
+ 	b.Wait()
+@@ -725,28 +722,10 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, links []string, interv
+ 					testChan <- urlTestResult{delay, testErr}
+ 				}()
+ 				var testResult urlTestResult
+-				for _, one := range urls {
+-					one := one
+-					testCtx, cancel := context.WithTimeout(b.ctx, b.timeout)
+-					testChan := make(chan urlTestResult, 1)
+-					go func() {
+-						delay, testErr := urltest.URLTest(testCtx, one, detour)
+-						testChan <- urlTestResult{delay, testErr}
+-					}()
+-					var one1 urlTestResult
+-					select {
+-					case one1 = <-testChan:
+-					case <-testCtx.Done():
+-						one1.err = testCtx.Err()
+-					}
+-					cancel()
+-					if one1.err != nil {
+-						testResult = one1
+-						break
+-					}
+-					if one1.delay > testResult.delay {
+-						testResult.delay = one1.delay
+-					}
++				select {
++				case testResult = <-testChan:
++				case <-testCtx.Done():
++					testResult.err = testCtx.Err()
+ 				}
+ 				if testResult.err != nil {
+ 					if b.ctx.Err() != nil {
+-- 
+2.55.0.windows.3
+

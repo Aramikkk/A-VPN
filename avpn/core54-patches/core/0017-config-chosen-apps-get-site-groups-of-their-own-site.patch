@@ -1,0 +1,216 @@
+From dae40a2a9ea9adef5cc0def0b99e0d92618bc7c1 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 00:17:04 +0300
+Subject: [PATCH 17/26] config: chosen apps get site groups of their own
+ (site-group-apps)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/hiddify_option.go   |   2 +
+ v2/config/site_groups.go      | 133 +++++++++++++++++++++++-----------
+ v2/config/site_groups_test.go |  29 ++++++++
+ 3 files changed, 123 insertions(+), 41 deletions(-)
+
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index e9df983..8b135c4 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -83,6 +83,8 @@ type URLTestOptions struct {
+ 	SiteGroups bool `json:"site-groups,omitempty" overridable:"true"`
+ 	// H: how much sooner (ms) another server must answer a service before its group moves to it (0 = 80)
+ 	SiteGroupsTolerance uint16 `json:"site-groups-tolerance,omitempty" overridable:"true"`
++	// H: apps (package names) with a group of their own when the site groups are on
++	SiteGroupApps []string `json:"site-group-apps,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+ 
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index a7fee7f..8ffd3f2 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -84,49 +84,37 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 	if tolerance == 0 {
+ 		tolerance = 80
+ 	}
+-	groups := make([]option.Outbound, 0, len(siteGroups))
+-	rules := make([]option.Rule, 0, len(siteGroups))
++	groups := make([]option.Outbound, 0, len(siteGroups)+len(hopt.SiteGroupApps))
++	rules := make([]option.Rule, 0, len(siteGroups)+len(hopt.SiteGroupApps))
++	// the apps the user chose (Settings → Sites): all of an app's traffic through a group of its own, tested
++	// against its service's page when it's one the app knows, else against the servers' own test address; their
++	// rules first, so a chosen app's connections to the services' names go through its own group too
++	seen := map[string]bool{}
++	for _, app := range hopt.SiteGroupApps {
++		app = strings.TrimSpace(app)
++		if app == "" || seen[app] {
++			continue
++		}
++		seen[app] = true
++		url := hopt.ConnectionTestUrl
++		if key, known := siteGroupAppServices[app]; known {
++			for _, site := range siteGroups {
++				if site.key == key {
++					url = site.url
++				}
++			}
++		}
++		if url == "" {
++			url = "https://www.gstatic.com/generate_204"
++		}
++		tag := AppGroupTagPrefix + app
++		groups = append(groups, siteGroupOutbound(tag, url, servers, tolerance))
++		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{PackageName: []string{app}}))
++	}
+ 	for _, site := range siteGroups {
+ 		tag := SiteGroupTagPrefix + site.key
+-		groups = append(groups, option.Outbound{
+-			Type: C.TypeURLTest,
+-			Tag:  tag,
+-			Options: &option.URLTestOutboundOptions{
+-				Outbounds: servers,
+-				URL:       site.url,
+-				// tested every two minutes, and only while the service is used (idle half an hour: no tests)
+-				Interval:    badoption.Duration(2 * time.Minute),
+-				IdleTimeout: badoption.Duration(30 * time.Minute),
+-				// another server only when it's sooner by this much (the app's setting), so the service doesn't hop
+-				Tolerance: tolerance,
+-				// what's open stays where it is (a call, a video); new connections go through the new one
+-				InterruptExistConnections: false,
+-				// its own results: they mustn't take the place of the servers' pings the app shows
+-				PrivateHistory: true,
+-				// the first minute after the start, a network change or a pause: through the main choice (the servers'
+-				// pings and Auto settle first), the group's own tests already running
+-				WarmUp:       badoption.Duration(time.Minute),
+-				WarmUpDetour: OutboundSelectTag,
+-				// a server only after three tests in a row answered (three in the warm-up minute, then one each
+-				// round), by their average; until one has, the main choice, never the first server listed
+-				StableSamples: 3,
+-				// a test through a whitelist server on mobile data takes longer than the 5 s default
+-				TestTimeout: badoption.Duration(10 * time.Second),
+-			},
+-		})
+-		rules = append(rules, option.Rule{
+-			Type: C.RuleTypeDefault,
+-			DefaultOptions: option.DefaultRule{
+-				RawDefaultRule: option.RawDefaultRule{
+-					DomainSuffix: site.domainSuffix,
+-					IPCIDR:       site.ipCIDR,
+-				},
+-				RuleAction: option.RuleAction{
+-					Action:       C.RuleActionTypeRoute,
+-					RouteOptions: option.RouteActionOptions{Outbound: tag},
+-				},
+-			},
+-		})
++		groups = append(groups, siteGroupOutbound(tag, site.url, servers, tolerance))
++		rules = append(rules, siteGroupRule(tag, option.RawDefaultRule{DomainSuffix: site.domainSuffix, IPCIDR: site.ipCIDR}))
+ 	}
+ 	// after the main group (the app takes the first group as the server list), before the direct ones
+ 	at := len(options.Outbounds)
+@@ -199,3 +187,66 @@ func internalSubnetRule(rule option.Rule) bool {
+ 	}
+ 	return false
+ }
++
++// AppGroupTagPrefix starts the tag of a chosen app's group: "app-" and its package name.
++const AppGroupTagPrefix = "app-"
++
++// siteGroupAppServices: the apps of the services the app times, tested against their service's page.
++var siteGroupAppServices = map[string]string{
++	"com.instagram.android":        "instagram",
++	"com.instagram.lite":           "instagram",
++	"com.whatsapp":                 "whatsapp",
++	"com.whatsapp.w4b":             "whatsapp",
++	"org.telegram.messenger":       "telegram",
++	"org.telegram.messenger.web":   "telegram",
++	"org.telegram.plus":            "telegram",
++	"org.thunderdog.challegram":    "telegram",
++	"com.openai.chatgpt":           "chatgpt",
++	"com.google.android.youtube":   "youtube",
++	"app.revanced.android.youtube": "youtube",
++	"com.google.android.apps.docs": "gdrive",
++}
++
++// siteGroupOutbound is a service's or an app's group: a URL test over the servers against [url].
++func siteGroupOutbound(tag, url string, servers []string, tolerance uint16) option.Outbound {
++	return option.Outbound{
++		Type: C.TypeURLTest,
++		Tag:  tag,
++		Options: &option.URLTestOutboundOptions{
++			Outbounds: servers,
++			URL:       url,
++			// tested every two minutes, and only while the service is used (idle half an hour: no tests)
++			Interval:    badoption.Duration(2 * time.Minute),
++			IdleTimeout: badoption.Duration(30 * time.Minute),
++			// another server only when it's sooner by this much (the app's setting), so the service doesn't hop
++			Tolerance: tolerance,
++			// what's open stays where it is (a call, a video); new connections go through the new one
++			InterruptExistConnections: false,
++			// its own results: they mustn't take the place of the servers' pings the app shows
++			PrivateHistory: true,
++			// the first minute after the start, a network change or a pause: through the main choice (the servers'
++			// pings and Auto settle first), the group's own tests already running
++			WarmUp:       badoption.Duration(time.Minute),
++			WarmUpDetour: OutboundSelectTag,
++			// a server only after three tests in a row answered (three in the warm-up minute, then one each
++			// round), by their average; until one has, the main choice, never the first server listed
++			StableSamples: 3,
++			// a test through a whitelist server on mobile data takes longer than the 5 s default
++			TestTimeout: badoption.Duration(10 * time.Second),
++		},
++	}
++}
++
++// siteGroupRule sends what [match] matches to the group [tag].
++func siteGroupRule(tag string, match option.RawDefaultRule) option.Rule {
++	return option.Rule{
++		Type: C.RuleTypeDefault,
++		DefaultOptions: option.DefaultRule{
++			RawDefaultRule: match,
++			RuleAction: option.RuleAction{
++				Action:       C.RuleActionTypeRoute,
++				RouteOptions: option.RouteActionOptions{Outbound: tag},
++			},
++		},
++	}
++}
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index 04ddd83..9659f7b 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -179,3 +179,32 @@ func TestSiteGroupsPerNetworkFromInput(t *testing.T) {
+ 		t.Fatalf("the choice mustn't reach the running config: %+v", mon)
+ 	}
+ }
++
++// The apps the user chose get groups of their own, their rules first; a known service's app tests its page.
++func TestSiteGroupApps(t *testing.T) {
++	options := siteGroupsTestOptions()
++	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{
++		SiteGroups:        true,
++		SiteGroupApps:     []string{"com.instagram.android", "ru.example.bank", "com.instagram.android"},
++		ConnectionTestUrl: "http://cp.cloudflare.com/",
++	}})
++	urls := map[string]string{}
++	for _, out := range options.Outbounds {
++		if out.Type == C.TypeURLTest {
++			urls[out.Tag] = out.Options.(*option.URLTestOutboundOptions).URL
++		}
++	}
++	if len(urls) != len(siteGroups)+2 {
++		t.Fatalf("%d groups, want %d (a chosen app once)", len(urls), len(siteGroups)+2)
++	}
++	if urls[AppGroupTagPrefix+"com.instagram.android"] != "https://www.instagram.com/" {
++		t.Fatalf("Instagram's app tests Instagram: %q", urls[AppGroupTagPrefix+"com.instagram.android"])
++	}
++	if urls[AppGroupTagPrefix+"ru.example.bank"] != "http://cp.cloudflare.com/" {
++		t.Fatalf("another app tests the servers' address: %q", urls[AppGroupTagPrefix+"ru.example.bank"])
++	}
++	rule := options.Route.Rules[3].DefaultOptions
++	if rule.RouteOptions.Outbound != AppGroupTagPrefix+"com.instagram.android" || rule.PackageName[0] != "com.instagram.android" {
++		t.Fatalf("the apps' rules come first: %+v", rule)
++	}
++}
+-- 
+2.55.0.windows.3
+

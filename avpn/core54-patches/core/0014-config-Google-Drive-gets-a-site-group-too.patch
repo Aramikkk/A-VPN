@@ -1,0 +1,38 @@
+From f5320c0243f1e5a007540c9bf1554faee79126e7 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 22:00:52 +0300
+Subject: [PATCH 14/26] config: Google Drive gets a site group too
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/site_groups.go | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index c41cbde..cf9cb65 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -9,7 +9,7 @@ import (
+ 	"github.com/sagernet/sing/common/json/badoption"
+ )
+ 
+-// H: an Auto of its own for each of the services the app's home screen times (Settings → Ping, beta): a URL test
++// H: an Auto of its own for each of the services the app's home screen times (Google Drive among them) (Settings → Ping, beta): a URL test
+ // group that picks, out of the same servers as Auto, the one answering that service's own page soonest, and a
+ // route rule sending the service's names and addresses to it. A service slow or failing through one server then
+ // goes through another, the rest of the traffic as before.
+@@ -54,6 +54,11 @@ var siteGroups = []siteGroup{
+ 		url:          "https://chatgpt.com/cdn-cgi/trace",
+ 		domainSuffix: []string{"chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com", "sora.com"},
+ 	},
++	{
++		key:          "gdrive",
++		url:          "https://drive.google.com/",
++		domainSuffix: []string{"drive.google.com", "docs.google.com", "drive.usercontent.google.com"},
++	},
+ 	{
+ 		key: "youtube",
+ 		url: "https://www.youtube.com/generate_204",
+-- 
+2.55.0.windows.3
+

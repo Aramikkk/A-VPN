@@ -1,0 +1,26 @@
+From 9c88d32885625748c62cf0985807eb546547552e Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 14:50:47 +0300
+Subject: [PATCH 02/14] clash api: report the balancer's real server in chains
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ experimental/clashapi/trafficontrol/tracker.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/experimental/clashapi/trafficontrol/tracker.go b/experimental/clashapi/trafficontrol/tracker.go
+index bb1af429b..20b889302 100644
+--- a/experimental/clashapi/trafficontrol/tracker.go
++++ b/experimental/clashapi/trafficontrol/tracker.go
+@@ -86,7 +86,7 @@ func (t TrackerMetadata) MarshalJSON() ([]byte, error) {
+ 		"upload":      t.Upload.Load(),
+ 		"download":    t.Download.Load(),
+ 		"start":       t.CreatedAt,
+-		"chains":      chains, //H: the balancer chain built above was not used
++		"chains":      chains, // A-VPN: with the balancer's real server first
+ 		"rule":        rule,
+ 		"rulePayload": "",
+ 	})
+-- 
+2.55.0.windows.3
+

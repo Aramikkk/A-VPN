@@ -1,0 +1,84 @@
+From 195f03a2a00e5b30779f6ba6ba81e120748b3fb7 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 21:43:57 +0300
+Subject: [PATCH 13/26] config: site groups per network, from the config the
+ app made for Wi-Fi or mobile data
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/builder.go          |  8 +++++++
+ v2/config/site_groups_test.go | 42 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 50 insertions(+)
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 7f7706f..6f38d3d 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -71,6 +71,14 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 	var options option.Options
+ 	// Carry only the app-prepared monitoring timeout, never an input API listener or secret.
+ 	if input.Experimental != nil && input.Experimental.Monitoring != nil {
++		// H: a config the app made for one network (Wi-Fi or mobile data) carries that network's site groups
++		// choice; a copy of the options, so the shared ones stay as they are
++		local := *hopts
++		local.SiteGroups = input.Experimental.Monitoring.SiteGroups
++		if tolerance := input.Experimental.Monitoring.SiteGroupsTolerance; tolerance > 0 {
++			local.SiteGroupsTolerance = tolerance
++		}
++		hopts = &local
+ 		value := input.Experimental.Monitoring.URLTestTimeout
+ 		if value.Build() >= time.Second && value.Build() <= 30*time.Second {
+ 			options.Experimental = &option.ExperimentalOptions{Monitoring: &option.MonitoringOptions{URLTestTimeout: value}}
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index 6c72426..8d52a8c 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -135,3 +135,45 @@ func TestSiteGroupsTolerance(t *testing.T) {
+ 		}
+ 	}
+ }
++
++// A config the app made for one network carries that network's choice in experimental.monitoring.
++func TestSiteGroupsPerNetworkFromInput(t *testing.T) {
++	servers := `{"type": "socks", "tag": "🇵🇱 Польша", "server": "127.0.0.1", "server_port": 1080},
++  {"type": "socks", "tag": "🇫🇮 Финляндия", "server": "127.0.0.1", "server_port": 1081}`
++	count := func(options *option.Options) (groups int, tolerance uint16) {
++		for _, out := range options.Outbounds {
++			if out.Type == C.TypeURLTest {
++				groups++
++				tolerance = out.Options.(*option.URLTestOutboundOptions).Tolerance
++			}
++		}
++		return
++	}
++	hopts := DefaultHiddifyOptions()
++	hopts.SiteGroups = true
++	off := `{"outbounds": [` + servers + `], "experimental": {"monitoring": {"url_test_timeout": "5s"}}}`
++	options, err := BuildConfig(libbox.BaseContext(nil), hopts, &ReadOptions{Content: off})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if groups, _ := count(options); groups != 0 {
++		t.Fatalf("this network has them off: %d groups", groups)
++	}
++	if !hopts.SiteGroups {
++		t.Fatalf("the shared options must stay as they are")
++	}
++	on := `{"outbounds": [` + servers + `], "experimental": {"monitoring": {"url_test_timeout": "5s", "site_groups": true, "site_groups_tolerance": 1500}}}`
++	options, err = BuildConfig(libbox.BaseContext(nil), DefaultHiddifyOptions(), &ReadOptions{Content: on})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the config: %v", err)
++	}
++	if groups, tolerance := count(options); groups != len(siteGroups) || tolerance != 1500 {
++		t.Fatalf("this network has them on at 1500 ms: %d groups, %d ms", groups, tolerance)
++	}
++	if mon := options.Experimental.Monitoring; mon.SiteGroups || mon.SiteGroupsTolerance != 0 {
++		t.Fatalf("the choice mustn't reach the running config: %+v", mon)
++	}
++}
+-- 
+2.55.0.windows.3
+

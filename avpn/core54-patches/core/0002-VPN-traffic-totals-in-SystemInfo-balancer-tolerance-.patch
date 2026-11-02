@@ -1,0 +1,210 @@
+From db051eaacb46bb8cd46ae87d9661f8114a4794da Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 14:54:06 +0300
+Subject: [PATCH 02/26] VPN traffic totals in SystemInfo; balancer tolerance
+ and keep-connections options
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/builder.go         | 18 +++++++----
+ v2/config/hiddify_option.go  |  4 +++
+ v2/hcore/commands.go         |  2 ++
+ v2/hcore/vpn_traffic.go      | 60 ++++++++++++++++++++++++++++++++++++
+ v2/hcore/vpn_traffic_test.go | 48 +++++++++++++++++++++++++++++
+ 5 files changed, 126 insertions(+), 6 deletions(-)
+ create mode 100644 v2/hcore/vpn_traffic.go
+ create mode 100644 v2/hcore/vpn_traffic_test.go
+
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index 3bf2224..e2879de 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -274,10 +274,9 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 			// URLs:      opt.ConnectionTestUrls,
+ 			// Interval:  badoption.Duration(opt.URLTestInterval.Duration()),
+ 			// IdleTimeout: badoption.Duration(opt.URLTestIdleTimeout.Duration()),
+-			Tolerance:      100,
+-			ToleranceRatio: 0.1,
++			Tolerance: balancerTolerance(opt),
+ 			// IdleTimeout:               badoption.Duration(opt.URLTestInterval.Duration().Nanoseconds() * 3),
+-			InterruptExistConnections: true,
++			InterruptExistConnections: !opt.BalancerKeepConnections,
+ 		},
+ 	}
+ 
+@@ -292,10 +291,9 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
+ 			// URLs:      opt.ConnectionTestUrls,
+ 			// Interval:  badoption.Duration(opt.URLTestInterval.Duration()),
+ 			// IdleTimeout: badoption.Duration(opt.URLTestIdleTimeout.Duration()),
+-			Tolerance:      100,
+-			ToleranceRatio: 0.1,
++			Tolerance: balancerTolerance(opt),
+ 			// IdleTimeout:               badoption.Duration(opt.URLTestInterval.Duration().Nanoseconds() * 3),
+-			InterruptExistConnections: true,
++			InterruptExistConnections: !opt.BalancerKeepConnections,
+ 		},
+ 	}
+ 	if len(tags) == 0 {
+@@ -1277,3 +1275,11 @@ func generateRandomString(length int) string {
+ 	// Trim padding characters and return the string
+ 	return randomString[:length]
+ }
++
++// balancerTolerance is the configured tolerance, or the old 1 ms (always the fastest) when none is set.
++func balancerTolerance(opt *HiddifyOptions) uint16 {
++	if opt.BalancerTolerance > 1 {
++		return opt.BalancerTolerance
++	}
++	return 1
++}
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index d8d86e3..3dadf7b 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -73,6 +73,10 @@ type URLTestOptions struct {
+ 	IpInfoUrl string `json:"ipinfo-url,omitempty" overridable:"true"`
+ 	// A-VPN: how long one server's test may take before it counts as unreachable (0 = the core's 5 s)
+ 	URLTestTimeout DurationInSeconds `json:"url-test-timeout,omitempty" overridable:"true"`
++	// A-VPN: automatic server choice keeps the current server unless another is faster by this many ms
++	// (0 = always take the fastest), and with BalancerKeepConnections a switch doesn't cut open connections
++	BalancerTolerance       uint16 `json:"balancer-tolerance,omitempty" overridable:"true"`
++	BalancerKeepConnections bool   `json:"balancer-keep-connections,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+ 
+diff --git a/v2/hcore/commands.go b/v2/hcore/commands.go
+index 1831508..447c19e 100644
+--- a/v2/hcore/commands.go
++++ b/v2/hcore/commands.go
+@@ -40,6 +40,8 @@ func (h *HiddifyInstance) readStatus(prev *SystemInfo) *SystemInfo {
+ 			message.Uplink = message.UplinkTotal - prev.UplinkTotal
+ 			message.Downlink = message.DownlinkTotal - prev.DownlinkTotal
+ 		}
++		vpnUp, vpnDown := h.vpnTraffic()
++		withVpnTraffic(&message, vpnUp, vpnDown)
+ 		if box := h.Box(); box != nil {
+ 			current := ""
+ 			if currentOutBound, ok := box.Outbound().Outbound(config.OutboundSelectTag); ok {
+diff --git a/v2/hcore/vpn_traffic.go b/v2/hcore/vpn_traffic.go
+new file mode 100644
+index 0000000..252e7f5
+--- /dev/null
++++ b/v2/hcore/vpn_traffic.go
+@@ -0,0 +1,60 @@
++package hcore
++
++// A-VPN: how much of the traffic went through the provider's servers, as opposed to direct (.ru sites, the
++// local network) or the home WireGuard. Sent as extra fields of SystemInfo, written straight onto the wire so
++// the generated protobuf code doesn't have to change; an app that doesn't know them just ignores them.
++
++import (
++	"strings"
++
++	C "github.com/sagernet/sing-box/constant"
++	"google.golang.org/protobuf/encoding/protowire"
++)
++
++const (
++	vpnUplinkTotalField   protowire.Number = 100
++	vpnDownlinkTotalField protowire.Number = 101
++)
++
++// isProviderServer reports whether traffic credited to an outbound of this type and tag went through a VPN
++// server: not direct, not blocked, not a group (groups are never credited) and not the home network.
++func isProviderServer(outboundType, tag string) bool {
++	switch outboundType {
++	case C.TypeDirect, C.TypeBlock, C.TypeDNS, C.TypeSelector, C.TypeURLTest:
++		return false
++	}
++	return !strings.HasPrefix(tag, "🏠")
++}
++
++// vpnTraffic sums the traffic of every provider server of the running box.
++func (h *HiddifyInstance) vpnTraffic() (up, down int64) {
++	box, manager := h.Box(), h.TrafficManager()
++	if box == nil || manager == nil {
++		return 0, 0
++	}
++	add := func(outboundType, tag string) {
++		if !isProviderServer(outboundType, tag) {
++			return
++		}
++		u, d := manager.OutboundUsage(tag)
++		up += u
++		down += d
++	}
++	for _, outbound := range box.Outbound().Outbounds() {
++		add(outbound.Type(), outbound.Tag())
++	}
++	for _, endpoint := range box.Endpoint().Endpoints() {
++		add(endpoint.Type(), endpoint.Tag())
++	}
++	return up, down
++}
++
++// withVpnTraffic adds the VPN totals to message as fields the generated code doesn't know.
++func withVpnTraffic(message *SystemInfo, up, down int64) {
++	var raw []byte
++	raw = protowire.AppendTag(raw, vpnUplinkTotalField, protowire.VarintType)
++	raw = protowire.AppendVarint(raw, uint64(up))
++	raw = protowire.AppendTag(raw, vpnDownlinkTotalField, protowire.VarintType)
++	raw = protowire.AppendVarint(raw, uint64(down))
++	message.ProtoReflect().SetUnknown(raw)
++}
+diff --git a/v2/hcore/vpn_traffic_test.go b/v2/hcore/vpn_traffic_test.go
+new file mode 100644
+index 0000000..3db448e
+--- /dev/null
++++ b/v2/hcore/vpn_traffic_test.go
+@@ -0,0 +1,48 @@
++package hcore
++
++import (
++	"testing"
++
++	"google.golang.org/protobuf/encoding/protowire"
++	"google.golang.org/protobuf/proto"
++)
++
++func TestVpnTrafficSurvivesTheWire(t *testing.T) {
++	message := &SystemInfo{UplinkTotal: 10, DownlinkTotal: 20}
++	withVpnTraffic(message, 3, 7)
++	raw, err := proto.Marshal(message)
++	if err != nil {
++		t.Fatal(err)
++	}
++	got := map[protowire.Number]uint64{}
++	for len(raw) > 0 {
++		num, typ, n := protowire.ConsumeTag(raw)
++		raw = raw[n:]
++		if typ != protowire.VarintType {
++			t.Fatalf("field %d: unexpected wire type %d", num, typ)
++		}
++		v, m := protowire.ConsumeVarint(raw)
++		raw = raw[m:]
++		got[num] = v
++	}
++	if got[8] != 10 || got[9] != 20 || got[vpnUplinkTotalField] != 3 || got[vpnDownlinkTotalField] != 7 {
++		t.Fatalf("fields on the wire: %v", got)
++	}
++}
++
++func TestOnlyProviderServersCount(t *testing.T) {
++	cases := map[[2]string]bool{
++		{"vless", "🇩🇪 Доступ - Германия § 3"}: true,
++		{"hysteria2", "LTE Only § 9"}:         true,
++		{"direct", "direct §hide§"}:           false,
++		{"block", "block"}:                    false,
++		{"selector", "select"}:                false,
++		{"urltest", "auto"}:                   false,
++		{"wireguard", "🏠 Mechta §hide§"}:      false,
++	}
++	for c, want := range cases {
++		if got := isProviderServer(c[0], c[1]); got != want {
++			t.Errorf("%v: got %v, want %v", c, got, want)
++		}
++	}
++}
+-- 
+2.55.0.windows.3
+

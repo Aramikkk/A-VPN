@@ -1,0 +1,41 @@
+From 42079b1bb1f7fed679f6a8d861841a1ed497e922 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 22:53:29 +0300
+Subject: [PATCH 16/26] config: site groups choose by three steady answers, 10
+ s tests, every 2 min
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ v2/config/site_groups.go | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index 0295de3..a7fee7f 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -94,8 +94,8 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 			Options: &option.URLTestOutboundOptions{
+ 				Outbounds: servers,
+ 				URL:       site.url,
+-				// tested every five minutes, and only while the service is used (idle half an hour: no tests)
+-				Interval:    badoption.Duration(5 * time.Minute),
++				// tested every two minutes, and only while the service is used (idle half an hour: no tests)
++				Interval:    badoption.Duration(2 * time.Minute),
+ 				IdleTimeout: badoption.Duration(30 * time.Minute),
+ 				// another server only when it's sooner by this much (the app's setting), so the service doesn't hop
+ 				Tolerance: tolerance,
+@@ -107,6 +107,11 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 				// pings and Auto settle first), the group's own tests already running
+ 				WarmUp:       badoption.Duration(time.Minute),
+ 				WarmUpDetour: OutboundSelectTag,
++				// a server only after three tests in a row answered (three in the warm-up minute, then one each
++				// round), by their average; until one has, the main choice, never the first server listed
++				StableSamples: 3,
++				// a test through a whitelist server on mobile data takes longer than the 5 s default
++				TestTimeout: badoption.Duration(10 * time.Second),
+ 			},
+ 		})
+ 		rules = append(rules, option.Rule{
+-- 
+2.55.0.windows.3
+
