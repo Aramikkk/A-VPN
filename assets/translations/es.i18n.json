@@ -430,12 +430,10 @@
           "stickySession": "Sticky session"
         },
         "resolveDestination": "Resolver destino",
-        "ipv6Route": "Ruta IPv6",
+        "ipv6Route": "IPv6",
         "ipv6Modes": {
-          "disable": "Desactivado",
-          "enable": "Activado",
-          "prefer": "Preferido",
-          "only": "Exclusivo"
+          "preferIpv4": "IPv4 primero",
+          "preferIpv6": "IPv6 primero"
         }
       },
       "dns": {

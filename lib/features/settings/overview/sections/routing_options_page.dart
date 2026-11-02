@@ -590,6 +590,7 @@ class _ListFooter extends ConsumerWidget {
           choices: IPv6Mode.values,
           present: (value) => value.present(t),
           onSelected: ref.read(ConfigOptions.ipv6Mode.notifier).update,
+          describe: (value) => value.describe(t),
         ),
       ],
     );

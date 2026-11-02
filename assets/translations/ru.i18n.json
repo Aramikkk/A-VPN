@@ -957,12 +957,12 @@
           "stickySession": "Sticky session"
         },
         "resolveDestination": "Определять адрес назначения",
-        "ipv6Route": "Маршрут IPv6",
+        "ipv6Route": "IPv6",
         "ipv6Modes": {
-          "disable": "Выключено",
-          "enable": "Включено",
-          "prefer": "Предпочтительно",
-          "only": "Только"
+          "preferIpv4": "Сначала IPv4",
+          "preferIpv6": "Сначала IPv6",
+          "preferIpv4Description": "Имена сначала определяются как IPv4. IPv6 используется только через прокси, который его поддерживает. Всё идёт через VPN.",
+          "preferIpv6Description": "Имена сначала определяются как IPv6 через прокси, который его поддерживает, иначе как IPv4. Всё идёт через VPN."
         },
         "outcomeVpn": "через VPN",
         "outcomeDirect": "напрямую",
