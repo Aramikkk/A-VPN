@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,7 +10,9 @@ import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
+import 'package:hiddify/features/app_update/auto_update.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
 import 'package:hiddify/features/settings/notifier/reset_tunnel/reset_tunnel_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -225,6 +228,24 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ),
           ),
+          // the program's own update, looked for now (Android)
+          if (PlatformUtils.isAndroid)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: _Frame(
+                child: ListTile(
+                  leading: const Icon(Icons.system_update_rounded),
+                  title: Text(t.$meta.locale.languageCode == 'ru' ? 'Проверить обновления' : 'Check for updates'),
+                  onTap: () => unawaited(
+                    updateNow(
+                      ref,
+                      ru: t.$meta.locale.languageCode == 'ru',
+                      tell: (message) => ref.read(inAppNotificationControllerProvider).showInfoToast(message),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (PlatformUtils.isIOS)
             Padding(
               padding: const EdgeInsets.only(top: 8),

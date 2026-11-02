@@ -108,5 +108,6 @@ abstract class AraUpdate {
   }
 
   /// Hands the downloaded APK to the installer: "ok", "permission" (the page for allowing it opened) or "error".
-  static Future<String> install(File apk) => AraTools.install(apk.path);
+  static Future<String> install(File apk, {bool allowSettings = true}) =>
+      AraTools.install(apk.path, allowSettings: allowSettings);
 }

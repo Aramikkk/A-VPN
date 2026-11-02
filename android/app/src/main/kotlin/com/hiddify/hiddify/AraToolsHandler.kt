@@ -47,7 +47,8 @@ class AraToolsHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
             "install" -> {
                 val path = call.argument<String>("path")
-                result.success(if (path == null) "error" else try { install(path) } catch (e: Exception) { "error" })
+                val allowSettings = call.argument<Boolean>("allowSettings") ?: true
+                result.success(if (path == null) "error" else try { install(path, allowSettings) } catch (e: Exception) { "error" })
             }
             else -> result.notImplemented()
         }
@@ -66,10 +67,12 @@ class AraToolsHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun install(path: String): String {
+    private fun install(path: String, allowSettings: Boolean): String {
         val ctx = context ?: return "error"
         // the user lets this app install apps once; until then the settings page for it opens
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ctx.packageManager.canRequestPackageInstalls()) {
+            // by itself (not asked for by the user) the settings page is not thrown open: only said
+            if (!allowSettings) return "permission"
             val settings = Intent(
                 android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                 Uri.parse("package:" + ctx.packageName),

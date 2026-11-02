@@ -22,10 +22,10 @@ abstract class AraTools {
 
   /// Hands the APK at [path] to the system's installer: "ok", "permission" (the page where the user lets A-VPN install
   /// apps was opened; try again after), or "error".
-  static Future<String> install(String path) async {
+  static Future<String> install(String path, {bool allowSettings = true}) async {
     if (!Platform.isAndroid) return 'error';
     try {
-      return await _channel.invokeMethod<String>('install', {'path': path}) ?? 'error';
+      return await _channel.invokeMethod<String>('install', {'path': path, 'allowSettings': allowSettings}) ?? 'error';
     } catch (_) {
       return 'error';
     }

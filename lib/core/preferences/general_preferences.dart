@@ -277,7 +277,16 @@ abstract class Preferences {
 
   /// A-VPN: the public folder of Yandex Disk the program updates itself from (a latest.json and the APK in it): the
   /// link, or empty
-  static final updateFolder = PreferencesNotifier.create<String, String>("update_folder", "");
+  static final updateFolder = PreferencesNotifier.create<String, String>(
+    "update_folder",
+    "https://disk.yandex.ru/d/REPLACED",
+  );
+
+  /// A-VPN: when the program last looked for an update by itself (milliseconds), once a day
+  static final lastUpdateCheck = PreferencesNotifier.create<int, int>("last_update_check", 0);
+
+  /// A-VPN: the build the program last offered by itself (downloaded and opened the installer for): each only once
+  static final lastOfferedBuild = PreferencesNotifier.create<int, int>("last_offered_build", 0);
 
   /// A-VPN: how the Dots ping block draws the answers (the menu of the big ping).
   static final pingGraph = PreferencesNotifier.create<PingGraph, String>(

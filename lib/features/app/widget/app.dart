@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
-import 'package:hiddify/core/app_info/app_info_provider.dart';
-import 'package:hiddify/features/app_update/ara_update.dart';
+import 'package:hiddify/features/app_update/auto_update.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:accessibility_tools/accessibility_tools.dart';
@@ -111,29 +109,15 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
       return null;
     }, [ownFrame]);
 
-    // the program's own update: once, a little after the start (Android), a toast when a newer build waits in the folder
+    // the program's own update (Android): once a day it looks in the update folder; a newer build is downloaded and the
+    // installer opened (one tap on "Install"), or said to be there when it cannot be done by itself
     useEffect(() {
       if (!PlatformUtils.isAndroid || !prefsReady) return null;
-      final timer = Timer(const Duration(seconds: 40), () async {
-        final folder = ref.read(Preferences.updateFolder).trim();
-        if (folder.isEmpty) return;
-        try {
-          final info = await AraUpdate.latest(folder);
-          final build = int.tryParse(ref.read(appInfoProvider).valueOrNull?.buildNumber ?? '') ?? 0;
-          if (info != null && info.isNewerThan(build)) {
-            final ru = locale.flutterLocale?.languageCode == 'ru';
-            ref
-                .read(inAppNotificationControllerProvider)
-                .showInfoToast(
-                  ru
-                      ? 'Доступна версия ${info.version}: О программе → Обновить'
-                      : 'Version ${info.version} is available: About → Update',
-                );
-          }
-        } catch (_) {
-          // no network or no folder: nothing to tell
-        }
-      });
+      final timer = startAutoUpdate(
+        ref,
+        ru: () => locale.flutterLocale?.languageCode == 'ru',
+        tell: (message) => ref.read(inAppNotificationControllerProvider).showInfoToast(message),
+      );
       return timer.cancel;
     }, [prefsReady]);
 
