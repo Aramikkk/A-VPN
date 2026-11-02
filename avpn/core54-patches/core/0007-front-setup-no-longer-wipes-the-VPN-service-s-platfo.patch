@@ -1,7 +1,7 @@
 From c4f4e12a5f6013f057519c2c15572c20a24e1d4f Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Tue, 13 Oct 2026 11:26:35 +0300
-Subject: [PATCH 07/26] front setup no longer wipes the VPN service's platform
+Subject: [PATCH 07/27] front setup no longer wipes the VPN service's platform
  interface (open /dev/tun: permission denied)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

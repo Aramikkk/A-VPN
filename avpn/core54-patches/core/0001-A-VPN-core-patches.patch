@@ -1,7 +1,7 @@
 From 5968e2455744526abd4c31abd8734b9866814f77 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Sun, 11 Oct 2026 13:59:22 +0300
-Subject: [PATCH 01/26] A-VPN core patches
+Subject: [PATCH 01/27] A-VPN core patches
 
 Keep route rules from the start config ahead of the built-in ones (home
 WireGuard network, Server mode), and expose the URL test timeout as

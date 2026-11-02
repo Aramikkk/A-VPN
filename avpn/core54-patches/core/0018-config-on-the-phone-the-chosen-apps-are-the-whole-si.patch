@@ -1,7 +1,7 @@
 From 7a26dff80d8a02dbbe63ee270400386f3c3801f8 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Wed, 21 Oct 2026 00:40:14 +0300
-Subject: [PATCH 18/26] config: on the phone the chosen apps are the whole site
+Subject: [PATCH 18/27] config: on the phone the chosen apps are the whole site
  groups choice
 
 A service's group only when its app is chosen; a chosen service app goes through

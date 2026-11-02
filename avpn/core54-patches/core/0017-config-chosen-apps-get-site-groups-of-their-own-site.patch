@@ -1,7 +1,7 @@
 From dae40a2a9ea9adef5cc0def0b99e0d92618bc7c1 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Wed, 21 Oct 2026 00:17:04 +0300
-Subject: [PATCH 17/26] config: chosen apps get site groups of their own
+Subject: [PATCH 17/27] config: chosen apps get site groups of their own
  (site-group-apps)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

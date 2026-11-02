@@ -1,7 +1,7 @@
 From 36228648c136da27adc4ec857fb3d1f165cbf028 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Mon, 2 Nov 2026 15:45:14 +0300
-Subject: [PATCH 25/26] A-VPN: site groups need every probe to answer
+Subject: [PATCH 25/27] A-VPN: site groups need every probe to answer
  (strict_urls)
 
 ---

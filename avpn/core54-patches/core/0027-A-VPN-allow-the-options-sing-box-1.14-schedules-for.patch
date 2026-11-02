@@ -1,0 +1,47 @@
+From 6ce935812d47d637857ff0cbe2657ac3ba634f25 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 16:44:45 +0300
+Subject: [PATCH 27/27] A-VPN: allow the options sing-box 1.14 schedules for
+ removal (the older core only warned)
+
+---
+ v2/hcore/legacy_dns.go | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 v2/hcore/legacy_dns.go
+
+diff --git a/v2/hcore/legacy_dns.go b/v2/hcore/legacy_dns.go
+new file mode 100644
+index 0000000..7ef66a6
+--- /dev/null
++++ b/v2/hcore/legacy_dns.go
+@@ -0,0 +1,27 @@
++package hcore
++
++import "os"
++
++// A-VPN: sing-box 1.14 refuses a config that uses an option scheduled for removal (the DNS rules' legacy "strategy",
++// the address filter, ...) unless it is allowed, and the config builder still writes some of them (the IPv6 preference
++// is a strategy). The older core only warned; this keeps that, until the builder moves to the new rule items.
++func init() {
++	for _, name := range []string{
++		"ENABLE_DEPRECATED_OUTBOUND_DNS_RULE_ITEM",
++		"ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER",
++		"ENABLE_DEPRECATED_LEGACY_DOMAIN_STRATEGY_OPTIONS",
++		"ENABLE_DEPRECATED_INLINE_ACME_OPTIONS",
++		"ENABLE_DEPRECATED_LEGACY_RULE_SET_DOWNLOAD_DETOUR",
++		"ENABLE_DEPRECATED_DNS_RULE_RULE_SET_IP_CIDR_ACCEPT_EMPTY",
++		"ENABLE_DEPRECATED_LEGACY_DNS_ADDRESS_FILTER",
++		"ENABLE_DEPRECATED_LEGACY_DNS_RULE_STRATEGY",
++		"ENABLE_DEPRECATED_INDEPENDENT_DNS_CACHE",
++		"ENABLE_DEPRECATED_STORE_RDRC",
++		"ENABLE_DEPRECATED_IMPLICIT_DEFAULT_HTTP_CLIENT",
++		"ENABLE_DEPRECATED_TUN_STACK",
++	} {
++		if os.Getenv(name) == "" {
++			_ = os.Setenv(name, "true")
++		}
++	}
++}
+-- 
+2.55.0.windows.3
+
