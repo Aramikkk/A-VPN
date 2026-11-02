@@ -74,6 +74,8 @@ part 'home_dots.dart';
 part 'home_dots_ping.dart';
 part 'home_dots_sites.dart';
 part 'home_connect.dart';
+part 'home_connect_orb.dart';
+part 'home_connect_water.dart';
 part 'home_glass.dart';
 part 'home_blocks.dart';
 part 'home_sites.dart';
