@@ -1,7 +1,7 @@
 From a4d45d74ed93fce15f53ef890f5e889e86a5c978 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Tue, 20 Oct 2026 22:18:49 +0300
-Subject: [PATCH 15/28] config: site groups go through the main choice for
+Subject: [PATCH 15/29] config: site groups go through the main choice for
  their first minute
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

@@ -1,0 +1,28 @@
+From fbd8cbc59a796b82fdb365892212c9d2fd850ba7 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 18:57:21 +0300
+Subject: [PATCH 29/29] A-VPN: IPv4-only DNS set once (no legacy strategy on
+ rules)
+
+---
+ v2/config/dns.go | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/v2/config/dns.go b/v2/config/dns.go
+index 23aed54..8390653 100644
+--- a/v2/config/dns.go
++++ b/v2/config/dns.go
+@@ -138,6 +138,10 @@ func setDns(options *option.Options, opt *HiddifyOptions, staticIps *map[string]
+ 	dnsOptions := option.DNSOptions{
+ 		RawDNSOptions: option.RawDNSOptions{
+ 			DNSClientOptions: option.DNSClientOptions{
++				// A-VPN does not use IPv6: every name is answered with IPv4 only (an AAAA gets an empty answer), so an app
++				// never tries a server's IPv6 address through a proxy that has none. Set here, once, not on each rule: a
++				// DNS rule action's own strategy is legacy in sing-box 1.14 and the core refuses to start with it.
++				Strategy:         option.DomainStrategy(C.DomainStrategyIPv4Only),
+ 				IndependentCache: opt.IndependentDNSCache && !C.IsIos,
+ 				DisableExpire:    true,
+ 			},
+-- 
+2.55.0.windows.3
+

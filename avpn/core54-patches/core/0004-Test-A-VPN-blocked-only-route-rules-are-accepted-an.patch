@@ -1,7 +1,7 @@
 From 011d1bb7a80f77451b48395369b32e14e07efcfa Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Sun, 11 Oct 2026 19:41:04 +0300
-Subject: [PATCH 04/28] Test: A-VPN blocked-only route rules are accepted and
+Subject: [PATCH 04/29] Test: A-VPN blocked-only route rules are accepted and
  kept in order
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

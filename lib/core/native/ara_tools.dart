@@ -3,10 +3,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// A-VPN's own Android tools (see AraToolsHandler.kt): an app's icon drawn as the launcher draws it, and the installer for
 /// the downloaded update.
+final _log = appLogger('AppIcons');
+
 abstract class AraTools {
   static const _channel = MethodChannel('com.aravpn.app/tools');
 
@@ -14,8 +17,14 @@ abstract class AraTools {
   static Future<Uint8List?> appIcon(String package) async {
     if (!Platform.isAndroid) return null;
     try {
-      return await _channel.invokeMethod<Uint8List>('appIcon', {'package': package});
-    } catch (_) {
+      final answer = await _channel.invokeMethod<Map<Object?, Object?>>('appIcon', {'package': package});
+      final icon = answer?['icon'];
+      if (icon is Uint8List && icon.isNotEmpty) return icon;
+      // what each source said, so the log shows why an app is drawn as a letter
+      _log.warning('no icon for $package:${answer?['why']}');
+      return null;
+    } catch (e) {
+      _log.warning('no icon for $package: $e');
       return null;
     }
   }
@@ -50,7 +59,16 @@ class NativeIcons extends Notifier<Map<String, Uint8List>> {
   }
 
   Future<void> _load(String package) async {
-    final icon = await AraTools.appIcon(package);
-    if (icon != null && icon.isNotEmpty) state = {...state, package: icon};
+    if (!Platform.isAndroid) return;
+    // an icon that did not come is asked for again a few times: the first ask can be too early (the app is only being
+    // installed or updated) and a package that answers nothing is not asked for ever after
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final icon = await AraTools.appIcon(package);
+      if (icon != null && icon.isNotEmpty) {
+        state = {...state, package: icon};
+        return;
+      }
+      await Future<void>.delayed(Duration(seconds: 15 * (attempt + 1)));
+    }
   }
 }

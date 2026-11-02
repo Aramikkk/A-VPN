@@ -1,7 +1,7 @@
 From 15cb891ef918f3b3b5be3ed6608915e9cea09f6c Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Mon, 2 Nov 2026 15:55:05 +0300
-Subject: [PATCH 26/28] A-VPN: port the core patches onto 5.4.0 (hot
+Subject: [PATCH 26/29] A-VPN: port the core patches onto 5.4.0 (hot
  reload/rebuild/suspend on the queue, test fixes)
 
 ---

@@ -1,7 +1,7 @@
 From 331ed3a178a607874af56329eab133b36e73573e Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Fri, 16 Oct 2026 00:40:49 +0300
-Subject: [PATCH 08/28] Reject without the flood drop: QUIC refused at once,
+Subject: [PATCH 08/29] Reject without the flood drop: QUIC refused at once,
  apps fall back to TCP without a timeout
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

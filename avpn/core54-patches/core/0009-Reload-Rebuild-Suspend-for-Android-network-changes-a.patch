@@ -1,7 +1,7 @@
 From f01028cc1cae2a3e2de394ca76192cf1b5bd9c21 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Mon, 19 Oct 2026 12:31:06 +0300
-Subject: [PATCH 09/28] Reload/Rebuild/Suspend for Android network changes and
+Subject: [PATCH 09/29] Reload/Rebuild/Suspend for Android network changes and
  auto-pause, gRPC secret, per-network URL test timeout, fake IP kept
 
 Work done in another session (16-18.10.2026, A-VPN 5.9.27-5.9.46), committed as it was tested. The Android AAR

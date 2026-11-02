@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
@@ -43,7 +47,14 @@ class AraToolsHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
         when (call.method) {
             "appIcon" -> {
                 val pkg = call.argument<String>("package")
-                result.success(if (pkg == null) null else try { icon(pkg) } catch (e: Exception) { null })
+                if (pkg == null) {
+                    result.success(null)
+                } else {
+                    // the icon (or null) and, when there is none, what each source said, for the app's log
+                    val why = StringBuilder()
+                    val icon = try { icon(pkg, why) } catch (e: Exception) { why.append(" error ").append(e); null }
+                    result.success(mapOf("icon" to icon, "why" to why.toString()))
+                }
             }
             "install" -> {
                 val path = call.argument<String>("path")
@@ -54,17 +65,80 @@ class AraToolsHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun icon(pkg: String): ByteArray? {
+    /**
+     * An app's icon as a PNG. The usual application icon first; some apps give an empty one (an adaptive icon whose layers
+     * draw nothing as such), so the icon of the app's launcher activity, then the one from its application info, then
+     * the themed (monochrome) layer on a dark tile are tried, and a picture with nothing in it is never taken.
+     */
+    private fun icon(pkg: String, why: StringBuilder): ByteArray? {
         val ctx = context ?: return null
-        val drawable = ctx.packageManager.getApplicationIcon(pkg)
+        val pm = ctx.packageManager
+        val sources = listOf<() -> Drawable?>(
+            { pm.getApplicationIcon(pkg) },
+            { pm.getLaunchIntentForPackage(pkg)?.let { pm.getActivityIcon(it) } },
+            { pm.getApplicationInfo(pkg, 0).loadUnbadgedIcon(pm) },
+        )
+        for ((index, source) in sources.withIndex()) {
+            val drawable = try { source() } catch (e: Exception) { why.append(" [$index: ${e.javaClass.simpleName}]"); null }
+            if (drawable == null) { why.append(" [$index: none]"); continue }
+            val bitmap = try { render(drawable) } catch (e: Exception) { why.append(" [$index: draw ${e.javaClass.simpleName}]"); null } ?: continue
+            if (!blank(bitmap)) return png(bitmap)
+            why.append(" [$index: ${drawable.javaClass.simpleName} blank]")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val adaptive = try { pm.getApplicationIcon(pkg) as? AdaptiveIconDrawable } catch (e: Exception) { null }
+            val mono = adaptive?.monochrome
+            if (mono != null) {
+                val bitmap = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                canvas.drawRoundRect(
+                    0f, 0f, ICON_SIZE.toFloat(), ICON_SIZE.toFloat(), ICON_SIZE * 0.27f, ICON_SIZE * 0.27f,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(27, 27, 29) },
+                )
+                val layer = mono.mutate()
+                layer.setTint(Color.WHITE)
+                // an adaptive layer is 108 dp with 72 dp showing: drawn bigger by that much
+                val pad = ICON_SIZE / 4
+                layer.setBounds(-pad, -pad, ICON_SIZE + pad, ICON_SIZE + pad)
+                layer.draw(canvas)
+                if (!blank(bitmap)) return png(bitmap)
+            }
+        }
+        android.util.Log.w("AraTools", "no icon for $pkg:$why")
+        return null
+    }
+
+    private fun render(drawable: Drawable): Bitmap? {
         val bitmap = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, ICON_SIZE, ICON_SIZE)
         drawable.draw(canvas)
-        ByteArrayOutputStream().use { stream ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-            return stream.toByteArray()
+        return bitmap
+    }
+
+    /** Nothing in it: every sampled pixel is clear, or they are all one colour. */
+    private fun blank(bitmap: Bitmap): Boolean {
+        val step = ICON_SIZE / 12
+        var first: Int? = null
+        var different = false
+        var visible = false
+        var y = step / 2
+        while (y < ICON_SIZE) {
+            var x = step / 2
+            while (x < ICON_SIZE) {
+                val pixel = bitmap.getPixel(x, y)
+                if (Color.alpha(pixel) > 8) visible = true
+                if (first == null) first = pixel else if (pixel != first) different = true
+                x += step
+            }
+            y += step
         }
+        return !visible || !different
+    }
+
+    private fun png(bitmap: Bitmap): ByteArray = ByteArrayOutputStream().use { stream ->
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        stream.toByteArray()
     }
 
     private fun install(path: String, allowSettings: Boolean): String {

@@ -1,7 +1,7 @@
 From d9eb1665bfea39f2dd09a1bb1dc03ffb710382ac Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Wed, 21 Oct 2026 11:03:41 +0300
-Subject: [PATCH 20/28] config: site groups probe the service's own hosts and
+Subject: [PATCH 20/29] config: site groups probe the service's own hosts and
  keep a server for ten minutes
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

@@ -1,7 +1,7 @@
 From 4d5b3d1eafac3d813e6d78d6f79f1867b097e6cf Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Wed, 21 Oct 2026 02:07:29 +0300
-Subject: [PATCH 19/28] config: ad blocking at the VPN's level (ad-block,
+Subject: [PATCH 19/29] config: ad blocking at the VPN's level (ad-block,
  ad-block-allow)
 
 Four remote lists, each cached by itself; a name refused in DNS as a name that

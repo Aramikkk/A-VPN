@@ -1,7 +1,7 @@
 From db051eaacb46bb8cd46ae87d9661f8114a4794da Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Sun, 11 Oct 2026 14:54:06 +0300
-Subject: [PATCH 02/28] VPN traffic totals in SystemInfo; balancer tolerance
+Subject: [PATCH 02/29] VPN traffic totals in SystemInfo; balancer tolerance
  and keep-connections options
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

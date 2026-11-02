@@ -1,7 +1,7 @@
 From eafc753853b7d506527e31ad3a993f3a1a31b521 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Mon, 2 Nov 2026 17:01:48 +0300
-Subject: [PATCH 28/28] A-VPN: DNS rules carry no strategy (sing-box 1.14
+Subject: [PATCH 28/29] A-VPN: DNS rules carry no strategy (sing-box 1.14
  refuses it), with a test
 
 ---

@@ -1,7 +1,7 @@
 From a73e2b9afcd710348979bf112d1493ff2cbe79e2 Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Tue, 20 Oct 2026 20:25:11 +0300
-Subject: [PATCH 11/28] config: site groups (beta), an Auto of its own for each
+Subject: [PATCH 11/29] config: site groups (beta), an Auto of its own for each
  service
 
 With site-groups on, Instagram, WhatsApp, Telegram, ChatGPT and YouTube each get a
