@@ -447,6 +447,10 @@ class _SlowPulse extends ChangeNotifier implements ValueListenable<double> {
 void _shieldOff(Canvas canvas, Offset centre, Color colour) {
   // Dots: the shield of dots with nothing in it (only its edge), struck out by a line of dots
   if (homeLookNow == HomeLayout.dots) {
+    if (paintPixelFlag(canvas, directFlag, centre, 30)) {
+      paintDirectFrame(canvas, centre, 30, colour);
+      return;
+    }
     paintDotShield(canvas, Rect.fromCenter(center: centre, width: 20, height: 23), colour, hollow: true, struck: true);
     return;
   }

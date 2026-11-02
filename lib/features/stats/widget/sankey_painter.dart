@@ -462,13 +462,20 @@ class _SankeyPainter extends CustomPainter {
           );
           letter.paint(canvas, Offset(x - 18 - letter.width / 2, labelTop + 18 - letter.height / 2));
         } else if (shield) {
-          paintDotShield(
-            canvas,
-            Rect.fromCenter(center: Offset(x + 1 + 20, labelTop + nameH / 2), width: 23, height: 26),
-            _route(n.route).withValues(alpha: alpha),
-            hollow: true,
-            struck: true,
-          );
+          // the direct way is the Russian flag in a frame (the frame tells it from a server in Russia); the shield
+          // struck out only until the flag is ready
+          final centre = Offset(x + 1 + 20, labelTop + nameH / 2);
+          if (paintPixelFlag(canvas, directFlag, centre, 40, alpha: alpha)) {
+            paintDirectFrame(canvas, centre, 40, _route(n.route).withValues(alpha: alpha));
+          } else {
+            paintDotShield(
+              canvas,
+              Rect.fromCenter(center: centre, width: 23, height: 26),
+              _route(n.route).withValues(alpha: alpha),
+              hollow: true,
+              struck: true,
+            );
+          }
         } else if (icon != null) {
           final glyph = TextPainter(
             text: TextSpan(

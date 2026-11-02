@@ -298,6 +298,21 @@ bool paintPixelFlag(Canvas canvas, String flag, Offset centre, double width, {do
   return true;
 }
 
+/// The direct way ("без VPN") is marked by the Russian flag, in a frame ([paintDirectFrame]).
+const directFlag = '🇷🇺';
+
+/// A frame round the flag of the direct way, so it is not taken for a server in Russia.
+void paintDirectFrame(Canvas canvas, Offset centre, double width, Color colour) {
+  final box = Rect.fromCenter(center: centre, width: width, height: width * 2 / 3).inflate(4);
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(box, const Radius.circular(4)),
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = colour,
+  );
+}
+
 /// A text whose flag emojis are pixel flags ([width] wide, in the line): "через VPN · 🇸🇪 🇱🇻" in the Dots look.
 Widget flagsText(String text, {TextStyle? style, int maxLines = 1, double width = 15}) {
   final flag = RegExp(r'[\u{1F1E6}-\u{1F1FF}]{2}', unicode: true);
