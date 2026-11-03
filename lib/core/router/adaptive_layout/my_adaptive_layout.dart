@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
+import 'package:hiddify/core/router/adaptive_layout/branch_swiper.dart' show branchChangeByBack;
 import 'package:hiddify/core/router/adaptive_layout/nav_icons.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
@@ -140,7 +141,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
             if (didPop) return;
             final homeIndex = getIndexOfBranch(isMobileBreakpoint, showProfilesAction, 'home');
             if (navigationShell.currentIndex != homeIndex) {
-              // on another branch: go home instead of closing the app
+              // on another branch: go home instead of closing the app (the old tab leaves to the right: that is
+              // the way the finger went)
+              branchChangeByBack = true;
               navigationShell.goBranch(homeIndex);
             } else {
               // already home: this is the way out of the app
@@ -341,6 +344,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     }
     final home = getIndexOfBranch(isMobileBreakpoint, showProfilesAction, 'home');
     if (navigationShell.currentIndex == home) return false;
+    branchChangeByBack = true;
     navigationShell.goBranch(home);
     return true;
   }

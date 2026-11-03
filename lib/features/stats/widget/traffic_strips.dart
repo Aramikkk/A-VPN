@@ -458,6 +458,23 @@ double get _markRadius => switch (homeLookNow) {
   _ => 3,
 };
 
+/// The Dots look's bar: a row of dots in [colour], lit up to [lit] (0 to 1), the rest faint.
+class DotBar extends StatelessWidget {
+  const DotBar({super.key, required this.colour, required this.lit, this.height = 6});
+
+  final Color colour;
+  final double lit;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: height,
+    child: CustomPaint(
+      painter: _DotField(colour, lit: lit, faint: Theme.of(context).colorScheme.onSurface.withValues(alpha: .15)),
+    ),
+  );
+}
+
 /// A field of dots in [colour] (Dots' strips and bars): the first [lit] share lit, the rest in [faint].
 class _DotField extends CustomPainter {
   _DotField(this.colour, {this.lit = 1, this.faint});

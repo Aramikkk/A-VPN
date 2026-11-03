@@ -11,6 +11,7 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/core/router/adaptive_layout/branch_swiper.dart' show branchChangeByBack;
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/app_update/auto_update.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
@@ -65,6 +66,18 @@ class SettingsPage extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        // the phone: the way back to Home, the same as the system's back (a computer has its menu)
+        leading: PlatformUtils.isDesktop
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () {
+                  branchChangeByBack = true;
+                  // the phone's branches: Connections, Statistics, Home, Topology, Settings
+                  StatefulNavigationShell.of(context).goBranch(2);
+                },
+              ),
         title: Text(t.pages.settings.title),
         actions: [
           MenuAnchor(

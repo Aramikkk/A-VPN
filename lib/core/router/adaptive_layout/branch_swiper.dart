@@ -6,6 +6,11 @@ import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 
+/// Set just before a change of tab that answers the system's back (the swipe in from the edge, the back button, the
+/// arrow in Settings): the old tab leaves to the right and the new one comes in from the left, whichever tabs they
+/// are (Settings otherwise leave upwards, the way a swipe up takes them).
+bool branchChangeByBack = false;
+
 /// The phone's tabs, kept alive like an indexed stack. A sideways drag moves the tab under the finger with the next
 /// (or previous) one coming in beside it; let go past a quarter of the width, or with a flick, and it goes on to
 /// that tab, otherwise it slides back. A tab chosen in the menu slides in the same way.
@@ -71,6 +76,11 @@ class _BranchSwiperState extends State<BranchSwiper> with TickerProviderStateMix
         // Settings come down from the top and go back up; Connections come up from below and go back down
         _direction = index == _settings || _current == _connections ? -1 : 1;
       }
+      if (branchChangeByBack) {
+        _vertical = false;
+        _direction = -1;
+      }
+      branchChangeByBack = false;
       _previous = _current;
       _current = index;
       final from = _from ?? 0;

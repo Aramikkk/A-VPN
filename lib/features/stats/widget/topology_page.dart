@@ -14,7 +14,6 @@ import 'package:hiddify/features/home/widget/pixel_flag.dart';
 import 'package:hiddify/features/stats/model/vpn_traffic.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
-import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/traffic_sankey.dart';
 import 'package:hiddify/features/stats/widget/traffic_strips.dart';
@@ -60,6 +59,8 @@ class TopologyPage extends HookConsumerWidget {
     }, [visible]);
     final ConnectionsState state = shown.value ?? ref.read(connectionsProvider);
     final byTraffic = useState(true);
+    // the servers' period: session, day, month, all the time (the last, to begin with)
+    final period = useState(3);
     final controller = useScrollController();
     // which page: only the title follows it (a state here rebuilt the whole page, the flows' picture laid out and
     // drawn again, as the scroll crossed the middle: a jerk between the two pages)
@@ -78,12 +79,6 @@ class TopologyPage extends HookConsumerWidget {
     final units = t.avpn.bytesUnits.split(',');
 
     final open = state.items;
-    // apps that moved less than a megabyte are left out, as in Connections
-    final bigApps = {
-      for (final g in groupConnections(open, (c) => c.app))
-        if (g.total >= smallTraffic) g.key,
-    };
-    final items = open.where((c) => bigApps.contains(c.app)).toList();
     // the ones that moved something, the closed ones too (dimmed on the picture): a connection under 20 KB is
     // background chatter, not a flow
     final rates = state.rates;
@@ -98,22 +93,27 @@ class TopologyPage extends HookConsumerWidget {
         )
         .toList();
     String speedValue(double w) => '${formatBytes(w.round(), units)}/${t.avpn.perSecond}';
-    double weight(SeenConnection c) => byTraffic.value ? c.total.toDouble() : c.count.toDouble();
     String value(double w) => byTraffic.value ? formatBytes(w.round(), units) : '${w.round()}';
-    final total = items.fold<double>(0, (s, c) => s + weight(c));
-    double sum(Iterable<SeenConnection> cs) => cs.fold<double>(0, (s, c) => s + weight(c));
-    // a rule and the way it sent its traffic: the same list can send some of it through the VPN and some direct
-    final apps = ref.watch(installedAppsProvider).valueOrNull ?? const {};
-    final rules = groupConnections(
-      items,
-      (c) => '${c.route.index}${ruleLabel(c.rule, t, apps: apps) ?? t.avpn.connRuleDefault}',
-    );
-
-    // what moved since the list started (03:00, or the last clearing) against what the list holds: connections
-    // shorter than one poll and the ones while the app was closed aren't in the list
-    // (the total follows the counters every second in a widget of its own, below: the whole page rebuilt every
-    // second for it)
-    final listed = state.items.where((c) => c.route != ConnectionRoute.block).fold<int>(0, (s, c) => s + c.total);
+    // the servers the VPN traffic went through and the direct share, over the period: how much each moved and how long
+    // it had a connection open (the servers under 10 MB aren't shown)
+    final totals = state.totals;
+    final bucket = switch (period.value) {
+      0 => totals.session,
+      1 => totals.day,
+      2 => totals.month,
+      _ => totals.all,
+    };
+    double serverWeight(({int bytes, int ms, int count}) e) =>
+        byTraffic.value ? e.bytes.toDouble() : e.count.toDouble();
+    final directWeight = byTraffic.value ? bucket.directBytes.toDouble() : bucket.directCount.toDouble();
+    final rows = <({String name, double weight, Duration? time, bool direct})>[
+      for (final e in bucket.servers.entries)
+        if (e.value.bytes >= TopologyServers.smallest)
+          (name: e.key, weight: serverWeight(e.value), time: Duration(milliseconds: e.value.ms), direct: false),
+      if (bucket.directBytes > 0)
+        (name: '$directFlag ${t.avpn.statsDirect}', weight: directWeight, time: null, direct: true),
+    ]..sort((a, b) => b.weight.compareTo(a.weight));
+    final everything = bucket.servers.values.fold<double>(directWeight, (sum, e) => sum + serverWeight(e));
 
     if (!state.available && state.items.isEmpty) {
       return Scaffold(
@@ -133,20 +133,40 @@ class TopologyPage extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        // the period the tab covers, under its name
+        // the first page is the topology, the one under it the servers
         title: ValueListenableBuilder<bool>(
           valueListenable: onSecondPage,
-          builder: (context, second, _) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(t.avpn.topologyTab),
-              // the first page is what is open now; the day is the second page's
-              if (second)
-                Text(t.avpn.topoPeriod, style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-            ],
-          ),
+          builder: (context, second, _) => Text(second ? t.avpn.topoServers : t.avpn.topologyTab),
         ),
+        // the servers' reset, only on their page
+        actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: onSecondPage,
+            builder: (context, second, _) => second
+                ? IconButton(
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    tooltip: t.avpn.topoServersReset,
+                    onPressed: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(t.avpn.topoServersResetAsk),
+                          content: Text(t.avpn.topoServersResetBody),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.common.cancel)),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: Text(t.avpn.topoServersReset),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (ok == true) ref.read(connectionsProvider.notifier).resetServerTotals();
+                    },
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -227,61 +247,36 @@ class TopologyPage extends HookConsumerWidget {
                         ),
                         // the next page is below, as in the statistics
                         const Gap(4),
-                        Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: scheme.onSurfaceVariant)),
+                        // the name of the page under this one, the arrow before it
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.keyboard_arrow_down_rounded, color: scheme.onSurfaceVariant),
+                            const Gap(4),
+                            Text(
+                              t.avpn.topoServers,
+                              style: theme.textTheme.labelLarge?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                   const Gap(12),
-                  // what moved by the core's counters (all of it); the lists below hold only the connections the app saw
-                  if (byTraffic.value)
-                    Consumer(
-                      builder: (context, ref, _) {
-                        if (visible) ref.watch(trafficHistoryProvider);
-                        final moved = ref
-                            .read(trafficHistoryProvider.notifier)
-                            .amountFrom(state.since ?? statsDayStart(DateTime.now()));
-                        final sessionAll = moved.total;
-                        if (sessionAll <= 0) return const SizedBox.shrink();
-                        final uncounted = sessionAll - listed;
-                        final showUncounted = uncounted > smallTraffic && uncounted > sessionAll * .05;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: TopologyDayTotal(
-                            total: formatBytes(sessionAll, units),
-                            vpn: formatBytes(moved.vpn, units),
-                            direct: formatBytes(math.max(0, sessionAll - moved.vpn), units),
-                            listed: showUncounted ? formatBytes(listed, units) : null,
-                          ),
-                        );
-                      },
-                    ),
-                  _Section(
-                    title: t.avpn.topoFlow,
-                    // a layer of its own: the page scrolls without drawing the strips again
-                    child: RepaintBoundary(
-                      child: TrafficStrips(items: items, weight: weight, value: value),
-                    ),
-                  ),
-                  if (rules.isNotEmpty) ...[
-                    const Gap(12),
-                    _Section(
-                      title: t.avpn.topoRulesTitle,
-                      hint: t.avpn.topoRulesHint,
-                      child: _RuleRows(
-                        rows: [
-                          for (final g in rules.take(8))
-                            (
-                              name: g.key.substring(1),
-                              route: g.items.first.route,
-                              servers: serverFlags(g.servers),
-                              weight: sum(g.items),
-                            ),
-                        ]..sort((a, b) => b.weight.compareTo(a.weight)),
-                        total: total,
+                  // the servers the VPN traffic went through, and the direct share
+                  ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: pageHeight - 12),
+                    child: _Section(
+                      child: TopologyServers(
+                        rows: rows,
+                        total: everything,
+                        period: period.value,
+                        onPeriod: (value) => period.value = value,
+                        since: totals.since,
                         value: value,
                       ),
                     ),
-                  ],
+                  ),
                 ],
               );
             },
@@ -368,54 +363,194 @@ class SessionRules extends ConsumerWidget {
   }
 }
 
-/// All the traffic since the day's start by the core's counters: the figure, how it split between the VPN and
-/// direct, and (when the lists hold much less) what the breakdown under it covers.
-class TopologyDayTotal extends ConsumerWidget {
-  const TopologyDayTotal({super.key, required this.total, required this.vpn, required this.direct, this.listed});
+/// The servers the VPN traffic went through (a country each in the usual case) and the direct traffic, ranked
+/// together by what they moved over a period: the amount, the share of the whole, and how long a server had a
+/// connection open. The totals are kept until the user resets them.
+class TopologyServers extends ConsumerWidget {
+  const TopologyServers({
+    super.key,
+    required this.rows,
+    required this.total,
+    required this.period,
+    required this.onPeriod,
+    required this.since,
+    required this.value,
+  });
 
-  final String total;
-  final String vpn;
-  final String direct;
-  final String? listed;
+  /// a server that moved less than this isn't shown
+  static const smallest = 10 * 1024 * 1024;
+
+  /// the biggest first
+  final List<({String name, double weight, Duration? time, bool direct})> rows;
+  final double total;
+
+  /// 0 session, 1 day, 2 month, 3 all the time
+  final int period;
+  final ValueChanged<int> onPeriod;
+  final DateTime? since;
+  final String Function(double) value;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return _Section(
-      title: t.avpn.topoDayTitle,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(total, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
-          const Gap(2),
-          Text(
-            t.avpn.topoDayDetail(vpn: vpn, direct: direct),
-            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-          if (listed != null) ...[
-            const Gap(8),
-            Text(
-              t.avpn.topoDayGap(listed: listed!),
-              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+    final surface = scheme.surfaceContainerLow;
+    final dots = homeLookNow == HomeLayout.dots;
+    final vpnColour = AraLook.readableOn(scheme.primary, surface);
+    final directColour = AraLook.readableOn(const Color(0xFF9AA0A6), surface);
+    String two(int n) => n.toString().padLeft(2, '0');
+    String time(Duration d) => d.inHours > 0
+        ? t.avpn.topoTimeHm(h: d.inHours, m: d.inMinutes % 60)
+        : (d.inMinutes > 0 ? t.avpn.topoTimeM(m: d.inMinutes) : t.avpn.topoTimeLess);
+    final top = rows.isEmpty ? 0.0 : rows.first.weight;
+    Widget row(({String name, double weight, Duration? time, bool direct}) r) {
+      // "🇸🇪 Швеция 2 · БС": the mark moves to a frame of its own
+      final whitelist = r.name.contains('БС');
+      final name = whitelist ? r.name.replaceAll(RegExp(r'\s*·?\s*БС'), '').trim() : r.name;
+      final colour = r.direct ? directColour : vpnColour;
+      final share = total <= 0 ? 0.0 : r.weight / total;
+      final spent = r.time;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: dots
+                            ? flagsText(
+                                name,
+                                width: 17,
+                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                              )
+                            : Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                      ),
+                      // a whitelist server: a white frame, so it isn't taken for the country's regular one
+                      if (whitelist) ...[
+                        const Gap(8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.white, width: 1.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            t.avpn.topoWhitelist,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Gap(8),
+                Text(value(r.weight), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+              ],
             ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    // no time recorded (it is kept from this version on): nothing is written
+                    spent == null || spent == Duration.zero ? '' : time(spent),
+                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                Text(
+                  '${(share * 100).round()}%',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const Gap(5),
+            if (dots)
+              DotBar(colour: colour, lit: top <= 0 ? 0 : r.weight / top)
+            else
+              ClipRRect(
+                borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.bento ? 5 : 4),
+                child: LinearProgressIndicator(
+                  value: top <= 0 ? 0 : r.weight / top,
+                  minHeight: homeLookNow == HomeLayout.bento ? 10 : 6,
+                  color: colour,
+                  backgroundColor: scheme.surfaceContainerHighest,
+                ),
+              ),
           ],
-        ],
-      ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // the period: the session, the day (from 03:00), the last 30 days, or all the time since the last reset
+        SegmentedButton<int>(
+          showSelectedIcon: false,
+          style: ButtonStyle(
+            visualDensity: VisualDensity.compact,
+            padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 4)),
+            textStyle: WidgetStatePropertyAll(theme.textTheme.labelMedium),
+          ),
+          segments: [
+            ButtonSegment(value: 0, label: Text(t.avpn.topoPeriodSession, maxLines: 1)),
+            ButtonSegment(value: 1, label: Text(t.avpn.topoPeriodDay, maxLines: 1)),
+            ButtonSegment(value: 2, label: Text(t.avpn.topoPeriodMonth, maxLines: 1)),
+            ButtonSegment(value: 3, label: Text(t.avpn.topoPeriodAll, maxLines: 1)),
+          ],
+          selected: {period},
+          onSelectionChanged: (s) => onPeriod(s.first),
+        ),
+        const Gap(14),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                period == 3 && since != null
+                    ? t.avpn.topoServersSince(
+                        date:
+                            '${two(since!.day)}.${two(since!.month)}.${since!.year % 100} ${two(since!.hour)}:${two(since!.minute)}',
+                      )
+                    : '',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ),
+            Text(value(total), style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+          ],
+        ),
+        const Gap(6),
+        if (rows.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(
+              t.avpn.topoServersNone,
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          )
+        else
+          for (final r in rows) row(r),
+      ],
     );
   }
 }
 
 class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.child,
-    this.hint,
-    this.expand = false,
-    this.trailing,
-    this.solid = false,
-  });
+  const _Section({this.title, required this.child, this.expand = false, this.trailing, this.solid = false});
 
   /// a pane with only a little see-through left in it, instead of the frosted glass
 
@@ -425,8 +560,7 @@ class _Section extends StatelessWidget {
 
   /// at the right end of the title's line
   final Widget? trailing;
-  final String title;
-  final String? hint;
+  final String? title;
   final Widget child;
 
   @override
@@ -434,7 +568,7 @@ class _Section extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final titleText = Text(
-      title.toUpperCase(),
+      (title ?? '').toUpperCase(),
       style: theme.textTheme.labelSmall?.copyWith(
         color: scheme.onSurfaceVariant,
         fontWeight: FontWeight.w800,
@@ -444,19 +578,17 @@ class _Section extends StatelessWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        trailing == null
-            ? titleText
-            : Row(
-                children: [
-                  Expanded(child: titleText),
-                  trailing!,
-                ],
-              ),
-        if (hint != null) ...[
-          const Gap(3),
-          Text(hint!, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+        if (title != null) ...[
+          trailing == null
+              ? titleText
+              : Row(
+                  children: [
+                    Expanded(child: titleText),
+                    trailing!,
+                  ],
+                ),
+          const Gap(10),
         ],
-        const Gap(10),
         if (expand) Expanded(child: child) else child,
       ],
     );

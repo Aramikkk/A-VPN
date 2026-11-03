@@ -14,6 +14,7 @@ import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
+import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -229,6 +230,7 @@ class ConnectionsState {
     this.since,
     this.usage = const {},
     this.routeUsage = const {},
+    this.totals = const ServerTotals(),
     this.rates = const {},
   });
 
@@ -242,6 +244,9 @@ class ConnectionsState {
   /// by route, then app: open-connection stretches, oldest first
   final RouteUsage routeUsage;
 
+  /// what went through each server, by period; kept until the user resets it
+  final ServerTotals totals;
+
   /// open ones and the ones closed today (the latest [Connections.keepClosed]), newest first
   final List<SeenConnection> items;
   final List<SeenConnection> sessionItems;
@@ -251,6 +256,102 @@ class ConnectionsState {
 
   /// when the list started: 03:00 today (the statistics day), or when it was last cleared
   final DateTime? since;
+}
+
+/// What went through each server and direct over one period.
+class ServerBucket {
+  const ServerBucket({this.servers = const {}, this.directBytes = 0, this.directCount = 0});
+
+  /// by server name ("🇸🇪 Швеция 3"): bytes moved, milliseconds it had a connection open, connections made
+  final Map<String, ({int bytes, int ms, int count})> servers;
+  final int directBytes;
+  final int directCount;
+}
+
+/// The servers' running totals by period: kept from one day to the next and reset only by the user, so they aren't
+/// the day's list (which starts over at 03:00 and drops the connections it can't keep).
+class ServerTotals {
+  const ServerTotals({
+    this.session = const ServerBucket(),
+    this.day = const ServerBucket(),
+    this.month = const ServerBucket(),
+    this.all = const ServerBucket(),
+    this.since,
+  });
+
+  final ServerBucket session;
+  final ServerBucket day;
+
+  /// the last 30 days
+  final ServerBucket month;
+  final ServerBucket all;
+
+  /// when the count started (the user's last reset)
+  final DateTime? since;
+}
+
+class _Tally {
+  int bytes = 0;
+  int ms = 0;
+  int count = 0;
+}
+
+class _Bucket {
+  final servers = <String, _Tally>{};
+  int directBytes = 0;
+  int directCount = 0;
+
+  void add(SeenConnection c, int delta, int fresh) {
+    if (c.route == ConnectionRoute.vpn && c.outbound.isNotEmpty) {
+      final t = servers.putIfAbsent(c.outbound, _Tally.new);
+      t.bytes += delta;
+      t.count += fresh;
+    } else if (c.route == ConnectionRoute.direct) {
+      directBytes += delta;
+      directCount += fresh;
+    }
+  }
+
+  void addTime(String server, int ms) => servers.putIfAbsent(server, _Tally.new).ms += ms;
+
+  void merge(_Bucket other) {
+    for (final e in other.servers.entries) {
+      final t = servers.putIfAbsent(e.key, _Tally.new);
+      t.bytes += e.value.bytes;
+      t.ms += e.value.ms;
+      t.count += e.value.count;
+    }
+    directBytes += other.directBytes;
+    directCount += other.directCount;
+  }
+
+  ServerBucket snapshot() => ServerBucket(
+    servers: {for (final e in servers.entries) e.key: (bytes: e.value.bytes, ms: e.value.ms, count: e.value.count)},
+    directBytes: directBytes,
+    directCount: directCount,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'directBytes': directBytes,
+    'directCount': directCount,
+    'servers': {
+      for (final e in servers.entries) e.key: {'bytes': e.value.bytes, 'ms': e.value.ms, 'count': e.value.count},
+    },
+  };
+
+  static _Bucket fromJson(Map<String, dynamic> json) {
+    final bucket = _Bucket()
+      ..directBytes = json['directBytes'] as int? ?? 0
+      ..directCount = json['directCount'] as int? ?? 0;
+    (json['servers'] as Map<String, dynamic>? ?? {}).forEach((name, value) {
+      final m = value as Map<String, dynamic>;
+      bucket.servers[name] = _Tally()
+        ..bytes = m['bytes'] as int? ?? 0
+        ..ms = m['ms'] as int? ?? 0
+        ..count = m['count'] as int? ?? 0;
+    });
+    return bucket;
+  }
 }
 
 /// How long [app] had a connection open from [from] to [now]: its stretches in [usage], cut to that time.
@@ -333,6 +434,13 @@ class Connections extends Notifier<ConnectionsState> {
   /// while A-VPN is in the background (or the screen is off): fewer wake-ups, the battery lasts longer; the
   /// traffic still adds up from the core's own totals
   static const backgroundInterval = Duration(seconds: 30);
+
+  /// while A-VPN is in the background but the traffic is flowing (the phone is in use, another app in front): the
+  /// list is asked for often enough to see the short connections (every 30 s it saw about a quarter of the day)
+  static const busyInterval = Duration(seconds: 5);
+
+  /// bytes a second above which the traffic counts as flowing
+  static const busySpeed = 30 * 1024;
   static const keepClosed = 400;
   static const saveEvery = Duration(seconds: 10);
 
@@ -364,6 +472,122 @@ class Connections extends Notifier<ConnectionsState> {
   DateTime? _since;
   DateTime _saved = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// The servers' running totals (see [ServerTotals]): all the time, each statistics day (the last 40 kept) and the
+  /// session.
+  var _all = _Bucket();
+  final _days = <int, _Bucket>{};
+  var _session = _Bucket();
+  int? _sessionId;
+  DateTime? _totalsSince;
+  bool _totalsLoaded = false;
+  int? _lastPollAt;
+
+  File? get _totalsFile {
+    final dirs = ref.read(appDirectoriesProvider).valueOrNull;
+    return dirs == null ? null : File('${dirs.baseDir.path}/server_totals.json');
+  }
+
+  int get _todayKey => statsDayStart(DateTime.now()).millisecondsSinceEpoch;
+
+  ServerTotals _totalsSnapshot() {
+    final from = DateTime.now().subtract(const Duration(days: 30)).millisecondsSinceEpoch;
+    final month = _Bucket();
+    for (final e in _days.entries) {
+      if (e.key >= from - const Duration(days: 1).inMilliseconds) month.merge(e.value);
+    }
+    return ServerTotals(
+      session: _session.snapshot(),
+      day: (_days[_todayKey] ?? _Bucket()).snapshot(),
+      month: month.snapshot(),
+      all: _all.snapshot(),
+      since: _totalsSince,
+    );
+  }
+
+  /// The saved totals; the first time, what today's list holds, so the page isn't empty at the start.
+  void _loadTotals() {
+    if (_totalsLoaded) return;
+    final file = _totalsFile;
+    if (file == null) return;
+    _totalsLoaded = true;
+    try {
+      if (file.existsSync()) {
+        final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        _totalsSince = DateTime.fromMillisecondsSinceEpoch(json['since'] as int);
+        _all = _Bucket.fromJson(json['all'] as Map<String, dynamic>);
+        (json['days'] as Map<String, dynamic>? ?? {}).forEach((key, value) {
+          _days[int.parse(key)] = _Bucket.fromJson(value as Map<String, dynamic>);
+        });
+        final session = json['session'] as Map<String, dynamic>?;
+        if (session != null && session['id'] == ref.read(sessionStartProvider)?.millisecondsSinceEpoch) {
+          _sessionId = session['id'] as int?;
+          _session = _Bucket.fromJson(session['bucket'] as Map<String, dynamic>);
+        }
+        return;
+      }
+    } catch (_) {
+      _all = _Bucket();
+      _days.clear();
+    }
+    _totalsSince = _since ?? statsDayStart(DateTime.now());
+    final today = _days.putIfAbsent(_todayKey, _Bucket.new);
+    for (final c in _seen.values) {
+      _seedFromList(c, today);
+    }
+  }
+
+  void _seedFromList(SeenConnection c, _Bucket today) {
+    _all.add(c, c.total, c.count);
+    today.add(c, c.total, c.count);
+  }
+
+  void _saveTotals() {
+    final file = _totalsFile;
+    final since = _totalsSince;
+    if (file == null || !_totalsLoaded || since == null) return;
+    final oldest = DateTime.now().subtract(const Duration(days: 40)).millisecondsSinceEpoch;
+    _days.removeWhere((key, _) => key < oldest);
+    final json = jsonEncode({
+      'since': since.millisecondsSinceEpoch,
+      'all': _all.toJson(),
+      'days': {for (final e in _days.entries) '${e.key}': e.value.toJson()},
+      'session': {'id': _sessionId, 'bucket': _session.toJson()},
+    });
+    unawaited(file.writeAsString(json).then<void>((_) {}, onError: (_) {}));
+  }
+
+  /// What a poll adds to the totals: the bytes the connection moved since the last time it was seen (all of
+  /// them when it is new).
+  void _count(SeenConnection c, SeenConnection? previous) {
+    if (!_totalsLoaded || c.route == ConnectionRoute.block) return;
+    var delta = c.total - (previous?.total ?? 0);
+    if (delta < 0) delta = c.total;
+    final fresh = previous == null ? 1 : 0;
+    _all.add(c, delta, fresh);
+    _days.putIfAbsent(_todayKey, _Bucket.new).add(c, delta, fresh);
+    _session.add(c, delta, fresh);
+  }
+
+  /// Starts the totals over from now (the user's button): every period.
+  void resetServerTotals() {
+    _all = _Bucket();
+    _days.clear();
+    _session = _Bucket();
+    _totalsSince = DateTime.now();
+    _totalsLoaded = true;
+    _saveTotals();
+    state = ConnectionsState(
+      items: state.items,
+      sessionItems: state.sessionItems,
+      available: state.available,
+      since: state.since,
+      usage: state.usage,
+      routeUsage: state.routeUsage,
+      rates: state.rates,
+      totals: _totalsSnapshot(),
+    );
+  }
+
   File? get _file {
     final dirs = ref.read(appDirectoriesProvider).valueOrNull;
     return dirs == null ? null : File('${dirs.baseDir.path}/connections_day.json');
@@ -392,6 +616,7 @@ class Connections extends Notifier<ConnectionsState> {
         since: _since,
         usage: _usage,
         routeUsage: _routeUsage,
+        totals: _totalsSnapshot(),
       );
     }
     // the core's API is on this machine: never through a proxy
@@ -407,9 +632,13 @@ class Connections extends Notifier<ConnectionsState> {
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     var disposed = false;
     Timer? timer;
+    var busy = false;
     void schedule() {
       timer?.cancel();
-      timer = Timer(foreground ? interval * (saving ? 2 : 1) : backgroundInterval * (saving ? 4 : (night ? 6 : 1)), () {
+      final background = busy && !night
+          ? busyInterval * (saving ? 2 : 1)
+          : backgroundInterval * (saving ? 4 : (night ? 6 : 1));
+      timer = Timer(foreground ? interval * (saving ? 2 : 1) : background, () {
         if (disposed) return;
         if (!driven) unawaited(_poll(client, url, secret));
         schedule();
@@ -431,6 +660,14 @@ class Connections extends Notifier<ConnectionsState> {
         schedule();
       },
     );
+    // the traffic starts or stops flowing while in the background: the wait changes at once, not after the old one
+    ref.listen(statsNotifierProvider, (_, next) {
+      final stats = next.valueOrNull;
+      final flowing = stats != null && stats.downlink + stats.uplink > busySpeed;
+      if (flowing == busy) return;
+      busy = flowing;
+      if (!foreground && !disposed) schedule();
+    });
     schedule();
     ref.onDispose(() {
       disposed = true;
@@ -446,6 +683,7 @@ class Connections extends Notifier<ConnectionsState> {
       since: _since,
       usage: _usage,
       routeUsage: _routeUsage,
+      totals: _totalsSnapshot(),
     );
   }
 
@@ -599,6 +837,7 @@ class Connections extends Notifier<ConnectionsState> {
       since: _since,
       usage: _usage,
       routeUsage: _routeUsage,
+      totals: _totalsSnapshot(),
     );
     _save();
   }
@@ -619,6 +858,13 @@ class Connections extends Notifier<ConnectionsState> {
     }
     if (!identical(client, _client)) return; // disposed meanwhile
     _rollDay();
+    _loadTotals();
+    // a new session (the VPN connected again): its totals start over
+    final sessionNow = ref.read(sessionStartProvider)?.millisecondsSinceEpoch;
+    if (sessionNow != _sessionId) {
+      _sessionId = sessionNow;
+      _session = _Bucket();
+    }
     if (list == null && _seen.isEmpty) {
       state = ConnectionsState(available: false, since: _since);
       return;
@@ -631,7 +877,9 @@ class Connections extends Notifier<ConnectionsState> {
       // adult sites go through the VPN but are never listed
       if (c == null || isAdultHost(c.host) || _hidden(c.app)) continue;
       open.add(c.id);
+      final previous = _seen[c.id];
       _seen[c.id] = c;
+      _count(c, previous);
       // its speed: what it moved since the last poll, half and half with the speed before
       final before = _rates[c.id];
       _rates[c.id] = (
@@ -645,6 +893,22 @@ class Connections extends Notifier<ConnectionsState> {
                 elapsed: Duration(milliseconds: polledAt - before.at),
               ),
       );
+    }
+    // the time each server had a connection open: the wait since the last poll, once for all its connections
+    final lastPoll = _lastPollAt;
+    _lastPollAt = polledAt;
+    if (list != null && _totalsLoaded && lastPoll != null) {
+      final wait = (polledAt - lastPoll).clamp(0, 300000);
+      final onServers = {
+        for (final id in open)
+          if (_seen[id]!.route == ConnectionRoute.vpn && _seen[id]!.outbound.isNotEmpty) _seen[id]!.outbound,
+      };
+      final today = _days.putIfAbsent(_todayKey, _Bucket.new);
+      for (final name in onServers) {
+        _all.addTime(name, wait);
+        today.addTime(name, wait);
+        _session.addTime(name, wait);
+      }
     }
     if (list != null) _rates.removeWhere((id, _) => !open.contains(id));
     if (list != null) {
@@ -664,9 +928,13 @@ class Connections extends Notifier<ConnectionsState> {
       since: _since,
       usage: Map.of(_usage),
       routeUsage: _routeUsage,
+      totals: _totalsSnapshot(),
       rates: {for (final e in _rates.entries) e.key: e.value.bps},
     );
-    if (DateTime.now().difference(_saved) > saveEvery) _save();
+    if (DateTime.now().difference(_saved) > saveEvery) {
+      _save();
+      _saveTotals();
+    }
   }
 
   /// Each app with a connection open now: its stretch goes on to now, or a new one starts with the earliest of

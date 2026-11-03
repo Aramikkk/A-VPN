@@ -369,7 +369,18 @@ class SideBarStatsOverview extends ConsumerWidget {
                       Expanded(flex: 2, child: losses),
                       if (!PlatformUtils.isDesktop || MediaQuery.sizeOf(context).width < 760) ...[
                         const Gap(4),
-                        Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: muted)),
+                        // the name of the page under this one, the arrow before it
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.keyboard_arrow_down_rounded, color: muted),
+                            const Gap(4),
+                            Text(
+                              t.avpn.statsSpeed,
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(color: muted),
+                            ),
+                          ],
+                        ),
                       ],
                     ],
                   ),
