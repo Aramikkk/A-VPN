@@ -136,7 +136,25 @@ class TopologyPage extends HookConsumerWidget {
         // the first page is the topology, the one under it the servers
         title: ValueListenableBuilder<bool>(
           valueListenable: onSecondPage,
-          builder: (context, second, _) => Text(second ? t.avpn.topoServers : t.avpn.topologyTab),
+          // two lines, as the Statistics' title: what the page counts under its name
+          builder: (context, second, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(second ? t.avpn.topoServers : t.avpn.topologyTab),
+              Text(
+                !second
+                    ? t.avpn.topoNow
+                    : switch (period.value) {
+                        0 => t.avpn.statsForSession,
+                        1 => t.avpn.topoForDay,
+                        2 => t.avpn.topoForMonth,
+                        _ => t.avpn.topoForAll,
+                      },
+                style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
         // the servers' reset, only on their page
         actions: [
@@ -183,7 +201,9 @@ class TopologyPage extends HookConsumerWidget {
                 // both pages kept built: a fast flick threw the far one away and built it again on the way back (the
                 // flows' picture, its icons, the dotted strips, the rules with their flags), a jerk at every flick
                 cacheExtent: pageHeight * 4,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                // the bottom: what the Statistics leave under their blocks (the padding, the gap and the hint), so the
+                // servers' block ends on the same line
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, _hintRoom),
                 children: [
                   SizedBox(
                     height: pageHeight,
@@ -246,7 +266,7 @@ class TopologyPage extends HookConsumerWidget {
                           ),
                         ),
                         // the next page is below, as in the statistics
-                        const Gap(4),
+                        const Gap(8),
                         // the name of the page under this one, the arrow before it
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -259,13 +279,14 @@ class TopologyPage extends HookConsumerWidget {
                             ),
                           ],
                         ),
+                        // the hint doesn't sit on the panel under it (the same as on the Statistics)
+                        const Gap(22),
                       ],
                     ),
                   ),
-                  const Gap(12),
                   // the servers the VPN traffic went through, and the direct share
                   ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: pageHeight - 12),
+                    constraints: BoxConstraints(minHeight: pageHeight - _hintRoom),
                     child: _Section(
                       child: TopologyServers(
                         rows: rows,
@@ -286,6 +307,9 @@ class TopologyPage extends HookConsumerWidget {
     );
   }
 }
+
+/// What the Statistics keep under their blocks: the bottom padding (22), the gap (8) and the hint's row (24).
+const _hintRoom = 54.0;
 
 /// The first page rests whole on the screen, the second under it: a scroll that lets go between them goes to the
 /// nearer one (a quick flick goes the way it was thrown).
@@ -530,7 +554,11 @@ class TopologyServers extends ConsumerWidget {
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ),
-            Text(value(total), style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+            // the period's total in the accent colour
+            Text(
+              value(total),
+              style: theme.textTheme.titleMedium?.copyWith(color: theme.araAccent, fontWeight: FontWeight.w800),
+            ),
           ],
         ),
         const Gap(6),

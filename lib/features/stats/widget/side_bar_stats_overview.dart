@@ -350,7 +350,7 @@ class SideBarStatsOverview extends ConsumerWidget {
           final ping = block(_PingBlock(range: range));
           final losses = block(const _LossDay());
           return Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 22),
             // the ping over the period on top, the session's losses under it (side by side on a short, wide page)
             child: wide
                 ? Row(
@@ -368,7 +368,7 @@ class SideBarStatsOverview extends ConsumerWidget {
                       const Gap(8),
                       Expanded(flex: 2, child: losses),
                       if (!PlatformUtils.isDesktop || MediaQuery.sizeOf(context).width < 760) ...[
-                        const Gap(4),
+                        const Gap(8),
                         // the name of the page under this one, the arrow before it
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
