@@ -240,8 +240,10 @@ Future<void> saveFileAs(
   required Translations t,
   required InAppNotificationController notifications,
 }) async {
-  final file = File('${source.path}.redacted.log');
-  await file.writeAsString(redactLogText(await source.readAsString()));
+  // a zip (the diagnostics) is sent as it is: it is not text, and the core and the exporter clean what goes into it
+  final binary = source.path.endsWith('.zip');
+  final file = binary ? source : File('${source.path}.redacted.log');
+  if (!binary) await file.writeAsString(redactLogText(await source.readAsString()));
   if (!PlatformUtils.isDesktop) {
     await UriUtils.tryShareOrLaunchFile(Uri.parse(file.path));
     return;

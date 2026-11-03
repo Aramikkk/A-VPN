@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:grpc/grpc.dart';
 import 'package:hiddify/core/logger/logger_setup.dart';
+import 'package:hiddify/core/logger/redaction.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
@@ -33,7 +34,7 @@ class DiagnosticsExporter {
     final core = _service.core;
     final extraFiles = <String, List<int>>{};
 
-    final appLogs = utf8.encode(logRing.records.map(formatRecord).join('\n'));
+    final appLogs = utf8.encode(redactLogText(logRing.records.map(formatRecord).join('\n')));
     extraFiles['app-logs.txt'] = appLogs.length > _maxExtraFileSize
         ? appLogs.sublist(appLogs.length - _maxExtraFileSize)
         : appLogs;

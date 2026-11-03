@@ -251,13 +251,23 @@ class ConnectionQuality extends Notifier<List<int?>> {
     unawaited(file.writeAsString(json).then((_) {}, onError: (_) {}));
   }
 
+  Future<void> _head(HttpClient client, Uri url) async {
+    final request = await client.headUrl(url).timeout(timeout);
+    final response = await request.close().timeout(timeout);
+    await response.drain<void>();
+  }
+
   Future<void> _probe(HttpClient client, Uri url) async {
     int? ms;
     final watch = Stopwatch()..start();
     try {
-      final request = await client.headUrl(url).timeout(timeout);
-      final response = await request.close().timeout(timeout);
-      await response.drain<void>();
+      try {
+        await _head(client, url);
+      } on HttpException {
+        // a connection kept from before (over a sleep of the phone) was closed on the way: that is the client's, not a lost
+        // packet, so it asks once more on a fresh one, and only a second failure counts
+        await _head(client, url);
+      }
       ms = watch.elapsedMilliseconds;
     } catch (e) {
       ms = null; // lost
