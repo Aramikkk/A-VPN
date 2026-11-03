@@ -767,10 +767,68 @@ class _ContrastHome extends ConsumerWidget {
       child: LayoutBuilder(
         // a short screen: no room for the traffic block (it's on the Statistics tab)
         builder: (context, box) {
-          final minimum = box.maxWidth > box.maxHeight ? 380.0 : 440.0;
+          final minimum = ContrastShellDock.sideways(context) ? 520.0 : (box.maxWidth > box.maxHeight ? 380.0 : 440.0);
           // the compact layouts: what room is left is shared in equal gaps between the blocks, and the last block's
           // distance from the panel's tab is one of them (the tab's top edge is where the page ends)
           final evenly = compactTraffic && traffic != null;
+          // a wide low screen (a car's, the phone turned): two columns that always fit, the ping on the left, the servers
+          // and the sites' delays on the right, the connect control at the side (nothing to scroll to)
+          if (evenly && ContrastShellDock.sideways(context) && box.maxWidth >= 520) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 6), child: header),
+                  if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(8)],
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: FitBlocks(
+                            minGap: 8,
+                            steps: [
+                              if (statusSlim != null) (group: 1, rank: 1),
+                              if (toggles != null) (group: 2, rank: -1),
+                            ],
+                            children: [
+                              FitSlot(group: 0, child: const SizedBox.shrink()),
+                              FitSlot(group: 1, child: _ContrastBlock(child: opensTraffic(status))),
+                              if (statusSlim != null)
+                                FitSlot(group: 1, rank: 1, child: _ContrastBlock(child: opensTraffic(statusSlim!))),
+                              if (toggles != null) FitSlot(group: 2, child: _ContrastBlock(child: toggles!)),
+                            ],
+                          ),
+                        ),
+                        const Gap(12),
+                        Expanded(
+                          flex: 6,
+                          child: FitBlocks(
+                            minGap: 8,
+                            steps: [
+                              if (trafficSlim != null) (group: 2, rank: 1),
+                              if (trafficSlim != null) (group: 2, rank: 2),
+                              (group: 2, rank: -1),
+                            ],
+                            children: [
+                              FitSlot(group: 0, child: const SizedBox.shrink()),
+                              if (!superLight) FitSlot(group: 1, child: _ContrastBlock(child: servers)),
+                              FitSlot(group: 2, child: _ContrastBlock(child: traffic!)),
+                              if (trafficSlim != null)
+                                FitSlot(group: 2, rank: 1, child: _ContrastBlock(child: trafficSlim!)),
+                              if (trafficSlim != null) FitSlot(group: 2, rank: 2, child: const _SiteStrip()),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
           if (evenly) {
             // the blocks always fit: when they don't all, the connections go, then the sites get down to one row, then the
             // top block loses its second row, and last the sites go too; the room left is shared in equal gaps

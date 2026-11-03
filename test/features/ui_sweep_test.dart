@@ -188,6 +188,25 @@ final _screens = <_Screen>[
     page: () => const Scaffold(body: AraHomeBody()),
     taps: [() => find.textContaining('Нидерланды'), () => find.textContaining('Финляндия')],
   ),
+  // a wide low screen (a car's head unit): the page with the connect column at its side, as the app's shell has them
+  (
+    name: 'car',
+    // (the test's window is not the view's size: the media query says the screen's height, as on a device)
+    page: () => LayoutBuilder(
+      builder: (context, box) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(size: box.biggest),
+        child: const Scaffold(
+          body: Row(
+            children: [
+              Expanded(child: AraHomeBody()),
+              ContrastShellDock(side: true),
+            ],
+          ),
+        ),
+      ),
+    ),
+    taps: [],
+  ),
   (
     name: 'speed',
     page: SpeedPage.new,
@@ -241,17 +260,27 @@ void main() {
           final text = details.exceptionAsString().split('\n').first;
           if (problems.isEmpty && Platform.environment['STACK'] == '1') previous?.call(details);
           // the test's own limits, not the app's: no router for the settings' sections, no Windows autostart
-          if (text.contains('unknown route name') || text.contains('Unsupported operation: enable')) return;
+          if (text.contains('unknown route name') ||
+              text.contains('Unsupported operation: enable') ||
+              text.contains('MissingPluginException'))
+            return;
           problems.add('$where: $text');
         };
         try {
           final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
-          for (final (size, sizeName) in [
-            (const Size(390, 844), 'phone'),
-            (const Size(320, 640), 'small'),
-            (const Size(880, 900), 'unfolded'),
-            (const Size(760, 1000), 'pc'),
-          ]) {
+          for (final (size, sizeName)
+              in screen.name == 'car'
+                  ? [
+                      (const Size(960, 330), 'car'),
+                      (const Size(1280, 480), 'carwide'),
+                      (const Size(800, 360), 'carsmall'),
+                    ]
+                  : [
+                      (const Size(390, 844), 'phone'),
+                      (const Size(320, 640), 'small'),
+                      (const Size(880, 900), 'unfolded'),
+                      (const Size(760, 1000), 'pc'),
+                    ]) {
             for (final dark in [true, false]) {
               // ACCENTS=oledYellow,oledRed picks the themes (and names the pictures after them)
               final picked = Platform.environment['ACCENTS']?.split(',').map(AraAccent.values.byName).toList();

@@ -32,11 +32,13 @@ class ContrastShellDock extends HookConsumerWidget {
       large: !side && MediaQuery.sizeOf(context).height >= 900,
     );
     if (side) {
+      // a third of the width, 340 at most: a narrow screen leaves the page room for its two columns
+      final panel = (MediaQuery.sizeOf(context).width * .33).clamp(260.0, 340.0);
       // a column at the right: the tab at its top, the connect control in the middle
       return Theme(
         data: contrastPanelTheme(theme),
         child: Container(
-          width: 340,
+          width: panel,
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
           decoration: BoxDecoration(
             color: contrastPanelColor(dark),
@@ -48,12 +50,27 @@ class ContrastShellDock extends HookConsumerWidget {
           ),
           child: Column(
             children: [
-              Expanded(child: Center(child: dock)),
-              // the home screen's toggles, here where there's room
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-                child: _CheckRow(onCheck: () => pingAllServers(ref), testing: testing, showCheck: false),
+              // the control and its toggles scale down to the height there is (a low screen cut them off)
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: SizedBox(
+                    width: panel - 18,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        dock,
+                        const Gap(12),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+                          child: _CheckRow(onCheck: () => pingAllServers(ref), testing: testing, showCheck: false),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
+              const Gap(10),
             ],
           ),
         ),
