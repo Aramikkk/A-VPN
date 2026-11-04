@@ -270,6 +270,9 @@ class ConnectionQuality extends Notifier<List<int?>> {
       }
       ms = watch.elapsedMilliseconds;
     } catch (e) {
+      // the client was closed under the probe (this notifier was rebuilt: the app came back, the core's link restarted):
+      // not a lost packet, and nothing is recorded below either, so the log doesn't call it a loss
+      if (!identical(client, _client)) return;
       ms = null; // lost
       // what a lost probe was, so the log says why the loss is not zero (a timeout or an error of the connection)
       _logger.warning('probe lost after ${watch.elapsedMilliseconds} ms: ${e.runtimeType}: $e');
