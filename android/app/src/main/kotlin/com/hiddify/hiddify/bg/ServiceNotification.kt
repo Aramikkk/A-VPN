@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
@@ -211,8 +212,16 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
 
             try {
                 var previous = coreClient.GetSystemInfo().executeBlocking(Empty())
+                val power = service.getSystemService(Context.POWER_SERVICE) as PowerManager
 
                 while (isActive) {
+                    // nobody sees the notification (the screen is off, or its notifications are switched off): the core
+                    // isn't asked, the ping isn't probed and nothing is posted; the screen coming on starts the stream
+                    // again at once (see onReceive), and this wait is only for the cases that broadcast missed
+                    if (unseen(power)) {
+                        delay(5_000)
+                        continue
+                    }
                     delay(1_000) // ✅ coroutine-friendly
                     val current = coreClient.GetSystemInfo().executeBlocking(Empty())
                     updateStatus(previous,current)
@@ -228,6 +237,17 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
             }
         }
     }
+    /** Nobody would see an update: the screen is off, or the app's notifications (or this channel) are off. */
+    private fun unseen(power: PowerManager): Boolean {
+        if (!power.isInteractive) return true
+        if (!Application.notification.areNotificationsEnabled()) return true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = Application.notification.getNotificationChannel(notificationChannel)
+            if (channel != null && channel.importance == NotificationManager.IMPORTANCE_NONE) return true
+        }
+        return false
+    }
+
     fun stopListenSystemInfo(){
         try {
             streamingJob?.cancel()
