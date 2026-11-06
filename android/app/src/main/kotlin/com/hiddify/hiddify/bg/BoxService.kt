@@ -146,9 +146,15 @@ class BoxService(
                 }
 
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_SCREEN_OFF -> {
+                    if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                        screenOffAt = android.os.SystemClock.elapsedRealtime()
+                        healJob?.cancel()
+                    }
                     screenWake.trySend(Unit)
                     syncNightMode()
                 }
+
+                Intent.ACTION_USER_PRESENT -> healAfterUnlock()
             }
         }
     }
@@ -542,6 +548,57 @@ class BoxService(
         runCatching { if (night) Mobile.pause() else Mobile.wake() }
     }
 
+    // the check after an unlock (see [healAfterUnlock])
+    @Volatile private var screenOffAt = 0L
+    private var lastHeal = 0L
+    private var healJob: Job? = null
+
+    /**
+     * The phone unlocked after a sleep of five minutes or more: the core is woken, and a request goes through the tunnel
+     * the way the first app's would. With no answer twice the core is reloaded (once a minute at most), so the VPN works
+     * as the first app opens, not after A-VPN is opened. Every outcome goes in the service log.
+     */
+    private fun healAfterUnlock() {
+        val asleep = android.os.SystemClock.elapsedRealtime() - screenOffAt
+        if (screenOffAt == 0L || asleep < 5 * 60_000L || status.value != Status.Started || paused || !NotificationQuality.canCheck()) return
+        healJob?.cancel()
+        healJob = GlobalScope.launch(Dispatchers.IO) {
+            val minutes = asleep / 60_000
+            runCatching { Mobile.wake() }
+            // the phone's own network may still be coming back (Wi-Fi after a sleep): waited for, ten seconds at most
+            var waited = 0L
+            while (isActive && waited < 10_000 && !networkUp()) {
+                delay(500)
+                waited += 500
+            }
+            delay(500)
+            var ms = NotificationQuality.checkOnce()
+            if (ms == null && isActive) {
+                delay(1_500)
+                ms = NotificationQuality.checkOnce()
+            }
+            if (ms != null) {
+                ServiceLog.write("unlock after $minutes min asleep: the tunnel answers in $ms ms (the network waited for $waited ms)")
+                return@launch
+            }
+            if (!isActive) return@launch
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastHeal < 60_000L) {
+                ServiceLog.write("unlock after $minutes min asleep: no answer through the tunnel, the core was reloaded a minute ago: left")
+                return@launch
+            }
+            lastHeal = now
+            ServiceLog.write("unlock after $minutes min asleep: no answer through the tunnel (the network waited for $waited ms), reloading the core")
+            serviceReload0()
+        }
+    }
+
+    private fun networkUp(): Boolean {
+        val network = DefaultNetworkMonitor.defaultNetwork ?: return false
+        val capabilities = Application.connectivity.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     private fun stopService() {
         // a paused VPN is stopped too: the service is still up and has to go
         if (status.value == Status.Stopped && !paused) return
@@ -638,6 +695,7 @@ class BoxService(
                 }
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_USER_PRESENT)
             }, ContextCompat.RECEIVER_NOT_EXPORTED)
             receiverRegistered = true
         }

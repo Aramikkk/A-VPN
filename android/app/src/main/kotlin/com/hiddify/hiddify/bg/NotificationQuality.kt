@@ -78,6 +78,34 @@ object NotificationQuality {
         socket = null
     }
 
+    /** Whether the proxy port the probes go through is on at all. */
+    fun canCheck(): Boolean = prefs.getBoolean("flutter.enable-mixed-port", true)
+
+    /**
+     * One HEAD through the proxy on a connection of its own (the kept one may be dead): the time to the answer's
+     * headers in ms, or null when none comes in time. For the check after the phone is unlocked.
+     */
+    fun checkOnce(): Long? {
+        val target = url()
+        return try {
+            val host = URI(target).host ?: "www.gstatic.com"
+            Socket().use { s ->
+                s.soTimeout = TIMEOUT_MS
+                s.connect(InetSocketAddress("127.0.0.1", port()), TIMEOUT_MS)
+                val started = System.nanoTime()
+                val crlf = "\r\n"
+                s.getOutputStream().apply {
+                    write(("HEAD $target HTTP/1.1${crlf}Host: $host${crlf}Connection: close${crlf}User-Agent: A-VPN$crlf$crlf").toByteArray())
+                    flush()
+                }
+                val status = readLine(s.getInputStream())
+                if (status != null && status.startsWith("HTTP/")) (System.nanoTime() - started) / 1_000_000 else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** One HEAD through the proxy; the time to the answer's headers in ms, or null when it doesn't come in time. */
     private fun measure(port: Int, target: String): Long? {
         for (attempt in 0..1) {
