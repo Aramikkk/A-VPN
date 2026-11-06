@@ -19,6 +19,43 @@ abstract class SubscriptionDecoy {
     return links.every(_isDecoyLink);
   }
 
+  /// Whether [content] can be a subscription at all: share links, a JSON or Clash/YAML config, a WireGuard file or a
+  /// base64 text. A number, an error line or an empty answer is not (the core says "got float64" to those).
+  static bool looksLikeProfile(String content) {
+    final text = content.trim();
+    if (text.isEmpty) return false;
+    if (RegExp(r'^[a-z][a-z0-9+.-]*://', caseSensitive: false).hasMatch(text)) return true;
+    if (text.startsWith('{') || text.startsWith('[')) return true;
+    final head = text.length > 4096 ? text.substring(0, 4096) : text;
+    if (RegExp(r'^\s*(proxies|outbounds|proxy-providers)\s*:', multiLine: true).hasMatch(head)) return true;
+    if (head.contains('"outbounds"') || head.contains('[Interface]')) return true;
+    // base64 of a list of links: long, and nothing but the alphabet
+    return text.length >= 40 && RegExp(r'^[A-Za-z0-9+/=_\-\s]+$').hasMatch(text);
+  }
+
+  /// The shape of [content] for the log, with no keys, addresses or names: its size, what it starts with and how many
+  /// share links it holds.
+  static String describe(String content) {
+    final text = content.trim();
+    final links = _links(content).length;
+    final scheme = RegExp(r'^([a-z][a-z0-9+.-]*)://', caseSensitive: false).firstMatch(text)?.group(1);
+    final String kind;
+    if (text.isEmpty) {
+      kind = 'empty';
+    } else if (scheme != null) {
+      kind = 'share links ($scheme://)';
+    } else if (text.startsWith('{') || text.startsWith('[')) {
+      kind = 'JSON';
+    } else if (RegExp(r'^\s*(proxies|mixed-port|port|proxy-groups)\s*:', multiLine: true).hasMatch(text)) {
+      kind = 'Clash YAML';
+    } else if (text.length <= 12) {
+      kind = 'short text "$text"';
+    } else {
+      kind = 'text starting with "${text.substring(0, 6).replaceAll(RegExp(r'\s'), ' ')}"';
+    }
+    return '${text.length} chars, $kind, $links links';
+  }
+
   static List<String> _links(String content) {
     var text = content.trim();
     if (text.isEmpty) return const [];

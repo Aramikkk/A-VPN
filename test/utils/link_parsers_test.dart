@@ -2,6 +2,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/utils/link_parsers.dart';
 
 void main() {
+  group("cleanPastedLink", () {
+    test("removes a space or a line break inside one link", () {
+      expect(cleanPastedLink("https://sub.com/a/1234 -5678-9"), equals("https://sub.com/a/1234-5678-9"));
+      expect(cleanPastedLink("  https://sub.com/a/12\n34-56  "), equals("https://sub.com/a/1234-56"));
+    });
+
+    test("leaves several links and other text as they are (trimmed)", () {
+      expect(cleanPastedLink("https://a.com/x https://b.com/y"), equals("https://a.com/x https://b.com/y"));
+      expect(cleanPastedLink(" vless://abc def "), equals("vless://abc def"));
+    });
+
+    test("LinkParser.parse takes the cleaned link", () {
+      final link = LinkParser.parse("https://sub.com/x/9421 -4d5d");
+      expect(link, isNotNull);
+      expect(link!.url, equals("https://sub.com/x/9421-4d5d"));
+    });
+  });
+
   group("LinkParser.deep - hiddify scheme", () {
     test("path form uses the fragment as the name", () {
       final link = LinkParser.deep("hiddify://import/https://sub.com/x#MyProfile");

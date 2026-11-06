@@ -35,4 +35,28 @@ void main() {
     expect(SubscriptionDecoy.isDecoy('proxies:\n  - name: a'), isFalse);
     expect(SubscriptionDecoy.isDecoy('!!!not base64!!!'), isFalse);
   });
+
+  test('looksLikeProfile: links, JSON, Clash, WireGuard and base64 are; a number or an empty answer is not', () {
+    expect(SubscriptionDecoy.looksLikeProfile(_link('h.example.com', 'a')), isTrue);
+    expect(SubscriptionDecoy.looksLikeProfile('{"outbounds": []}'), isTrue);
+    expect(SubscriptionDecoy.looksLikeProfile('[{"dns": {}}]'), isTrue);
+    expect(SubscriptionDecoy.looksLikeProfile('mixed-port: 7890\nproxies:\n  - name: a'), isTrue);
+    expect(SubscriptionDecoy.looksLikeProfile('[Interface]\nPrivateKey = x'), isTrue);
+    expect(SubscriptionDecoy.looksLikeProfile(base64.encode(utf8.encode(_link('h.example.com', 'a')))), isTrue);
+    expect(SubscriptionDecoy.looksLikeProfile(''), isFalse);
+    expect(SubscriptionDecoy.looksLikeProfile('0'), isFalse);
+    expect(SubscriptionDecoy.looksLikeProfile('404 not found'), isFalse);
+    expect(SubscriptionDecoy.looksLikeProfile('Access denied'), isFalse);
+  });
+
+  test('describe: the shape only, no keys or addresses', () {
+    final text = SubscriptionDecoy.describe(
+      '${_link('secret.example.com', 'name')}\n${_link('other.example.com', 'b')}',
+    );
+    expect(text, contains('share links (vless://)'));
+    expect(text, contains('2 links'));
+    expect(text, isNot(contains('secret')));
+    expect(SubscriptionDecoy.describe('0'), contains('short text "0"'));
+    expect(SubscriptionDecoy.describe('mixed-port: 7890\nproxies:'), contains('Clash YAML'));
+  });
 }

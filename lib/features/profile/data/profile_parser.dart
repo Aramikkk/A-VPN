@@ -170,18 +170,30 @@ class ProfileParser {
     final first = _ref.read(ConfigOptions.useXrayCoreWhenPossible)
         ? _httpClient.userAgent.replaceAll("HiddifyNext", "HiddifyNextX")
         : DeviceHeaders.subscriptionUserAgent;
-    final host = Uri.tryParse(url.trim())?.host ?? '';
+    final host = Uri.tryParse(cleanPastedLink(url))?.host ?? '';
     Map<String, dynamic>? firstAnswer;
     String? firstContent;
+    // what the provider said when it was not a subscription at all (a number, an error line), to tell the user
+    String? notAProfile;
     for (final agent in await DeviceHeaders.agentsFor(host, first)) {
       final answer = await _fetchProfile(url, tempFilePath, cancelToken, agent);
       final content = await File(tempFilePath).readAsString();
+      // the answer's shape (no keys or addresses) for the log: why an add failed can't be read from the core's message
+      appLogger('profile').info('subscription answer to "$agent": ${SubscriptionDecoy.describe(content)}');
+      if (!SubscriptionDecoy.looksLikeProfile(content)) {
+        notAProfile ??= SubscriptionDecoy.describe(content);
+        continue;
+      }
       if (!SubscriptionDecoy.isDecoy(content)) {
         if (agent != first) await DeviceHeaders.remember(host, agent);
         return answer;
       }
       firstAnswer ??= answer;
       firstContent ??= content;
+    }
+    // no client got a subscription: said as it is, not as the core's "got float64"
+    if (firstAnswer == null && notAProfile != null) {
+      throw ProfileFailure.invalidConfig('The provider answered with no subscription: $notAProfile');
     }
     // every client got decoys: the first answer as it was (the profile shows what the provider said)
     await File(tempFilePath).writeAsString(firstContent ?? '');
@@ -198,7 +210,7 @@ class ProfileParser {
   ) async {
     final rs = await _httpClient
         .download(
-          url.trim(),
+          cleanPastedLink(url),
           tempFilePath,
           cancelToken: cancelToken,
           userAgent: agent,

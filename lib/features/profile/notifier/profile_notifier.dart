@@ -84,7 +84,7 @@ class AddProfileNotifier extends _$AddProfileNotifier with AppLogger {
       return await task
           .match(
             (err) {
-              loggy.warning("failed to add profile", err);
+              loggy.warning("failed to add profile: $err", err);
               throw err;
             },
             (_) {
@@ -104,7 +104,7 @@ class AddProfileNotifier extends _$AddProfileNotifier with AppLogger {
       return await task
           .match(
             (err) {
-              loggy.warning("failed to add profile", err);
+              loggy.warning("failed to add profile: $err", err);
               throw err;
             },
             (r) {

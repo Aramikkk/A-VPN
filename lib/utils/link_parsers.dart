@@ -4,6 +4,16 @@ import 'package:hiddify/utils/validators.dart';
 
 typedef ProfileLink = ({String url, String name});
 
+/// A link pasted from a chat often has a space or a line break inside it (the message wrapped it), and the server
+/// answers 400 to a link like that. Text that is one http(s) link has all its whitespace removed; anything else (a
+/// config, several links) is returned as it came.
+String cleanPastedLink(String input) {
+  final text = input.trim();
+  final link = RegExp(r'https?://', caseSensitive: false);
+  if (!text.startsWith(link) || link.allMatches(text).length != 1) return input.trim();
+  return text.replaceAll(RegExp(r'\s+'), '');
+}
+
 // TODO: test and improve
 abstract class LinkParser {
   static String generateSubShareLink(String url, [String? name]) {
@@ -24,7 +34,8 @@ abstract class LinkParser {
   static const protocols = ['hiddify', 'v2ray', 'v2rayn', 'v2rayng', 'clash', 'clashmeta', 'sing-box'];
 
   static ProfileLink? parse(String link) {
-    return simple(link) ?? deep(link);
+    final cleaned = cleanPastedLink(link);
+    return simple(cleaned) ?? deep(cleaned);
   }
 
   static ProfileLink? simple(String link) {

@@ -227,7 +227,7 @@ class AddProfileManual extends HookConsumerWidget {
                         await ref
                             .read(addProfileNotifierProvider.notifier)
                             .addManual(
-                              url: urlTextController.text.trim(),
+                              url: cleanPastedLink(urlTextController.text),
                               userOverride: UserOverride(
                                 name: nameTextController.text.trim(),
                                 isAutoUpdateDisable: isAutoUpdateDisable.value,
