@@ -161,114 +161,128 @@ class SettingsPage extends HookConsumerWidget {
         ],
       ),
       // the sections as squares in one block: a sign, the name and a line of what is in it
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        children: [
-          _Frame(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: _SectionGrid(
-                items: [
-                  (
-                    Icons.view_list_rounded,
-                    t.pages.profiles.title,
-                    t.avpn.settingsCapProfiles,
-                    context.namedLocation('profiles'),
-                  ),
-                  (
-                    Icons.tune_rounded,
-                    t.avpn.profileManagement,
-                    t.avpn.settingsCapManagement,
-                    context.namedLocation('profileManagement'),
-                  ),
-                  (
-                    Icons.layers_rounded,
-                    t.pages.settings.general.title,
-                    t.avpn.settingsCapGeneral,
-                    context.namedLocation('general'),
-                  ),
-                  (
-                    Icons.power_settings_new_rounded,
-                    t.avpn.settingsConnection,
-                    t.avpn.settingsCapConnection,
-                    context.namedLocation('connectionOptions'),
-                  ),
-                  (Icons.palette_rounded, t.avpn.themes, t.avpn.settingsCapThemes, context.namedLocation('themes')),
-                  (
-                    Icons.route_rounded,
-                    t.pages.settings.routing.title,
-                    t.avpn.settingsCapRouting,
-                    context.namedLocation('routingOptions'),
-                  ),
-                  (
-                    Icons.dns_outlined,
-                    t.avpn.settingsServers,
-                    t.avpn.settingsCapServers,
-                    context.namedLocation('serversOptions'),
-                  ),
-                  (
-                    Icons.network_ping_rounded,
-                    t.avpn.pingSettings,
-                    t.avpn.settingsCapPing,
-                    context.namedLocation('pingOptions'),
-                  ),
-                  // each site and chosen app through its own server (beta); DNS is under Inbound now
-                  (
-                    Icons.alt_route_rounded,
-                    t.avpn.pingSites,
-                    t.avpn.settingsCapSites,
-                    context.namedLocation('sitesOptions'),
-                  ),
-                  (
-                    Icons.block_rounded,
-                    t.avpn.adBlock,
-                    t.avpn.settingsCapAdBlock,
-                    context.namedLocation('adBlockOptions'),
-                  ),
-                  (
-                    Icons.description_rounded,
-                    t.pages.logs.title,
-                    t.avpn.settingsCapLogs,
-                    context.namedLocation('logs'),
-                  ),
-                  // About is a section of its own again (the inbound ports and DNS went into General)
-                  (Icons.info_rounded, t.pages.about.title, t.avpn.settingsCapAbout, context.namedLocation('about')),
-                ],
+      body: LayoutBuilder(
+        builder: (context, page) => ListView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          children: [
+            _Frame(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: _SectionGrid(
+                  // what is left of the page for the tiles: the frame's padding, the update line, the bottom gap
+                  fitHeight: page.maxHeight - 12 - 20 - (PlatformUtils.isAndroid ? 64 : 0),
+                  items: [
+                    (
+                      Icons.view_list_rounded,
+                      t.pages.profiles.title,
+                      t.avpn.settingsCapProfiles,
+                      context.namedLocation('profiles'),
+                    ),
+                    (
+                      Icons.tune_rounded,
+                      t.avpn.profileManagement,
+                      t.avpn.settingsCapManagement,
+                      context.namedLocation('profileManagement'),
+                    ),
+                    (
+                      Icons.layers_rounded,
+                      t.pages.settings.general.title,
+                      t.avpn.settingsCapGeneral,
+                      context.namedLocation('general'),
+                    ),
+                    (
+                      Icons.power_settings_new_rounded,
+                      t.avpn.settingsConnection,
+                      t.avpn.settingsCapConnection,
+                      context.namedLocation('connectionOptions'),
+                    ),
+                    (
+                      Icons.palette_rounded,
+                      t.avpn.themes,
+                      t.avpn.settingsCapThemes,
+                      context.namedLocation('themes'),
+                    ),
+                    (
+                      Icons.route_rounded,
+                      t.pages.settings.routing.title,
+                      t.avpn.settingsCapRouting,
+                      context.namedLocation('routingOptions'),
+                    ),
+                    (
+                      Icons.dns_outlined,
+                      t.avpn.settingsServers,
+                      t.avpn.settingsCapServers,
+                      context.namedLocation('serversOptions'),
+                    ),
+                    (
+                      Icons.network_ping_rounded,
+                      t.avpn.pingSettings,
+                      t.avpn.settingsCapPing,
+                      context.namedLocation('pingOptions'),
+                    ),
+                    // each site and chosen app through its own server (beta); DNS is under Inbound now
+                    (
+                      Icons.alt_route_rounded,
+                      t.avpn.pingSites,
+                      t.avpn.settingsCapSites,
+                      context.namedLocation('sitesOptions'),
+                    ),
+                    (
+                      Icons.block_rounded,
+                      t.avpn.adBlock,
+                      t.avpn.settingsCapAdBlock,
+                      context.namedLocation('adBlockOptions'),
+                    ),
+                    (
+                      Icons.description_rounded,
+                      t.pages.logs.title,
+                      t.avpn.settingsCapLogs,
+                      context.namedLocation('logs'),
+                    ),
+                    // About is a section of its own again (the inbound ports and DNS went into General)
+                    (
+                      Icons.info_rounded,
+                      t.pages.about.title,
+                      t.avpn.settingsCapAbout,
+                      context.namedLocation('about'),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          // the program's own update, looked for now (Android)
-          if (PlatformUtils.isAndroid)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: _Frame(
-                child: ListTile(
-                  leading: const Icon(Icons.system_update_rounded),
-                  title: Text(t.$meta.locale.languageCode == 'ru' ? 'Проверить обновления' : 'Check for updates'),
-                  onTap: () => unawaited(
-                    updateNow(
-                      ref,
-                      ru: t.$meta.locale.languageCode == 'ru',
-                      tell: (message) => ref.read(inAppNotificationControllerProvider).showInfoToast(message),
+            // the program's own update, looked for now (Android)
+            if (PlatformUtils.isAndroid)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: _Frame(
+                  child: ListTile(
+                    leading: const Icon(Icons.system_update_rounded),
+                    title: Text(t.$meta.locale.languageCode == 'ru' ? 'Проверить обновления' : 'Check for updates'),
+                    onTap: () => unawaited(
+                      updateNow(
+                        ref,
+                        ru: t.$meta.locale.languageCode == 'ru',
+                        tell: (message) => ref.read(inAppNotificationControllerProvider).showInfoToast(message),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          if (PlatformUtils.isIOS)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Material(
-                child: ListTile(
-                  title: Text(t.pages.settings.resetTunnel),
-                  leading: const Icon(Icons.autorenew_rounded),
-                  onTap: () async {
-                    await ref.read(resetTunnelNotifierProvider.notifier).run();
-                  },
+            if (PlatformUtils.isIOS)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Material(
+                  child: ListTile(
+                    title: Text(t.pages.settings.resetTunnel),
+                    leading: const Icon(Icons.autorenew_rounded),
+                    onTap: () async {
+                      await ref.read(resetTunnelNotifierProvider.notifier).run();
+                    },
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -286,7 +300,11 @@ class SettingsPage extends HookConsumerWidget {
 /// The sections as squares, in as many columns as the screen takes (two on a phone), each as large as the room gives: the
 /// last one, when alone in its row in two columns, stretches across it.
 class _SectionGrid extends StatelessWidget {
-  const _SectionGrid({required this.items});
+  const _SectionGrid({required this.items, this.fitHeight});
+
+  /// The height the tiles should fit into on a phone (two columns): they are made lower, down to a limit, so the
+  /// whole page shows without scrolling.
+  final double? fitHeight;
 
   /// (sign, name, what is in it, where it goes)
   final List<(IconData, String, String, String)> items;
@@ -303,12 +321,53 @@ class _SectionGrid extends StatelessWidget {
         final layout = settingsGridLayout(box.maxWidth, gap: gap);
         final k = layout.scale;
         final side = (box.maxWidth - gap * (layout.columns - 1)) / layout.columns;
+        final rows = (items.length / layout.columns).ceil();
+        final fit = layout.columns == 2 && fitHeight != null ? (fitHeight! - gap * (rows - 1)) / rows : null;
+        final usual = math.max(side * .7, 128.0 * k);
+        final tileHeight = fit == null ? usual : fit.clamp(82.0, usual);
+        // lower tiles: the sign beside the name, the caption under them
+        final compact = tileHeight < 112 * k;
         Widget tile(int i, double width) {
           final (icon, title, caption, where) = items[i];
+          final sign = Container(
+            width: (compact ? 28 : 34) * k,
+            height: (compact ? 28 : 34) * k,
+            // Dots: an inked square with the sign on the paper's colour
+            decoration: homeLookNow == HomeLayout.dots
+                ? BoxDecoration(color: scheme.onSurface, borderRadius: BorderRadius.circular(4))
+                : BoxDecoration(shape: BoxShape.circle, color: accent),
+            child: Icon(
+              icon,
+              size: (compact ? 16 : 19) * k,
+              color: homeLookNow == HomeLayout.dots
+                  ? (dark ? const Color(0xFF151515) : const Color(0xFFEAE9E5))
+                  : ContrastPalette.ink,
+            ),
+          );
+          final name = Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+              fontSize: (theme.textTheme.titleSmall?.fontSize ?? 14) * k,
+            ),
+          );
+          final note = Text(
+            caption,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontSize: (theme.textTheme.labelSmall?.fontSize ?? 11) * k,
+              height: 1.1,
+            ),
+          );
           return SizedBox(
             width: width,
             // enough for the sign, two lines of the name and two of the caption on a narrow screen
-            height: math.max(side * .7, 128.0 * k),
+            height: tileHeight,
             child: Material(
               // Bento: a solid tile; Dots: the paper with an inked edge
               color: switch (homeLookNow) {
@@ -332,48 +391,26 @@ class _SectionGrid extends StatelessWidget {
               child: InkWell(
                 onTap: () => context.go(where),
                 child: Padding(
-                  padding: EdgeInsets.all(12 * k),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 34 * k,
-                        height: 34 * k,
-                        // Dots: an inked square with the sign on the paper's colour
-                        decoration: homeLookNow == HomeLayout.dots
-                            ? BoxDecoration(color: scheme.onSurface, borderRadius: BorderRadius.circular(4))
-                            : BoxDecoration(shape: BoxShape.circle, color: accent),
-                        child: Icon(
-                          icon,
-                          size: 19 * k,
-                          color: homeLookNow == HomeLayout.dots
-                              ? (dark ? const Color(0xFF151515) : const Color(0xFFEAE9E5))
-                              : ContrastPalette.ink,
+                  padding: EdgeInsets.all((compact ? 9 : 12) * k),
+                  child: compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                sign,
+                                Gap(8 * k),
+                                Expanded(child: name),
+                              ],
+                            ),
+                            const Spacer(),
+                            note,
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [sign, const Spacer(), name, Gap(2 * k), note],
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          height: 1.15,
-                          fontSize: (theme.textTheme.titleSmall?.fontSize ?? 14) * k,
-                        ),
-                      ),
-                      Gap(2 * k),
-                      Text(
-                        caption,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: (theme.textTheme.labelSmall?.fontSize ?? 11) * k,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
