@@ -1,3 +1,4 @@
+import 'package:hiddify/core/http_client/provider_quirks.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/haptic/haptic_service.dart';
@@ -106,6 +107,16 @@ class GeneralPage extends HookConsumerWidget {
                   secondary: const Icon(Icons.battery_saver_rounded),
                   value: ref.watch(Preferences.lightBackground),
                   onChanged: ref.read(Preferences.lightBackground.notifier).update,
+                ),
+                SwitchListTile.adaptive(
+                  title: Text(t.avpn.providerSigma),
+                  subtitle: Text(t.avpn.providerSigmaMsg),
+                  secondary: const Icon(Icons.dns_rounded),
+                  value: ref.watch(Preferences.providerSigma),
+                  onChanged: (value) {
+                    ProviderQuirks.sigma = value;
+                    ref.read(Preferences.providerSigma.notifier).update(value);
+                  },
                 ),
                 // Inbound (the ports, DNS) is here; About and the logs are on the settings' main page
                 ListTile(

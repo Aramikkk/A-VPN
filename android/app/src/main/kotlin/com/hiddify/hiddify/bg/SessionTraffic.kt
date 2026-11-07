@@ -1,6 +1,7 @@
 package com.hiddify.hiddify.bg
 
 import com.hiddify.core.api.v2.hcore.SystemInfo
+import com.hiddify.hiddify.Application
 
 /**
  * The VPN session's traffic for the notification: how much went through the VPN and how much direct.
@@ -86,13 +87,22 @@ object SessionTraffic {
         return "${text.replace('.', ',')} ${units[unit]}"
     }
 
+    /** Sigma Gate's "Доступ" shown as Sigma: only when the provider option is on in the app's settings. */
+    private fun sigma(text: String): String {
+        val on = try {
+            Application.application.applicationContext.getSharedPreferences("FlutterSharedPreferences", android.content.Context.MODE_PRIVATE)
+                .getBoolean("flutter.provider_sigma", false)
+        } catch (_: Exception) { false }
+        return if (on) text.replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma") else text
+    }
+
     /** "Авто: 🇸🇪 Швеция 2" from the core's "lowest→🇸🇪 Доступ - Швеция 2"; a chosen server keeps its name. */
     fun serverLine(currentOutbound: String): String {
         val parts = currentOutbound.split("→")
         val auto = parts.size > 1 && parts[0].trim() in setOf("lowest", "balance")
         // without the core's "§ 15" numbering
         var name = parts.last().replace("§hide§", "").replace(Regex("""\s*§\s*\d+\s*$"""), "")
-            .replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma").trim()
+            .let(::sigma).trim()
         if (auto) {
             // the flag and the country, without the provider's prefix
             val flag = Regex("^\\S+\\s").find(name)?.value?.takeIf { it.codePoints().anyMatch { c -> c in 0x1F1E6..0x1F1FF } } ?: ""
@@ -105,5 +115,5 @@ object SessionTraffic {
     }
 
     fun profileName(name: String) =
-        name.replace(Regex("Доступ", RegexOption.IGNORE_CASE), "Sigma").ifBlank { "A-VPN" }
+        sigma(name).ifBlank { "A-VPN" }
 }

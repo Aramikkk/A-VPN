@@ -3,6 +3,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/core/utils/json_converters.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
@@ -149,10 +150,10 @@ abstract class ConfigOptions {
   static final strictRoute = PreferencesNotifier.create<bool, bool>("strict-route", true);
 
   /// Keep only European servers in the server list and the auto groups.
-  static final europeOnlyServers = PreferencesNotifier.create<bool, bool>("europe-only-servers", true);
+  static final europeOnlyServers = PreferencesNotifier.create<bool, bool>("europe-only-servers", false);
 
   /// World and CIS: every country but Russia and Belarus; turning it on turns Europe only off, and back
-  static final cisOnlyServers = PreferencesNotifier.create<bool, bool>("cis-only-servers", false);
+  static final cisOnlyServers = PreferencesNotifier.create<bool, bool>("cis-only-servers", true);
 
   /// Only sites and services blocked in Russia go through the VPN, everything else direct (downloads, games,
   /// updates at full speed). A phone applies it on Wi-Fi only: on mobile data operators may let only
@@ -176,7 +177,7 @@ abstract class ConfigOptions {
 
   /// Instagram, WhatsApp, Telegram, ChatGPT and YouTube each through the server answering that service soonest
   /// (the core's site groups), the rest through Auto as before. Beta: on from the start, the user can turn it off.
-  static final siteGroups = PreferencesNotifier.create<bool, bool>("site-groups", true);
+  static final siteGroups = PreferencesNotifier.create<bool, bool>("site-groups", false);
 
   /// The same on mobile data (the phone): on or off of its own.
   static final siteGroupsMobile = PreferencesNotifier.create<bool, bool>("site-groups-mobile", true);
@@ -228,8 +229,8 @@ abstract class ConfigOptions {
 
   /// How much sooner (ms, 10 to 3000) another server must answer a site before the site moves to it; on Wi-Fi
   /// (and on a computer), and on mobile data.
-  static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 200);
-  static final siteGroupsToleranceMobile = PreferencesNotifier.create<int, int>("site-groups-tolerance-mobile", 50);
+  static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 100);
+  static final siteGroupsToleranceMobile = PreferencesNotifier.create<int, int>("site-groups-tolerance-mobile", 10);
 
   /// The thresholds offered: by 10 ms to 300, by 50 to a second, by 100 to three.
   static final siteGroupsTolerances = [
@@ -269,23 +270,29 @@ abstract class ConfigOptions {
   /// How long one server's ping may take before it counts as unreachable.
   static final urlTestTimeout = PreferencesNotifier.create<Duration, int>(
     "url-test-timeout",
-    const Duration(seconds: 5),
+    const Duration(seconds: 2),
     mapFrom: const IntervalInSecondsConverter().fromJson,
     mapTo: const IntervalInSecondsConverter().toJson,
   );
 
   static final urlTestTimeoutWifi = PreferencesNotifier.create<Duration, int>(
     "url-test-timeout-wifi",
-    const Duration(seconds: 5),
-    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, maxPingTimeout)),
+    const Duration(seconds: 10),
+    // an older general timeout is inherited; without one, the default for this network
+    defaultValueFunction: (ref) => ref.read(sharedPreferencesProvider).requireValue.containsKey("url-test-timeout")
+        ? Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, maxPingTimeout))
+        : const Duration(seconds: 10),
     mapFrom: const IntervalInSecondsConverter().fromJson,
     mapTo: const IntervalInSecondsConverter().toJson,
     validator: (value) => value.inSeconds >= 1 && value.inSeconds <= maxPingTimeout,
   );
   static final urlTestTimeoutMobile = PreferencesNotifier.create<Duration, int>(
     "url-test-timeout-mobile",
-    const Duration(seconds: 5),
-    defaultValueFunction: (ref) => Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, maxPingTimeout)),
+    const Duration(seconds: 60),
+    // an older general timeout is inherited; without one, the default for this network
+    defaultValueFunction: (ref) => ref.read(sharedPreferencesProvider).requireValue.containsKey("url-test-timeout")
+        ? Duration(seconds: ref.read(urlTestTimeout).inSeconds.clamp(1, maxPingTimeout))
+        : const Duration(seconds: 60),
     mapFrom: const IntervalInSecondsConverter().fromJson,
     mapTo: const IntervalInSecondsConverter().toJson,
     validator: (value) => value.inSeconds >= 1 && value.inSeconds <= maxPingTimeout,

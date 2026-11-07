@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/db/db.dart';
 import 'package:hiddify/core/http_client/device_headers.dart';
+import 'package:hiddify/core/http_client/provider_quirks.dart';
 import 'package:hiddify/core/http_client/dio_http_client.dart';
 import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/features/profile/data/clash_to_links.dart';
@@ -169,7 +170,7 @@ class ProfileParser {
     // Happ"), the other well-known ones, and the one that works is kept for this provider
     final first = _ref.read(ConfigOptions.useXrayCoreWhenPossible)
         ? _httpClient.userAgent.replaceAll("HiddifyNext", "HiddifyNextX")
-        : DeviceHeaders.subscriptionUserAgent;
+        : (ProviderQuirks.sigma ? DeviceHeaders.subscriptionUserAgent : _httpClient.userAgent);
     final host = Uri.tryParse(cleanPastedLink(url))?.host ?? '';
     Map<String, dynamic>? firstAnswer;
     String? firstContent;

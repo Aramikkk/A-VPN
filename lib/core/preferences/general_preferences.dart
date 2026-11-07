@@ -140,6 +140,9 @@ abstract class Preferences {
     mapTo: (value) => value.join(';'),
   );
 
+  /// Special handling of the Sigma Gate provider (its servers named Sigma, its panel asked as Clash Meta). Off: a plain client.
+  static final providerSigma = PreferencesNotifier.create<bool, bool>("provider_sigma", false);
+
   /// The order the user dragged the subscriptions into on the Profiles page: their ids, first to last. Empty: the
   /// order of the chosen sort (choosing a sort clears this). Kept as one ";"-separated string.
   static final profilesOrder = PreferencesNotifier.create<List<String>, String>(
@@ -264,7 +267,7 @@ abstract class Preferences {
   /// A-VPN: Contrast's colour (a warm accent and a cool second colour).
   static final contrastPalette = PreferencesNotifier.create<ContrastPalette, String>(
     "contrast_palette",
-    ContrastPalette.oled,
+    ContrastPalette.citrus,
     mapFrom: (value) =>
         ContrastPalette.values.firstWhere((e) => e.name == value, orElse: () => ContrastPalette.fallback),
     mapTo: (value) => value.name,
@@ -303,7 +306,7 @@ abstract class Preferences {
   /// A-VPN: how the Dots ping block draws the answers (the menu of the big ping).
   static final pingGraph = PreferencesNotifier.create<PingGraph, String>(
     "ping_graph",
-    PingGraph.fallback,
+    PingGraph.equalizer,
     mapFrom: PingGraph.fromName,
     mapTo: (value) => value.name,
   );
@@ -411,7 +414,7 @@ abstract class Preferences {
 
   /// How many records the in-memory log ring keeps. Saved, so a size picked
   /// once while chasing a bug is still there on the next run.
-  static final logBufferSize = PreferencesNotifier.create<int, int>("log-buffer-size", 2500);
+  static final logBufferSize = PreferencesNotifier.create<int, int>("log-buffer-size", 5000);
 
   static final profilesSort = PreferencesNotifier.create<({ProfilesSort by, SortMode mode}), String>(
     "profiles_sort",

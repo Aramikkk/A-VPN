@@ -1,8 +1,13 @@
+import 'package:hiddify/core/http_client/provider_quirks.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 
 void main() {
+  // the badge tests are about the Sigma provider, whose special handling is an option
+  setUpAll(() => ProviderQuirks.sigma = true);
+  tearDownAll(() => ProviderQuirks.sigma = false);
+
   test('the subscription a server is from, by the shift of its number', () {
     expect(profileOfTag('🇸🇪 Доступ - Швеция 2 § 29'), 0);
     expect(profileOfTag('🇩🇪 Германия § 1001'), 1);

@@ -182,6 +182,8 @@
     "lightLook": "Light look",
     "lightLookMsg": "No see-through blocks or blur, no gliding animations or sliding pages, a flat background, less memory for pictures. The theme's colours stay. For a weak phone or to save battery",
     "lightBackground": "Light background work",
+    "providerSigma": "Sigma Gate provider",
+    "providerSigmaMsg": "Show the «Доступ» servers as Sigma and ask the subscription as the Clash Meta client (how this provider gives its mobile-network servers). Not needed for other providers",
     "lightBackgroundMsg": "Polls connections, ping and the screen less often while the app is out of sight: a little less CPU and memory. The look doesn't change; the sites' server choice and auto-pause react a bit slower",
     "nightMode": "Night mode",
     "nightModeMsg": "While the screen is locked the checks sleep: the core doesn't ping the servers, the service and the app wake less often. Everything returns with the screen. It saves noticeable battery overnight; open connections and calls aren't touched",

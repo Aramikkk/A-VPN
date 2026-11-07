@@ -19,6 +19,7 @@ import 'package:hiddify/core/logger/sinks/file_sink.dart';
 import 'package:hiddify/core/model/environment.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_migration.dart';
+import 'package:hiddify/core/http_client/provider_quirks.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/utils/smooth_wheel.dart';
 import 'package:hiddify/features/app/widget/app.dart';
@@ -77,6 +78,7 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   final appInfo = await _init("app info", () => container.read(appInfoProvider.future));
   await _init("preferences", () => container.read(sharedPreferencesProvider.future));
+  await ProviderQuirks.load();
   // The ring starts at a safe default and only now learns the size the user
   // picked, since nothing could be read from disk before this point.
   logRing.capacity = container.read(Preferences.logBufferSize);

@@ -7,6 +7,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/http_client/provider_quirks.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -1311,8 +1312,9 @@ String _marked(String text, String name) =>
 const whitelistMark = 'БС';
 
 /// The provider calls its regular servers and its profile "Доступ"; A-VPN shows them as Sigma (Sigma Gate).
-String sigmaName(String name) =>
-    name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+String sigmaName(String name) => !ProviderQuirks.sigma
+    ? name
+    : name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
 
 /// A server's flag emoji (if its name has one), its name without the flag and the core's " § N" suffix, and which
 /// subscription it is from (0: the active profile; see profileOfTag).

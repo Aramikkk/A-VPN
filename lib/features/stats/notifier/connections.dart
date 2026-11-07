@@ -1,3 +1,4 @@
+import 'package:hiddify/core/http_client/provider_quirks.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'dart:async';
@@ -204,7 +205,7 @@ class SeenConnection {
     final name = tag
         .replaceAll('§hide§', '')
         .replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '')
-        .replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma')
+        .replaceAll(RegExp('Доступ', caseSensitive: false), ProviderQuirks.sigma ? 'Sigma' : 'Доступ')
         .trim();
     final dash = name.indexOf(' - ');
     if (dash < 0) {

@@ -52,7 +52,7 @@ class AraUpdateTile extends HookConsumerWidget {
             : (ru ? 'Не удалось проверить обновления' : 'Could not check for updates'),
       UpdatePhase.idle => state.upToDate ? (ru ? 'Установлена последняя версия' : 'You have the latest version') : null,
     };
-    final shown = all.value ? changelog : changelog.take(3).toList();
+    final shown = all.value ? changelog : changelog.take(2).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -120,7 +120,7 @@ class AraUpdateTile extends HookConsumerWidget {
                 ],
               ),
             ),
-          if (changelog.length > 3)
+          if (changelog.length > 2)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
               child: GestureDetector(
