@@ -8,6 +8,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/widget/adaptive_icon.dart';
+import 'package:hiddify/features/about/widget/donate_tile.dart';
 import 'package:hiddify/features/app_update/widget/ara_update_tile.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -83,6 +84,7 @@ class AboutPage extends HookConsumerWidget {
             delegate: SliverChildListDelegate([
               ...conditionalTiles,
               if (conditionalTiles.isNotEmpty) const Divider(),
+              const DonateTile(),
               ListTile(
                 title: Text(t.avpn.aboutBasedOn),
                 trailing: const Icon(FluentIcons.open_24_regular),
