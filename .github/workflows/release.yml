@@ -1,20 +1,162 @@
-name: Release
-on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+.*'
+name: A-VPN release
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# Builds the A-VPN release on GitHub's own runners, so that what is published is what the sources say:
+#   1. the core: hiddify-core 5.4.0 + hiddify-sing-box, with the patches of avpn/core54-patches applied;
+#   2. the Android app (arm64 only), signed with the release key kept in the repository's Secrets;
+#   3. a GitHub release with the APK and latest.json (version, build, size, SHA-256) the app's own update reads.
+#
+# Run it by hand (Actions -> A-VPN release -> Run workflow) after the version in pubspec.yaml and the entry in
+# avpn/CHANGELOG.md are in the branch. Secrets needed:
+#   ANDROID_KEYSTORE_BASE64  the release keystore (.jks), base64
+#   ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: "Mark the release as a pre-release (the app's update does not offer those)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  # the upstream commits the patches in avpn/core54-patches are made against
+  CORE_REPO: https://github.com/hiddify/hiddify-core
+  CORE_COMMIT: b097daad
+  SINGBOX_COMMIT: 004371d6b
+  FLUTTER_VERSION: 3.38.5
 
 jobs:
-  build-release:
-    uses: ./.github/workflows/build.yml
-    secrets: inherit
-    permissions: write-all
-    with:
-      upload-artifact: true
-      tag-name: "${{ github.ref_name }}"
-      channel: "${{ github.ref_type == 'tag' && endsWith(github.ref_name, 'dev') && 'dev' || github.ref_type != 'tag' && 'dev' || 'prod' }}"
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        run: |
+          version=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *([0-9.]+)\+.*/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "A-VPN $version"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Android NDK
+        run: sdkmanager --install "ndk;28.2.13676358"
+
+      # ---- the core -------------------------------------------------------------------------------------------
+      - name: Core sources
+        run: |
+          git clone "$CORE_REPO" core
+          cd core
+          git checkout "$CORE_COMMIT"
+          git submodule update --init hiddify-sing-box
+          (cd hiddify-sing-box && git checkout "$SINGBOX_COMMIT")
+          git config user.name "A-VPN build"
+          git config user.email "build@users.noreply.github.com"
+
+      - name: A-VPN patches
+        run: |
+          cd core
+          git am --3way ../avpn/core54-patches/core/*.patch
+          cd hiddify-sing-box
+          git config user.name "A-VPN build"
+          git config user.email "build@users.noreply.github.com"
+          git am --3way ../../avpn/core54-patches/sing-box/*.patch
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - name: Core (Android AAR)
+        working-directory: core
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          GOFLAGS: -mod=mod
+          CGO_LDFLAGS: -O2 -g -s -w -Wl,-z,max-page-size=16384
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          gomobile init
+          mkdir -p bin
+          TAGS=with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_grpc,with_awg,tfogo_checklinkname0,with_conntrack
+          gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core \
+            -tags="$TAGS" -trimpath -ldflags="-w -s -checklinkname=0 -buildid=" \
+            -target=android/arm64 \
+            -o bin/hiddify-core.aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+          ls -la bin/hiddify-core.aar
+
+      - name: Put the core in the app
+        run: |
+          mkdir -p android/app/libs
+          cp core/bin/hiddify-core.aar android/app/libs/hiddify-core.aar
+
+      # ---- the app --------------------------------------------------------------------------------------------
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Generated code
+        run: |
+          flutter pub get
+          dart run slang
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: Tests
+        run: flutter test
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then echo "ANDROID_KEYSTORE_BASE64 is not set in the repository's Secrets" >&2; exit 1; fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/release.jks
+          {
+            echo "storeFile=$GITHUB_WORKSPACE/android/release.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      - name: APK (arm64)
+        run: flutter build apk --release --target lib/main_prod.dart --split-per-abi --target-platform android-arm64 --no-pub
+
+      - name: Release files
+        id: files
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          mkdir -p out
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "out/A-VPN-$version-arm64.apk"
+          python3 avpn/scripts/make_latest.py . out
+          # the signing certificate, to compare with what the phone's installer shows
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --print-certs "out/A-VPN-$version-arm64.apk" | tee out/signing-certificate.txt
+          (cd out && sha256sum "A-VPN-$version-arm64.apk" > "A-VPN-$version-arm64.apk.sha256")
+          cat out/latest.json
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          notes=$(python3 - <<'PY'
+          import json
+          print("\n".join("- " + line for line in json.load(open("out/latest.json", encoding="utf-8"))["notes"].splitlines()))
+          PY
+          )
+          flags=""
+          if [ "${{ inputs.prerelease }}" = "true" ]; then flags="--prerelease"; fi
+          gh release create "v$version" out/* --title "A-VPN $version" --notes "$notes" $flags
