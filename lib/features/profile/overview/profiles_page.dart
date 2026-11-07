@@ -48,11 +48,23 @@ class ProfilesPage extends HookConsumerWidget {
         icon: const Icon(Icons.add_rounded),
       ),
       body: asyncProfiles.when(
-        data: (data) => ListView.separated(
+        // a card held a moment can be dragged to another place: the order is kept (choosing a sort in the dialog
+        // above puts the cards back in that sort's order)
+        data: (data) => ReorderableListView.builder(
           padding: const EdgeInsets.all(12).copyWith(bottom: 84),
-          separatorBuilder: (context, index) => const Gap(12),
-          itemBuilder: (context, index) => ProfileTile(key: ValueKey(data[index].id), profile: data[index]),
+          buildDefaultDragHandles: false,
           itemCount: data.length,
+          onReorder: (from, to) => ref.read(profilesNotifierProvider.notifier).reorder(data, from, to),
+          proxyDecorator: (child, index, animation) =>
+              Material(color: Colors.transparent, elevation: 6, borderRadius: BorderRadius.circular(14), child: child),
+          itemBuilder: (context, index) => ReorderableDelayedDragStartListener(
+            key: ValueKey(data[index].id),
+            index: index,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: index == data.length - 1 ? 0 : 12),
+              child: ProfileTile(profile: data[index]),
+            ),
+          ),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Text(t.presentShortError(error)),

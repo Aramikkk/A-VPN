@@ -140,6 +140,15 @@ abstract class Preferences {
     mapTo: (value) => value.join(';'),
   );
 
+  /// The order the user dragged the subscriptions into on the Profiles page: their ids, first to last. Empty: the
+  /// order of the chosen sort (choosing a sort clears this). Kept as one ";"-separated string.
+  static final profilesOrder = PreferencesNotifier.create<List<String>, String>(
+    "profiles_order",
+    const [],
+    mapFrom: (value) => value.split(';').where((e) => e.isNotEmpty).toList(),
+    mapTo: (value) => value.join(';'),
+  );
+
   /// The priority subscription: the id of the profile whose servers the automatic choice keeps to unless the others
   /// are clearly faster (see the margins in ConfigOptions). Empty: none.
   static final priorityProfile = PreferencesNotifier.create<String, String>("priority_profile", "");

@@ -19,12 +19,28 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'profiles_notifier.g.dart';
 
+/// [profiles] in the order the user dragged them into: the ones in [order] first, as listed there, then the others (added
+/// since) as they came. An empty [order] leaves them as the chosen sort has them.
+List<ProfileEntity> applyProfilesOrder(List<ProfileEntity> profiles, List<String> order) =>
+    orderByIds(profiles, (p) => p.id, order);
+
+/// [items] in the order of the ids in [order] (the ones not named in it last, as they came).
+List<T> orderByIds<T>(List<T> items, String Function(T item) idOf, List<String> order) {
+  if (order.isEmpty) return items;
+  final rank = {for (final (i, id) in order.indexed) id: i};
+  final known = items.where((item) => rank.containsKey(idOf(item))).toList()
+    ..sort((a, b) => rank[idOf(a)]!.compareTo(rank[idOf(b)]!));
+  return [...known, ...items.where((item) => !rank.containsKey(idOf(item)))];
+}
+
 @riverpod
 class ProfilesSortNotifier extends _$ProfilesSortNotifier with AppLogger {
   @override
   ({ProfilesSort by, SortMode mode}) build() => ref.watch(Preferences.profilesSort);
 
   void changeSort(ProfilesSort sortBy) {
+    // a sort chosen: the dragged order gives way to it
+    unawaited(ref.read(Preferences.profilesOrder.notifier).update(const []));
     ref.read(Preferences.profilesSort.notifier).update((
       by: sortBy,
       mode: switch (sortBy) {
@@ -35,6 +51,7 @@ class ProfilesSortNotifier extends _$ProfilesSortNotifier with AppLogger {
   }
 
   void toggleMode() {
+    unawaited(ref.read(Preferences.profilesOrder.notifier).update(const []));
     final current = ref.read(Preferences.profilesSort);
     ref.read(Preferences.profilesSort.notifier).update((
       by: current.by,
@@ -48,7 +65,28 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
   @override
   Stream<List<ProfileEntity>> build() {
     final sort = ref.watch(profilesSortNotifierProvider);
-    return _profilesRepo.watchAll(sort: sort.by, sortMode: sort.mode).map((event) => event.getOrElse((l) => throw l));
+    final order = ref.watch(Preferences.profilesOrder);
+    return _profilesRepo
+        .watchAll(sort: sort.by, sortMode: sort.mode)
+        .map((event) => event.getOrElse((l) => throw l))
+        .map((profiles) => applyProfilesOrder(profiles, order));
+  }
+
+  /// The profiles' ids in the order they are shown after the one at [from] is dropped at [to] (a list's own indexes,
+  /// as `ReorderableListView` gives them: [to] counts the item itself still in its old place).
+  static List<String> movedOrder(List<String> shownIds, int from, int to) {
+    final ids = [...shownIds];
+    final item = ids.removeAt(from);
+    ids.insert(to > from ? to - 1 : to, item);
+    return ids;
+  }
+
+  /// Keeps the order the user dragged the profiles into.
+  Future<void> reorder(List<ProfileEntity> shown, int from, int to) async {
+    if (from == to || from + 1 == to) return;
+    loggy.debug('moving profile from $from to $to');
+    await ref.read(hapticServiceProvider.notifier).lightImpact();
+    await ref.read(Preferences.profilesOrder.notifier).update(movedOrder([for (final p in shown) p.id], from, to));
   }
 
   ProfileRepository get _profilesRepo => ref.read(profileRepositoryProvider).requireValue;

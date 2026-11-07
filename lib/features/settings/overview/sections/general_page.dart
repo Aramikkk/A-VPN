@@ -107,12 +107,13 @@ class GeneralPage extends HookConsumerWidget {
                   value: ref.watch(Preferences.lightBackground),
                   onChanged: ref.read(Preferences.lightBackground.notifier).update,
                 ),
-                // About is here (the logs are on the settings' main page)
+                // Inbound (the ports, DNS) is here; About and the logs are on the settings' main page
                 ListTile(
-                  leading: const Icon(Icons.info_rounded),
-                  title: Text(t.pages.about.title),
+                  leading: const Icon(Icons.input_rounded),
+                  title: Text(t.pages.settings.inbound.title),
+                  subtitle: Text(t.avpn.settingsCapInbound),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.goNamed('about'),
+                  onTap: () => context.goNamed('inboundOptions'),
                 ),
                 // Debug mode and log level moved to the Logs page. Both decide how
                 // much is recorded, which is only meaningful next to the logs

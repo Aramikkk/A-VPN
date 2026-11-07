@@ -140,6 +140,7 @@
     "homeLayoutClassic": "Tiles",
     "homeLayoutVessel": "Vessel",
     "homeLayoutPulse": "Pulse",
+    "settingsCapAbout": "Version, links, licences",
     "settingsCapLogs": "Log, level of detail",
     "scaleTitle": "Scale and font",
     "uiScaleLabel": "Interface scale",

@@ -15,13 +15,13 @@ part 'profiles_update_notifier.g.dart';
 
 typedef ProfileUpdateStatus = ({String name, bool success});
 
-@Riverpod(keepAlive: true)
 /// The profiles whose failure to update was last told (see above), kept over the runs.
 String? _toldFailure;
 
 /// When each profile was last asked to update, by its id (what it was, successful or not).
 final _lastTry = <String, DateTime>{};
 
+@Riverpod(keepAlive: true)
 class ForegroundProfilesUpdateNotifier extends _$ForegroundProfilesUpdateNotifier with AppLogger {
   static const prefKey = "profiles_update_check";
   static const interval = Duration(minutes: 15);

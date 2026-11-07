@@ -226,17 +226,13 @@ class SettingsPage extends HookConsumerWidget {
                     context.namedLocation('adBlockOptions'),
                   ),
                   (
-                    Icons.input_rounded,
-                    t.pages.settings.inbound.title,
-                    t.avpn.settingsCapInbound,
-                    context.namedLocation('inboundOptions'),
-                  ),
-                  (
                     Icons.description_rounded,
                     t.pages.logs.title,
                     t.avpn.settingsCapLogs,
                     context.namedLocation('logs'),
                   ),
+                  // About is a section of its own again (the inbound ports and DNS went into General)
+                  (Icons.info_rounded, t.pages.about.title, t.avpn.settingsCapAbout, context.namedLocation('about')),
                 ],
               ),
             ),
@@ -272,7 +268,6 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
             ),
-          // the logs and About are in General now
         ],
       ),
     );
