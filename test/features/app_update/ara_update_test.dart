@@ -45,4 +45,25 @@ void main() {
     expect(AraUpdate.matchesSha256(file, ''), isTrue);
     expect(AraUpdateInfo.fromJson({'version': '1', 'build': 1, 'apk': 'a'}).sha256, '');
   });
+
+  test('updates come from the GitHub release of the project, whatever the old setting said', () {
+    expect(AraUpdate.repoOf('Aramikkk/A-VPN'), 'Aramikkk/A-VPN');
+    expect(AraUpdate.repoOf('https://github.com/Someone/fork.git'), 'Someone/fork');
+    expect(AraUpdate.repoOf('https://github.com/Someone/fork/releases'), 'Someone/fork');
+    // the folder on Yandex Disk of the versions before 1.2, an empty value, and nonsense: the project's own
+    expect(AraUpdate.repoOf('https://disk.yandex.ru/d/REPLACED'), AraUpdate.defaultRepo);
+    expect(AraUpdate.repoOf(''), AraUpdate.defaultRepo);
+    expect(AraUpdate.repoOf('a b/c'), AraUpdate.defaultRepo);
+  });
+
+  test('a file of the release is a plain name on github.com', () {
+    expect(
+      AraUpdate.fileUrl('Aramikkk/A-VPN', 'latest.json'),
+      'https://github.com/Aramikkk/A-VPN/releases/latest/download/latest.json',
+    );
+    expect(AraUpdate.fileUrl('', 'A-VPN-1.2.0-arm64.apk'), contains('/Aramikkk/A-VPN/releases/latest/download/'));
+    for (final bad in ['', '../x.apk', 'a/b.apk', r'a\b.apk']) {
+      expect(() => AraUpdate.fileUrl('', bad), throwsFormatException);
+    }
+  });
 }

@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:hiddify/core/native/ara_tools.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// What the update folder says about the newest build (its latest.json).
+/// What the newest release says about its build (its latest.json).
 class AraUpdateInfo {
   const AraUpdateInfo({
     required this.version,
@@ -32,7 +32,7 @@ class AraUpdateInfo {
   /// the Android build number, which grows with every release
   final int build;
 
-  /// the APK's file name in the folder
+  /// the APK's file name among the release's files
   final String apk;
 
   /// its size in bytes (0: not said)
@@ -47,20 +47,31 @@ class AraUpdateInfo {
   bool isNewerThan(int installedBuild) => build > installedBuild;
 }
 
-/// A-VPN's own update over the network: the newest build is looked up in a public folder of Yandex Disk (a latest.json and
-/// the APK beside it), downloaded to the cache and handed to the system's installer.
+/// A-VPN's own update over the network: the newest build is looked up in the GitHub Releases of the project (a latest.json
+/// and the APK among the release's files), downloaded to the cache and handed to the system's installer. The APK is checked
+/// against the SHA-256 of latest.json, which comes from the same release.
 abstract class AraUpdate {
-  static const _resolver = 'cloud-api.yandex.net';
+  /// The project's releases: where the program updates itself from.
+  static const defaultRepo = 'Aramikkk/A-VPN';
 
-  /// The address a file of the public folder [folder] ("https://disk.yandex.ru/d/...") can be downloaded from.
-  static Future<String> _href(Dio dio, String folder, String path) async {
-    final response = await dio.get<Map<String, dynamic>>(
-      'https://$_resolver/v1/disk/public/resources/download',
-      queryParameters: {'public_key': folder, 'path': path},
-    );
-    final href = response.data?['href'] as String?;
-    if (href == null || href.isEmpty) throw const FormatException('no link to the file');
-    return href;
+  static final _repoPattern = RegExp(r'^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$');
+
+  /// The "owner/repo" an update is looked for in. [setting] may be a repo, a GitHub link to it, or (as saved by the
+  /// versions before 1.2, which updated from a folder on Yandex Disk) anything else: that gives [defaultRepo].
+  static String repoOf(String setting) {
+    var value = setting.trim();
+    final link = RegExp(r'^https://github\.com/([^/]+/[^/#?]+)').firstMatch(value);
+    if (link != null) value = link.group(1)!;
+    if (value.endsWith('.git')) value = value.substring(0, value.length - 4);
+    return _repoPattern.hasMatch(value) ? value : defaultRepo;
+  }
+
+  /// The address of a file of the newest release of [setting]'s repo. The name is a plain file name.
+  static String fileUrl(String setting, String name) {
+    if (name.isEmpty || name.contains('/') || name.contains(r'\') || name.contains('..')) {
+      throw const FormatException('not a file name');
+    }
+    return 'https://github.com/${repoOf(setting)}/releases/latest/download/${Uri.encodeComponent(name)}';
   }
 
   static Dio _dio() => Dio(
@@ -71,32 +82,35 @@ abstract class AraUpdate {
     ),
   );
 
-  /// The newest build in [folder], or null when the folder says nothing usable.
-  static Future<AraUpdateInfo?> latest(String folder) async {
-    final link = folder.trim();
-    if (link.isEmpty) return null;
+  /// The newest build of the project in [setting] (see [repoOf]), or null when the release says nothing usable.
+  static Future<AraUpdateInfo?> latest(String setting) async {
     final dio = _dio();
     try {
-      final href = await _href(dio, link, '/latest.json');
-      final body = await dio.get<String>(href, options: Options(responseType: ResponseType.plain));
+      final body = await dio.get<String>(
+        fileUrl(setting, 'latest.json'),
+        options: Options(responseType: ResponseType.plain),
+      );
       return AraUpdateInfo.fromJson(jsonDecode(body.data ?? '') as Map<String, dynamic>);
+    } on DioException catch (e) {
+      // no release yet
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
     } finally {
       dio.close();
     }
   }
 
-  /// Downloads the APK of [info] from [folder] to the cache, [onProgress] told the share done (0 to 1). The file is
+  /// Downloads the APK of [info] from the release to the cache, [onProgress] told the share done (0 to 1). The file is
   /// checked against the size latest.json gives.
-  static Future<File> download(String folder, AraUpdateInfo info, {void Function(double)? onProgress}) async {
+  static Future<File> download(String setting, AraUpdateInfo info, {void Function(double)? onProgress}) async {
     final dir = Directory('${(await getTemporaryDirectory()).path}/ara_update');
     if (dir.existsSync()) dir.deleteSync(recursive: true);
     dir.createSync(recursive: true);
     final file = File('${dir.path}/${info.apk}');
     final dio = _dio();
     try {
-      final href = await _href(dio, folder.trim(), '/${info.apk}');
       await dio.download(
-        href,
+        fileUrl(setting, info.apk),
         file.path,
         onReceiveProgress: (done, total) {
           final whole = total > 0 ? total : info.size;
