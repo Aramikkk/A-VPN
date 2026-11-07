@@ -37,6 +37,9 @@ import com.hiddify.core.libbox.Libbox
 import com.hiddify.core.mobile.Mobile
 
 
+import com.hiddify.core.api.v2.hcore.CoreClient
+import com.hiddify.core.api.v2.hcore.UrlTestRequest
+import com.hiddify.hiddify.utils.GrpcClientProvider
 import com.hiddify.core.libbox.CommandServer
 import com.hiddify.core.libbox.CommandServerHandler
 import com.hiddify.core.libbox.Notification
@@ -554,16 +557,35 @@ class BoxService(
     private var healJob: Job? = null
 
     /**
-     * The phone unlocked after a sleep of five minutes or more: the core is woken, and a request goes through the tunnel
-     * the way the first app's would. With no answer twice the core is reloaded (once a minute at most), so the VPN works
-     * as the first app opens, not after A-VPN is opened. Every outcome goes in the service log.
+     * The phone unlocked after a sleep of five minutes or more: the core is woken, every server is pinged again at once
+     * (what opening A-VPN does: the servers the services go through are picked anew, not left on the ones that died
+     * while the phone slept), and a request goes through the tunnel. With no answer twice the core is reloaded (once a
+     * minute at most), so the VPN works as the first app opens, not after A-VPN is opened. Every unlock, and what
+     * was done about it, goes in the service log.
      */
     private fun healAfterUnlock() {
+        try {
+            healAfterUnlock0()
+        } catch (e: Throwable) {
+            ServiceLog.write("unlock check failed: $e")
+        }
+    }
+
+    private fun healAfterUnlock0() {
         val asleep = android.os.SystemClock.elapsedRealtime() - screenOffAt
-        if (screenOffAt == 0L || asleep < 5 * 60_000L || status.value != Status.Started || paused || !NotificationQuality.canCheck()) return
+        val minutes = asleep / 60_000
+        val skip = when {
+            screenOffAt == 0L -> "no screen-off seen yet"
+            asleep < 5 * 60_000L -> "a short sleep"
+            status.value != Status.Started -> "the service is ${status.value}"
+            paused -> "the tunnel is paused"
+            !NotificationQuality.canCheck() -> "the proxy port is off"
+            else -> null
+        }
+        ServiceLog.write("unlock after $minutes min asleep: " + (skip?.let { "nothing to do ($it)" } ?: "checking"))
+        if (skip != null) return
         healJob?.cancel()
         healJob = GlobalScope.launch(Dispatchers.IO) {
-            val minutes = asleep / 60_000
             runCatching { Mobile.wake() }
             // the phone's own network may still be coming back (Wi-Fi after a sleep): waited for, ten seconds at most
             var waited = 0L
@@ -571,6 +593,16 @@ class BoxService(
                 delay(500)
                 waited += 500
             }
+            // every server pinged again, as when the app is opened
+            val tested = android.os.SystemClock.elapsedRealtime()
+            val pinged = try {
+                GrpcClientProvider.grpcClient.create(CoreClient::class).UrlTest().executeBlocking(UrlTestRequest(tag = "select"))
+                "done"
+            } catch (e: Throwable) {
+                "failed: ${e.message}"
+            }
+            ServiceLog.write("unlock after $minutes min asleep: servers pinged again ($pinged, ${android.os.SystemClock.elapsedRealtime() - tested} ms)")
+            if (!isActive) return@launch
             delay(500)
             var ms = NotificationQuality.checkOnce()
             if (ms == null && isActive) {
