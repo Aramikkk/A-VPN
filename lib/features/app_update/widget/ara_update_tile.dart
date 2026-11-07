@@ -24,7 +24,6 @@ class AraUpdateTile extends HookConsumerWidget {
     final state = ref.watch(araUpdateProvider);
     final changelog = ref.watch(araChangelogProvider).valueOrNull ?? const <AraRelease>[];
     final version = ref.watch(appInfoProvider).valueOrNull?.version ?? '';
-    final controller = useTextEditingController(text: folder);
     final all = useState(false);
     final theme = Theme.of(context);
     final soft = theme.colorScheme.onSurfaceVariant;
@@ -134,21 +133,6 @@ class AraUpdateTile extends HookConsumerWidget {
               ),
             ),
         ],
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              isDense: true,
-              labelText: ru ? 'Ссылка на папку с обновлениями (Яндекс Диск)' : 'Update folder link (Yandex Disk)',
-              border: const OutlineInputBorder(),
-            ),
-            onSubmitted: (value) {
-              unawaited(ref.read(Preferences.updateFolder.notifier).update(value.trim()));
-              ref.read(araUpdateProvider.notifier).dismiss();
-            },
-          ),
-        ),
         const Gap(4),
       ],
     );

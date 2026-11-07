@@ -86,6 +86,15 @@ class AboutPage extends HookConsumerWidget {
               if (conditionalTiles.isNotEmpty) const Divider(),
               const DonateTile(),
               ListTile(
+                leading: const Icon(Icons.code_rounded),
+                title: const Text('A-VPN on GitHub'),
+                subtitle: const Text('github.com/Aramikkk/A-VPN'),
+                trailing: const Icon(FluentIcons.open_24_regular),
+                onTap: () async {
+                  await UriUtils.tryLaunch(Uri.parse(Constants.araGithubUrl));
+                },
+              ),
+              ListTile(
                 title: Text(t.avpn.aboutBasedOn),
                 trailing: const Icon(FluentIcons.open_24_regular),
                 onTap: () async {

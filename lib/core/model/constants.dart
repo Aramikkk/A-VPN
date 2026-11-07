@@ -5,6 +5,8 @@ import 'package:hiddify/utils/utils.dart';
 abstract class Constants {
   static const appName = "A-VPN";
   static const githubUrl = "https://github.com/hiddify/hiddify-next";
+  /// A-VPN's own page: the sources and the releases.
+  static const araGithubUrl = "https://github.com/Aramikkk/A-VPN";
   static const licenseUrl = "https://github.com/hiddify/hiddify-next?tab=License-1-ov-file#readme";
   static const githubReleasesApiUrl = "https://api.github.com/repos/hiddify/hiddify-next/releases";
   static const githubLatestReleaseUrl = "https://github.com/hiddify/hiddify-app/releases/latest";
