@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
@@ -7,23 +8,17 @@ import 'package:hiddify/features/app_update/update_controller.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart' show dotsAccentNow;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Opens the update card over what is on screen (the daily look finds a build while the user is anywhere).
+/// Shows the update: the strip on the home screen ([UpdateBanner]) carries it in the look of the theme in use, so the
+/// places that used to open a card over what is on screen (the check in Settings, the About page) take the user there.
 Future<void> openUpdateCard() async {
   final context = rootNavKey.currentContext;
   if (context == null || !context.mounted) return;
   await showUpdateCard(context);
 }
 
-Future<void> showUpdateCard(BuildContext context) => showDialog<void>(
-  context: context,
-  barrierColor: Colors.black.withValues(alpha: .6),
-  builder: (_) => const Dialog(
-    backgroundColor: Colors.transparent,
-    elevation: 0,
-    insetPadding: EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-    child: UpdateCard(),
-  ),
-);
+Future<void> showUpdateCard(BuildContext context) async {
+  GoRouter.of(context).goNamed('home');
+}
 
 /// The program's update in the dot style: the offer with what is new, the download, and the build ready to install.
 class UpdateCard extends HookConsumerWidget {

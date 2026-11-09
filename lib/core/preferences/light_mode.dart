@@ -8,7 +8,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// The light look: no see-through blocks and no pictures behind them (a flat colour), no gliding of the arcs and
 /// the water, no sliding of the pages, a smaller cache of pictures. The colours stay.
 final lightLookProvider = Provider<bool>((ref) {
-  final on = ref.watch(sharedPreferencesProvider).hasValue &&
+  final on =
+      ref.watch(sharedPreferencesProvider).hasValue &&
       (ref.watch(Preferences.lightLook) || ref.watch(Preferences.superLight));
   lightLookNow = on;
   // the pictures the app keeps decoded: fewer in the light look

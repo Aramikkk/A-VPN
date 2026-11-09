@@ -66,4 +66,33 @@ void main() {
       expect(() => AraUpdate.fileUrl('', bad), throwsFormatException);
     }
   });
+
+  test('the newest build is read from the release, and no release yet is no update', () async {
+    // the test engine answers every request with 400: this one talks to a server of its own
+    HttpOverrides.global = null;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) {
+      if (request.uri.path == '/latest.json') {
+        request.response
+          ..headers.contentType = ContentType.json
+          ..write(
+            '{"version":"1.2.1","build":60201,"apk":"A-VPN-1.2.1-arm64.apk","size":10,"sha256":"","notes":"One\\nTwo"}',
+          );
+      } else {
+        request.response.statusCode = 404;
+      }
+      request.response.close();
+    });
+    final before = AraUpdate.testBase;
+    addTearDown(() => AraUpdate.testBase = before);
+    AraUpdate.testBase = 'http://127.0.0.1:${server.port}';
+    final info = await AraUpdate.latest('');
+    expect(info?.version, '1.2.1');
+    expect(info?.build, 60201);
+    expect(info?.isNewerThan(60200), isTrue);
+    // a release without latest.json: nothing to offer
+    AraUpdate.testBase = 'http://127.0.0.1:${server.port}/nothing-here';
+    expect(await AraUpdate.latest(''), isNull);
+  });
 }

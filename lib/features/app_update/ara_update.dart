@@ -54,6 +54,12 @@ abstract class AraUpdate {
   /// The project's releases: where the program updates itself from.
   static const defaultRepo = 'Aramikkk/A-VPN';
 
+  /// For tests only: the release's files are taken from this address (a local server) instead of GitHub. Empty in the app
+  /// (set at build time with --dart-define=ARA_UPDATE_BASE=http://127.0.0.1:8099, or by a test).
+  static String? testBase = const String.fromEnvironment('ARA_UPDATE_BASE').isEmpty
+      ? null
+      : const String.fromEnvironment('ARA_UPDATE_BASE');
+
   static final _repoPattern = RegExp(r'^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$');
 
   /// The "owner/repo" an update is looked for in. [setting] may be a repo, a GitHub link to it, or (as saved by the
@@ -71,6 +77,8 @@ abstract class AraUpdate {
     if (name.isEmpty || name.contains('/') || name.contains(r'\') || name.contains('..')) {
       throw const FormatException('not a file name');
     }
+    final base = testBase;
+    if (base != null) return '$base/${Uri.encodeComponent(name)}';
     return 'https://github.com/${repoOf(setting)}/releases/latest/download/${Uri.encodeComponent(name)}';
   }
 

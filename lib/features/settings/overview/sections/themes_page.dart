@@ -245,8 +245,10 @@ class StylePicker extends ConsumerWidget {
       ref.read(Preferences.araStyle.notifier).update(style == 'glass' ? AraStyle.glass : AraStyle.contrast);
       if (style == 'bento') ref.read(Preferences.homeLayout.notifier).update(HomeLayout.bento);
       if (style == 'dots') ref.read(Preferences.homeLayout.notifier).update(HomeLayout.dots);
-      // back to Contrast from Bento or Dots: its tiles
-      if (style == 'contrast' && layout.ownStyle) ref.read(Preferences.homeLayout.notifier).update(HomeLayout.classic);
+      // back to Contrast or on to Glass from Bento or Dots: their own look goes, or it would stay under the new colours
+      if ((style == 'contrast' || style == 'glass') && layout.ownStyle) {
+        ref.read(Preferences.homeLayout.notifier).update(HomeLayout.classic);
+      }
     }
 
     Widget preview(String style) => switch (style) {

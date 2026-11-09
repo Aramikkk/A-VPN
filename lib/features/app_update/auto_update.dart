@@ -42,8 +42,8 @@ Timer startAutoUpdate(WidgetRef ref, {required bool Function() ru, required void
   Future<void> run() async {
     final said = await autoUpdateCheck(ref, ru: ru());
     if (said != null) {
+      // the offer is in the strip on the home screen: no window over what the user is doing
       tell(said);
-      await openUpdateCard();
     }
   }
 

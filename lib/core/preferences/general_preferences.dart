@@ -291,10 +291,7 @@ abstract class Preferences {
   /// The newest crash report the user was offered, by name, so each crash is offered once.
   static final lastSeenCrashReport = PreferencesNotifier.create<String, String>("last_seen_crash_report", "");
 
-  static final updateFolder = PreferencesNotifier.create<String, String>(
-    "update_folder",
-    "Aramikkk/A-VPN",
-  );
+  static final updateFolder = PreferencesNotifier.create<String, String>("update_folder", "Aramikkk/A-VPN");
 
   /// A-VPN: when the program last looked for an update by itself (milliseconds), once a day
   static final lastUpdateCheck = PreferencesNotifier.create<int, int>("last_update_check", 0);

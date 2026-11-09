@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/notification/themed_toast.dart';
 import 'package:hiddify/core/notification/toast_hover_pause.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -27,45 +28,33 @@ class InAppNotificationController with AppLogger {
     // that so a notification can never abort startup or crash the app.
     try {
       toastification.dismissAll();
-      final text = Text(message, maxLines: 6, softWrap: true, overflow: TextOverflow.ellipsis);
       late final ToastificationItem item;
       final closeAfter = action == null ? const Duration(seconds: 4) : const Duration(seconds: 8);
-      item = toastification.show(
-        title: ToastHoverPause(
-          item: () => item,
-          child: action == null
-              ? text
-              : Row(
-                  children: [
-                    Expanded(child: text),
-                    // in the color of the toast's icon
-                    TextButton(
-                      style: TextButton.styleFrom(foregroundColor: type._toastificationType.color),
-                      onPressed: () {
-                        toastification.dismiss(item);
-                        action.onPressed();
-                      },
-                      child: Text(action.label),
-                    ),
-                  ],
-                ),
-        ),
-        // the button's own padding stands in for the toast's at the end
-        padding: action == null ? null : const EdgeInsetsDirectional.fromSTEB(20, 16, 4, 16),
-        type: type._toastificationType,
+      // the notification is drawn by the app, in the look of the theme in use (Dots, Bento, Glass, Contrast)
+      item = toastification.showCustom(
         alignment: AlignmentDirectional.bottomCenter,
-        margin: const EdgeInsets.only(bottom: 64 + 16, right: 16, left: 16),
         // 4 s, a Material 3 snackbar's time; 8 s with a button, to read it and reach the button
         autoCloseDuration: closeAfter,
-        style: ToastificationStyle.flat,
-        // see ToastHoverPause
-        pauseOnHover: false,
-        showProgressBar: false,
-        dragToClose: true,
-        closeOnClick: true,
-        // a hidden close button takes no room, so an action reaches the end of the toast
-        closeButton: ToastCloseButton(
-          showType: action == null ? CloseButtonShowType.onHover : CloseButtonShowType.none,
+        builder: (context, holder) => Padding(
+          padding: const EdgeInsets.only(bottom: 64 + 16, right: 16, left: 16),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            heightFactor: 1,
+            child: ToastHoverPause(
+              item: () => holder,
+              child: ThemedToast(
+                message: message,
+                kind: switch (type) {
+                  NotificationType.success => ToastKind.success,
+                  NotificationType.error => ToastKind.error,
+                  NotificationType.info => ToastKind.info,
+                },
+                onClose: () => toastification.dismiss(holder),
+                actionLabel: action?.label,
+                onAction: action?.onPressed,
+              ),
+            ),
+          ),
         ),
       );
       // a phone: the toast always goes by itself. Its own timer could be held (a hover that never ended, the app in
@@ -89,12 +78,4 @@ class InAppNotificationController with AppLogger {
       _show(message, type: NotificationType.success, action: action);
 
   ToastificationItem? showInfoToast(String message, {ToastAction? action}) => _show(message, action: action);
-}
-
-extension NotificationTypeX on NotificationType {
-  ToastificationType get _toastificationType => switch (this) {
-    NotificationType.success => ToastificationType.success,
-    NotificationType.error => ToastificationType.error,
-    NotificationType.info => ToastificationType.info,
-  };
 }

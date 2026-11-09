@@ -123,6 +123,7 @@ class _StyledHome extends HookConsumerWidget {
       return _ContrastHome(
         superLight: superLight,
         header: header,
+        banner: const UpdateBanner(),
         // Windows without the administrator's rights: the system proxy instead of the VPN mode chosen, and a way to
         // the full one
         notice: ref.watch(tunDeniedProvider) && ref.watch(ConfigOptions.serviceMode) == ServiceMode.tun
@@ -732,6 +733,7 @@ class _ContrastHome extends ConsumerWidget {
     required this.traffic,
     required this.toggles,
     this.notice,
+    this.banner,
     this.superLight = false,
     this.compactTraffic = false,
     this.statusSlim,
@@ -750,6 +752,9 @@ class _ContrastHome extends ConsumerWidget {
 
   /// a note over the blocks (Windows without the administrator's rights)
   final Widget? notice;
+
+  /// the program's update, a thin strip over the blocks
+  final Widget? banner;
   final Widget status;
   final Widget servers;
   final Widget? traffic;
@@ -787,6 +792,7 @@ class _ContrastHome extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 6), child: header),
+                  if (banner != null) banner!,
                   if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(8)],
                   Expanded(
                     child: Row(
@@ -862,6 +868,7 @@ class _ContrastHome extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
+                          if (banner != null) banner!,
                           if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(10)],
                         ],
                       ),
@@ -895,6 +902,7 @@ class _ContrastHome extends ConsumerWidget {
               children: [
                 Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
                 // the blocks a little apart (14, was 8)
+                if (banner != null) banner!,
                 if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(14)],
                 _ContrastBlock(child: opensTraffic(status)),
                 between(),
