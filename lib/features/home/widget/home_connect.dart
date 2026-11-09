@@ -15,6 +15,7 @@ class _GraphiteRow extends StatelessWidget {
     this.networkStyled = false,
     this.mobileNetwork = false,
     this.flooded = false,
+    this.lead,
   });
 
   final String? flag;
@@ -36,6 +37,9 @@ class _GraphiteRow extends StatelessWidget {
   /// already drawn inside the neon theme override
   final bool flooded;
 
+  /// a button at the left: the server is then in the middle of the row (the current server's one)
+  final Widget? lead;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -55,6 +59,7 @@ class _GraphiteRow extends StatelessWidget {
         mobileNetwork: mobileNetwork,
         testing: testing,
         onTap: onTap,
+        lead: lead,
       );
     }
     if (selected && fill != null && !flooded) {

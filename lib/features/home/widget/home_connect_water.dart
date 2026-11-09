@@ -248,7 +248,11 @@ class _ContrastRow extends StatelessWidget {
     required this.mobileNetwork,
     required this.testing,
     required this.onTap,
+    this.lead,
   });
+
+  /// a button at the left, the server in the middle (the current server's row)
+  final Widget? lead;
 
   final String? flag;
 
@@ -327,6 +331,7 @@ class _ContrastRow extends StatelessWidget {
               selected: selected,
               testing: testing,
               onTap: onTap,
+              lead: lead,
             )
           : _dotsServerRow(
               context,
@@ -337,7 +342,80 @@ class _ContrastRow extends StatelessWidget {
               ms: ms,
               testing: testing,
               onTap: onTap,
+              lead: lead,
             );
+    }
+    if (lead != null && !group) {
+      // the current server: the button at the left, the flag and the country in the middle, the ping at the right
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Material(
+          color: Colors.transparent,
+          child: Ink(
+            decoration: decoration,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                child: _centeredServer(
+                  lead: lead!,
+                  reserve: 82,
+                  center: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FlagBadge(
+                        profile: profile,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: selected ? accent : scheme.outlineVariant, width: 1.3),
+                          ),
+                          child: flagGlyph(flag, emoji: 18, width: 24),
+                        ),
+                      ),
+                      const Gap(11),
+                      Flexible(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: titleStyle),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(color: ink.withValues(alpha: .75)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: testing
+                      ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: ink))
+                      : Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: ms),
+                              if (delay > 0 && delay <= 65000)
+                                TextSpan(
+                                  text: ' ms',
+                                  style: TextStyle(fontSize: 11, letterSpacing: 0, color: ink.withValues(alpha: .65)),
+                                ),
+                            ],
+                          ),
+                          style: titleStyle?.copyWith(fontWeight: FontWeight.w700, fontSize: 24),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
     }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),

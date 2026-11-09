@@ -351,9 +351,61 @@ Widget _dotsServerRow(
   required String ms,
   required bool testing,
   required VoidCallback onTap,
+  Widget? lead,
 }) {
   final dark = Theme.of(context).brightness == Brightness.dark;
   final ink = _Dots.ink(dark);
+  if (lead != null) {
+    // the current server: the button at the left, the flag and the country in the middle, the ping in dots at the right
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: _dotPaper(
+          context,
+          _centeredServer(
+            lead: lead,
+            reserve: 62,
+            center: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (group)
+                  SizedBox(width: 42, child: Icon(Icons.auto_awesome_rounded, size: 28, color: ink))
+                else
+                  flagMark(flag, width: 42),
+                const Gap(12),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        caption.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _Dots.mono(10, _Dots.soft(dark)),
+                      ),
+                      Text(
+                        name.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _Dots.mono(15, ink, weight: FontWeight.w800, spacing: 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            trailing: testing
+                ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: ink))
+                : _DotNumber(ms == '×' ? '—' : ms, cell: 4, colour: ink, faint: _Dots.grid(dark)),
+          ),
+          padding: const EdgeInsets.fromLTRB(10, 9, 16, 9),
+        ),
+      ),
+    );
+  }
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: GestureDetector(

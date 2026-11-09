@@ -155,9 +155,12 @@ class BoxService(
                     }
                     screenWake.trySend(Unit)
                     syncNightMode()
+                    // the screen came on: the check starts at once, not at the unlock (USER_PRESENT does not come on
+                    // some phones: the service log of a week showed none, with 200 screen-ons)
+                    if (intent.action == Intent.ACTION_SCREEN_ON) healAfterUnlock("screen on")
                 }
 
-                Intent.ACTION_USER_PRESENT -> healAfterUnlock()
+                Intent.ACTION_USER_PRESENT -> healAfterUnlock("unlock")
             }
         }
     }
@@ -563,15 +566,20 @@ class BoxService(
      * minute at most), so the VPN works as the first app opens, not after A-VPN is opened. Every unlock, and what
      * was done about it, goes in the service log.
      */
-    private fun healAfterUnlock() {
+    private fun healAfterUnlock(source: String) {
         try {
-            healAfterUnlock0()
+            healAfterUnlock0(source)
         } catch (e: Throwable) {
-            ServiceLog.write("unlock check failed: $e")
+            ServiceLog.write("wake check failed: $e")
         }
     }
 
-    private fun healAfterUnlock0() {
+    // the sleep (its screen-off time) the check was already made for: the screen-on and the unlock that follows it are one
+    @Volatile private var healedFor = -1L
+
+    private fun healAfterUnlock0(source: String) {
+        if (healedFor == screenOffAt) return
+        healedFor = screenOffAt
         val asleep = android.os.SystemClock.elapsedRealtime() - screenOffAt
         val minutes = asleep / 60_000
         val skip = when {
@@ -582,7 +590,7 @@ class BoxService(
             !NotificationQuality.canCheck() -> "the proxy port is off"
             else -> null
         }
-        ServiceLog.write("unlock after $minutes min asleep: " + (skip?.let { "nothing to do ($it)" } ?: "checking"))
+        ServiceLog.write("unlock after $minutes min asleep ($source): " + (skip?.let { "nothing to do ($it)" } ?: "checking"))
         if (skip != null) return
         healJob?.cancel()
         healJob = GlobalScope.launch(Dispatchers.IO) {

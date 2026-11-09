@@ -148,6 +148,7 @@ class _StyledHome extends HookConsumerWidget {
                     height: 64,
                     child: _StyledServerList(
                       showCurrentServer: true,
+                      lead: const _BestButton(),
                       networkStyled: true,
                       mobileNetwork: actualMobile,
                       servers: [
@@ -623,7 +624,11 @@ class _StyledServerList extends ConsumerWidget {
     this.showCurrentServer = false,
     this.networkStyled = false,
     this.mobileNetwork = false,
+    this.lead,
   });
+
+  /// the current server's button, at the left of its row (see [showCurrentServer])
+  final Widget? lead;
 
   /// a tap on a row does this instead of choosing it (Contrast's one row opens the list)
   final VoidCallback? onRowTap;
@@ -704,6 +709,7 @@ class _StyledServerList extends ConsumerWidget {
               testing: testing,
               first: i == 0,
               onTap: onRowTap ?? select,
+              lead: currentServer != null ? lead : null,
             );
           },
         );

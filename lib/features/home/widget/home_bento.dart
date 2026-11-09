@@ -376,10 +376,76 @@ Widget _bentoServerRow(
   required bool selected,
   required bool testing,
   required VoidCallback onTap,
+  Widget? lead,
 }) {
   final theme = Theme.of(context);
   final scheme = theme.colorScheme;
   final accent = theme.araAccent;
+  if (lead != null) {
+    // the current server: the button at the left, the label, the flag and the country in the middle, the ping at the right
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(_Bento.radius),
+          onTap: onTap,
+          child: _bentoTile(
+            context,
+            _centeredServer(
+              lead: lead,
+              reserve: 86,
+              center: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _Bento.label(scheme.onSurfaceVariant),
+                  ),
+                  const Gap(3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (group)
+                        Icon(Icons.auto_awesome_rounded, size: 17, color: accent)
+                      else
+                        Text(
+                          flag ?? '🌐',
+                          style: const TextStyle(fontSize: 17, height: 1, fontFamilyFallback: ['Emoji']),
+                        ),
+                      const Gap(6),
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _Bento.figure(16, scheme.onSurface).copyWith(letterSpacing: -.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              trailing: testing
+                  ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: accent))
+                  : Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: ms),
+                          if (measured) TextSpan(text: ' ms', style: _Bento.label(scheme.onSurfaceVariant)),
+                        ],
+                      ),
+                      style: _Bento.figure(selected ? 24 : 20, scheme.onSurface),
+                    ),
+            ),
+            padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
+          ),
+        ),
+      ),
+    );
+  }
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Material(
