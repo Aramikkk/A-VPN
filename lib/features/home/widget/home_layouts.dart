@@ -532,6 +532,20 @@ String _otherCountry(String? server, String? main) {
   return (dash < 0 ? title : title.substring(dash + 3)).replaceAll(RegExp(r'\s*\d+\s*$'), '').trim();
 }
 
+bool _siteLineKept = false;
+
+/// Whether the sites' block keeps the line for a site's own server (its flag or country), given whether any site has one
+/// right now. Once one has been seen the line stays: the data (each site's server and the main one) is read again when
+/// the app comes back, for a moment there is none, and the line going and coming back changed the block's height by a
+/// few points, so the blocks under it shrank and grew again.
+bool keepSiteLine(bool anySiteHasOwnServer) {
+  if (anySiteHasOwnServer) _siteLineKept = true;
+  return _siteLineKept;
+}
+
+/// For tests: forget that a site was seen with a server of its own.
+void resetSiteLine() => _siteLineKept = false;
+
 List<_SiteEntry> _siteEntries(WidgetRef ref, ColorScheme scheme) {
   final sites = ref.watch(siteLatencyProvider);
   final shown = ref.watch(homeSitesProvider);

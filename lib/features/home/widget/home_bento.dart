@@ -276,7 +276,7 @@ class _SiteBento extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final entries = _siteEntries(ref, scheme);
     if (entries.isEmpty) return const SizedBox.shrink();
-    final anyCountry = entries.any((e) => e.country.isNotEmpty);
+    final anyCountry = keepSiteLine(entries.any((e) => e.country.isNotEmpty));
     Widget cell(_SiteEntry e, bool fill) => Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: _Bento.inner(dark), borderRadius: BorderRadius.circular(16)),

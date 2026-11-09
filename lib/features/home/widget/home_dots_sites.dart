@@ -116,7 +116,7 @@ class _SiteDots extends HookConsumerWidget {
                             ),
                             const Gap(6),
                             // a site with a server of its own: its flag over the name (the line is kept for all)
-                            if (entries.any((x) => x.flag.isNotEmpty))
+                            if (keepSiteLine(entries.any((x) => x.flag.isNotEmpty)))
                               SizedBox(
                                 height: 14,
                                 child: e.flag.isEmpty ? null : Center(child: flagMark(e.flag, width: 18)),
