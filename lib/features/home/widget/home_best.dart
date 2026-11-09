@@ -3,9 +3,28 @@ part of 'avpn_home_body.dart';
 /// Set while the best server is being looked for (every server pinged, then the choice made).
 final homeBestRunning = ValueNotifier(false);
 
-/// Pings every server anew and puts the choice on Auto. The core's own pick then follows every rule of the app (the
-/// countries and networks switched off, the whitelist servers, the priority subscription and its margin), so "the
-/// best" is the best by those rules and not just the lowest number. Tells which server it came to.
+/// The answering server with the lowest ping among those shown (the countries and networks switched off and the
+/// whitelist servers are already left out of [OutboundInfo.isVisible]); null when none answers. The groups (Auto, Smart)
+/// are not servers. The priority subscription's margin and Auto's tolerance don't apply: this is a choice made by hand.
+///
+/// With the servers chosen by network ([network] known) the whitelist servers ("LTE Only", "БС") are the only ones taken on
+/// mobile data and the only ones left out on Wi-Fi, as in the config itself.
+OutboundInfo? fastestServer(Iterable<OutboundInfo> items, {NetworkKind network = NetworkKind.unknown}) {
+  OutboundInfo? best;
+  for (final item in items) {
+    if (item.isGroup || !item.isVisible || item.tag.contains('§hide§')) continue;
+    final mobileOnly = ServerRegionFilter.isMobileOnly(item.tag);
+    if (network == NetworkKind.mobile && !mobileOnly) continue;
+    if (network == NetworkKind.wifi && mobileOnly) continue;
+    final delay = item.urlTestDelay;
+    if (delay <= 0 || delay >= 65000) continue;
+    if (best == null || delay < best.urlTestDelay) best = item;
+  }
+  return best;
+}
+
+/// Pings every server anew and chooses the fastest one (see [fastestServer]); the choice stays on it until Auto is
+/// chosen again in the list. Tells which server it came to.
 Future<void> pingAndChooseBest(WidgetRef ref) async {
   if (homeBestRunning.value) return;
   homeBestRunning.value = true;
@@ -13,20 +32,15 @@ Future<void> pingAndChooseBest(WidgetRef ref) async {
   final tell = ref.read(inAppNotificationControllerProvider);
   try {
     await pingAllServers(ref);
-    var group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
-    final autoTag = group?.selected == 'balance' ? 'balance' : 'lowest';
-    final hasAuto = group?.items.any((i) => i.isGroup && i.tag == autoTag) ?? false;
-    if (hasAuto && group?.selected != autoTag) {
-      await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', autoTag);
-      // the core says which server the choice came to a moment later
-      await Future<void>.delayed(const Duration(milliseconds: 1500));
-      group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
-    }
-    final auto = group?.items.where((i) => i.isGroup && i.tag == autoTag).firstOrNull;
-    final pick = auto == null ? null : autoPick(auto, group!.items);
-    if (pick == null || pick.urlTestDelay <= 0 || pick.urlTestDelay >= 65000) {
+    final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
+    final network = ref.read(ConfigOptions.serversByNetwork) ? _actualNetworkKind.value : NetworkKind.unknown;
+    final pick = fastestServer(group?.items ?? const <OutboundInfo>[], network: network);
+    if (pick == null) {
       tell.showInfoToast(t.avpn.bestNone);
     } else {
+      if (group?.selected != pick.tag) {
+        await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', pick.tag);
+      }
       tell.showSuccessToast(t.avpn.bestPicked(name: _withFlag(serverName(pick)), ms: pick.urlTestDelay));
     }
   } catch (_) {

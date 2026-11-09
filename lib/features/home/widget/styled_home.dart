@@ -709,7 +709,8 @@ class _StyledServerList extends ConsumerWidget {
               testing: testing,
               first: i == 0,
               onTap: onRowTap ?? select,
-              lead: currentServer != null ? lead : null,
+              // the single-row panel always has it, Auto or a server chosen by hand
+              lead: showCurrentServer ? lead : null,
             );
           },
         );
