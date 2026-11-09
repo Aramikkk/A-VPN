@@ -581,7 +581,8 @@ class BoxService(
         if (healedFor == screenOffAt) return
         healedFor = screenOffAt
         val asleep = android.os.SystemClock.elapsedRealtime() - screenOffAt
-        val minutes = asleep / 60_000
+        // no screen-off seen since the service started: the sleep isn't known, and "minutes" would be the phone's uptime
+        val minutes = if (screenOffAt == 0L) 0L else asleep / 60_000
         val skip = when {
             screenOffAt == 0L -> "no screen-off seen yet"
             asleep < 5 * 60_000L -> "a short sleep"
