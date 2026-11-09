@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding;
 import 'package:fpdart/fpdart.dart';
 import 'package:grpc/grpc.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
@@ -47,19 +48,36 @@ class HiddifyCoreService with InfraLogger {
   final Map<String, StreamSubscription?> subscriptions = {};
   List<OutboundGroup> latest = [];
 
+  /// The core refusing the connection (its own port is shut while the app is away and opened again by [init]).
+  static bool _unreachable(String error) => error.contains('UNAVAILABLE') || error.contains('Connection refused');
+
   Future<void> init() async {
-    await setup()
-        .mapLeft((e) {
-          loggy.error(e);
-          if (PlatformUtils.isIOS) return;
-          statusController.add(const CoreStatus.stopped());
-          ref.read(inAppNotificationControllerProvider).showErrorToast(e);
-        })
-        .map((_) {
-          loggy.info("Hiddify-core setup done");
-          ref.read(coreRestartSignalProvider.notifier).restart();
-        })
-        .run();
+    var result = await setup().run();
+    // the app came back and went away again within a moment: the pause shut the core's port while this set-up was
+    // knocking on it. One more try a little later, if the app is still in front, is enough.
+    for (var retry = 0; retry < 2 && result.isLeft() && result.match((e) => _unreachable(e), (_) => false); retry++) {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) break;
+      result = await setup().run();
+    }
+    result.match(
+      (e) {
+        // the app is already away again: its next return sets the core up anew, nothing to tell now (and the screen must
+        // not show the VPN as stopped for it)
+        if (_unreachable(e) && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+          loggy.warning("core set-up skipped, the app went to the background: $e");
+          return;
+        }
+        loggy.error(e);
+        if (PlatformUtils.isIOS) return;
+        statusController.add(const CoreStatus.stopped());
+        ref.read(inAppNotificationControllerProvider).showErrorToast(e);
+      },
+      (_) {
+        loggy.info("Hiddify-core setup done");
+        ref.read(coreRestartSignalProvider.notifier).restart();
+      },
+    );
   }
 
   /// validates config by path and save it
