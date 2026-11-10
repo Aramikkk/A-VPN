@@ -82,4 +82,5 @@ windows/sign.cer
 test/**/goldens/
 
 # build and audit logs (local only)
-diagnostics/
+# the diagnostics archives written at the project root (lib/core/diagnostics is source)
+/diagnostics/
