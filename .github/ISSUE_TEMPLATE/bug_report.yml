@@ -1,0 +1,54 @@
+name: Ошибка
+description: Что-то работает не так, как должно
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что сообщаете. Чем точнее описание, тем быстрее получится разобраться.
+        **Не публикуйте ссылку на подписку, ключи и пароли.** Журналы приложение очищает само, но перед отправкой всё равно просмотрите их.
+  - type: input
+    id: version
+    attributes:
+      label: Версия приложения
+      description: «Настройки» → «О программе»
+      placeholder: "1.2.2"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Устройство и Android
+      placeholder: "Galaxy S24, Android 15"
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Сеть, на которой проявилось
+      options:
+        - Wi-Fi
+        - Мобильная сеть (LTE/5G)
+        - Обе
+        - Не знаю
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Что вы делали, что ожидали увидеть и что увидели.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Журнал
+      description: «Настройки» → «Логи» → отправить диагностику. Приложите файл или вставьте нужный фрагмент.

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Вопрос или помощь с настройкой
+    url: https://github.com/Aramikkk/A-VPN/discussions
+    about: Вопросы по использованию, подписке и настройкам лучше задавать в обсуждениях
+  - name: Уязвимость
+    url: https://github.com/Aramikkk/A-VPN/security/advisories/new
+    about: О проблемах безопасности сообщайте приватно, не в открытом обращении
