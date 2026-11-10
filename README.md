@@ -56,7 +56,8 @@
 - Задержка и потери с историей, трафик по приложениям.
 
 **Работа в фоне**
-- Ночной режим и режим лёгкой работы: реже опросы, меньше пробуждений устройства.
+- **Суперлайт** (кнопка с листом на главном экране): остаётся только главная с пингом, потерями и скоростью, всё лишнее выключается. Замеры идут раз в 10 секунд, топология, список соединений, история скорости и проверки сайтов отключены, серверы проверяются редко. На мобильной сети мультисервер остаётся включённым: серверов там мало, нагрузка небольшая. Для слабых телефонов и экономии батареи.
+- Ночной режим: реже опросы, меньше пробуждений устройства.
 - Уведомление службы не обновляется, пока экран выключен.
 
 ## Интерфейс
@@ -128,6 +129,7 @@
 - **Servers per network.** Whitelist-friendly servers on mobile data, regular ones on Wi‑Fi; countries are set per network.
 - **Steady connection.** Latency and loss are measured all the time, the server is switched in good time, the core restarts if the link is lost, and the connection is checked after the device wakes up.
 - Per-service servers, blocked-only routing, per-app split tunnelling, ad/tracker/phishing blocking, per-server traffic statistics.
+- Super light mode (the leaf button): only the home screen is left, measurements every 10 s, the heavy pages and checks are off. For weak phones and the battery.
 - No telemetry. Updates come only from this repository's releases and are verified by SHA‑256.
 
 **Install:** download `A-VPN-<version>-arm64.apk` from the [latest release](https://github.com/Aramikkk/A-VPN/releases/latest) and verify it with the `.sha256` file and the certificate fingerprint above. Android 7+, 64-bit ARM only. A Windows 10+ (x64) installer, `A-VPN-Setup-<version>-windows.exe`, is attached to the same release, with its `.sha256`; it is not code-signed, so SmartScreen may warn. Source, build workflow and the core patches are in this repository.
