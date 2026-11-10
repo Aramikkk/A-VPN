@@ -890,13 +890,38 @@ class ConnectionAppIcon extends StatelessWidget {
         child: appIconView(icon!, size: size),
       );
     }
+    // Dots: a square of dots with a frame and the app's letter in the mono face, as the icons of the others are drawn in
+    // dots (a filled grey tile with a letter is not of this look)
+    if (homeLookNow == HomeLayout.dots) {
+      final ink = scheme.onSurface;
+      return SizedBox(
+        key: const Key('dots-fallback-icon'),
+        width: size,
+        height: size,
+        child: CustomPaint(
+          painter: _DotsTilePainter(ink),
+          child: Center(
+            child: Text(
+              name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+              style: TextStyle(
+                fontFamily: 'JetBrains Mono',
+                color: ink,
+                fontWeight: FontWeight.w800,
+                fontSize: size * .5,
+                height: 1,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: scheme.primary.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(homeLookNow == HomeLayout.dots ? 4 : 10),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         name.isEmpty ? '?' : name.characters.first.toUpperCase(),
@@ -904,4 +929,34 @@ class ConnectionAppIcon extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A frame and a faint grid of dots: the tile of an app that has no picture, in the Dots look.
+class _DotsTilePainter extends CustomPainter {
+  _DotsTilePainter(this.ink);
+
+  final Color ink;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final frame = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(4));
+    canvas.drawRRect(
+      frame,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = ink.withValues(alpha: .55),
+    );
+    const n = 6;
+    final cell = size.width / n;
+    final dot = Paint()..color = ink.withValues(alpha: .22);
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        canvas.drawCircle(Offset((x + .5) * cell, (y + .5) * cell), cell * .13, dot);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotsTilePainter old) => old.ink != ink;
 }

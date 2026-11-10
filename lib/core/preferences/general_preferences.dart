@@ -140,6 +140,18 @@ abstract class Preferences {
     mapTo: (value) => value.join(';'),
   );
 
+  /// The subscriptions switched off, not in the work (the Profiles page): their ids. The ones that are on, in the shown
+  /// order, are the main one (the top) and the added ones (see profile_work.dart). Kept as one ";"-separated string.
+  static final offProfiles = PreferencesNotifier.create<List<String>, String>(
+    "off_profiles",
+    const [],
+    mapFrom: (value) => value.split(';').where((e) => e.isNotEmpty).toList(),
+    mapTo: (value) => value.join(';'),
+  );
+
+  /// The old way of choosing (one active profile and added ones) has been moved to [offProfiles].
+  static final profilesWorkMigrated = PreferencesNotifier.create<bool, bool>("profiles_work_migrated", false);
+
   /// Special handling of the Sigma Gate provider (its servers named Sigma, its panel asked as Clash Meta). Off: a plain client.
   static final providerSigma = PreferencesNotifier.create<bool, bool>("provider_sigma", false);
 

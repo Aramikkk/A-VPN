@@ -10,6 +10,7 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_repository.dart';
+import 'package:hiddify/features/profile/data/profile_work.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/model/profile_sort_enum.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -66,10 +67,102 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
   Stream<List<ProfileEntity>> build() {
     final sort = ref.watch(profilesSortNotifierProvider);
     final order = ref.watch(Preferences.profilesOrder);
+    final off = ref.watch(Preferences.offProfiles).toSet();
+    final migrated = ref.watch(Preferences.profilesWorkMigrated);
     return _profilesRepo
         .watchAll(sort: sort.by, sortMode: sort.mode)
         .map((event) => event.getOrElse((l) => throw l))
-        .map((profiles) => applyProfilesOrder(profiles, order));
+        .map((profiles) => applyProfilesOrder(profiles, order))
+        .map((ordered) {
+          // the core's active profile and the added ones follow the order and the switches (also after a profile is
+          // added or deleted)
+          if (!migrated) {
+            _migrate(ordered);
+          } else {
+            _heal(ordered, off);
+          }
+          return ordered;
+        });
+  }
+
+  bool _migrating = false;
+  bool _syncing = false;
+
+  /// The old way of choosing is moved over once: what was neither active nor added is switched off, and the active
+  /// profile goes to the top of the list so it stays the main one.
+  void _migrate(List<ProfileEntity> ordered) {
+    if (_migrating || ordered.isEmpty) return;
+    _migrating = true;
+    unawaited(
+      Future(() async {
+        try {
+          final ids = [for (final p in ordered) p.id];
+          final active = ordered.where((p) => p.active).map((p) => p.id).firstOrNull;
+          final off = offFromOldModel(ids, activeId: active, extras: ref.read(Preferences.extraProfiles));
+          final firstOn = ids.where((id) => !off.contains(id)).firstOrNull;
+          if (active != null && firstOn != active) {
+            await ref.read(Preferences.profilesOrder.notifier).update([active, ...ids.where((id) => id != active)]);
+          }
+          await ref.read(Preferences.offProfiles.notifier).update(off.toList());
+          await ref.read(Preferences.profilesWorkMigrated.notifier).update(true);
+        } finally {
+          _migrating = false;
+        }
+      }),
+    );
+  }
+
+  /// Sets the active profile and the added ones as the order and the switches say, when they are not.
+  void _heal(List<ProfileEntity> ordered, Set<String> off) {
+    if (_syncing || ordered.isEmpty) return;
+    final ids = [for (final p in ordered) p.id];
+    final active = ordered.where((p) => p.active).map((p) => p.id).firstOrNull;
+    final extras = ref.read(Preferences.extraProfiles);
+    if (!workNeedsSync(ids, off, activeId: active, extras: extras)) return;
+    _syncing = true;
+    unawaited(
+      Future(() async {
+        try {
+          final want = workingProfiles(ids, off);
+          var changed = false;
+          if (active != want.main) {
+            await selectActiveProfile(want.main!);
+            changed = true;
+          }
+          if (extras.length != want.extras.length || !extras.toSet().containsAll(want.extras)) {
+            await ref.read(Preferences.extraProfiles.notifier).update(want.extras);
+            changed = true;
+          }
+          // the config is made at the start, so a running VPN is restarted to take the new set
+          final current = await ref.read(activeProfileProvider.future);
+          if (changed && current != null && ref.read(connectionNotifierProvider).valueOrNull is Connected) {
+            await ref.read(connectionNotifierProvider.notifier).reconnect(current);
+          }
+        } finally {
+          _syncing = false;
+        }
+      }),
+    );
+  }
+
+  /// Takes the subscription out of the work, or puts it back (the list then sets the main one and the added ones).
+  /// The last one that is on can not be switched off.
+  Future<void> toggleWork(ProfileEntity profile, List<ProfileEntity> shown) async {
+    final ids = [for (final p in shown) p.id];
+    final off = ref.read(Preferences.offProfiles).toSet();
+    final turningOff = !off.contains(profile.id);
+    if (turningOff && !canSwitchOff(ids, off, profile.id)) {
+      final t = ref.read(translationsProvider).requireValue;
+      ref.read(inAppNotificationControllerProvider).showInfoToast(t.avpn.profileWorkLast);
+      return;
+    }
+    loggy.debug('profile [${profile.id}] in the work: ${!turningOff}');
+    if (turningOff) {
+      off.add(profile.id);
+    } else {
+      off.remove(profile.id);
+    }
+    await ref.read(Preferences.offProfiles.notifier).update(off.toList());
   }
 
   /// The profiles' ids in the order they are shown after the one at [from] is dropped at [to] (a list's own indexes,
@@ -107,21 +200,6 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
     if (extras.contains(id)) await ref.read(Preferences.extraProfiles.notifier).update([...extras]..remove(id));
   }
 
-  /// Adds the profile's servers to the active profile's (or takes them out again): several subscriptions at once.
-  /// The config is made at the start, so a running VPN is restarted to take it.
-  Future<void> toggleExtra(ProfileEntity profile) async {
-    final extras = ref.read(Preferences.extraProfiles);
-    final on = extras.contains(profile.id);
-    loggy.debug('profile [${profile.id}] as an extra one: ${!on}');
-    await ref
-        .read(Preferences.extraProfiles.notifier)
-        .update(on ? ([...extras]..remove(profile.id)) : [...extras, profile.id]);
-    final active = await ref.read(activeProfileProvider.future);
-    if (active != null && ref.read(connectionNotifierProvider).valueOrNull is Connected) {
-      await ref.read(connectionNotifierProvider.notifier).reconnect(active);
-    }
-  }
-
   /// The priority subscription: its servers are kept to unless the others are clearly faster (or the choice is taken
   /// off it again). The core makes its choice at the start, so a running VPN is restarted to take it.
   Future<void> togglePriority(ProfileEntity profile) async {
@@ -147,6 +225,8 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
 
     if (profile.active) await ref.read(connectionNotifierProvider.notifier).abortConnection();
     await _dropExtra(profile.id);
+    final off = ref.read(Preferences.offProfiles);
+    if (off.contains(profile.id)) await ref.read(Preferences.offProfiles.notifier).update([...off]..remove(profile.id));
     await _profilesRepo
         .deleteById(profile.id, profile.active)
         .match(

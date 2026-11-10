@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
@@ -16,6 +18,7 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/widget/adaptive_icon.dart';
 import 'package:hiddify/core/widget/adaptive_menu.dart';
+import 'package:hiddify/features/profile/data/profile_work.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/profile/overview/profiles_notifier.dart';
@@ -52,8 +55,11 @@ class ProfileTile extends HookConsumerWidget {
       _ => null,
     };
 
-    // the servers of this profile are in the work too, with the active one's (several subscriptions)
-    final extra = !profile.active && ref.watch(Preferences.extraProfiles).contains(profile.id);
+    // in the work: on in the list (the old way of choosing, until it is moved over: the active one and the added ones)
+    final migrated = ref.watch(Preferences.profilesWorkMigrated);
+    final inWork = migrated
+        ? !ref.watch(Preferences.offProfiles).contains(profile.id)
+        : (profile.active || ref.watch(Preferences.extraProfiles).contains(profile.id));
     final showActionButton = profile is RemoteProfileEntity || !isMain;
     final priority = ref.watch(Preferences.priorityProfile) == profile.id;
 
@@ -66,13 +72,10 @@ class ProfileTile extends HookConsumerWidget {
         }
         return;
       }
-      if (selectActiveMutation.state.isInProgress) return;
-      selectActiveMutation.setFuture(ref.read(profilesNotifierProvider.notifier).selectActiveProfile(profile.id));
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.goNamed('home');
-      }
+      // a tap on a subscription opens its settings (its countries, for Wi-Fi and for LTE)
+      profileManagementFocus.value = profile.id;
+      if (context.canPop()) context.pop();
+      context.goNamed('profileManagement');
     }
 
     // Provider links (profile-web-page-url / support-url) show as separate pills
@@ -87,10 +90,10 @@ class ProfileTile extends HookConsumerWidget {
     final card = Card(
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        side: profile.active || extra ? BorderSide(color: theme.colorScheme.outline) : BorderSide.none,
+        side: profile.active ? BorderSide(color: theme.colorScheme.outline) : BorderSide.none,
         borderRadius: showLinks ? ProfileTileConst.topOnlyBorderRadius : ProfileTileConst.cardBorderRadius,
       ),
-      elevation: profile.active || extra ? 0 : 1,
+      elevation: profile.active ? 0 : 1,
       child: IntrinsicHeight(
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
@@ -107,7 +110,25 @@ class ProfileTile extends HookConsumerWidget {
                 ),
                 if (profile.active) VerticalDivider(width: 1, color: theme.colorScheme.outline) else const Gap(1),
               ],
-              Expanded(child: _body(context, t, theme, subInfo, showActionButton, handleTap, showLinks, extra, priority)),
+              Expanded(
+                child: Opacity(
+                  opacity: inWork || isMain ? 1 : .5,
+                  child: _body(context, t, theme, subInfo, showActionButton, handleTap, showLinks, false, priority),
+                ),
+              ),
+              // in the work or not: the top one that is on is the main one (the home screen's)
+              if (!isMain)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  child: Switch.adaptive(
+                    value: inWork,
+                    onChanged: (_) => unawaited(
+                      ref
+                          .read(profilesNotifierProvider.notifier)
+                          .toggleWork(profile, ref.read(profilesNotifierProvider).valueOrNull ?? [profile]),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -192,8 +213,6 @@ class ProfileTile extends HookConsumerWidget {
         ? const Icon(Icons.arrow_drop_down_rounded)
         : priority
         ? Icon(Icons.star_rounded, size: 18, color: theme.colorScheme.primary)
-        : extra
-        ? Icon(Icons.layers_rounded, size: 18, color: theme.colorScheme.primary)
         : profile.pinned
         ? Icon(Icons.push_pin, size: 16, color: theme.colorScheme.onSurfaceVariant)
         : null;
@@ -375,15 +394,6 @@ class ProfileActionsMenu extends HookConsumerWidget {
         ),
         onTap: () => ref.read(profilesNotifierProvider.notifier).togglePriority(profile),
       ),
-      // several subscriptions at once: this one's servers beside the active profile's
-      if (!profile.active)
-        AdaptiveMenuItem(
-          title: ref.watch(Preferences.extraProfiles).contains(profile.id)
-              ? t.avpn.profileExtraOff
-              : t.avpn.profileExtraOn,
-          leadingIcon: const Icon(Icons.layers_rounded),
-          onTap: () => ref.read(profilesNotifierProvider.notifier).toggleExtra(profile),
-        ),
       if (profile case RemoteProfileEntity())
         AdaptiveMenuItem(
           title: t.common.update,

@@ -14,166 +14,56 @@ class _SiteDots extends HookConsumerWidget {
     final ink = _Dots.ink(dark);
     final soft = _Dots.soft(dark);
     final faint = _Dots.grid(dark);
-    return _dotPaper(
-      context,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SitesHeader(),
-          switch (style) {
-            SiteGraph.list => Column(
-              children: [
-                for (final e in entries)
-                  _dotRow(
-                    context,
-                    e.name,
-                    !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
-                    valueColour: e.measured && e.colour != _SiteTiles._good ? _Dots.red : null,
-                    country: e.country,
-                  ),
-              ],
-            ),
-            SiteGraph.scales => Column(
-              children: [
-                for (final e in entries)
-                  _sitePlate(
-                    dark,
-                    e,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: _flaggedText(e, e.name.toUpperCase(), _Dots.mono(11, soft)),
-                              ),
-                            ),
-                            _siteFigure(e, ink),
-                          ],
-                        ),
-                        const Gap(3),
-                        SizedBox(
-                          height: 8,
-                          child: CustomPaint(
-                            painter: _SitePainter(
-                              kind: SiteGraph.scales,
-                              ms: e.measured ? e.ms : null,
-                              ink: ink,
-                              accent: _Dots.red,
-                              faint: faint,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            SiteGraph.digits => Column(
-              children: [
-                for (var i = 0; i < entries.length; i += 3)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Row(
-                      children: [
-                        for (var k = i; k < i + 3; k++)
-                          Expanded(
-                            child: k < entries.length
-                                ? _flagPlate(dark, entries[k], _siteDigits(entries[k], ink, soft, faint))
-                                : const SizedBox.shrink(),
-                          ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            SiteGraph.columns => Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(
+    // a tap on the block itself (the pills of its head have their own) chooses how the sites are shown
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => unawaited(_pickSiteGraph(context, ref, style)),
+      child: _dotPaper(
+        context,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SitesHeader(),
+            switch (style) {
+              SiteGraph.list => Column(
                 children: [
                   for (final e in entries)
-                    Expanded(
-                      child: _flagPlate(
-                        dark,
-                        e,
-                        Column(
-                          children: [
-                            SizedBox(
-                              height: 7 * 14.0,
-                              width: 16,
-                              child: CustomPaint(
-                                painter: _SitePainter(
-                                  kind: SiteGraph.columns,
-                                  ms: e.measured ? e.ms : null,
-                                  ink: ink,
-                                  accent: _Dots.red,
-                                  faint: faint,
-                                ),
-                              ),
-                            ),
-                            const Gap(6),
-                            // a site with a server of its own: its flag over the name (the line is kept for all)
-                            if (keepSiteLine(entries.any((x) => x.flag.isNotEmpty)))
-                              SizedBox(
-                                height: 14,
-                                child: e.flag.isEmpty ? null : Center(child: flagMark(e.flag, width: 18)),
-                              ),
-                            // the same gap between the flag, the name and the figure
-                            const Gap(5),
-                            // the whole name, as small as it takes to fit its column
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
-                              child: SizedBox(
-                                height: 13,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    e.name.toUpperCase(),
-                                    maxLines: 1,
-                                    style: _Dots.mono(9, soft, spacing: 0),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const Gap(5),
-                            _siteFigure(e, ink, size: 11, align: Alignment.center),
-                          ],
-                        ),
-                      ),
+                    _dotRow(
+                      context,
+                      e.name,
+                      !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
+                      valueColour: e.measured && e.colour != _SiteTiles._good ? _Dots.red : null,
+                      country: e.country,
                     ),
                 ],
               ),
-            ),
-            SiteGraph.lanes => Column(
-              children: [
-                for (final e in entries)
-                  _sitePlate(
-                    dark,
-                    e,
-                    SizedBox(
-                      height: 22,
-                      child: Row(
+              SiteGraph.scales => Column(
+                children: [
+                  for (final e in entries)
+                    _sitePlate(
+                      dark,
+                      e,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SizedBox(
-                            width: 86,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: _flaggedText(
-                                e,
-                                e.name.toUpperCase(),
-                                _Dots.mono(10, soft, spacing: .2),
-                                fit: true,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: _flaggedText(e, e.name.toUpperCase(), _Dots.mono(11, soft)),
+                                ),
                               ),
-                            ),
+                              _siteFigure(e, ink),
+                            ],
                           ),
-                          Expanded(
+                          const Gap(3),
+                          SizedBox(
+                            height: 8,
                             child: CustomPaint(
-                              size: const Size.fromHeight(22),
                               painter: _SitePainter(
-                                kind: SiteGraph.lanes,
+                                kind: SiteGraph.scales,
                                 ms: e.measured ? e.ms : null,
                                 ink: ink,
                                 accent: _Dots.red,
@@ -181,17 +71,132 @@ class _SiteDots extends HookConsumerWidget {
                               ),
                             ),
                           ),
-                          SizedBox(width: 52, child: _siteFigure(e, ink)),
                         ],
                       ),
                     ),
-                  ),
-              ],
-            ),
-          },
-        ],
+                ],
+              ),
+              SiteGraph.digits => Column(
+                children: [
+                  for (var i = 0; i < entries.length; i += 3)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Row(
+                        children: [
+                          for (var k = i; k < i + 3; k++)
+                            Expanded(
+                              child: k < entries.length
+                                  ? _flagPlate(dark, entries[k], _siteDigits(entries[k], ink, soft, faint))
+                                  : const SizedBox.shrink(),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              SiteGraph.columns => Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    for (final e in entries)
+                      Expanded(
+                        child: _flagPlate(
+                          dark,
+                          e,
+                          Column(
+                            children: [
+                              SizedBox(
+                                height: 7 * 14.0,
+                                width: 16,
+                                child: CustomPaint(
+                                  painter: _SitePainter(
+                                    kind: SiteGraph.columns,
+                                    ms: e.measured ? e.ms : null,
+                                    ink: ink,
+                                    accent: _Dots.red,
+                                    faint: faint,
+                                  ),
+                                ),
+                              ),
+                              const Gap(6),
+                              // a site with a server of its own: its flag over the name (the line is kept for all)
+                              if (keepSiteLine(entries.any((x) => x.flag.isNotEmpty)))
+                                SizedBox(
+                                  height: 14,
+                                  child: e.flag.isEmpty ? null : Center(child: flagMark(e.flag, width: 18)),
+                                ),
+                              // the same gap between the flag, the name and the figure
+                              const Gap(5),
+                              // the whole name, as small as it takes to fit its column
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: SizedBox(
+                                  height: 13,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      e.name.toUpperCase(),
+                                      maxLines: 1,
+                                      style: _Dots.mono(9, soft, spacing: 0),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const Gap(5),
+                              _siteFigure(e, ink, size: 11, align: Alignment.center),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              SiteGraph.lanes => Column(
+                children: [
+                  for (final e in entries)
+                    _sitePlate(
+                      dark,
+                      e,
+                      SizedBox(
+                        height: 22,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 86,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: _flaggedText(
+                                  e,
+                                  e.name.toUpperCase(),
+                                  _Dots.mono(10, soft, spacing: .2),
+                                  fit: true,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: CustomPaint(
+                                size: const Size.fromHeight(22),
+                                painter: _SitePainter(
+                                  kind: SiteGraph.lanes,
+                                  ms: e.measured ? e.ms : null,
+                                  ink: ink,
+                                  accent: _Dots.red,
+                                  faint: faint,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 52, child: _siteFigure(e, ink)),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            },
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
     );
   }
 }

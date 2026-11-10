@@ -536,6 +536,13 @@ void main() {
               );
             }
           }
+          // Dots: the block's view is chosen by a tap on the block itself, there is no button of its own for it
+          if (connected && (_env('HOMELAYOUT') ?? '') == 'dots' && _env('SUPERLIGHT') != '1' && _env('SITEGRAPH') == 'list') {
+            expect(find.byKey(const Key('sites-view')), findsNothing);
+            await tester.tap(find.text('INSTAGRAM').first);
+            await tester.pump(const Duration(milliseconds: 400));
+            expect(find.text('Вид сайтов'), findsOneWidget);
+          }
           // Contrast: the delay to the sites in place of the traffic (that is in Topology), six tiles
           if (connected && contrast && _env('SUPERLIGHT') != '1' && (_env('HOMELAYOUT') ?? '').isEmpty) {
             final sites = find.byKey(const Key('contrast-sites'));

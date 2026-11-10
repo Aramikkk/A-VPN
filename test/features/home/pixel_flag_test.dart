@@ -157,6 +157,9 @@ void main() {
       expect(tester.getSize(find.byType(DotsAppIcon)), const Size.square(40));
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
       await tester.pump();
+      // the picture is made a frame at a time: the frame after the icon is decoded makes it, the next draws it
+      await tester.pump();
+      await tester.pump();
       expect(find.descendant(of: find.byType(DotsAppIcon), matching: find.byType(CustomPaint)), findsWidgets);
       expect(tester.getSize(find.byType(DotsAppIcon)), const Size.square(40));
     });

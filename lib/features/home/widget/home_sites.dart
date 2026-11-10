@@ -558,26 +558,6 @@ class _SitesHeader extends HookConsumerWidget {
                   ),
                 ),
               ),
-              // Dots: the switch on the left, the button of the block's view on the right
-              if (signs) ...[
-                const Spacer(),
-                GestureDetector(
-                  key: const Key('sites-view'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => unawaited(_pickSiteGraph(context, ref, ref.read(Preferences.siteGraph))),
-                  child: Container(
-                    height: 30,
-                    width: 34,
-                    decoration:
-                        delayPill?.box ??
-                        BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: scheme.outlineVariant),
-                        ),
-                    child: Icon(Icons.grid_view_rounded, size: 15, color: delayPill?.ink ?? scheme.onSurfaceVariant),
-                  ),
-                ),
-              ],
             ],
           ),
         ],

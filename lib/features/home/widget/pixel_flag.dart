@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 
 /// A country's flag as a small grid of square pixels (Dots): the stripes, crosses and discs of the commonest countries;
@@ -406,8 +407,105 @@ class PixelIcons {
   /// whether the icon of [key] could not be made
   static bool failed(String key) => _failed.contains(key);
 
-  /// the icon in [box] as it is, with a thin grid of fine lines over it (only over the icon itself, not its corners)
+  /// the pixels a logical pixel has on this screen (the baked icons are made at it); a test sets its own
+  static double pixelRatio = ui.PlatformDispatcher.instance.implicitView?.devicePixelRatio ?? 3;
+
+  /// the icons as they are drawn, each made once per size and edge colour: a list of dozens of icons drew each of them
+  /// every frame through a layer of its own with a high-quality filter and thirty lines (up to 50 ms a frame)
+  static final _baked = <String, ui.Image>{};
+
+  static int get bakedCount => _baked.length;
+
+  static void clearBaked() {
+    for (final image in _baked.values) {
+      image.dispose();
+    }
+    _baked.clear();
+    _bakeQueue.clear();
+  }
+
+  /// the icon in [box] as it is, with a thin grid of fine lines over it (only over the icon itself, not its corners):
+  /// made once into a small picture of the size it is drawn at, then drawn with one call
   static void paint(Canvas canvas, Rect box, PixelIcon icon, {double alpha = 1, Color edge = const Color(0xFF000000)}) {
+    final baked = _bake(icon, box.size, edge);
+    final w = baked.width.toDouble(), h = baked.height.toDouble();
+    canvas.drawImageRect(
+      baked,
+      Rect.fromLTWH(0, 0, w, h),
+      box.inflate(_margin),
+      Paint()
+        ..filterQuality = FilterQuality.low
+        ..color = Color.fromRGBO(255, 255, 255, alpha),
+    );
+  }
+
+  /// a margin for the faint outline round the icon
+  static const _margin = 1.0;
+
+  static String _keyOf(PixelIcon icon, Size size, Color edge) {
+    final w = ((size.width + 2 * _margin) * pixelRatio).ceil();
+    final h = ((size.height + 2 * _margin) * pixelRatio).ceil();
+    return '${identityHashCode(icon.image)}:$w:$h:${edge.toARGB32()}';
+  }
+
+  /// the icon made into its picture for [size] (kept), now
+  static ui.Image _bake(PixelIcon icon, Size size, Color edge) {
+    final key = _keyOf(icon, size, edge);
+    final kept = _baked[key];
+    if (kept != null) return kept;
+    final ratio = pixelRatio;
+    final recorder = ui.PictureRecorder();
+    final c = Canvas(recorder)..scale(ratio);
+    paintDirect(c, Rect.fromLTWH(_margin, _margin, size.width, size.height), icon, edge: edge);
+    final picture = recorder.endRecording();
+    final baked = picture.toImageSync(
+      ((size.width + 2 * _margin) * ratio).ceil(),
+      ((size.height + 2 * _margin) * ratio).ceil(),
+    );
+    picture.dispose();
+    return _baked[key] = baked;
+  }
+
+  /// whether the picture of [icon] for [size] is ready
+  static bool isBaked(PixelIcon icon, Size size, Color edge) => _baked.containsKey(_keyOf(icon, size, edge));
+
+  static final _bakeQueue = <String, (PixelIcon, Size, Color)>{};
+  static bool _bakeScheduled = false;
+
+  /// asks for the picture of [icon] for [size] to be made, one icon to a frame (a page of dozens of icons made them all in
+  /// the frame they appeared in: a frame of fifty milliseconds); [revision] ticks as each is ready
+  static void bakeLater(PixelIcon icon, Size size, Color edge) {
+    final key = _keyOf(icon, size, edge);
+    if (_baked.containsKey(key) || _bakeQueue.containsKey(key)) return;
+    _bakeQueue[key] = (icon, size, edge);
+    if (_bakeScheduled) return;
+    _bakeScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback(_bakeOne);
+    SchedulerBinding.instance.scheduleFrame();
+  }
+
+  static void _bakeOne(Duration _) {
+    _bakeScheduled = false;
+    if (_bakeQueue.isEmpty) return;
+    final key = _bakeQueue.keys.first;
+    final (icon, size, edge) = _bakeQueue.remove(key)!;
+    _bake(icon, size, edge);
+    revision.value++;
+    if (_bakeQueue.isNotEmpty) {
+      _bakeScheduled = true;
+      SchedulerBinding.instance.addPostFrameCallback(_bakeOne);
+      SchedulerBinding.instance.scheduleFrame();
+    }
+  }
+
+  /// the icon drawn straight onto [canvas] (what [paint] bakes)
+  static void paintDirect(
+    Canvas canvas,
+    Rect box,
+    PixelIcon icon, {
+    double alpha = 1,
+    Color edge = const Color(0xFF000000),
+  }) {
     // a faint outline in the paper's ink round the icon's own shape, so a white tile has an edge and is not seen smaller
     final halo = Paint()
       ..filterQuality = FilterQuality.high
@@ -468,10 +566,13 @@ class DotsAppIcon extends StatelessWidget {
       final made = PixelIcons.of(key, icon);
       if (made != null) {
         final dark = Theme.of(context).brightness == Brightness.dark;
-        return CustomPaint(
-          size: Size.square(size),
-          painter: _PixelIconPainter(made, dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000)),
-        );
+        final edge = dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
+        // its picture is made a frame at a time; until it is, there is room for it
+        if (!PixelIcons.isBaked(made, Size.square(size), edge)) {
+          PixelIcons.bakeLater(made, Size.square(size), edge);
+          return SizedBox(width: size, height: size);
+        }
+        return CustomPaint(size: Size.square(size), painter: _PixelIconPainter(made, edge));
       }
       if (PixelIcons.failed(key)) return Image.memory(icon, width: size, height: size, gaplessPlayback: true);
       return SizedBox(width: size, height: size);

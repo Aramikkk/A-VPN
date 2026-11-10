@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
+import 'package:hiddify/features/profile/data/profile_work.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
@@ -111,6 +112,9 @@ class _ProfileCountries extends HookConsumerWidget {
     final servers = useState<List<({String code, String host, int port})>?>(null);
     final pings = useState<Map<String, int?>>(const {});
     final started = useRef(false);
+    // the subscription a tap on it asked for is open (else the active one)
+    final focus = profileManagementFocus.value;
+    final opened = focus != null ? focus == profile.id : profile.active;
 
     Future<void> load() async {
       if (started.value) return;
@@ -133,7 +137,7 @@ class _ProfileCountries extends HookConsumerWidget {
 
     // the active profile is open at once, and asked at once; the others when opened
     useEffect(() {
-      if (profile.active) unawaited(load());
+      if (opened) unawaited(load());
       return null;
     }, const []);
 
@@ -320,7 +324,7 @@ class _ProfileCountries extends HookConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
-        initiallyExpanded: profile.active,
+        initiallyExpanded: opened,
         shape: const Border(),
         collapsedShape: const Border(),
         onExpansionChanged: (open) {

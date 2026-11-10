@@ -67,7 +67,7 @@ Widget _centeredServer({required Widget lead, required Widget center, required W
 }
 
 /// The button at the left of the current server: every server is pinged and the best one chosen. In each look its own
-/// shape (Dots: an inked frame; Bento and the others: the accent or the dark disc).
+/// shape (Dots: a bolt of dots, no frame; Bento and the others: the accent or the dark disc).
 class _BestButton extends HookConsumerWidget {
   const _BestButton();
 
@@ -78,6 +78,18 @@ class _BestButton extends HookConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final accent = theme.araAccent;
     final running = useValueListenable(homeBestRunning);
+    // while the servers are pinged the bolt charges: its dots light from the bottom up, round and round
+    final charging = useAnimationController(duration: lightDuration(const Duration(milliseconds: 1300)));
+    useEffect(() {
+      if (running) {
+        charging.repeat();
+      } else {
+        charging
+          ..stop()
+          ..value = 0;
+      }
+      return null;
+    }, [running]);
     final look = homeLookNow;
     final dots = look == HomeLayout.dots;
     final bento = look == HomeLayout.bento;
@@ -94,20 +106,34 @@ class _BestButton extends HookConsumerWidget {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: running ? null : () => unawaited(pingAndChooseBest(ref)),
-          child: Container(
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: fill,
-              shape: dots ? BoxShape.rectangle : BoxShape.circle,
-              borderRadius: dots ? BorderRadius.circular(6) : null,
-              border: dots ? Border.all(color: ink, width: 1.2) : null,
-            ),
-            child: running
-                ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: ink))
-                : Icon(Icons.bolt_rounded, size: 22, color: ink),
-          ),
+          child: dots
+              // Dots: no frame, the bolt in the dots of the ping figures beside it (red while the servers are pinged)
+              ? SizedBox(
+                  width: size,
+                  height: size,
+                  child: Center(
+                    child: CustomPaint(
+                      size: Size(7 * 3.6, 9 * 3.6),
+                      painter: _DotBoltPainter(
+                        cell: 3.6,
+                        colour: ink,
+                        charge: _Dots.red,
+                        faint: _Dots.grid(dark),
+                        progress: running ? () => charging.value : null,
+                        repaint: charging,
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  width: size,
+                  height: size,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
+                  child: running
+                      ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: ink))
+                      : Icon(Icons.bolt_rounded, size: 22, color: ink),
+                ),
         ),
       ),
     );

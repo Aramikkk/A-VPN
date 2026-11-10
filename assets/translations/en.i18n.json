@@ -132,6 +132,7 @@
     "profileManagementActive": "active",
     "profileManagementNoCountries": "No server in this profile has a country I can tell",
     "profileCountriesAll": "all countries",
+    "profileWorkLast": "At least one subscription must be in the work",
     "profileExtraOn": "Add to the active one (servers together)",
     "profilePriorityOn": "Priority subscription",
     "homeSpeed": "Speed",

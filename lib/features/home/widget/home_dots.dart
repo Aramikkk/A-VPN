@@ -199,6 +199,9 @@ class _DotNumber extends StatelessWidget {
     '—': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
     '.': ['0', '0', '0', '0', '0', '0', '1'],
     '%': ['11001', '11010', '00010', '00100', '01000', '01011', '10011'],
+    // the best-server button's sign: a lightning bolt, in the same dots as the figures
+    // (nine rows, seven columns: chunky, reads as a bolt even small)
+    '⚡': ['0000111', '0001110', '0011100', '0111000', '1111111', '0001110', '0011100', '0111000', '0110000'],
   };
 
   /// the columns a glyph takes with the gap after it
@@ -208,11 +211,67 @@ class _DotNumber extends StatelessWidget {
   Widget build(BuildContext context) {
     final chars = text.split('').where(_glyphs.containsKey).toList();
     final width = chars.isEmpty ? 0.0 : (chars.fold<int>(0, (n, c) => n + advance(c)) - 1) * cell;
+    // the figures are seven rows high, the bolt nine
+    final rows = chars.fold<int>(7, (n, c) => math.max(n, _glyphs[c]!.length));
     return CustomPaint(
-      size: Size(width, 7 * cell),
+      size: Size(width, rows * cell),
       painter: _DotNumberPainter(chars: chars, cell: cell, colour: colour, faint: faint),
     );
   }
+}
+
+/// How many rows of the bolt are charged at [progress] (0 to 1) of a charge: from the bottom up, the last part of the
+/// cycle all of them (the flash), then it starts over.
+int boltChargedRows(double progress, int rows) => (progress.clamp(0.0, 1.0) * (rows + 2)).floor().clamp(0, rows);
+
+/// The bolt of the best-server button in dots. [progress] null: at rest, all lit in [colour]. Otherwise it charges: the
+/// rows charged so far in [charge], the rest of the bolt dim.
+class _DotBoltPainter extends CustomPainter {
+  _DotBoltPainter({
+    required this.cell,
+    required this.colour,
+    required this.charge,
+    required this.faint,
+    this.progress,
+    Listenable? repaint,
+  }) : super(repaint: repaint);
+
+  final double cell;
+  final Color colour;
+  final Color charge;
+  final Color faint;
+  final ValueGetter<double>? progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rows = _DotNumber._glyphs['⚡']!;
+    final lit = Paint()..color = colour;
+    final charged = Paint()..color = charge;
+    final dim = Paint()..color = colour.withValues(alpha: .26);
+    final off = Paint()..color = faint;
+    final r = cell * .42;
+    final p = progress?.call();
+    final filled = p == null ? rows.length : boltChargedRows(p, rows.length);
+    for (var y = 0; y < rows.length; y++) {
+      for (var x = 0; x < rows[y].length; x++) {
+        final centre = Offset((x + .5) * cell, (y + .5) * cell);
+        if (rows[y][x] != '1') {
+          canvas.drawCircle(centre, r * .45, off);
+          continue;
+        }
+        final fromBottom = rows.length - 1 - y;
+        canvas.drawCircle(centre, r, p == null ? lit : (fromBottom < filled ? charged : dim));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotBoltPainter old) =>
+      old.cell != cell ||
+      old.colour != colour ||
+      old.charge != charge ||
+      old.faint != faint ||
+      (old.progress == null) != (progress == null);
 }
 
 class _DotNumberPainter extends CustomPainter {
@@ -231,7 +290,7 @@ class _DotNumberPainter extends CustomPainter {
     var column = 0;
     for (final c in chars) {
       final rows = _DotNumber._glyphs[c]!;
-      for (var y = 0; y < 7; y++) {
+      for (var y = 0; y < rows.length; y++) {
         for (var x = 0; x < rows[y].length; x++) {
           final centre = Offset((column + x + .5) * cell, (y + .5) * cell);
           canvas.drawCircle(centre, rows[y][x] == '1' ? r : r * .45, rows[y][x] == '1' ? on : off);
