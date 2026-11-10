@@ -1,0 +1,377 @@
+From 4c44bf2dcb2e5d00393baa3a200a0c1aff1a67eb Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 19:54:10 +0300
+Subject: [PATCH] config: the AI group, one pinned group for all the AI
+ services (DeepSeek added)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ v2/config/ai_group.go         | 105 +++++++++++++++++++++++++++
+ v2/config/ai_group_test.go    | 133 ++++++++++++++++++++++++++++++++++
+ v2/config/builder.go          |   2 +
+ v2/config/hiddify_option.go   |   2 +
+ v2/config/site_groups.go      |  20 +++++
+ v2/config/site_groups_test.go |   8 +-
+ 6 files changed, 266 insertions(+), 4 deletions(-)
+ create mode 100644 v2/config/ai_group.go
+ create mode 100644 v2/config/ai_group_test.go
+
+diff --git a/v2/config/ai_group.go b/v2/config/ai_group.go
+new file mode 100644
+index 0000000..d2185c6
+--- /dev/null
++++ b/v2/config/ai_group.go
+@@ -0,0 +1,105 @@
++package config
++
++import (
++	"time"
++
++	C "github.com/sagernet/sing-box/constant"
++	"github.com/sagernet/sing-box/option"
++	"github.com/sagernet/sing/common/json/badoption"
++)
++
++// H: the AI group: one group, one server, for every foreign AI service (ChatGPT, Claude, Gemini, Perplexity, DeepSeek).
++// The servers are the user's choice for the network the config is made for: the main one first, then the backups. The
++// group stays on the main one and goes to the next only when the one in use has failed, and back after the main one
++// has answered everything for ten minutes (a "pinned" group of sing-box). The AI services have no groups of their own
++// then (see applySiteGroups).
++
++// AIGroupTag is the tag of the AI group.
++const AIGroupTag = "ai"
++
++// aiServices are the site groups' keys of the AI services the AI group takes over.
++var aiServices = []string{"chatgpt", "claude", "gemini", "perplexity", "deepseek"}
++
++func isAIService(key string) bool {
++	for _, k := range aiServices {
++		if k == key {
++			return true
++		}
++	}
++	return false
++}
++
++func hasOutbound(options *option.Options, tag string) bool {
++	for _, out := range options.Outbounds {
++		if out.Tag == tag {
++			return true
++		}
++	}
++	return false
++}
++
++// applyAIGroup adds the AI group and the rules sending the AI services to it. It returns false (and changes nothing)
++// when no chosen server is among the config's outbounds.
++func applyAIGroup(options *option.Options, hopt *HiddifyOptions) bool {
++	if len(hopt.AIGroupServers) == 0 || options.Route == nil {
++		return false
++	}
++	servers := make([]string, 0, len(hopt.AIGroupServers))
++	seen := map[string]bool{}
++	for _, tag := range hopt.AIGroupServers {
++		if seen[tag] || !hasOutbound(options, tag) {
++			continue
++		}
++		seen[tag] = true
++		servers = append(servers, tag)
++	}
++	if len(servers) == 0 {
++		return false
++	}
++	var url string
++	var probes []string
++	rules := make([]option.Rule, 0, 2*len(aiServices))
++	seenProbe := map[string]bool{}
++	for _, site := range siteGroups {
++		if !isAIService(site.key) {
++			continue
++		}
++		if url == "" {
++			url = site.url
++		}
++		for _, probe := range site.probes {
++			if !seenProbe[probe] {
++				seenProbe[probe] = true
++				probes = append(probes, probe)
++			}
++		}
++		if len(site.packages) > 0 {
++			rules = append(rules, siteGroupRule(AIGroupTag, option.RawDefaultRule{PackageName: site.packages}))
++		}
++		rules = append(rules, siteGroupRule(AIGroupTag, option.RawDefaultRule{DomainSuffix: site.domainSuffix, IPCIDR: prefixables(site.ipCIDR)}))
++	}
++	group := option.Outbound{
++		Type: C.TypeURLTest,
++		Tag:  AIGroupTag,
++		Options: &option.URLTestOutboundOptions{
++			Outbounds: servers,
++			URL:       url,
++			URLs:      probes,
++			// every probe must answer: a server that reaches the page but not the API is a failed one
++			StrictURLs: true,
++			// a test every ten seconds while the AI is in use (idle half an hour: no tests); three unanswered in a row
++			// is a failed server
++			Interval:      badoption.Duration(10 * time.Second),
++			IdleTimeout:   badoption.Duration(30 * time.Minute),
++			StableSamples: 3,
++			TestTimeout:   badoption.Duration(10 * time.Second),
++			// the servers in the order given; no warm-up: it would send the AI through the main choice
++			Pinned:       true,
++			PinnedReturn: badoption.Duration(10 * time.Minute),
++			// its own results; what is open on a server it leaves is closed by the group itself
++			PrivateHistory: true,
++		},
++	}
++	insertSiteOutbounds(options, []option.Outbound{group}, rules)
++	return true
++}
+diff --git a/v2/config/ai_group_test.go b/v2/config/ai_group_test.go
+new file mode 100644
+index 0000000..46de15a
+--- /dev/null
++++ b/v2/config/ai_group_test.go
+@@ -0,0 +1,133 @@
++package config
++
++import (
++	"testing"
++	"time"
++
++	C "github.com/sagernet/sing-box/constant"
++	"github.com/sagernet/sing-box/experimental/libbox"
++	"github.com/sagernet/sing-box/option"
++)
++
++func aiOptions(servers ...string) *HiddifyOptions {
++	return &HiddifyOptions{URLTestOptions: URLTestOptions{AIGroupServers: servers}}
++}
++
++func findAIGroup(options *option.Options) *option.URLTestOutboundOptions {
++	for _, out := range options.Outbounds {
++		if out.Tag == AIGroupTag {
++			return out.Options.(*option.URLTestOutboundOptions)
++		}
++	}
++	return nil
++}
++
++func ruleSuffixOutbound(options *option.Options, suffix string) string {
++	for _, rule := range options.Route.Rules {
++		for _, s := range rule.DefaultOptions.DomainSuffix {
++			if s == suffix {
++				return rule.DefaultOptions.RuleAction.RouteOptions.Outbound
++			}
++		}
++	}
++	return ""
++}
++
++func TestAIGroupOffChangesNothing(t *testing.T) {
++	options := siteGroupsTestOptions()
++	if applyAIGroup(options, aiOptions()) {
++		t.Fatal("no servers chosen: no group")
++	}
++	if len(options.Outbounds) != 7 || len(options.Route.Rules) != 4 {
++		t.Fatalf("off: %d outbounds, %d rules", len(options.Outbounds), len(options.Route.Rules))
++	}
++}
++
++func TestAIGroupIsPinnedToTheChosenServersInOrder(t *testing.T) {
++	options := siteGroupsTestOptions()
++	if !applyAIGroup(options, aiOptions("fi", "pl", "lv")) {
++		t.Fatal("three servers chosen: a group")
++	}
++	group := findAIGroup(options)
++	if group == nil {
++		t.Fatal("no group " + AIGroupTag)
++	}
++	if !group.Pinned || !group.StrictURLs || len(group.URLs) < 2 || !group.PrivateHistory || group.InterruptExistConnections {
++		t.Fatalf("pinned, strict, several probes, private expected: %+v", group)
++	}
++	if len(group.Outbounds) != 3 || group.Outbounds[0] != "fi" || group.Outbounds[1] != "pl" || group.Outbounds[2] != "lv" {
++		t.Fatalf("the chosen servers in the order given: %v", group.Outbounds)
++	}
++	if group.Interval.Build() != 10*time.Second || group.StableSamples != 3 || group.WarmUp.Build() != 0 || group.Candidates != 0 {
++		t.Fatalf("every 10 s, three samples, no warm-up (it would send the AI through the main choice): %+v", group)
++	}
++	if options.Outbounds[0].Tag != OutboundSelectTag || options.Outbounds[len(options.Outbounds)-1].Tag != OutboundDirectTag {
++		t.Fatal("the main group stays first, the direct outbound last")
++	}
++	for _, suffix := range []string{"claude.ai", "anthropic.com", "chatgpt.com", "openai.com", "gemini.google.com", "perplexity.ai", "deepseek.com"} {
++		if got := ruleSuffixOutbound(options, suffix); got != AIGroupTag {
++			t.Errorf("%s goes to %q, want %q", suffix, got, AIGroupTag)
++		}
++	}
++}
++
++func TestAIGroupSkipsServersThatAreNotThere(t *testing.T) {
++	options := siteGroupsTestOptions()
++	if !applyAIGroup(options, aiOptions("fi", "gone")) {
++		t.Fatal("one of two exists: a group")
++	}
++	if group := findAIGroup(options); len(group.Outbounds) != 1 || group.Outbounds[0] != "fi" {
++		t.Fatalf("only the server that exists: %v", group.Outbounds)
++	}
++	options = siteGroupsTestOptions()
++	if applyAIGroup(options, aiOptions("gone")) || findAIGroup(options) != nil {
++		t.Fatal("none exists: no group")
++	}
++}
++
++func TestSiteGroupsLeaveTheAIServicesToTheAIGroup(t *testing.T) {
++	options := siteGroupsTestOptions()
++	applyAIGroup(options, aiOptions("fi", "pl"))
++	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{SiteGroups: true, AIGroupServers: []string{"fi", "pl"}}})
++	for _, out := range options.Outbounds {
++		switch out.Tag {
++		case SiteGroupTagPrefix + "chatgpt", SiteGroupTagPrefix + "claude", SiteGroupTagPrefix + "gemini",
++			SiteGroupTagPrefix + "perplexity", SiteGroupTagPrefix + "deepseek":
++			t.Errorf("%s still has a group of its own", out.Tag)
++		}
++	}
++	found := false
++	for _, out := range options.Outbounds {
++		if out.Tag == SiteGroupTagPrefix+"youtube" && out.Type == C.TypeURLTest {
++			found = true
++		}
++	}
++	if !found {
++		t.Fatal("the other services keep their groups")
++	}
++	if got := ruleSuffixOutbound(options, "claude.ai"); got != AIGroupTag {
++		t.Fatalf("claude.ai goes to %q", got)
++	}
++}
++
++// The whole config built with the AI group on, as the app starts the core with it: sing-box takes it.
++func TestAIGroupBuiltConfigChecks(t *testing.T) {
++	profile := `{"outbounds": [
++  {"type": "socks", "tag": "🇩🇪 Германия", "server": "127.0.0.1", "server_port": 1080},
++  {"type": "socks", "tag": "🇫🇮 Финляндия", "server": "127.0.0.1", "server_port": 1081},
++  {"type": "socks", "tag": "🇸🇪 Швеция", "server": "127.0.0.1", "server_port": 1082}]}`
++	hopts := DefaultHiddifyOptions()
++	hopts.SiteGroups = true
++	hopts.AIGroupServers = []string{"🇫🇮 Финляндия", "🇩🇪 Германия"}
++	options, err := BuildConfig(libbox.BaseContext(nil), hopts, &ReadOptions{Content: profile})
++	if err != nil {
++		t.Fatalf("BuildConfig: %v", err)
++	}
++	if err := libbox.CheckConfigOptions(options); err != nil {
++		t.Fatalf("sing-box rejects the config: %v", err)
++	}
++	group := findAIGroup(options)
++	if group == nil || len(group.Outbounds) != 2 || group.Outbounds[0] != "🇫🇮 Финляндия" {
++		t.Fatalf("the AI group with the chosen servers in order: %+v", group)
++	}
++}
+diff --git a/v2/config/builder.go b/v2/config/builder.go
+index eb0fe2f..16a4066 100644
+--- a/v2/config/builder.go
++++ b/v2/config/builder.go
+@@ -82,6 +82,7 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 		}
+ 		local.PriorityProfile = input.Experimental.Monitoring.PriorityProfile
+ 		local.PriorityMargin = input.Experimental.Monitoring.PriorityMargin
++		local.AIGroupServers = input.Experimental.Monitoring.AIGroupServers
+ 		hopts = &local
+ 		value := input.Experimental.Monitoring.URLTestTimeout
+ 		if value.Build() >= time.Second && value.Build() <= 30*time.Second {
+@@ -112,6 +113,7 @@ func BuildConfig(ctx context.Context, hopts *HiddifyOptions, inputOpt *ReadOptio
+ 		return nil, err
+ 	}
+ 	prependInputRouteRules(&options, input)
++	applyAIGroup(&options, hopts)
+ 	applySiteGroups(&options, hopts)
+ 	applyAdBlock(&options, hopts)
+ 
+diff --git a/v2/config/hiddify_option.go b/v2/config/hiddify_option.go
+index 6f3d5ed..d66594d 100644
+--- a/v2/config/hiddify_option.go
++++ b/v2/config/hiddify_option.go
+@@ -97,6 +97,8 @@ type URLTestOptions struct {
+ 	SiteGroupApps []string `json:"site-group-apps,omitempty" overridable:"true"`
+ 	// H: the chosen apps are the whole choice (the phone): a service only when its app is chosen
+ 	SiteGroupAppsOnly bool `json:"site-group-apps-only,omitempty" overridable:"true"`
++	// H: the AI group: one server for all the AI services, the main one and up to two backups, by tag (see applyAIGroup)
++	AIGroupServers []string `json:"ai-group-servers,omitempty" overridable:"true"`
+ 	// URLTestIdleTimeout DurationInSeconds `json:"url-test-idle-timeout"`
+ }
+ 
+diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
+index fcc4a25..085dc15 100644
+--- a/v2/config/site_groups.go
++++ b/v2/config/site_groups.go
+@@ -102,6 +102,15 @@ var siteGroups = []siteGroup{
+ 		always:       true,
+ 		packages:     []string{"ai.perplexity.app.android"},
+ 	},
++	{
++		key:          "deepseek",
++		url:          "https://chat.deepseek.com/",
++		probes:       []string{"https://chat.deepseek.com/", "https://api.deepseek.com/"},
++		domainSuffix: []string{"deepseek.com", "deepseek.ai"},
++		sticky:       true,
++		always:       true,
++		packages:     []string{"com.deepseek.chat"},
++	},
+ 	{
+ 		key:          "gdrive",
+ 		url:          "https://drive.google.com/",
+@@ -168,7 +177,12 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 	for _, app := range apps {
+ 		rules = append(rules, siteGroupRule(app.tag, option.RawDefaultRule{PackageName: []string{app.pkg}}))
+ 	}
++	aiGroup := hasOutbound(options, AIGroupTag)
+ 	for _, site := range siteGroups {
++		// the AI services go through the AI group when there is one
++		if aiGroup && isAIService(site.key) {
++			continue
++		}
+ 		if hopt.SiteGroupAppsOnly && !services[site.key] && !site.always {
+ 			continue
+ 		}
+@@ -182,6 +196,12 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 	if len(groups) == 0 {
+ 		return
+ 	}
++	insertSiteOutbounds(options, groups, rules)
++}
++
++// insertSiteOutbounds puts [groups] after the main group and [rules] before the first rule sending traffic through the
++// VPN, so the rules sending something direct or blocking it still come first.
++func insertSiteOutbounds(options *option.Options, groups []option.Outbound, rules []option.Rule) {
+ 	// after the main group (the app takes the first group as the server list), before the direct ones
+ 	at := len(options.Outbounds)
+ 	for i, out := range options.Outbounds {
+diff --git a/v2/config/site_groups_test.go b/v2/config/site_groups_test.go
+index be0a7e6..da73aa4 100644
+--- a/v2/config/site_groups_test.go
++++ b/v2/config/site_groups_test.go
+@@ -198,10 +198,10 @@ func TestSiteGroupApps(t *testing.T) {
+ 		}
+ 	}
+ 	// Instagram's and the bank's, and the AI chats' (always, whatever the phone chose)
+-	if len(urls) != 6 {
+-		t.Fatalf("Instagram's group, the bank's and the four AI chats': %v", urls)
++	if len(urls) != 7 {
++		t.Fatalf("Instagram's group, the bank's and the five AI chats': %v", urls)
+ 	}
+-	for _, key := range []string{"chatgpt", "gemini", "claude", "perplexity"} {
++	for _, key := range []string{"chatgpt", "gemini", "claude", "perplexity", "deepseek"} {
+ 		if urls[SiteGroupTagPrefix+key] == "" {
+ 			t.Fatalf("the %s group is always there: %v", key, urls)
+ 		}
+@@ -229,7 +229,7 @@ func TestSiteGroupApps(t *testing.T) {
+ func TestSiteGroupAppsNoneChosen(t *testing.T) {
+ 	options := siteGroupsTestOptions()
+ 	applySiteGroups(options, &HiddifyOptions{URLTestOptions: URLTestOptions{SiteGroups: true, SiteGroupAppsOnly: true}})
+-	if len(options.Outbounds) != 7+4 || len(options.Route.Rules) != 4+8 {
++	if len(options.Outbounds) != 7+5 || len(options.Route.Rules) != 4+10 {
+ 		t.Fatalf("nothing chosen: %d outbounds, %d rules", len(options.Outbounds), len(options.Route.Rules))
+ 	}
+ 	for _, out := range options.Outbounds {
+-- 
+2.55.0.windows.3
+

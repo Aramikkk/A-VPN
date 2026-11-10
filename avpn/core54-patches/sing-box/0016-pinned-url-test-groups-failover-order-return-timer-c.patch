@@ -1,0 +1,327 @@
+From c40d4feab5a194f6a5c7c0dbfcd0c4475d999545 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 19:52:04 +0300
+Subject: [PATCH 16/17] pinned url-test groups: failover order, return timer,
+ connections dropped on a network change
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ protocol/group/h_urltest_modes.go |  4 ++
+ protocol/group/pinned.go          | 75 +++++++++++++++++++++++-
+ protocol/group/pinned_test.go     | 97 +++++++++++++++++++++++++++++++
+ protocol/group/urltest.go         | 27 ++++++++-
+ 4 files changed, 201 insertions(+), 2 deletions(-)
+
+diff --git a/protocol/group/h_urltest_modes.go b/protocol/group/h_urltest_modes.go
+index 5cede32b1..77e31bdef 100644
+--- a/protocol/group/h_urltest_modes.go
++++ b/protocol/group/h_urltest_modes.go
+@@ -133,6 +133,10 @@ func (g *URLTestGroup) penaltyBest(network string, exclude adapter.Outbound) ada
+ // selectForUpdate is the selection of performUpdateCheck: failover keeps the selected member,
+ // and penalties rank first when the fastest member has too many.
+ func (g *URLTestGroup) selectForUpdate(network string) (adapter.Outbound, bool) {
++	// H: a pinned group (the AI services) goes by its own order and failure window only, not by the penalties
++	if g.pinned && g.stableSamples > 0 {
++		return g.selectPinned(network)
++	}
+ 	if g.penaltyEmergency(network) {
+ 		if best := g.penaltyBest(network, nil); best != nil {
+ 			return best, true
+diff --git a/protocol/group/pinned.go b/protocol/group/pinned.go
+index 3d9b7d033..9057a9b7e 100644
+--- a/protocol/group/pinned.go
++++ b/protocol/group/pinned.go
+@@ -1,6 +1,12 @@
+ package group
+ 
+-import "time"
++import (
++	"time"
++
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing/common"
++	N "github.com/sagernet/sing/common/network"
++)
+ 
+ // H: pinnedChoice picks the server of a pinned group (the AI services: one server, chosen by the user, that must not
+ // hop). [order] is the servers by the user's priority (the main one, then the backups), [current] the server in use,
+@@ -40,3 +46,70 @@ func pinnedChoice(order []string, current string, down func(tag string) bool, pr
+ 	}
+ 	return current
+ }
++
++// pinnedDown: a server of a pinned group has failed when it has the results of a whole window and none of them answered.
++func (g *URLTestGroup) pinnedDown(tag string) bool {
++	g.samplesAccess.Lock()
++	list := append([]uint16(nil), g.samples[tag]...)
++	g.samplesAccess.Unlock()
++	if len(list) < g.stableSamples || len(list) == 0 {
++		return false
++	}
++	for _, delay := range list {
++		if delay != 0 && delay != 65535 {
++			return false
++		}
++	}
++	return true
++}
++
++// notePrimary: the main server answered (or not) a test: the count of how long it has answered everything starts at
++// its first answer and starts again after a failed test.
++func (g *URLTestGroup) notePrimary(answered bool, now time.Time) {
++	if !answered {
++		g.primaryUp.Store(0)
++		return
++	}
++	g.primaryUp.CompareAndSwap(0, now.UnixNano())
++}
++
++// primaryUpFor: how long the main server has answered every test (0: it has not).
++func (g *URLTestGroup) primaryUpFor(now time.Time) time.Duration {
++	since := g.primaryUp.Load()
++	if since == 0 {
++		return 0
++	}
++	return now.Sub(time.Unix(0, since))
++}
++
++// selectPinned: the pinned group's choice for [network] among its servers in the order given.
++func (g *URLTestGroup) selectPinned(network string) (adapter.Outbound, bool) {
++	var order []adapter.Outbound
++	for _, detour := range g.outbounds {
++		if common.Contains(detour.Network(), network) {
++			order = append(order, detour)
++		}
++	}
++	if len(order) == 0 {
++		return nil, false
++	}
++	tags := make([]string, len(order))
++	for i, detour := range order {
++		tags[i] = detour.Tag()
++	}
++	current := g.selectedOutboundTCP
++	if network == N.NetworkUDP {
++		current = g.selectedOutboundUDP
++	}
++	currentTag := ""
++	if current != nil {
++		currentTag = current.Tag()
++	}
++	chosen := pinnedChoice(tags, currentTag, g.pinnedDown, g.primaryUpFor(time.Now()), g.pinnedReturn)
++	for _, detour := range order {
++		if detour.Tag() == chosen {
++			return detour, true
++		}
++	}
++	return order[0], true
++}
+diff --git a/protocol/group/pinned_test.go b/protocol/group/pinned_test.go
+index 3a591875c..6c6d1b838 100644
+--- a/protocol/group/pinned_test.go
++++ b/protocol/group/pinned_test.go
+@@ -3,6 +3,9 @@ package group
+ import (
+ 	"testing"
+ 	"time"
++
++	"github.com/sagernet/sing-box/adapter"
++	N "github.com/sagernet/sing/common/network"
+ )
+ 
+ func TestPinnedChoice(t *testing.T) {
+@@ -44,3 +47,97 @@ func TestPinnedChoice(t *testing.T) {
+ 		}
+ 	}
+ }
++
++type fakeOut struct {
++	adapter.Outbound
++	tag string
++}
++
++func (f fakeOut) Tag() string       { return f.tag }
++func (f fakeOut) Network() []string { return []string{N.NetworkTCP, N.NetworkUDP} }
++
++func pinnedGroup(tags ...string) *URLTestGroup {
++	g := &URLTestGroup{stableSamples: 3, pinned: true, pinnedReturn: 10 * time.Minute, samples: map[string][]uint16{}}
++	for _, tag := range tags {
++		g.outbounds = append(g.outbounds, fakeOut{tag: tag})
++	}
++	return g
++}
++
++func TestPinnedDown(t *testing.T) {
++	g := pinnedGroup("a")
++	set := func(results ...uint16) { g.samples["a"] = results }
++	set()
++	if g.pinnedDown("a") {
++		t.Fatal("no results yet: not down")
++	}
++	set(0, 0)
++	if g.pinnedDown("a") {
++		t.Fatal("two failed tests are less than a whole window: not down")
++	}
++	set(120, 0, 0)
++	if g.pinnedDown("a") {
++		t.Fatal("one test of the window answered: not down")
++	}
++	set(0, 65535, 0)
++	if !g.pinnedDown("a") {
++		t.Fatal("a whole window unanswered: down")
++	}
++}
++
++func TestPrimaryReturnTimer(t *testing.T) {
++	g := pinnedGroup("a", "b")
++	now := time.Unix(1000, 0)
++	if g.primaryUpFor(now) != 0 {
++		t.Fatal("never answered: zero")
++	}
++	g.notePrimary(true, now)
++	g.notePrimary(true, now.Add(time.Minute))
++	if got := g.primaryUpFor(now.Add(4 * time.Minute)); got != 4*time.Minute {
++		t.Fatalf("counted from the first answer, got %v", got)
++	}
++	g.notePrimary(false, now.Add(5*time.Minute))
++	if g.primaryUpFor(now.Add(6*time.Minute)) != 0 {
++		t.Fatal("one failed test starts the count again")
++	}
++}
++
++func TestSelectPinned(t *testing.T) {
++	g := pinnedGroup("a", "b", "c")
++	pick := func() string {
++		out, ok := g.selectPinned(N.NetworkTCP)
++		if !ok || out == nil {
++			t.Fatal("a pinned group always has a choice")
++		}
++		return out.Tag()
++	}
++	if got := pick(); got != "a" {
++		t.Fatalf("before any test: the main server, got %s", got)
++	}
++	g.selectedOutboundTCP = g.outbounds[0]
++	g.samples["a"] = []uint16{0, 0, 0}
++	if got := pick(); got != "b" {
++		t.Fatalf("main failed: the first backup, got %s", got)
++	}
++	g.selectedOutboundTCP = g.outbounds[1]
++	g.samples["b"] = []uint16{0, 0, 0}
++	if got := pick(); got != "c" {
++		t.Fatalf("the first backup failed too: the second, got %s", got)
++	}
++	g.selectedOutboundTCP = g.outbounds[2]
++	g.samples["c"] = []uint16{0, 0, 0}
++	if got := pick(); got != "c" {
++		t.Fatalf("all failed: stays, got %s", got)
++	}
++	g.selectedOutboundTCP = g.outbounds[1]
++	g.samples["a"] = []uint16{50, 50, 50}
++	g.samples["b"] = []uint16{50, 50, 50}
++	g.primaryUp.Store(time.Now().Add(-9 * time.Minute).UnixNano())
++	if got := pick(); got != "b" {
++		t.Fatalf("main back for nine minutes: stays on the backup, got %s", got)
++	}
++	g.primaryUp.Store(time.Now().Add(-11 * time.Minute).UnixNano())
++	if got := pick(); got != "a" {
++		t.Fatalf("main stable for ten minutes: back to it, got %s", got)
++	}
++}
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index 5635fd96d..fdce84883 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -59,6 +59,8 @@ type URLTest struct {
+ 	minDwell                     time.Duration // H
+ 	strictURLs                   bool          // H
+ 	sticky                       bool          // H
++	pinned                       bool          // H: the servers in the order given: the main one and its backups
++	pinnedReturn                 time.Duration // H
+ 	// H: the warm-up: until warmUntil (unix ns) everything goes through warmDetour
+ 	warmUp        time.Duration
+ 	warmDetourTag string
+@@ -95,6 +97,8 @@ func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLo
+ 		minDwell:                     time.Duration(options.MinDwell),
+ 		strictURLs:                   options.StrictURLs,
+ 		sticky:                       options.Sticky,
++		pinned:                       options.Pinned,
++		pinnedReturn:                 time.Duration(options.PinnedReturn),
+ 		warmUp:                       time.Duration(options.WarmUp),
+ 		stableSamples:                options.StableSamples,
+ 		testTimeout:                  time.Duration(options.TestTimeout),
+@@ -155,6 +159,11 @@ func (s *URLTest) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+ 		group.startGap = s.startGap
+ 		group.minDwell = s.minDwell
+ 		group.sticky = s.sticky
++		group.pinned = s.pinned
++		group.pinnedReturn = s.pinnedReturn
++		if group.pinned && group.pinnedReturn <= 0 {
++			group.pinnedReturn = 10 * time.Minute
++		}
+ 		group.strictURLs = s.strictURLs
+ 		group.testTimeout = s.testTimeout
+ 		s.group = group
+@@ -293,6 +302,11 @@ func (s *URLTest) InterfaceUpdated(ctx context.Context) {
+ 	if group == nil {
+ 		return
+ 	}
++	// H: another network: a pinned group drops what is open on the old network first, then starts its tests afresh
++	if group.pinned {
++		group.interruptGroup.Interrupt(true)
++		group.resetSamples()
++	}
+ 	// H: another network: the main choice first again, for the warm-up
+ 	s.warm()
+ 	if group.pause.IsDevicePaused() || group.pause.IsNetworkPaused() {
+@@ -396,6 +410,9 @@ type URLTestGroup struct {
+ 	minDwell      time.Duration // H
+ 	strictURLs    bool          // H
+ 	sticky        bool          // H
++	pinned        bool          // H: see URLTest.pinned
++	pinnedReturn  time.Duration // H
++	primaryUp     atomic.Int64  // H: since when the main server has answered every test (unix ns, 0: it has not)
+ 	switchedAt    atomic.Int64  // H: when the server was last changed (unix ns)
+ 	samples       map[string][]uint16
+ 	samplesAccess sync.Mutex
+@@ -482,6 +499,9 @@ func (g *URLTestGroup) Close() error {
+ }
+ 
+ func (g *URLTestGroup) Select(network string) (adapter.Outbound, bool) {
++	if g.pinned && g.stableSamples > 0 {
++		return g.selectPinned(network)
++	}
+ 	if g.stableSamples > 0 {
+ 		return g.selectStable(network)
+ 	}
+@@ -772,7 +792,8 @@ func (g *URLTestGroup) performUpdateCheck() {
+ 	}
+ 	if updated {
+ 		g.switchedAt.Store(time.Now().UnixNano())
+-		g.interruptGroup.Interrupt(g.interruptExternalConnections)
++		// H: a pinned group (the AI services) drops what is open on the server it leaves
++		g.interruptGroup.Interrupt(g.interruptExternalConnections || g.pinned)
+ 		g.signalSelection() //H
+ 	}
+ 	if selected {
+@@ -822,6 +843,7 @@ func (g *URLTestGroup) resetSamples() {
+ 	g.samplesAccess.Lock()
+ 	g.samples = nil
+ 	g.samplesAccess.Unlock()
++	g.primaryUp.Store(0)
+ }
+ 
+ // H: recordSamples adds a round's results: each server's delay, 0 for one that didn't answer.
+@@ -838,6 +860,9 @@ func (g *URLTestGroup) recordSamples(tested []adapter.Outbound, result map[strin
+ 			list = list[len(list)-g.stableSamples:]
+ 		}
+ 		g.samples[tag] = list
++		if g.pinned && len(g.outbounds) > 0 && tag == g.outbounds[0].Tag() {
++			g.notePrimary(result[tag] != 0 && result[tag] != 65535, time.Now())
++		}
+ 	}
+ }
+ 
+-- 
+2.55.0.windows.3
+

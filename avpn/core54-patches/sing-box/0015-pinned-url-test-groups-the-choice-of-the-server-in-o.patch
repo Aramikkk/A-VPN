@@ -1,0 +1,134 @@
+From 3450f332e1e0f75f8681c942be3d801a288348a3 Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 19:50:55 +0300
+Subject: [PATCH 15/17] pinned url-test groups: the choice of the server in
+ order
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ option/group.go               |  5 ++++
+ protocol/group/pinned.go      | 42 ++++++++++++++++++++++++++++++++
+ protocol/group/pinned_test.go | 46 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 93 insertions(+)
+ create mode 100644 protocol/group/pinned.go
+ create mode 100644 protocol/group/pinned_test.go
+
+diff --git a/option/group.go b/option/group.go
+index a4ed3fccc..a21de66c0 100644
+--- a/option/group.go
++++ b/option/group.go
+@@ -35,6 +35,11 @@ type URLTestOutboundOptions struct {
+ 	// H: the server in use is kept until it stops answering (three tests in a row) or is a second slower than the
+ 	// best: for services that dislike a changed address (the AI chats)
+ 	Sticky bool `json:"sticky,omitempty"`
++	// H: a pinned group (the AI services): the servers in the order given are the main one and its backups; the group goes 
++	// to the next only when the one in use has failed, and back to the main one after it answered everything for
++	// pinned_return (10 minutes by default)
++	Pinned       bool               `json:"pinned,omitempty"`
++	PinnedReturn badoption.Duration `json:"pinned_return,omitempty"`
+ 	// H: how long one test may take (0: the TCP timeout, 5 s)
+ 	TestTimeout badoption.Duration `json:"test_timeout,omitempty"`
+ 	// H: the background checks test this many servers at a time, StartGap apart, instead of every server at once
+diff --git a/protocol/group/pinned.go b/protocol/group/pinned.go
+new file mode 100644
+index 000000000..3d9b7d033
+--- /dev/null
++++ b/protocol/group/pinned.go
+@@ -0,0 +1,42 @@
++package group
++
++import "time"
++
++// H: pinnedChoice picks the server of a pinned group (the AI services: one server, chosen by the user, that must not
++// hop). [order] is the servers by the user's priority (the main one, then the backups), [current] the server in use,
++// [down] says a server has failed (a whole window of tests unanswered). The group leaves the server in use only when it
++// is down, then takes the first one in the order that is not; from a backup it goes back to the main one only after the
++// main one has answered everything for [returnAfter] ([primaryUpFor] is how long it has). When every server is down it
++// stays where it is.
++func pinnedChoice(order []string, current string, down func(tag string) bool, primaryUpFor, returnAfter time.Duration) string {
++	if len(order) == 0 {
++		return current
++	}
++	first := ""
++	for _, tag := range order {
++		if !down(tag) {
++			first = tag
++			break
++		}
++	}
++	if first == "" {
++		if current != "" {
++			return current
++		}
++		return order[0]
++	}
++	inOrder := false
++	for _, tag := range order {
++		if tag == current {
++			inOrder = true
++			break
++		}
++	}
++	if current == "" || !inOrder || down(current) {
++		return first
++	}
++	if current != order[0] && !down(order[0]) && primaryUpFor >= returnAfter {
++		return order[0]
++	}
++	return current
++}
+diff --git a/protocol/group/pinned_test.go b/protocol/group/pinned_test.go
+new file mode 100644
+index 000000000..3a591875c
+--- /dev/null
++++ b/protocol/group/pinned_test.go
+@@ -0,0 +1,46 @@
++package group
++
++import (
++	"testing"
++	"time"
++)
++
++func TestPinnedChoice(t *testing.T) {
++	order := []string{"a", "b", "c"}
++	downSet := func(tags ...string) func(string) bool {
++		return func(tag string) bool {
++			for _, d := range tags {
++				if d == tag {
++					return true
++				}
++			}
++			return false
++		}
++	}
++	const ret = 10 * time.Minute
++	cases := []struct {
++		name    string
++		current string
++		down    []string
++		upFor   time.Duration
++		want    string
++	}{
++		{"nothing chosen yet: the first that answers", "", nil, 0, "a"},
++		{"nothing chosen yet, primary down", "", []string{"a"}, 0, "b"},
++		{"primary in use and up: stays", "a", nil, 0, "a"},
++		{"primary down: the first backup", "a", []string{"a"}, 0, "b"},
++		{"primary and the first backup down: the second", "a", []string{"a", "b"}, 0, "c"},
++		{"all down: stays where it is", "c", []string{"a", "b", "c"}, 0, "c"},
++		{"on a backup, primary up nine minutes: stays", "b", nil, 9 * time.Minute, "b"},
++		{"on a backup, primary up ten minutes: back to primary", "b", nil, 10 * time.Minute, "a"},
++		{"on a backup that is down, primary up: primary at once", "b", []string{"b"}, 0, "a"},
++		{"on the second backup, the first up and primary still down: stays", "c", []string{"a"}, 0, "c"},
++		{"on the second backup that is down, primary down, first backup up", "c", []string{"a", "c"}, 0, "b"},
++	}
++	for _, c := range cases {
++		got := pinnedChoice(order, c.current, downSet(c.down...), c.upFor, ret)
++		if got != c.want {
++			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
++		}
++	}
++}
+-- 
+2.55.0.windows.3
+

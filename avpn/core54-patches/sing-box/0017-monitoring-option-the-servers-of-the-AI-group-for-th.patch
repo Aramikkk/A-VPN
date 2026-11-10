@@ -1,0 +1,26 @@
+From 453b5c0881edeac4725cbb38f697ed9588fc5a9a Mon Sep 17 00:00:00 2001
+From: Aram <154891765+Aramikkk@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 19:54:10 +0300
+Subject: [PATCH 17/17] monitoring option: the servers of the AI group for the
+ network the config is made for
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ option/monitoring.go | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/option/monitoring.go b/option/monitoring.go
+index b37bc95d8..47c740eda 100644
+--- a/option/monitoring.go
++++ b/option/monitoring.go
+@@ -28,4 +28,7 @@ type MonitoringOptions struct {
+ 	// leaves it. Read by hiddify-core's config builder.
+ 	PriorityProfile int    `json:"priority_profile,omitempty"`
+ 	PriorityMargin  uint16 `json:"priority_margin,omitempty"`
++	// H: the servers of the AI group for the network the config is made for (the main one, then the backups, by tag);
++	// empty: no AI group. Read by hiddify-core's config builder.
++	AIGroupServers []string `json:"ai_group_servers,omitempty"`
+ }
+-- 
+2.55.0.windows.3
+
