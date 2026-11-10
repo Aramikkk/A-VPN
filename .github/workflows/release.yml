@@ -168,3 +168,105 @@ jobs:
           flags=""
           if [ "${{ inputs.prerelease }}" = "true" ]; then flags="--prerelease"; fi
           gh release create "v$version" out/* --title "A-VPN $version" --notes "$notes" $flags
+
+  # ---- Windows: the same core (as a DLL), the app and the installer, attached to the release made above ------------
+  windows:
+    needs: release
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *([0-9.]+)\+.*/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Core sources and A-VPN patches
+        shell: bash
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global user.name "A-VPN build"
+          git config --global user.email "build@users.noreply.github.com"
+          git clone "$CORE_REPO" core
+          cd core
+          git checkout "$CORE_COMMIT"
+          git submodule update --init ray2sing hiddify-sing-box
+          (cd hiddify-sing-box && git checkout "$SINGBOX_COMMIT" && git submodule update --init --recursive)
+          git am --3way ../avpn/core54-patches/core/*.patch
+          (cd hiddify-sing-box && git am --3way ../../avpn/core54-patches/sing-box/*.patch)
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      # the core is built with cgo, so it needs a MinGW compiler
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: mingw-w64-x86_64-gcc
+
+      - name: Core (hiddify-core.dll and HiddifyCli.exe)
+        shell: msys2 {0}
+        working-directory: core
+        env:
+          GOFLAGS: -mod=mod
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "1"
+          CC: gcc
+        run: |
+          TAGS=with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_grpc,with_awg,tfogo_checklinkname0,with_conntrack,with_purego
+          LDFLAGS="-w -s -checklinkname=0 -buildid="
+          mkdir -p bin
+          go build -trimpath -ldflags="$LDFLAGS" -buildmode=c-shared -tags "$TAGS" -o bin/hiddify-core.dll ./platform/desktop
+          cp bin/hiddify-core.dll ./hiddify-core.dll
+          CGO_LDFLAGS="hiddify-core.dll" go build -trimpath -ldflags="$LDFLAGS" -tags "$TAGS" -o bin/HiddifyCli.exe ./cmd/bydll
+          rm -f ./hiddify-core.dll
+          ls -la bin
+
+      - name: Put the core in the app
+        shell: bash
+        run: |
+          mkdir -p hiddify-core/bin
+          cp core/bin/hiddify-core.dll core/bin/HiddifyCli.exe hiddify-core/bin/
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Generated code
+        shell: bash
+        run: |
+          flutter pub get
+          dart run slang
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: App (Windows)
+        shell: bash
+        run: flutter build windows --release --target lib/main_prod.dart --no-pub
+
+      - name: Installer
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -f "$ISCC" ]; then choco install innosetup -y --no-progress; fi
+          (cd windows/packaging/avpn && "$ISCC" //Q "//DAppVersion=$version" avpn.iss)
+          ls -la build/windows/installer
+
+      - name: Attach to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          file="build/windows/installer/A-VPN-Setup-$version-windows.exe"
+          (cd build/windows/installer && sha256sum "A-VPN-Setup-$version-windows.exe" > "A-VPN-Setup-$version-windows.exe.sha256")
+          gh release upload "v$version" "$file" "$file.sha256"
