@@ -1,12 +1,14 @@
 <p align="center">
-  <img src="docs/screenshots/logo.png" width="96" alt="A-VPN">
+  <img src="docs/screenshots/hero.png" alt="A-VPN: сам переключается между Wi-Fi и LTE и держит соединение стабильным">
 </p>
 
-<h1 align="center">A-VPN</h1>
+<p align="center">
+  <img src="docs/screenshots/logo.png" width="72" alt="A-VPN">
+</p>
 
 <p align="center">
   VPN-клиент для Android на ядре sing-box. Форк <a href="https://github.com/hiddify/hiddify-app">Hiddify</a> с собственным интерфейсом, статистикой и логикой выбора серверов.<br>
-  <i>An Android VPN client on the sing-box core: a fork of Hiddify with its own interface, statistics and server selection. Android 7+, 64-bit ARM only.</i>
+  <i>An Android VPN client on the sing-box core: a fork of Hiddify that switches between Wi-Fi and LTE by itself and keeps the connection steady. Android 7+, 64-bit ARM only.</i>
 </p>
 
 <p align="center">
@@ -17,13 +19,30 @@
 
 > **A-VPN не связан с командой Hiddify и не одобрен ею.** Это независимый форк по условиям их лицензии (см. [Лицензия](#лицензия)). Оригинал: <https://github.com/hiddify/hiddify-app>.
 
-## Скриншоты
+## Сильные стороны
 
 <p align="center">
-  <img src="docs/screenshots/home-dots.png" width="23%" alt="Главный экран, тема «Точки»">
-  <img src="docs/screenshots/home-bento.png" width="23%" alt="Главный экран, тема Bento">
-  <img src="docs/screenshots/home-glass.png" width="23%" alt="Главный экран, тема Glass">
-  <img src="docs/screenshots/home-contrast.png" width="23%" alt="Главный экран, тема Contrast">
+  <img src="docs/screenshots/strengths.png" alt="Wi-Fi и LTE без вашего участия, серверы под сеть, стабильное соединение">
+</p>
+
+- **Wi‑Fi и LTE без вашего участия.** Сеть сменилась: серверы и настройки подобраны под неё, VPN не отключается.
+- **Серверы под сеть.** В мобильной сети только серверы для белых списков, в Wi‑Fi обычные; страны отключаются отдельно для каждой сети.
+- **Стабильное соединение.** Постоянный контроль пинга и потерь, перевыбор сервера, перезапуск ядра, если связь пропала, проверка и восстановление связи после сна телефона.
+
+<p align="center">
+  <img src="docs/screenshots/advantages.png" alt="Все плюсы A-VPN">
+</p>
+
+## Скриншоты
+
+Основная тема «Точки», рядом Bento; у каждой есть дневной и ночной вид.
+
+<p align="center">
+  <img src="docs/screenshots/themes.png" alt="Темы «Точки» и Bento, день и ночь">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/features.png" alt="Выбор сервера, статистика по серверам, статистика, настройки">
 </p>
 
 ## Что умеет
@@ -39,6 +58,8 @@
 - Режим «только заблокированное через VPN»: всё остальное идёт напрямую (встроенный список, обновляется).
 - Правила по приложениям (раздельное туннелирование) и по доменам; готовые группы для российских сервисов, банков и маркетплейсов.
 - Блокировка рекламы, трекеров, фишинга и майнеров на уровне VPN.
+- Автопауза: VPN сам отключается, пока открыто приложение из вашего списка (Госуслуги, банки), и включается обратно.
+- Домашний Wi‑Fi: если на роутере уже работает свой VPN, приложение само встаёт на паузу и возвращается вне дома (сеть определяется по роутеру, без доступа к геолокации).
 
 **Статистика**
 - Топология: какой трафик куда ушёл (VPN, напрямую, заблокировано) и через какие страны.
@@ -46,7 +67,7 @@
 - Потери и пинг с историей, трафик по приложениям.
 
 **Интерфейс и батарея**
-- Четыре темы (Точки, Bento, Glass, Contrast), день и ночь, масштаб интерфейса и шрифта.
+- Основная тема «Точки» и Bento, день и ночь, масштаб интерфейса и шрифта (в приложении есть ещё Glass и Contrast).
 - Ночной режим и «лёгкая работа в фоне»: реже опросы, меньше пробуждений.
 - Проверка и восстановление связи после сна телефона.
 
