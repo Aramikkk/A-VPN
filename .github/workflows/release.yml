@@ -47,10 +47,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
+      # the runner's image already has the Android SDK; only the NDK the core is built with is added
       - name: Android NDK
-        run: sdkmanager --install "ndk;28.2.13676358"
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358"
 
       # ---- the core -------------------------------------------------------------------------------------------
       - name: Core sources
