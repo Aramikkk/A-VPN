@@ -1,202 +1,133 @@
-<div dir="ltr" align=center>
-    
-[**![Lang_farsi](https://user-images.githubusercontent.com/125398461/234186932-52f1fa82-52c6-417f-8b37-08fe9250a55f.png) فارسی**](README_fa.md) / [**Русский 🇷🇺**](README_ru.md) / [**简体中文 🇨🇳**](README_cn.md) / [**日本語 🇯🇵**](README_ja.md) / [**Portugês-BR 🇧🇷**](README_br.md)
-
-</div>
-<br>
-
-<p align="center"><img src="https://github.com/hiddify/hiddify.com/blob/main/docs/assets/hiddify-app-logo.svg" width=56% /></p>
-<br>
-
-<div align="center">
-
-<!--
-![Hiddify logo + text](https://github.com/hiddify/hiddify-app/assets/125398461/d821cfe0-b4c4-441f-be4e-eb9209f59542)
-    -->
-    
-[![GP-Intalls](https://img.shields.io/endpoint?color=green&logo=google-play&logoColor=green&url=https%3A%2F%2Fplay.cuzi.workers.dev%2Fplay%3Fi%3Dapp.hiddify.com%26l%3DGoogle%2520Play%26m%3D%24shortinstalls&style=flat-square)](https://play.google.com/store/apps/details?id=app.hiddify.com) [![Downloads](https://img.shields.io/github/downloads/hiddify/hiddify-next/total?style=flat-square&logo=github)](https://github.com/hiddify/hiddify-app/releases/)[![Last Version](https://img.shields.io/github/release/hiddify/hiddify-next/all.svg?style=flat-square)](https://github.com/hiddify/hiddify-app/releases/)[![Last Release Date](https://img.shields.io/github/release-date/hiddify/hiddify-next.svg?style=flat-square)](https://github.com/hiddify/hiddify-app/releases/)[![commits](https://img.shields.io/github/commit-activity/m/hiddify/hiddify-next?style=flat-square)](https://github.com/hiddify/hiddify-app/)
-[![Youtube](https://img.shields.io/youtube/channel/views/UCxrmeMvVryNfB4XL35lXQNg?label=Youtube&style=flat-square&logo=youtube)](https://www.youtube.com/@hiddify)[![Telegram Channel](https://img.shields.io/endpoint?label=Channel&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Fhiddify&color=blue)](https://telegram.dog/hiddify)[![Telegram Group](https://img.shields.io/endpoint?color=neon&label=Support%20Group&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Fhiddify_board)](https://telegram.dog/hiddify_board/5)
-
-</div>
-
-
-
-
-## What is Hiddify app?
-
-<p dir="ltr" style="font-size: 16px">A multi-platform proxy client based on <a href="https://github.com/SagerNet/sing-box">Sing-box</a> universal proxy tool-chain. Hiddify offers a wide range of capabilities, like automatic node selection, TUN mode, remote profiles etc. Hiddify is ad-free and open-source. With support for a wide range of protocols, it provides a secure and private way for accessing free internet.</p>
-
-<div align=center>
-<img width=90% alt="English Demo" src="https://github.com/hiddify/hiddify-app/assets/125398461/ffe5346d-3404-470f-b5e0-4364e23743d2">
-
-</div>
-
-## 🚀 Main features
-
-✈️ Multi-platform: Android, iOS, Windows, macOS and Linux
-
-⭐ Intuitive and accessible UI
-
-🔍 Delay based node selection
-
-🟡 Wide range of protocols:
-Vless, Vmess, Reality, TUIC, Hysteria, Wireguard, SSH etc.
-
-🟡 Subscription link and configuration formats: Sing-box, V2ray, Clash, Clash meta
-
-🔄 Automatic subscription update
-
-🔎 Display profile information including remaining days and traffic usage
-
-🛡 Open source, secure and community driven
-
-🌙 Dark and light modes
-
-⚙ Compatible with all proxy management panels
-
-⭐ Appropriate configuration for Iran, China, Russia and other countries
-
-📱 Available on official stores
-
-## 🛍️ Get It On Stores
-<a href="https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532?platform=iphone"><img height=50px src="https://github.com/user-attachments/assets/a7c62126-07ce-4f18-8197-bbb672f6d8be"></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://play.google.com/store/apps/details?id=app.hiddify.com"><img height=50px src="docs/google-play-badge.png"></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://apps.microsoft.com/detail/Hiddify/9pdfnl3qv2s5?mode=mini" target="_blank"><img height=50px src="https://github.com/hiddify/hiddify-next/assets/125398461/620750bb-4459-41b5-9f86-ba82119345b8" /></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-
-
-## 📥 Direct Download
-
-<div align=left>
-<table>
-    <thead align=left>
-        <tr>
-            <th>OS</th>
-            <th>Download</th>
-        </tr>
-    </thead>
-    <tbody align=left>
-        <tr>
-        <td>iOS</td>
-            <td>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-iOS.ipa"><img src="https://img.shields.io/badge/IPA-Universal-c0c0c0.svg?logo=ios"></a>
-            </td>
-        </tr>
-        <tr>
-        <td>Android</td>
-            <td>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-universal.apk"><img src="https://img.shields.io/badge/APK-Universal-044d29.svg?logo=android"></a><br>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-arm64.apk"><img src="https://img.shields.io/badge/APK-ARMv8-168039.svg?logo=android"></a><br>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-arm7.apk"><img src="https://img.shields.io/badge/APK-ARMv7-45bf55.svg?logo=android"></a><br>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-x86_64.apk"><img src="https://img.shields.io/badge/APK-x64-96ed89.svg?logo=android"></a>
-            </td>
-        </tr>
-        <tr>
-            <td>Windows</td>
-            <td>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Windows-Setup-x64.Msix"><img src="https://img.shields.io/badge/OfficialSetup-x64-0078d7.svg?logo=windows"></a><br>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Windows-Setup-x64.exe"><img src="https://img.shields.io/badge/Setup-x64-2d7d9a.svg?logo=windows"></a><br>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Windows-Portable-x64.zip"><img src="https://img.shields.io/badge/Portable-x64-67b7d1.svg?logo=windows"></a>
-            </td>
-        </tr>
-        <tr>
-            <td>macOS</td>
-            <td>
-                <a href="https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532"><img src="https://img.shields.io/badge/IPA-ARM-D33A54.svg?logo=apple"></a><br>
-                <a href="https://github.com/hiddify/hiddify-next/releases/latest/download/Hiddify-MacOS.dmg"><img src="https://img.shields.io/badge/DMG-Universal-ea005e.svg?logo=apple"></a><br>
-                <a href="https://github.com/hiddify/hiddify-next/releases/latest/download/Hiddify-MacOS-Installer.pkg"><img src="https://img.shields.io/badge/PKG-Universal-bc544b.svg?logo=apple" /></a>
-            </td>
-        </tr>
-        <tr>
-            <td>Linux</td>
-            <td>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Linux-x64.AppImage"><img src="https://img.shields.io/badge/AppImage-x64-f84e29.svg?logo=linux"> </a><br>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Debian-x64.deb"><img src="https://img.shields.io/badge/DebPackage-x64-FF9966.svg?logo=debian"> </a><br>
-                <a href="https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-rpm-x64.rpm"><img src="https://img.shields.io/badge/RpmPackage-x64-F1B42F.svg?logo=redhat"> </a>
-            </td>
-        </tr>
-    </tbody>
-</table>
-
-
-</div>
-
-## ⚙️ Installation and tutorials
-
-**Find tutorial information on our wiki page by clicking on image below.**
-
-<div align="center">
-
-[![Tutorials on Wiki](https://github.com/hiddify/hiddify-app/assets/125398461/95bb5cf8-c143-4934-87d6-b9d4c31e035e)](https://hiddify.com/app/)
-
-
-</div>
-
-## 🌎 Translations
-
-    
-You can improve existing languages or contribute new ones either by editing the JSON files in `/assets/translations` or [![Translate with Inlang](https://img.shields.io/badge/%20-%20-3ECF8E?logo=i18next&logoColor=white)](https://fink.inlang.com/github.com/hiddify/hiddify-app) by using [Inlang online editor](https://fink.inlang.com/github.com/hiddify/hiddify-app).    
-
-
-## ✏️ Acknowledgements
-
-We would like to express our sincere appreciation to the contributors of the following projects, whose robust foundation and innovative features have significantly enhanced the success and functionality of this project.
-
-- [Sing-box](https://github.com/SagerNet/sing-box)
-- [Sing-box for Android](https://github.com/SagerNet/sing-box-for-android)
-- [Sing-box for Apple](https://github.com/SagerNet/sing-box-for-apple)
-- [Clash](https://github.com/Dreamacro/clash)
-- [Clash Meta](https://github.com/MetaCubeX/Clash.Meta)
-- [FClash](https://github.com/Fclash/Fclash)
-- [Vazirmatn Font by Saber Rastikerdar](https://github.com/rastikerdar/vazirmatn)
-- [Others](./pubspec.yaml)
-
-## 🎯 Donation and Support
-
-The easiest way to support us is to click on the star (⭐) at the top of this page.
-
-<div align=center>
-    
-<a href="https://next.ossinsight.io/widgets/official/analyze-repo-stars-history?repo_id=643504282" target="_blank" style="display: block" align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/analyze-repo-stars-history/thumbnail.png?repo_id=643504282&image_size=auto&color_scheme=dark" width="721" height="auto">
-    <img alt="Star History of hiddify/hiddify-app" src="https://next.ossinsight.io/widgets/official/analyze-repo-stars-history/thumbnail.png?repo_id=643504282&image_size=auto&color_scheme=light" width="721" height="auto">
-  </picture>
-</a>
-
-</div>
-
-We also need financial support for our services. All of our activities are done voluntarily and financial support will be spent on the development of the project. You can view our support addresses [here](https://hiddify.com/donation-and-support/).
-
-## 👩‍🏫 Collaboration and Contact Information
-
-Hiddify is a community driven project. If you're interested in contributing, please read the [contribution guidelines](./CONTRIBUTING.md). We would specially appreciate any help we can get in these areas: **Flutter, Go, iOS development (Swift), Android development (Kotlin).**
-
-<div align=center>
-
-<br>
-
-[![Email](https://img.shields.io/badge/Email-contribute@hiddify.com-005FF9?style=flat-square&logo=mail.ru)](mailto:contribute@hiddify.com)
-[![Telegram Channel](https://img.shields.io/endpoint?label=Channel&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Fhiddify&color=blue)](https://telegram.dog/hiddify)
-[![Telegram Group](https://img.shields.io/endpoint?color=neon&label=Support%20Group&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Fhiddify_board)](https://telegram.dog/hiddify_board)
-[![Youtube](https://img.shields.io/youtube/channel/views/UCxrmeMvVryNfB4XL35lXQNg?label=Youtube&style=flat-square&logo=youtube)](https://www.youtube.com/@hiddify)
-[![Twitter](https://img.shields.io/twitter/follow/hiddify_com?color=%231DA1F2&logo=twitter&logoColor=1DA1F2&style=flat-square)](https://twitter.com/intent/follow?screen_name=hiddify_com)
-
-</div>
-
-<p align=center>
- We appreciate all people who are participating in this project. Some people here and many many more outside of Github. It means a lot to us. ♥
- </p>
- 
-<p align=center> 
-<a href="https://github.com/hiddify/hiddify-app/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=hiddify/hiddify-next" />
-</a>
-</p>
-<p align=center>
- Made with <a rel="" target="_blank" href="https://contrib.rocks">Contrib.Rocks</a> 
+<p align="center">
+  <img src="docs/screenshots/logo.png" width="96" alt="A-VPN">
 </p>
 
+<h1 align="center">A-VPN</h1>
 
+<p align="center">
+  VPN-клиент для Android на ядре sing-box. Форк <a href="https://github.com/hiddify/hiddify-app">Hiddify</a> с собственным интерфейсом, статистикой и логикой выбора серверов.<br>
+  <i>An Android VPN client on the sing-box core: a fork of Hiddify with its own interface, statistics and server selection. Android 7+, 64-bit ARM only.</i>
+</p>
 
+<p align="center">
+  <a href="https://github.com/Aramikkk/A-VPN/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Aramikkk/A-VPN?label=release"></a>
+  <a href="https://github.com/Aramikkk/A-VPN/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Aramikkk/A-VPN/total?label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9"></a>
+  <a href="LICENSE.md"><img alt="License" src="https://img.shields.io/badge/license-Hiddify%20Extended%20GPL%20v3-blue"></a>
+</p>
 
+> **A-VPN не связан с командой Hiddify и не одобрен ею.** Это независимый форк по условиям их лицензии (см. [Лицензия](#лицензия)). Оригинал: <https://github.com/hiddify/hiddify-app>.
 
+## Скриншоты
 
+<p align="center">
+  <img src="docs/screenshots/home-dots.png" width="23%" alt="Главный экран, тема «Точки»">
+  <img src="docs/screenshots/home-bento.png" width="23%" alt="Главный экран, тема Bento">
+  <img src="docs/screenshots/home-glass.png" width="23%" alt="Главный экран, тема Glass">
+  <img src="docs/screenshots/home-contrast.png" width="23%" alt="Главный экран, тема Contrast">
+</p>
 
+## Что умеет
+
+**Подключение и выбор серверов**
+- Несколько подписок сразу; порядок меняется перетаскиванием, одну можно сделать приоритетной (её серверы остаются, пока другие не быстрее на заданное число миллисекунд).
+- «Авто» по минимальной задержке с допуском отдельно для Wi‑Fi и мобильной сети.
+- Кнопка у текущего сервера: пингует все серверы и выбирает самый быстрый из подходящих.
+- Серверы по сети: в мобильной сети только серверы для белых списков («LTE Only», «БС»), в Wi‑Fi обычные; страны можно отключать отдельно для каждой сети.
+- «Мульти серверы»: отдельный сервер для каждого из выбранных сайтов и приложений (Instagram, WhatsApp, Telegram, YouTube и т. д.), с измерением задержки до каждого сайта.
+
+**Маршрутизация**
+- Режим «только заблокированное через VPN»: всё остальное идёт напрямую (встроенный список, обновляется).
+- Правила по приложениям (раздельное туннелирование) и по доменам; готовые группы для российских сервисов, банков и маркетплейсов.
+- Блокировка рекламы, трекеров, фишинга и майнеров на уровне VPN.
+
+**Статистика**
+- Топология: какой трафик куда ушёл (VPN, напрямую, заблокировано) и через какие страны.
+- «Серверы»: объём и время по каждому серверу за сессию, сутки, месяц и всё время.
+- Потери и пинг с историей, трафик по приложениям.
+
+**Интерфейс и батарея**
+- Четыре темы (Точки, Bento, Glass, Contrast), день и ночь, масштаб интерфейса и шрифта.
+- Ночной режим и «лёгкая работа в фоне»: реже опросы, меньше пробуждений.
+- Проверка и восстановление связи после сна телефона.
+
+**Безопасность**
+- Управление ядром идёт через локальный gRPC с случайным секретом, свой у каждой установки (другие приложения к ядру не подключатся).
+- Журналы очищаются от ссылок подписок, ключей, паролей и UUID.
+- Обновления берутся только из релизов этого репозитория, архив проверяется по SHA‑256.
+
+## Установка
+
+1. Скачайте `A-VPN-<версия>-arm64.apk` из [релизов](https://github.com/Aramikkk/A-VPN/releases/latest).
+2. Проверьте контрольную сумму: рядом лежит файл `*.apk.sha256`.
+   ```bash
+   sha256sum -c A-VPN-<версия>-arm64.apk.sha256
+   ```
+3. Установите (Android попросит разрешить установку из этого источника) и добавьте свою подписку: «Профили» → «+».
+
+**Подпись.** Все релизы подписаны одним ключом. SHA‑256 сертификата:
+
+```
+95:CC:05:9F:8E:1A:E2:E0:B8:59:43:66:6E:C4:5D:D3:2D:66:F8:1E:80:7B:3F:6E:7A:D6:CD:75:BE:A6:B1:9A
+```
+
+Проверить: `apksigner verify --print-certs A-VPN-<версия>-arm64.apk`. Если отпечаток другой, это не наша сборка.
+
+**Только 64-битный ARM** (`arm64-v8a`): практически все телефоны последних лет. Для других процессоров (32‑битный ARM, x86) сборок нет.
+
+Обновления приходят из самого приложения («Настройки» → «О программе»): оно раз в сутки смотрит `latest.json` в последнем релизе этого репозитория, показывает полосу «Доступна версия» и ставит файл после вашего подтверждения.
+
+## Разрешения и приватность
+
+| Разрешение | Зачем |
+|---|---|
+| `INTERNET`, `BIND_VPN_SERVICE`, `FOREGROUND_SERVICE*` | сам VPN |
+| `QUERY_ALL_PACKAGES` | список установленных приложений для раздельного туннелирования и статистики по приложениям |
+| `PACKAGE_USAGE_STATS` | определить приложение на экране для автопаузы VPN (по желанию) |
+| `REQUEST_INSTALL_PACKAGES` | установка обновления по вашему подтверждению |
+| `RECEIVE_BOOT_COMPLETED`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | запуск после перезагрузки и работа в фоне |
+| `POST_NOTIFICATIONS` | уведомление службы со скоростью и сервером |
+| `CAMERA` | сканирование QR-кода подписки |
+
+- Телеметрии и аналитики в сборках нет (ключ отправки отчётов не задан).
+- Единственное обращение приложения «от себя»: раз в сутки запрос `latest.json` на github.com (как у любого браузера: ваш IP виден GitHub, никаких идентификаторов приложение не добавляет).
+- Запросы к подписке идут к вашему провайдеру. Если его панель ограничивает число устройств, приложение передаёт случайный идентификатор установки (создаётся при первом запуске, не связан с вами).
+- Всё, что вы настраиваете (подписки, списки приложений, статистика), хранится только на устройстве.
+
+## Отличия от Hiddify
+
+Полный список по версиям: [`avpn/CHANGELOG.md`](avpn/CHANGELOG.md). Главное:
+
+- новый интерфейс (четыре темы), главный экран с пингом, потерями, сайтами и текущим сервером;
+- страницы статистики «Топология» и «Серверы», история потерь и пинга;
+- выбор серверов по сети, приоритетная подписка, мульти‑серверы по сайтам;
+- маршрутизация «только заблокированное», группы российских сервисов, блокировка рекламы;
+- нижний уровень: патчи к ядру ([`avpn/core54-patches`](avpn/core54-patches)) поверх `hiddify-core` 5.4.0 и `hiddify-sing-box`: горячая перезагрузка при смене сети, статистика трафика, группы сайтов;
+- работа в фоне: ночной режим, проверка связи после сна, перезапуск ядра при необходимости;
+- обновление из GitHub Releases;
+- настройка под отдельного провайдера (Sigma Gate: название «Sigma» вместо «Доступ», запрос подписки как Clash Meta) включается отдельным переключателем в «Общие» и по умолчанию выключена.
+
+Ядро собирается из исходников `hiddify-core` и `hiddify-sing-box` (подробности в [`avpn/core54-patches/README.md`](avpn/core54-patches/README.md)).
+
+## Сборка
+
+Релизы собирает только GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)): ядро с патчами, затем подписанный APK. Для запуска в репозитории нужны секреты `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+
+Локально: Flutter 3.38.5, JDK 17, Android SDK с NDK 28, Go (версия из `go.mod` ядра) и `gomobile`. Шаги те же, что в workflow.
+
+```bash
+flutter pub get
+dart run slang
+dart run build_runner build --delete-conflicting-outputs
+flutter test
+```
+
+## Лицензия
+
+Проект распространяется по **Hiddify Extended GNU GPL v3** ([`LICENSE.md`](LICENSE.md)): GPL v3 с дополнительными условиями Hiddify.
+Кратко: исходный код открыт и опубликован как форк Hiddify; релизы собираются в GitHub Actions; указана атрибуция Hiddify (<https://github.com/hiddify/hiddify-app>); приложение не публикуется в магазинах приложений; коммерческое использование без письменного разрешения запрещено; производные работы распространяются на тех же условиях. Условия полностью в `LICENSE.md`, они обязательны.
+
+Спасибо команде [Hiddify](https://github.com/hiddify), проекту [sing-box](https://github.com/SagerNet/sing-box) и всем авторам библиотек, на которых это построено.
+
+## Поддержать разработчика
+
+Это личный проект, он бесплатный и таким останется. Если приложение пригодилось, в «О программе» есть раздел «Поблагодарить разработчика» с реквизитами. Это добровольно и ни на что не влияет.
