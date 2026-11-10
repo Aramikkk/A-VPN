@@ -57,11 +57,14 @@ jobs:
       # ---- the core -------------------------------------------------------------------------------------------
       - name: Core sources
         run: |
+          # the upstream lists some submodules by SSH address; the runner has no key, so HTTPS is used
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
           git clone "$CORE_REPO" core
           cd core
           git checkout "$CORE_COMMIT"
-          git submodule update --init hiddify-sing-box
-          (cd hiddify-sing-box && git checkout "$SINGBOX_COMMIT")
+          git submodule update --init ray2sing hiddify-sing-box
+          # hiddify-sing-box has submodules of its own (the replaced modules under replace/), which go.mod points to
+          (cd hiddify-sing-box && git checkout "$SINGBOX_COMMIT" && git submodule update --init --recursive)
           git config user.name "A-VPN build"
           git config user.email "build@users.noreply.github.com"
 
