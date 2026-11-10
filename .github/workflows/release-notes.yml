@@ -1,0 +1,46 @@
+name: Release notes
+
+# Sets a release's description from the section of avpn/CHANGELOG.md for its version, so a fix to the changelog after
+# the build can reach the release page without rebuilding anything.
+# Run it by hand: Actions -> Release notes -> Run workflow, with the version (for example 1.2.2).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version whose release is updated (1.2.2, with no v)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  notes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Description from the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          version = os.environ["VERSION"]
+          log = open("avpn/CHANGELOG.md", encoding="utf-8").read()
+          match = re.search(r"^## " + re.escape(version) + r"\b.*?\n(.*?)(?=^## |\Z)", log, re.M | re.S)
+          if not match:
+              raise SystemExit(f"no section for {version} in avpn/CHANGELOG.md")
+          points = [line[2:].strip() for line in match.group(1).splitlines() if line.startswith("- ")]
+          body = "\n".join("- " + p for p in points)
+          body += (
+              "\n\n**Установка.** Скачайте `A-VPN-" + version + "-arm64.apk`, проверьте сумму по `.sha256` и подпись по "
+              "`signing-certificate.txt` (SHA-256 сертификата `95:CC:05:9F:8E:1A:E2:E0:B8:59:43:66:6E:C4:5D:D3:2D:66:F8:1E:80:7B:3F:6E:7A:D6:CD:75:BE:A6:B1:9A`). "
+              "Android 7+, только arm64. Установленные копии A-VPN обновляются из приложения."
+          )
+          open("notes.md", "w", encoding="utf-8").write(body)
+          print(body)
+          PY
+          gh release edit "v$VERSION" --notes-file notes.md
