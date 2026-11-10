@@ -94,6 +94,8 @@
 
 Проверить: `apksigner verify --print-certs A-VPN-<версия>-arm64.apk`. Если отпечаток другой, это не наша сборка.
 
+**Windows.** Скачайте `A-VPN-Setup-<версия>-windows.exe` из того же релиза (Windows 10 и новее, 64 бит). Контрольная сумма лежит рядом: `sha256sum -c A-VPN-Setup-<версия>-windows.exe.sha256` (в PowerShell: `Get-FileHash`). Установщик не подписан сертификатом издателя, поэтому SmartScreen может предупредить о неизвестном издателе: сверьте сумму и выберите «Подробнее» → «Выполнить в любом случае». Установщику нужны права администратора: так VPN-режим запускается без запроса при каждом входе.
+
 **Архитектура.** Только 64-битный ARM (`arm64-v8a`), то есть подавляющее большинство устройств последних лет. Сборок для 32-битного ARM и x86 нет.
 
 **Обновления.** Приложение раз в сутки запрашивает `latest.json` в последнем релизе этого репозитория, показывает уведомление о новой версии и устанавливает её после вашего подтверждения.
@@ -175,4 +177,4 @@ flutter test
 - Per-service servers, blocked-only routing, per-app split tunnelling, ad/tracker/phishing blocking, per-server traffic statistics.
 - No telemetry. Updates come only from this repository's releases and are verified by SHA‑256.
 
-**Install:** download `A-VPN-<version>-arm64.apk` from the [latest release](https://github.com/Aramikkk/A-VPN/releases/latest) and verify it with the `.sha256` file and the certificate fingerprint above. Android 7+, 64-bit ARM only. Source, build workflow and the core patches are in this repository.
+**Install:** download `A-VPN-<version>-arm64.apk` from the [latest release](https://github.com/Aramikkk/A-VPN/releases/latest) and verify it with the `.sha256` file and the certificate fingerprint above. Android 7+, 64-bit ARM only. A Windows 10+ (x64) installer, `A-VPN-Setup-<version>-windows.exe`, is attached to the same release, with its `.sha256`; it is not code-signed, so SmartScreen may warn. Source, build workflow and the core patches are in this repository.
