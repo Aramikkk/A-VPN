@@ -1,4 +1,4 @@
-From 4c44bf2dcb2e5d00393baa3a200a0c1aff1a67eb Mon Sep 17 00:00:00 2001
+From a6b05c00ccaa75ade21da9a9f1c99ece9edd312b Mon Sep 17 00:00:00 2001
 From: Aram <154891765+Aramikkk@users.noreply.github.com>
 Date: Tue, 10 Nov 2026 19:54:10 +0300
 Subject: [PATCH] config: the AI group, one pinned group for all the AI
@@ -6,22 +6,22 @@ Subject: [PATCH] config: the AI group, one pinned group for all the AI
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 ---
- v2/config/ai_group.go         | 105 +++++++++++++++++++++++++++
- v2/config/ai_group_test.go    | 133 ++++++++++++++++++++++++++++++++++
+ v2/config/ai_group.go         | 121 ++++++++++++++++++++++++
+ v2/config/ai_group_test.go    | 170 ++++++++++++++++++++++++++++++++++
  v2/config/builder.go          |   2 +
  v2/config/hiddify_option.go   |   2 +
- v2/config/site_groups.go      |  20 +++++
+ v2/config/site_groups.go      |  25 +++++
  v2/config/site_groups_test.go |   8 +-
- 6 files changed, 266 insertions(+), 4 deletions(-)
+ 6 files changed, 324 insertions(+), 4 deletions(-)
  create mode 100644 v2/config/ai_group.go
  create mode 100644 v2/config/ai_group_test.go
 
 diff --git a/v2/config/ai_group.go b/v2/config/ai_group.go
 new file mode 100644
-index 0000000..d2185c6
+index 0000000..7ff4ef8
 --- /dev/null
 +++ b/v2/config/ai_group.go
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,121 @@
 +package config
 +
 +import (
@@ -48,6 +48,21 @@ index 0000000..d2185c6
 +	for _, k := range aiServices {
 +		if k == key {
 +			return true
++		}
++	}
++	return false
++}
++
++// isAIPackage: [pkg] is the phone app of one of the AI services.
++func isAIPackage(pkg string) bool {
++	for _, site := range siteGroups {
++		if !isAIService(site.key) {
++			continue
++		}
++		for _, p := range site.packages {
++			if p == pkg {
++				return true
++			}
 +		}
 +	}
 +	return false
@@ -109,8 +124,9 @@ index 0000000..d2185c6
 +			Outbounds: servers,
 +			URL:       url,
 +			URLs:      probes,
-+			// every probe must answer: a server that reaches the page but not the API is a failed one
-+			StrictURLs: true,
++			// a server is up when any probe answers: it has failed only when none does (one service blocked on a server is
++			// not a reason to leave it: the others work there)
++			StrictURLs: false,
 +			// a test every ten seconds while the AI is in use (idle half an hour: no tests); three unanswered in a row
 +			// is a failed server
 +			Interval:      badoption.Duration(10 * time.Second),
@@ -129,10 +145,10 @@ index 0000000..d2185c6
 +}
 diff --git a/v2/config/ai_group_test.go b/v2/config/ai_group_test.go
 new file mode 100644
-index 0000000..46de15a
+index 0000000..0dfaea3
 --- /dev/null
 +++ b/v2/config/ai_group_test.go
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,170 @@
 +package config
 +
 +import (
@@ -187,8 +203,8 @@ index 0000000..46de15a
 +	if group == nil {
 +		t.Fatal("no group " + AIGroupTag)
 +	}
-+	if !group.Pinned || !group.StrictURLs || len(group.URLs) < 2 || !group.PrivateHistory || group.InterruptExistConnections {
-+		t.Fatalf("pinned, strict, several probes, private expected: %+v", group)
++	if !group.Pinned || group.StrictURLs || len(group.URLs) < 2 || !group.PrivateHistory || group.InterruptExistConnections {
++		t.Fatalf("pinned, several probes and a server that answers any of them is up (only none answering is a failure), private expected: %+v", group)
 +	}
 +	if len(group.Outbounds) != 3 || group.Outbounds[0] != "fi" || group.Outbounds[1] != "pl" || group.Outbounds[2] != "lv" {
 +		t.Fatalf("the chosen servers in the order given: %v", group.Outbounds)
@@ -266,6 +282,43 @@ index 0000000..46de15a
 +		t.Fatalf("the AI group with the chosen servers in order: %+v", group)
 +	}
 +}
++
++// The AI apps the user marked in Settings → Sites have no group of their own once the AI group is on: their traffic
++// goes to the AI group, not to a group of the app's or to a service group that does not exist any more.
++func TestAIAppsGoToTheAIGroupWhateverTheAppsChoice(t *testing.T) {
++	options := siteGroupsTestOptions()
++	hopt := &HiddifyOptions{URLTestOptions: URLTestOptions{
++		SiteGroups:        true,
++		SiteGroupAppsOnly: true,
++		AIGroupServers:    []string{"fi", "pl"},
++		SiteGroupApps:     []string{"com.anthropic.claude", "com.openai.chatgpt", "ai.perplexity.app.android", "com.instagram.android"},
++	}}
++	applyAIGroup(options, hopt)
++	applySiteGroups(options, hopt)
++	outbounds := map[string]bool{}
++	for _, out := range options.Outbounds {
++		outbounds[out.Tag] = true
++	}
++	for _, rule := range options.Route.Rules {
++		target := rule.DefaultOptions.RuleAction.RouteOptions.Outbound
++		if target != "" && target != "block" && !outbounds[target] && target != OutboundDirectTag && target != OutboundSelectTag {
++			t.Errorf("a rule goes to %q, which does not exist", target)
++		}
++		for _, pkg := range rule.DefaultOptions.PackageName {
++			switch pkg {
++			case "com.anthropic.claude", "com.openai.chatgpt", "ai.perplexity.app.android":
++				if target != AIGroupTag {
++					t.Errorf("%s goes to %q, want %q", pkg, target, AIGroupTag)
++				}
++			}
++		}
++	}
++	for _, tag := range []string{AppGroupTagPrefix + "com.anthropic.claude", AppGroupTagPrefix + "ai.perplexity.app.android"} {
++		if outbounds[tag] {
++			t.Errorf("%s: an AI app has no group of its own when the AI group is on", tag)
++		}
++	}
++}
 diff --git a/v2/config/builder.go b/v2/config/builder.go
 index eb0fe2f..16a4066 100644
 --- a/v2/config/builder.go
@@ -300,7 +353,7 @@ index 6f3d5ed..d66594d 100644
  }
  
 diff --git a/v2/config/site_groups.go b/v2/config/site_groups.go
-index fcc4a25..085dc15 100644
+index fcc4a25..d3bd3b7 100644
 --- a/v2/config/site_groups.go
 +++ b/v2/config/site_groups.go
 @@ -102,6 +102,15 @@ var siteGroups = []siteGroup{
@@ -319,11 +372,27 @@ index fcc4a25..085dc15 100644
  	{
  		key:          "gdrive",
  		url:          "https://drive.google.com/",
-@@ -168,7 +177,12 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
- 	for _, app := range apps {
+@@ -144,11 +153,17 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+ 	seen := map[string]bool{}
+ 	type chosenApp struct{ pkg, tag string }
+ 	var apps []chosenApp
++	// with the AI group on, the AI services' apps go through it (its rules match them by package): they get neither a group
++	// of their own nor a rule to a service group that is not there
++	aiGroup := hasOutbound(options, AIGroupTag)
+ 	for _, app := range hopt.SiteGroupApps {
+ 		app = strings.TrimSpace(app)
+ 		if app == "" || seen[app] {
+ 			continue
+ 		}
++		if aiGroup && isAIPackage(app) {
++			continue
++		}
+ 		seen[app] = true
+ 		if key, known := siteGroupAppServices[app]; known {
+ 			services[key] = true
+@@ -169,6 +184,10 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
  		rules = append(rules, siteGroupRule(app.tag, option.RawDefaultRule{PackageName: []string{app.pkg}}))
  	}
-+	aiGroup := hasOutbound(options, AIGroupTag)
  	for _, site := range siteGroups {
 +		// the AI services go through the AI group when there is one
 +		if aiGroup && isAIService(site.key) {
@@ -332,7 +401,7 @@ index fcc4a25..085dc15 100644
  		if hopt.SiteGroupAppsOnly && !services[site.key] && !site.always {
  			continue
  		}
-@@ -182,6 +196,12 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
+@@ -182,6 +201,12 @@ func applySiteGroups(options *option.Options, hopt *HiddifyOptions) {
  	if len(groups) == 0 {
  		return
  	}
