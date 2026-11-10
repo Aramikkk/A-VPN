@@ -31,6 +31,14 @@
 - **Свои серверы для каждой сети.** В LTE работают серверы для белых списков, в Wi‑Fi обычные. Страны для каждой сети выбираются отдельно.
 - **Устойчивое соединение.** Приложение постоянно измеряет задержку и потери, вовремя меняет сервер, перезапускает ядро при потере связи и проверяет соединение после сна устройства.
 
+## Доступ к ИИ
+
+<p align="center">
+  <img src="docs/screenshots/ai-group.png" alt="Группа ИИ: один основной и два запасных сервера для Claude, ChatGPT и других">
+</p>
+
+ИИ-сервисы часто сбрасывают сессию или ограничивают доступ, когда адрес меняется. Выберите основной сервер и два запасных: Claude, ChatGPT, Gemini, Perplexity и DeepSeek идут только через него и не прыгают между серверами. На запасной сервер приложение переходит только при полном отказе основного, а при смене Wi‑Fi на LTE сначала обрывает старые соединения ИИ и переходит на выбранный сервер для мобильной сети. Постоянный адрес помогает реже терять сессии и попадать под ограничения, гарантировать доступ нельзя: решает сам сервис. Включается отдельно для Wi‑Fi и LTE в «Настройки → Сайты».
+
 ## Возможности
 
 <p align="center">
@@ -129,6 +137,7 @@
 - **Servers per network.** Whitelist-friendly servers on mobile data, regular ones on Wi‑Fi; countries are set per network.
 - **Steady connection.** Latency and loss are measured all the time, the server is switched in good time, the core restarts if the link is lost, and the connection is checked after the device wakes up.
 - Per-service servers, blocked-only routing, per-app split tunnelling, ad/tracker/phishing blocking, per-server traffic statistics.
+- AI group: one server of your choice (and two backups) for Claude, ChatGPT, Gemini, Perplexity and DeepSeek, per network; it moves to a backup only when the main server has failed.
 - Super light mode (the leaf button): only the home screen is left, measurements every 10 s, the heavy pages and checks are off. For weak phones and the battery.
 - No telemetry. Updates come only from this repository's releases and are verified by SHA‑256.
 

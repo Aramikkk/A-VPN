@@ -10,6 +10,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/settings/overview/sections/ai_group_card.dart';
 import 'package:hiddify/features/stats/notifier/site_latency.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -123,6 +124,11 @@ class SitesPage extends HookConsumerWidget {
                 await apply();
               },
             ),
+          ],
+          // the AI services: one server of the user's choice with two backups, for each network
+          if (PlatformUtils.isAndroid) ...[
+            heading(t.avpn.aiGroup),
+            AiGroupCard(onChanged: apply),
           ],
           // the apps with a server of their own (a phone's apps are known by package)
           if (PlatformUtils.isAndroid) ...[

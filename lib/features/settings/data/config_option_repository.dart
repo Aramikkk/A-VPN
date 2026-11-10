@@ -227,6 +227,14 @@ abstract class ConfigOptions {
     'com.google.android.apps.docs': 'Google Диск',
   };
 
+  /// The AI group (Settings → Sites): one server for all the foreign AI services, chosen by the user for each network:
+  /// the main one and two backups, by tag. The group goes to a backup only when the one in use has failed.
+  /// Each network has its own switch: the group can be on for Wi-Fi only, or for mobile data only.
+  static final aiGroupWifi = PreferencesNotifier.create<bool, bool>("ai-group-wifi", false);
+  static final aiGroupMobile = PreferencesNotifier.create<bool, bool>("ai-group-mobile", false);
+  static final aiServersWifi = PreferencesNotifier.create<List<String>, List<String>>("ai-servers-wifi", const <String>[]);
+  static final aiServersMobile = PreferencesNotifier.create<List<String>, List<String>>("ai-servers-mobile", const <String>[]);
+
   /// How much sooner (ms, 10 to 3000) another server must answer a site before the site moves to it; on Wi-Fi
   /// (and on a computer), and on mobile data.
   static final siteGroupsTolerance = PreferencesNotifier.create<int, int>("site-groups-tolerance", 100);
@@ -527,6 +535,10 @@ abstract class ConfigOptions {
     "site-groups-tolerance": siteGroupsTolerance,
     "site-groups-mobile": siteGroupsMobile,
     "site-group-apps": siteGroupApps,
+    "ai-group-wifi": aiGroupWifi,
+    "ai-group-mobile": aiGroupMobile,
+    "ai-servers-wifi": aiServersWifi,
+    "ai-servers-mobile": aiServersMobile,
     "ad-block": adBlock,
     "ad-block-allow": adBlockAllow,
     "ad-block-level": adBlockLevel,

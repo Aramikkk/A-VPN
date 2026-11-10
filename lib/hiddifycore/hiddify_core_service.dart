@@ -20,6 +20,7 @@ import 'package:hiddify/features/proxy/data/home_network.dart';
 import 'package:hiddify/features/proxy/data/network_ping_timeout.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
+import 'package:hiddify/features/settings/data/ai_group.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper_stub.dart'
     if (dart.library.io) 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper.dart';
@@ -319,6 +320,13 @@ class HiddifyCoreService with InfraLogger {
         ),
         priorityProfile: _priorityProfile(profilePath),
         priorityMargin: _priorityMargin(current),
+        // the AI services: one server of the user's choice for this network, with two backups
+        aiGroupServers: aiServersFor(
+          enabled: ref.read(current == NetworkKind.mobile ? ConfigOptions.aiGroupMobile : ConfigOptions.aiGroupWifi),
+          network: current,
+          wifi: ref.read(ConfigOptions.aiServersWifi),
+          mobile: ref.read(ConfigOptions.aiServersMobile),
+        ),
       );
     }
     return withPriority(filtered, current, _priorityProfile(profilePath), _priorityMargin(current));

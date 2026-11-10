@@ -138,19 +138,30 @@ final homeSitesProvider = Provider<List<LatencySite>>(
 /// server's tag, read from the core's site groups ("site-<key>"); empty when that's off.
 final siteServersProvider = StreamProvider<Map<String, String>>((ref) {
   // on for either network: the core has the groups only on the one it's on, so the map is empty on the other
-  final on = ref.watch(ConfigOptions.siteGroups) || ref.watch(ConfigOptions.siteGroupsMobile);
+  final on =
+      ref.watch(ConfigOptions.siteGroups) ||
+      ref.watch(ConfigOptions.siteGroupsMobile) ||
+      ref.watch(ConfigOptions.aiGroupWifi) ||
+      ref.watch(ConfigOptions.aiGroupMobile);
   if (!on || !ref.watch(serviceRunningProvider)) return Stream.value(const {});
   return ref
       .watch(proxyRepositoryProvider)
       .watchActiveProxies()
       .map((event) => event.getOrElse((_) => const []))
-      .map(
-        (groups) => {
-          for (final group in groups)
-            if (group.tag.startsWith('site-') && group.selected.isNotEmpty) group.tag.substring(5): group.selected,
-        },
-      );
+      .map(siteServersOf);
 });
+
+/// The AI services that go through the core's AI group ("ai") instead of a group each.
+const aiServiceKeys = ['chatgpt', 'claude', 'gemini', 'perplexity', 'deepseek'];
+
+/// Each site's server from the core's groups: the service groups ("site-<key>") and, for the AI services, the AI group.
+Map<String, String> siteServersOf(Iterable<OutboundGroup> groups) => {
+  for (final group in groups)
+    if (group.selected.isNotEmpty) ...{
+      if (group.tag.startsWith('site-')) group.tag.substring(5): group.selected,
+      if (group.tag == 'ai') for (final key in aiServiceKeys) key: group.selected,
+    },
+};
 
 /// The last round: each site's delay in ms (null: no answer in time), when it ran, and whether one runs now.
 /// [done]: the sites answered (or given up) in the round running now.

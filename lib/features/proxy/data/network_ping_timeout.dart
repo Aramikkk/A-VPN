@@ -12,6 +12,7 @@ Future<String> withNetworkPingTimeout(
   int siteGroupsTolerance = 80,
   int priorityProfile = 0,
   int priorityMargin = 0,
+  List<String> aiGroupServers = const [],
 }) async {
   final seconds = timeout.inSeconds.clamp(1, 120);
   final config = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
@@ -22,6 +23,12 @@ Future<String> withNetworkPingTimeout(
   monitoring['site_groups'] = siteGroups;
   monitoring['site_groups_tolerance'] = siteGroupsTolerance.clamp(10, 3000);
   _setPriority(monitoring, priorityProfile, priorityMargin);
+  // this network's servers of the AI group (the main one, then the backups): the core builds the group from them
+  if (aiGroupServers.isEmpty) {
+    monitoring.remove('ai_group_servers');
+  } else {
+    monitoring['ai_group_servers'] = aiGroupServers;
+  }
   experimental['monitoring'] = monitoring;
   config['experimental'] = experimental;
   for (final outbound in (config['outbounds'] as List? ?? const []).whereType<Map<String, dynamic>>()) {
