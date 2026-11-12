@@ -403,7 +403,7 @@ class _GraphiteDock extends HookConsumerWidget {
                   ? _DotNumber(
                       on && measured && !busy ? lossText : '—',
                       cell: 3.6,
-                      colour: on && measured && !busy && loss >= _DotsStats.alertLoss ? _Dots.red : _Dots.ink(dark),
+                      colour: on && measured && !busy && loss >= _DotsStats.limits.loss ? _Dots.red : _Dots.ink(dark),
                       faint: _Dots.ink(dark).withValues(alpha: .14),
                     )
                   : theme.contrastLayout

@@ -1,6 +1,7 @@
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/home/widget/feature_dialog.dart';
+import 'package:hiddify/features/home/model/alert_limits.dart';
 import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/connection/widget/pause_strip.dart';
 import 'package:hiddify/features/home/widget/popup_transition.dart';

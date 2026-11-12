@@ -550,7 +550,7 @@ List<_SiteEntry> _siteEntries(WidgetRef ref, ColorScheme scheme) {
   final sites = ref.watch(siteLatencyProvider);
   final shown = ref.watch(homeSitesProvider);
   final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
-  final grade = siteGrade(ref.watch(ConfigOptions.pingHttps));
+  final grade = siteGrade(ref.watch(ConfigOptions.pingHttps), mobile: _actualNetworkKind.value == NetworkKind.mobile);
   // each site's own server (Settings → Ping → Sites), or the one everything else goes through
   final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const <String, String>{};
   final mainServer = ref.watch(proxiesOverviewNotifierProvider.select((v) => SiteLatency.mainServer(v.valueOrNull)));

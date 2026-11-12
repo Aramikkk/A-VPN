@@ -264,7 +264,14 @@ Widget _sitePlate(bool dark, _SiteEntry e, Widget row) =>
 
 /// The dots of a site: a row filled up to the delay (scales), a column of them (columns), a runner on a track (lanes).
 class _SitePainter extends CustomPainter {
-  _SitePainter({required this.kind, required this.ms, required this.ink, required this.accent, required this.faint});
+  _SitePainter({
+    required this.kind,
+    required this.ms,
+    required this.ink,
+    required this.accent,
+    required this.faint,
+    int? slowAt,
+  }) : slowAt = slowAt ?? alertLimits(mobile: _actualNetworkKind.value == NetworkKind.mobile).siteSlow;
 
   final SiteGraph kind;
   final int? ms;
@@ -272,10 +279,13 @@ class _SitePainter extends CustomPainter {
   final Color accent;
   final Color faint;
 
+  /// the delay from which the dots turn to the accent (by the network: mobile data is milder)
+  final int slowAt;
+
   @override
   void paint(Canvas canvas, Size size) {
     void dot(Offset at, double r, Color c) => canvas.drawCircle(at, r, Paint()..color = c);
-    final slow = ms != null && ms! >= 240;
+    final slow = ms != null && ms! >= slowAt;
     switch (kind) {
       case SiteGraph.columns:
         const rows = 7;

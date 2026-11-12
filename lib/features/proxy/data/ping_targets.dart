@@ -43,4 +43,7 @@ String? pingTargetName(String url) => pingTargets.where((p) => p.url == url).fir
 /// of its own before the answer), so its marks are wider than for plain HTTP.
 typedef SiteGrade = ({int good, int slow, int scale});
 
-SiteGrade siteGrade(bool https) => https ? (good: 250, slow: 500, scale: 750) : (good: 150, slow: 300, scale: 450);
+/// On mobile data ([mobile]) the marks are wider still: its delays are higher by nature (181-231 ms is good there).
+SiteGrade siteGrade(bool https, {bool mobile = false}) => mobile
+    ? (https ? (good: 500, slow: 900, scale: 1200) : (good: 300, slow: 600, scale: 900))
+    : (https ? (good: 250, slow: 500, scale: 750) : (good: 150, slow: 300, scale: 450));

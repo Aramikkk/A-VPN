@@ -29,9 +29,9 @@ class _DotsStats extends HookConsumerWidget {
   final (String, String) direct;
   final bool slim;
 
-  /// the ping this slow or the loss this heavy turns the figures to the accent
-  static const alertPing = 300;
-  static const alertLoss = 15.0;
+  /// the ping this slow or the loss this heavy turns the figures to the accent: by the network the phone is on (mobile
+  /// data is milder)
+  static AlertLimits get limits => alertLimits(mobile: _actualNetworkKind.value == NetworkKind.mobile);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -81,7 +81,7 @@ class _DotsStats extends HookConsumerWidget {
                 connected && !paused && ping != null ? '$ping' : '—',
                 cell: slim ? 6 : 10,
                 // the ordinary colour; the accent when the ping is very high or the loss is heavy
-                colour: connected && !paused && ((ping ?? 0) >= _DotsStats.alertPing || loss >= _DotsStats.alertLoss)
+                colour: connected && !paused && ((ping ?? 0) >= _DotsStats.limits.ping || loss >= _DotsStats.limits.loss)
                     ? _Dots.red
                     : ink,
                 faint: _Dots.grid(dark),
@@ -171,7 +171,7 @@ class _DotsStats extends HookConsumerWidget {
                       'MAX ${answers.reduce(math.max)}',
                       style: _Dots.mono(
                         10,
-                        answers.reduce(math.max) >= _DotsStats.alertPing ? _Dots.red : _Dots.soft(dark),
+                        answers.reduce(math.max) >= _DotsStats.limits.ping ? _Dots.red : _Dots.soft(dark),
                         spacing: 1.5,
                       ),
                     ),

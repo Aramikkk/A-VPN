@@ -156,13 +156,11 @@ class _DotsLook extends AraLook {
   final Color ink;
   final Color accent;
 
-  static const slowAt = 300;
-
   @override
   List<Color> get pingColors => [ink, ink, ink, accent];
 
   @override
-  Color pingColor(int ms, Color muted) => ms >= slowAt ? accent : ink;
+  Color pingColor(int ms, Color muted) => ms >= alertLimits(mobile: _actualNetworkKind.value == NetworkKind.mobile).ping ? accent : ink;
 }
 
 /// [theme] (a page's) with the Dots look's colours: the chosen accent where the page draws the theme's accent (the VPN

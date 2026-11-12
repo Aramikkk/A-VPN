@@ -79,7 +79,7 @@ class _SiteTiles extends HookConsumerWidget {
     final shown = ref.watch(homeSitesProvider);
     final installed = ref.watch(installedAppsProvider).valueOrNull ?? const {};
     // the marks of a good delay, by the method (HTTPS is higher by nature)
-    final grade = siteGrade(ref.watch(ConfigOptions.pingHttps));
+    final grade = siteGrade(ref.watch(ConfigOptions.pingHttps), mobile: _actualNetworkKind.value == NetworkKind.mobile);
     // each site's own server (Settings → Ping → Sites, beta): its flag in the tile's corner
     final siteServers = ref.watch(siteServersProvider).valueOrNull ?? const {};
     // the server everything else goes through: a site's flag shows only when its own one is another
