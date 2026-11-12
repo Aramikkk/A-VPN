@@ -167,13 +167,22 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
         ..add(Timer(const Duration(seconds: 10), refilterIfNetworkChanged));
     });
     // the light background work: the safety net looks three times less often
+    var lastNetLook = DateTime.now();
     final safetyNet = Timer.periodic(
       Duration(
         seconds: ref.read(superLightProvider)
             ? 120
             : (ref.read(lightBackgroundProvider) || ref.read(nightModeProvider) ? 45 : 15),
       ),
-      (_) => refilterIfNetworkChanged(),
+      (_) {
+        // the night mode: out of sight it looks once in six minutes (a change of the network comes by its own signal too)
+        final state = WidgetsBinding.instance.lifecycleState;
+        final now = DateTime.now();
+        final outOfSight = state != null && state != AppLifecycleState.resumed;
+        if (outOfSight && ref.read(nightModeProvider) && now.difference(lastNetLook) < const Duration(seconds: 360)) return;
+        lastNetLook = now;
+        unawaited(refilterIfNetworkChanged());
+      },
     );
     // back on screen after the night mode let the checks sleep: the servers are pinged again at once (at most every
     // three minutes), so the list and the auto choice aren't the night's

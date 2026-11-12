@@ -159,8 +159,8 @@ class _RenderFitBlocks extends RenderBox
         final c = pick(g);
         if (c == null) continue;
         sum += natural[c]!;
-        // the head has its own space under it
-        if (g != groups.first) count++;
+        // the head has its own space under it; a block with nothing in it (no sites marked) has no gap either
+        if (g != groups.first && natural[c]! > 0.5) count++;
       }
       return sum + _minGap * count;
     }
@@ -186,7 +186,8 @@ class _RenderFitBlocks extends RenderBox
     final shown = <RenderBox>[];
     for (final g in groups) {
       final c = pick(g);
-      if (c != null) shown.add(c);
+      // a block with nothing in it takes no place and no gap
+      if (c != null && (natural[c]! > 0.5 || g == groups.first)) shown.add(c);
     }
     for (final c in children) {
       (c.parentData! as _FitParentData).shown = shown.contains(c);

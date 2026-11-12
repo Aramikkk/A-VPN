@@ -317,8 +317,9 @@ class _ContrastRow extends StatelessWidget {
     final titleStyle = theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, color: ink);
     final look = _homeLayoutOf(context);
     if (look == HomeLayout.bento || look == HomeLayout.dots) {
-      final nameText = group ? (country ?? subtitle) : title;
-      final caption = group ? title : subtitle;
+      // Auto in the list: "Польша · Авто" (the country it is on now, and that it is Auto), no line over it
+      final nameText = group ? (country == null ? title : '$country · $title') : title;
+      final caption = group ? '' : subtitle;
       return look == HomeLayout.bento
           ? _bentoServerRow(
               context,
@@ -341,6 +342,7 @@ class _ContrastRow extends StatelessWidget {
               caption: caption,
               ms: ms,
               testing: testing,
+              selected: selected,
               onTap: onTap,
               lead: lead,
             );

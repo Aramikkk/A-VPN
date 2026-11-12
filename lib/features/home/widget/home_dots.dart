@@ -25,14 +25,20 @@ abstract final class _Dots {
 }
 
 /// A sheet of the dotted paper with [child] on it.
-Widget _dotPaper(BuildContext context, Widget child, {EdgeInsets padding = const EdgeInsets.fromLTRB(16, 11, 16, 11)}) {
+Widget _dotPaper(
+  BuildContext context,
+  Widget child, {
+  EdgeInsets padding = const EdgeInsets.fromLTRB(16, 11, 16, 11),
+  bool highlight = false,
+}) {
   final dark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: padding,
     decoration: BoxDecoration(
-      color: _Dots.paper(dark),
+      // the chosen one (a server in the list): framed in the accent and a little lighter
+      color: highlight ? Color.alphaBlend(_Dots.red.withValues(alpha: .1), _Dots.paper(dark)) : _Dots.paper(dark),
       borderRadius: BorderRadius.circular(dotsRadius),
-      border: Border.all(color: _Dots.ink(dark).withValues(alpha: .28)),
+      border: highlight ? Border.all(color: _Dots.red, width: 2) : Border.all(color: _Dots.ink(dark).withValues(alpha: .28)),
     ),
     child: child,
   );
@@ -411,6 +417,7 @@ Widget _dotsServerRow(
   required bool testing,
   required VoidCallback onTap,
   Widget? lead,
+  bool selected = false,
 }) {
   final dark = Theme.of(context).brightness == Brightness.dark;
   final ink = _Dots.ink(dark);
@@ -542,6 +549,7 @@ Widget _dotsServerRow(
           ],
         ),
         padding: const EdgeInsets.fromLTRB(16, 9, 16, 9),
+        highlight: selected,
       ),
     ),
   );

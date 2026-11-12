@@ -688,7 +688,8 @@ class _StyledServerList extends ConsumerWidget {
             final note = RegExp(r'\s*\(([^()]*)\)$').firstMatch(full);
             final title = currentServer != null
                 ? (note == null ? full : full.substring(0, note.start).trim())
-                : (auto ? t.avpn.server : (note == null ? full : full.substring(0, note.start).trim()));
+                // Auto is named as Auto, the server it is on now under it
+                : (auto ? t.avpn.auto : (note == null ? full : full.substring(0, note.start).trim()));
             final subtitle = currentServer != null
                 ? [
                     if (note != null) note[1]!,
@@ -793,6 +794,26 @@ class _ContrastHome extends ConsumerWidget {
       child: LayoutBuilder(
         // a short screen: no room for the traffic block (it's on the Statistics tab)
         builder: (context, box) {
+          // the super light mode: the time and the speed on top, the servers with their pings in all the room there is, and the way
+          // back to everything at the bottom
+          if (superLight) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: header),
+                  if (banner != null) banner!,
+                  if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(10)],
+                  _ContrastBlock(child: opensTraffic(status)),
+                  const Gap(10),
+                  Expanded(child: traffic == null ? const SizedBox.shrink() : _ContrastBlock(expand: true, child: traffic!)),
+                  const Gap(10),
+                  const _SuperLightOff(),
+                ],
+              ),
+            );
+          }
           final minimum = ContrastShellDock.sideways(context) ? 520.0 : (box.maxWidth > box.maxHeight ? 380.0 : 440.0);
           // the compact layouts: what room is left is shared in equal gaps between the blocks, and the last block's
           // distance from the panel's tab is one of them (the tab's top edge is where the page ends)
@@ -945,6 +966,46 @@ class _ContrastHome extends ConsumerWidget {
             child: SizedBox(height: minimum, child: content),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The super light mode's plaque at the bottom of the home screen: one tap and everything is back.
+class _SuperLightOff extends ConsumerWidget {
+  const _SuperLightOff();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final theme = Theme.of(context);
+    final dots = ref.watch(Preferences.homeLayout) == HomeLayout.dots;
+    final dark = theme.brightness == Brightness.dark;
+    final row = Row(
+      children: [
+        Icon(Icons.eco_rounded, size: 22, color: dots ? _Dots.ink(dark) : theme.araAccent),
+        const Gap(12),
+        Expanded(
+          child: Text(
+            dots ? t.avpn.superLightOff.toUpperCase() : t.avpn.superLightOff,
+            style: dots
+                ? _Dots.mono(13, _Dots.ink(dark), weight: FontWeight.w800, spacing: 1.2)
+                : theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        Icon(Icons.power_settings_new_rounded, size: 22, color: dots ? _Dots.soft(dark) : theme.colorScheme.onSurfaceVariant),
+      ],
+    );
+    return Semantics(
+      key: const ValueKey('super-light-off'),
+      button: true,
+      label: t.avpn.superLightOff,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => ref.read(Preferences.superLight.notifier).update(false),
+        child: dots
+            ? _dotPaper(context, row, padding: const EdgeInsets.fromLTRB(16, 14, 16, 14))
+            : _ContrastBlock(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14), child: row)),
       ),
     );
   }

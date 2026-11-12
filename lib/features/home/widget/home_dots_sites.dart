@@ -9,7 +9,27 @@ class _SiteDots extends HookConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final entries = _siteEntries(ref, scheme);
-    if (entries.isEmpty) return const SizedBox.shrink();
+    if (entries.isEmpty) {
+      // no sites marked for the home screen: the block's head stays (its buttons are how the multi-server mode and the fewer hops
+      // are reached), with a line on where the sites are chosen
+      final t = ref.watch(translationsProvider).requireValue;
+      return _dotPaper(
+        context,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SitesHeader(),
+            const Gap(8),
+            Text(
+              t.avpn.sitesNoneHint,
+              textAlign: TextAlign.center,
+              style: _Dots.mono(10, _Dots.soft(Theme.of(context).brightness == Brightness.dark), spacing: 0.6),
+            ),
+          ],
+        ),
+      );
+    }
     final style = ref.watch(Preferences.siteGraph);
     final ink = _Dots.ink(dark);
     final soft = _Dots.soft(dark);

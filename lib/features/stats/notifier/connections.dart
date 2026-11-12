@@ -600,7 +600,7 @@ class Connections extends Notifier<ConnectionsState> {
     ref.watch(sessionStartProvider);
     // the light background work: the polls twice as far apart, and a long way apart out of sight
     final saving = ref.watch(lightBackgroundProvider);
-    // the night mode: out of sight the list is asked for six times less often (every three minutes)
+    // the night mode: out of sight the list is asked for twelve times less often (every six minutes)
     final night = ref.watch(nightModeProvider);
     // the super light mode: the list isn't asked for at all (the topology and the connections are off)
     final superLight = ref.watch(superLightProvider);
@@ -639,7 +639,7 @@ class Connections extends Notifier<ConnectionsState> {
       timer?.cancel();
       final background = busy && !night
           ? busyInterval * (saving ? 2 : 1)
-          : backgroundInterval * (saving ? 4 : (night ? 6 : 1));
+          : backgroundInterval * (saving ? 4 : (night ? 12 : 1));
       timer = Timer(foreground ? interval * (saving ? 2 : 1) : background, () {
         if (disposed) return;
         if (!driven) unawaited(_poll(client, url, secret));

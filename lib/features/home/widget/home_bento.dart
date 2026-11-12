@@ -31,11 +31,20 @@ Widget _bentoTile(
   Color? colour,
   EdgeInsets padding = const EdgeInsets.all(14),
   double radius = _Bento.radius,
+  bool highlight = false,
 }) {
   final dark = Theme.of(context).brightness == Brightness.dark;
+  final accent = Theme.of(context).araAccent;
   return Container(
     padding: padding,
-    decoration: BoxDecoration(color: colour ?? _Bento.tile(dark), borderRadius: BorderRadius.circular(radius)),
+    decoration: BoxDecoration(
+      // the chosen one (a server in the list): framed in the accent and tinted with it
+      color: highlight
+          ? Color.alphaBlend(accent.withValues(alpha: .14), colour ?? _Bento.tile(dark))
+          : (colour ?? _Bento.tile(dark)),
+      borderRadius: BorderRadius.circular(radius),
+      border: highlight ? Border.all(color: accent, width: 2.2) : null,
+    ),
     child: child,
   );
 }
@@ -515,6 +524,7 @@ Widget _bentoServerRow(
             ],
           ),
           padding: const EdgeInsets.fromLTRB(16, 8, 10, 8),
+          highlight: selected,
         ),
       ),
     ),
