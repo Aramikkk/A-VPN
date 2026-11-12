@@ -5,6 +5,7 @@ import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/proxy/notifier/home_refresh.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -37,7 +38,7 @@ class AutoPing {
 
   void _periodic() {
     if (!_ref.read(superLightProvider)) return;
-    if (_ref.read(connectionNotifierProvider).valueOrNull is! Connected) return;
+    if (_ref.read(connectionNotifierProvider).valueOrNull is! Connected || _ref.read(vpnPauseProvider).paused) return;
     _last = DateTime.now();
     unawaited(_ref.read(Preferences.lastAutoPing.notifier).update(_last!.millisecondsSinceEpoch));
     unawaited(() async {
@@ -51,7 +52,7 @@ class AutoPing {
 
   void _check() {
     if (!_ref.read(Preferences.autoPingOnOpen)) return;
-    if (_ref.read(connectionNotifierProvider).valueOrNull is! Connected) return;
+    if (_ref.read(connectionNotifierProvider).valueOrNull is! Connected || _ref.read(vpnPauseProvider).paused) return;
     final now = DateTime.now();
     final last = _last ?? DateTime.fromMillisecondsSinceEpoch(_ref.read(Preferences.lastAutoPing));
     if (now.difference(last) < every) return;

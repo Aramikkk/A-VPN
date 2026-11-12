@@ -21,6 +21,7 @@ import 'package:hiddify/features/proxy/data/network_ping_timeout.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/route_rules/notifier/rules_notifier.dart';
 import 'package:hiddify/features/settings/data/ai_group.dart';
+import 'package:hiddify/features/settings/data/min_hops.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper_stub.dart'
     if (dart.library.io) 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper.dart';
@@ -307,8 +308,12 @@ class HiddifyCoreService with InfraLogger {
         filtered,
         current,
         ref.read(current == NetworkKind.mobile ? ConfigOptions.urlTestTimeoutMobile : ConfigOptions.urlTestTimeoutWifi),
-        balancerTolerance: ref.read(
-          current == NetworkKind.mobile ? ConfigOptions.balancerToleranceMobile : ConfigOptions.balancerToleranceWifi,
+        balancerTolerance: hopsTolerance(
+          minHops: ref.read(ConfigOptions.minHops),
+          mobile: current == NetworkKind.mobile,
+          user: ref.read(
+            current == NetworkKind.mobile ? ConfigOptions.balancerToleranceMobile : ConfigOptions.balancerToleranceWifi,
+          ),
         ),
         // the super light mode leaves them off on Wi-Fi (dozens of servers); on mobile data there are only a few, and
         // the services' own servers are what keeps the apps working when the main choice is off

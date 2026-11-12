@@ -194,7 +194,7 @@ class _StyledHome extends HookConsumerWidget {
                   profile == null
                       ? _EmptyCard(text: t.avpn.noProfile)
                       : Text(
-                          t.avpn.connectToSeeServers,
+                          noServersText(t, ref.watch(vpnPauseProvider)),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                         ),
@@ -268,7 +268,7 @@ class _StyledHome extends HookConsumerWidget {
                           child: Padding(
                             padding: const EdgeInsets.all(24),
                             child: Text(
-                              t.avpn.connectToSeeServers,
+                              noServersText(t, ref.watch(vpnPauseProvider)),
                               textAlign: TextAlign.center,
                               style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                             ),

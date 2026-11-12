@@ -73,6 +73,9 @@ class BoxService(
     companion object {
         private const val TAG = "A/BoxService"
 
+        /** What the app asks (the "pauseState" of the tools channel): "" not paused, "home", or "app:" and the app's name. */
+        @Volatile var pauseState: String = ""
+
         private var initializeOnce = false
         private lateinit var workingDir: File
         private fun initialize() {
@@ -348,6 +351,7 @@ class BoxService(
             val pm = service.packageManager
             pm.getApplicationLabel(pm.getApplicationInfo(app, 0)).toString()
         }.getOrDefault(app)
+        pauseState = if (app == null) "home" else "app:$label"
         try {
             fileDescriptor?.close()
             fileDescriptor = null
@@ -377,6 +381,7 @@ class BoxService(
             if (operation != generation.get() || stopping) return@withLock
             paused = false
             pausedForHome = false
+            pauseState = ""
             withContext(Dispatchers.Main) {
                 if (operation != generation.get() || stopping) return@withContext
                 status.value = Status.Started
@@ -396,6 +401,7 @@ class BoxService(
         unwatchNetwork()
         paused = false
         pausedForHome = false
+        pauseState = ""
         runCatching { fileDescriptor?.close() }
         fileDescriptor = null
         DefaultNetworkMonitor.stop()
@@ -651,6 +657,7 @@ class BoxService(
         unwatchNetwork()
         paused = false
         pausedForHome = false
+        pauseState = ""
         status.value = Status.Stopping
         if (receiverRegistered) {
             service.unregisterReceiver(receiver)

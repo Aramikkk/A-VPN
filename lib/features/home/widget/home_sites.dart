@@ -414,6 +414,8 @@ class _SitesHeader extends HookConsumerWidget {
     final look = ref.watch(Preferences.homeLayout);
     final delayPill = lookPill(look, context, on: sites.testing);
     final multiPill = lookPill(look, context, on: multiOn);
+    final hopsOn = ref.watch(ConfigOptions.minHops);
+    final hopsPill = lookPill(look, context, on: hopsOn);
     final upper = look == HomeLayout.dots;
     // Dots: the two pills are signs without words (the check; the multi-server switch with the network it is for)
     final signs = look == HomeLayout.dots;
@@ -512,7 +514,20 @@ class _SitesHeader extends HookConsumerWidget {
               GestureDetector(
                 key: const Key('multi-servers'),
                 behavior: HitTestBehavior.opaque,
-                onTap: () => ref.read(multiPref.notifier).update(!multiOn),
+                // a tap says what the switch is and lets the user turn it on or off
+                onTap: () => unawaited(
+                  showFeatureDialog(
+                    context,
+                    title: '${t.avpn.multiServersTitle} · ${onMobile ? 'LTE' : 'Wi-Fi'}',
+                    body: t.avpn.multiServersInfo,
+                    stateText: multiOn ? t.avpn.featureStateOn : t.avpn.featureStateOff,
+                    on: multiOn,
+                    onLabel: t.avpn.featureOn,
+                    offLabel: t.avpn.featureOff,
+                    closeLabel: t.avpn.featureClose,
+                    onChoose: (on) => ref.read(multiPref.notifier).update(on),
+                  ),
+                ),
                 child: Container(
                   height: 30,
                   padding: const EdgeInsets.symmetric(horizontal: 9),
@@ -555,6 +570,41 @@ class _SitesHeader extends HookConsumerWidget {
                         ),
                       ],
                     ],
+                  ),
+                ),
+              ),
+              // the fewer-hops mode: the server chosen stays while it is steady; a tap says what it is and turns it on or off
+              if (signs) const Spacer() else const Gap(8),
+              GestureDetector(
+                key: const Key('min-hops'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => unawaited(
+                  showFeatureDialog(
+                    context,
+                    title: t.avpn.minHops,
+                    body: t.avpn.minHopsInfo,
+                    stateText: hopsOn ? t.avpn.featureStateOn : t.avpn.featureStateOff,
+                    on: hopsOn,
+                    onLabel: t.avpn.featureOn,
+                    offLabel: t.avpn.featureOff,
+                    closeLabel: t.avpn.featureClose,
+                    onChoose: (on) => ref.read(ConfigOptions.minHops.notifier).update(on),
+                  ),
+                ),
+                child: Container(
+                  height: 30,
+                  width: 34,
+                  decoration:
+                      hopsPill?.box ??
+                      BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        color: hopsOn ? accent.withValues(alpha: .16) : Colors.transparent,
+                        border: Border.all(color: hopsOn ? accent : scheme.outlineVariant),
+                      ),
+                  child: Icon(
+                    Icons.anchor_rounded,
+                    size: 15,
+                    color: hopsPill?.ink ?? (hopsOn ? accent : scheme.onSurfaceVariant),
                   ),
                 ),
               ),

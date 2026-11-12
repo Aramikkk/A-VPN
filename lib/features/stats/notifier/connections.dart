@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/proxy/data/server_region_filter.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_groups.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -604,7 +605,7 @@ class Connections extends Notifier<ConnectionsState> {
     // the super light mode: the list isn't asked for at all (the topology and the connections are off)
     final superLight = ref.watch(superLightProvider);
     _rollDay();
-    final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;
+    final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected && !ref.watch(vpnPauseProvider).paused;
     final enabled = ref.watch(ConfigOptions.enableClashApi);
     final port = ref.watch(ConfigOptions.clashApiPort);
     final secret = ref.watch(ConfigOptions.clashApiSecret);

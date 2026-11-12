@@ -11,6 +11,7 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
+import com.hiddify.hiddify.bg.BoxService
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -21,6 +22,7 @@ import java.io.File
  * A-VPN's own small tools for the Dart side:
  *  - "appIcon": an app's icon as a picture (an adaptive icon with its two layers, as the launcher draws it), for the
  *    apps the installed-apps list gave none for;
+ *  - "pauseState": whether the service has paused the VPN (a home Wi-Fi, or an app that is on screen);
  *  - "install": the downloaded update (an APK in the cache's ara_update folder) handed to the system's installer.
  */
 class AraToolsHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
@@ -56,6 +58,8 @@ class AraToolsHandler : FlutterPlugin, MethodChannel.MethodCallHandler {
                     result.success(mapOf("icon" to icon, "why" to why.toString()))
                 }
             }
+            // the service's pause: "" not paused, "home", or "app:" and the app's name (see BoxService.pauseState)
+            "pauseState" -> result.success(BoxService.pauseState)
             "install" -> {
                 val path = call.argument<String>("path")
                 val allowSettings = call.argument<Boolean>("allowSettings") ?: true

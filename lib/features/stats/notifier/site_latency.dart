@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
@@ -180,7 +181,7 @@ class SiteLatency extends Notifier<SiteLatencyState> {
 
   @override
   SiteLatencyState build() {
-    final connected = ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
+    final connected = ref.watch(tunnelUpProvider);
     if (connected && !_connected && !ref.watch(superLightProvider)) Future.microtask(test);
     _connected = connected;
     // Auto moved to another server: the sites again
@@ -211,7 +212,7 @@ class SiteLatency extends Notifier<SiteLatencyState> {
   Future<void> test({bool quiet = false}) async {
     if (_running || state.testing || ref.read(superLightProvider)) return;
     if (state.at != null && DateTime.now().difference(state.at!) < const Duration(seconds: 3)) return;
-    if (!(ref.read(connectionNotifierProvider).valueOrNull?.isConnected ?? false)) return;
+    if (!ref.read(tunnelUpProvider)) return;
     if (!ref.read(ConfigOptions.enableMixedPort)) return;
     _running = true;
     if (!quiet) state = (ms: state.ms, at: state.at, testing: true, done: 0);

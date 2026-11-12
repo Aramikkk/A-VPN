@@ -78,7 +78,7 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
           // added or deleted)
           if (!migrated) {
             _migrate(ordered);
-          } else {
+          } else if (!_pin(ordered, order)) {
             _heal(ordered, off);
           }
           return ordered;
@@ -110,6 +110,15 @@ class ProfilesNotifier extends _$ProfilesNotifier with AppLogger {
         }
       }),
     );
+  }
+
+  /// Keeps the order shown when some profile has no place in the kept one yet (see [orderToPin]); true when it had to:
+  /// the list is built again with the kept order, and only then the main profile is looked at.
+  bool _pin(List<ProfileEntity> ordered, List<String> order) {
+    final pinned = orderToPin(order, [for (final p in ordered) p.id]);
+    if (pinned == null) return false;
+    unawaited(Future(() => ref.read(Preferences.profilesOrder.notifier).update(pinned)));
+    return true;
   }
 
   /// Sets the active profile and the added ones as the order and the switches say, when they are not.

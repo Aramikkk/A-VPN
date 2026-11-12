@@ -10,6 +10,7 @@ import 'package:hiddify/features/connection/data/connection_data_providers.dart'
 import 'package:hiddify/features/connection/data/connection_repository.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
+import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/connection/model/startup_connection.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -247,7 +248,8 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
 @Riverpod(keepAlive: true)
 bool serviceRunning(Ref ref) {
   // ref.watch(coreRestartSignalProvider);
-  return ref.watch(connectionNotifierProvider).valueOrNull?.isConnected ?? false;
+  // not while the service has the VPN paused: the tunnel is closed, there is nothing to ask the core for
+  return ref.watch(tunnelUpProvider);
 }
 
 class SingleCall {

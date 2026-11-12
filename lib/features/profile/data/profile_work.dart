@@ -44,3 +44,12 @@ bool workNeedsSync(List<String> orderedIds, Set<String> off, {required String? a
 /// The subscription whose settings were asked for by a tap on it (Settings → Profile management opens that one);
 /// null: the active one.
 final profileManagementFocus = ValueNotifier<String?>(null);
+
+/// The order to keep when some shown profile has no place in the kept [order] yet (none was ever kept, or a profile was
+/// added): the order shown now. Null when every shown one has its place. Without it the list follows the sort (by the
+/// last update, as a rule), and a subscription that updates would move to the top and become the main one by itself.
+List<String>? orderToPin(List<String> order, List<String> shownIds) {
+  if (shownIds.isEmpty) return null;
+  final kept = order.toSet();
+  return shownIds.every(kept.contains) ? null : [...shownIds];
+}

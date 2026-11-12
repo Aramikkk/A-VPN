@@ -31,6 +31,8 @@ class ProfileManagementPage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final profiles = ref.watch(profilesNotifierProvider).valueOrNull ?? const <ProfileEntity>[];
     final changed = useState(false);
+    // the subscription a tap asked for is opened once: the next visit (from Settings) opens the active one again
+    useEffect(() => () => profileManagementFocus.value = null, const []);
     // Wi-Fi and LTE are two lists: one is shown, the other is a tap away
     final network = useState('wifi');
     final connected = ref.watch(connectionNotifierProvider).valueOrNull is Connected;

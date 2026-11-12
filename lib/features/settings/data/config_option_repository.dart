@@ -1,5 +1,6 @@
 import 'package:dartx/dartx.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:hiddify/features/settings/data/min_hops.dart';
 import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
@@ -306,6 +307,9 @@ abstract class ConfigOptions {
     validator: (value) => value.inSeconds >= 1 && value.inSeconds <= maxPingTimeout,
   );
 
+  /// Fewer hops: the server chosen stays while it is steady (another must be far faster to take its place) and the
+  /// servers are checked seldom (see min_hops.dart). The button beside the multi-server one on the home screen.
+  static final minHops = PreferencesNotifier.create<bool, bool>('min-hops', false);
   static final balancerToleranceWifi = PreferencesNotifier.create<int, int>('balancer-tolerance-wifi', 50);
   static final balancerToleranceMobile = PreferencesNotifier.create<int, int>('balancer-tolerance-mobile', 25);
 
@@ -529,6 +533,7 @@ abstract class ConfigOptions {
     "url-test-timeout": urlTestTimeout,
     "url-test-timeout-wifi": urlTestTimeoutWifi,
     "url-test-timeout-mobile": urlTestTimeoutMobile,
+    "min-hops": minHops,
     "balancer-tolerance-wifi": balancerToleranceWifi,
     "balancer-tolerance-mobile": balancerToleranceMobile,
     "site-groups": siteGroups,
@@ -642,9 +647,9 @@ abstract class ConfigOptions {
       region: ref.watch(region).name,
       balancerStrategy: ref.watch(balancerStrategy),
       // Retain a working server across small latency changes, and keep existing connections during selection.
-      balancerTolerance: ref.watch(balancerToleranceWifi),
-      balancerToleranceWifi: ref.watch(balancerToleranceWifi),
-      balancerToleranceMobile: ref.watch(balancerToleranceMobile),
+      balancerTolerance: hopsTolerance(minHops: ref.watch(minHops), mobile: false, user: ref.watch(balancerToleranceWifi)),
+      balancerToleranceWifi: hopsTolerance(minHops: ref.watch(minHops), mobile: false, user: ref.watch(balancerToleranceWifi)),
+      balancerToleranceMobile: hopsTolerance(minHops: ref.watch(minHops), mobile: true, user: ref.watch(balancerToleranceMobile)),
       balancerKeepConnections: true,
       siteGroups: ref.watch(siteGroups) && !ref.watch(superLightProvider),
       siteGroupsTolerance: ref.watch(siteGroupsTolerance).clamp(10, 3000),
@@ -678,7 +683,10 @@ abstract class ConfigOptions {
       mtu: ref.watch(mtu),
       strictRoute: ref.watch(strictRoute),
       connectionTestUrl: pingUrl(ref.watch(connectionTestUrl), ref.watch(pingHttps)),
-      urlTestInterval: ref.watch(superLightProvider) ? const Duration(minutes: 10) : ref.watch(urlTestInterval),
+      urlTestInterval: hopsInterval(
+        minHops: ref.watch(minHops),
+        user: ref.watch(superLightProvider) ? const Duration(minutes: 10) : ref.watch(urlTestInterval),
+      ),
       urlTestTimeout: ref.watch(urlTestTimeoutWifi),
       enableClashApi: ref.watch(enableClashApi),
       clashApiPort: ref.watch(clashApiPort),

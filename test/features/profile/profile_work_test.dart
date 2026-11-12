@@ -83,4 +83,23 @@ void main() {
       expect(workNeedsSync(['a'], {'a'}, activeId: 'a', extras: const []), isFalse);
     });
   });
+
+  group('orderToPin', () {
+    test('no order kept yet: the order shown is kept, so an updated subscription can not rise to the top', () {
+      expect(orderToPin(const [], ['sigma', 'chill', 'wg']), ['sigma', 'chill', 'wg']);
+    });
+    test('every shown profile has its place: nothing to do', () {
+      expect(orderToPin(['a', 'b', 'c'], ['a', 'b', 'c']), isNull);
+      expect(orderToPin(['b', 'a'], ['b', 'a']), isNull);
+    });
+    test('a new profile has no place yet: it gets the one it is shown at (the end)', () {
+      expect(orderToPin(['a', 'b'], ['a', 'b', 'new']), ['a', 'b', 'new']);
+    });
+    test('a deleted profile left in the kept order is no reason to write it again', () {
+      expect(orderToPin(['a', 'gone', 'b'], ['a', 'b']), isNull);
+    });
+    test('no profiles: nothing', () {
+      expect(orderToPin(const [], const []), isNull);
+    });
+  });
 }

@@ -539,6 +539,16 @@ void main() {
           // Dots: the block's view is chosen by a tap on the block itself, there is no button of its own for it
           if (connected && (_env('HOMELAYOUT') ?? '') == 'dots' && _env('SUPERLIGHT') != '1' && _env('SITEGRAPH') == 'list') {
             expect(find.byKey(const Key('sites-view')), findsNothing);
+            // the fewer-hops button beside the multi-server one: a tap says what it is and offers on and off
+            expect(find.byKey(const Key('min-hops')), findsOneWidget);
+            await tester.tap(find.byKey(const Key('min-hops')));
+            await tester.pump(const Duration(milliseconds: 400));
+            expect(find.text('Меньше прыжков'), findsOneWidget);
+            expect(find.text('Включить'), findsOneWidget);
+            expect(find.text('Выключить'), findsOneWidget);
+            expect(find.text('Сейчас: выключено'), findsOneWidget);
+            await tester.tap(find.text('Закрыть'));
+            await tester.pump(const Duration(milliseconds: 400));
             await tester.tap(find.text('INSTAGRAM').first);
             await tester.pump(const Duration(milliseconds: 400));
             expect(find.text('Вид сайтов'), findsOneWidget);

@@ -426,34 +426,43 @@ Widget _dotsServerRow(
           _centeredServer(
             lead: lead,
             reserve: 62,
+            // the country's name is in the middle, between the bolt and the ping, the flag beside it on the left: the
+            // two sides take the same room, so the name is the row's own middle
             center: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                if (group)
-                  SizedBox(width: 42, child: Icon(Icons.auto_awesome_rounded, size: 28, color: ink))
-                else
-                  flagMark(flag, width: 42),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: group
+                        ? SizedBox(width: 42, child: Icon(Icons.auto_awesome_rounded, size: 28, color: ink))
+                        : flagMark(flag, width: 42),
+                  ),
+                ),
                 const Gap(12),
                 Flexible(
+                  flex: 2,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
                         caption.toUpperCase(),
                         maxLines: 1,
+                        textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
                         style: _Dots.mono(10, _Dots.soft(dark)),
                       ),
                       Text(
                         name.toUpperCase(),
                         maxLines: 1,
+                        textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
                         style: _Dots.mono(15, ink, weight: FontWeight.w800, spacing: 1),
                       ),
                     ],
                   ),
                 ),
+                const Expanded(child: SizedBox()),
               ],
             ),
             trailing: testing

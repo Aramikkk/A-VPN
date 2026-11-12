@@ -7,6 +7,7 @@ import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/ping_targets.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
@@ -149,7 +150,8 @@ class ConnectionQuality extends Notifier<List<int?>> {
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     final status = ref.watch(connectionNotifierProvider).valueOrNull;
-    final connected = status is Connected;
+    // a paused VPN (a home Wi-Fi, an app on screen) has no tunnel: the probes would all be lost
+    final connected = status is Connected && !ref.watch(vpnPauseProvider).paused;
     if (status is Connecting) _sawConnecting = true;
     if (connected) {
       // a new connection: one that went through "connecting", or the VPN down for more than a few seconds; the

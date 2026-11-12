@@ -10,7 +10,6 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/model/trusted_links.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
@@ -41,15 +40,6 @@ class ProfileTile extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final theme = Theme.of(context);
 
-    final selectActiveMutation = useMutation(
-      initialOnFailure: (err) {
-        CustomToast.error(t.presentShortError(err)).show(context);
-      },
-      initialOnSuccess: () {
-        if (context.mounted && context.canPop()) context.pop();
-      },
-    );
-
     final subInfo = switch (profile) {
       RemoteProfileEntity(:final subInfo) => subInfo,
       _ => null,
@@ -74,8 +64,11 @@ class ProfileTile extends HookConsumerWidget {
       }
       // a tap on a subscription opens its settings (its countries, for Wi-Fi and for LTE)
       profileManagementFocus.value = profile.id;
-      if (context.canPop()) context.pop();
-      context.goNamed('profileManagement');
+      final router = GoRouter.of(context);
+      // in the home screen's sheet of profiles the sheet closes first; on the Profiles page the settings open over the
+      // list, so "back" returns to it
+      if (ModalRoute.of(context) is PopupRoute) Navigator.of(context).pop();
+      unawaited(router.pushNamed('profileManagement'));
     }
 
     // Provider links (profile-web-page-url / support-url) show as separate pills

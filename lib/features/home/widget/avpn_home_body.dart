@@ -1,5 +1,7 @@
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/preferences/light_mode.dart';
+import 'package:hiddify/features/home/widget/feature_dialog.dart';
+import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/home/widget/popup_transition.dart';
 import 'dart:ui' as ui;
 import 'dart:async';
@@ -358,7 +360,7 @@ class _ProviderCard extends HookConsumerWidget {
             child: servers.isEmpty
                 ? Center(
                     child: Text(
-                      t.avpn.connectToSeeServers,
+                      noServersText(t, ref.watch(vpnPauseProvider)),
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                     ),
