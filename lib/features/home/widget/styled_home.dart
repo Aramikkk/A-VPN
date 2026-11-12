@@ -21,6 +21,8 @@ class _StyledHome extends HookConsumerWidget {
     // the status as the screen shows it: a blink of "disconnected" while the core's link restarts doesn't show
     final status = ref.watch(shownConnectionProvider);
     final connected = status.isConnected;
+    // the pause of the VPN: the screen is drawn again when it begins or ends (the pings turn to dashes and back)
+    ref.watch(vpnPauseProvider);
     // The home page listener resolves the physical network under the VPN.
     final networkKind = useListenable(_actualNetworkKind).value;
     final actualMobile = networkKind == NetworkKind.mobile;
@@ -123,7 +125,7 @@ class _StyledHome extends HookConsumerWidget {
       return _ContrastHome(
         superLight: superLight,
         header: header,
-        banner: const UpdateBanner(),
+        banner: const Column(mainAxisSize: MainAxisSize.min, children: [PauseStrip(), UpdateBanner()]),
         // Windows without the administrator's rights: the system proxy instead of the VPN mode chosen, and a way to
         // the full one
         notice: ref.watch(tunDeniedProvider) && ref.watch(ConfigOptions.serviceMode) == ServiceMode.tun
@@ -437,6 +439,7 @@ class _StatusBlock extends HookConsumerWidget {
       if (layout == HomeLayout.dots) {
         return _DotsStats(
           connected: connected,
+          paused: ref.watch(vpnPauseProvider).paused,
           timeText: timeFigure,
           ping: quality.ping,
           loss: quality.loss,

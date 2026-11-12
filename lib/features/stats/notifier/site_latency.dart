@@ -192,6 +192,8 @@ class SiteLatency extends Notifier<SiteLatencyState> {
       _pick = pick;
       if (changed) unawaited(test());
     });
+    // the tunnel closed (a pause, or the VPN off): the old delays are not shown as if they were now
+    if (!connected) return (ms: const {}, at: null, testing: false, done: 0);
     return stateOrNull ?? (ms: const {}, at: null, testing: false, done: 0);
   }
 

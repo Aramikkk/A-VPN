@@ -307,7 +307,7 @@ class _ContrastRow extends StatelessWidget {
               color: dark ? Colors.white.withValues(alpha: .1) : scheme.outlineVariant.withValues(alpha: .25),
             ),
           );
-    final ms = delay <= 0 ? '—' : (delay > 65000 ? '×' : '$delay');
+    final ms = vpnPausedNow || delay <= 0 ? '—' : (delay > 65000 ? '×' : '$delay');
     // Auto: the country it's on now right after its name ("Авто 🇵🇱 Польша"), no line under it
     final now = group ? subtitle.indexOf(': ') : -1;
     final nowOn = now < 0 ? null : subtitle.substring(now + 2);

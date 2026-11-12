@@ -13,6 +13,10 @@ typedef VpnPause = ({bool paused, bool home, String app});
 
 const noVpnPause = (paused: false, home: false, app: '');
 
+/// Whether the VPN is paused now, for the places that draw without watching [vpnPauseProvider] (the home screen
+/// rebuilds when it changes, and they read this): the pings of a paused VPN are dashes, they do not change.
+bool vpnPausedNow = false;
+
 /// What the service says: "" (not paused), "home", or "app:" and the app's name.
 VpnPause parseVpnPause(String? raw) {
   if (raw == null || raw.isEmpty) return noVpnPause;
@@ -43,6 +47,7 @@ class VpnPauseNotifier extends Notifier<VpnPause> {
   Future<void> refresh() async {
     try {
       final next = parseVpnPause(await _channel.invokeMethod<String>('pauseState'));
+      vpnPausedNow = next.paused;
       if (next != state) state = next;
     } catch (_) {
       // an older service without the answer: never paused, as before

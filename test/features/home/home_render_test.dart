@@ -26,6 +26,7 @@ import 'package:hiddify/core/theme/ara_style.dart';
 import 'package:hiddify/core/theme/glass_scheme.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/connection/notifier/shown_connection.dart';
 import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
@@ -63,6 +64,7 @@ const _variants = <String, Map<String, String>>{
   'dots digits': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'digits'},
   'dots columns': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'columns', 'SITEFLAGS': '1'},
   'dots lanes': {'HOMELAYOUT': 'dots', 'SITEGRAPH': 'lanes', 'SITEFLAGS': '1'},
+  'dots paused': {'HOMELAYOUT': 'dots', 'PAUSED': 'home'},
   'dots ping bars': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'bars'},
   'dots ping equalizer': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'equalizer'},
   'dots ping ruler': {'HOMELAYOUT': 'dots', 'PINGGRAPH': 'ruler'},
@@ -341,6 +343,8 @@ void main() {
                 connectionQualityProvider.overrideWith(_Quality.new),
                 siteLatencyProvider.overrideWith(_Sites.new),
                 siteHistoryProvider.overrideWith(_SiteHistory.new),
+                // PAUSED=home|app:Name: the VPN paused by the service
+                if ((_env('PAUSED') ?? '').isNotEmpty) vpnPauseProvider.overrideWith(() => _PausedVpn(_env('PAUSED')!)),
                 // SUPERLIGHT=1: the super light mode
                 if (_env('SUPERLIGHT') == '1') superLightProvider.overrideWithValue(true),
                 // HOMEAPPS=pkg,pkg: these apps of Settings -> Sites marked for the home screen's delay block (the phone's way)
@@ -536,6 +540,13 @@ void main() {
               );
             }
           }
+          // the VPN paused by the service: a strip says so in few words, and the pings are dashes (they do not change)
+          if (connected && (_env('PAUSED') ?? '').isNotEmpty && (_env('HOMELAYOUT') ?? '') == 'dots') {
+            expect(find.byKey(const Key('pause-strip')), findsOneWidget);
+            expect(find.textContaining('ДОМАШНИЙ РЕЖИМ: VPN НА ПАУЗЕ'), findsOneWidget);
+            expect(find.textContaining('РОУТЕР'), findsNothing, reason: 'the strip is short');
+            expect(find.textContaining('СРЕДНИЙ'), findsNothing, reason: 'no average of a ping that is not measured');
+          }
           // Dots: the block's view is chosen by a tap on the block itself, there is no button of its own for it
           if (connected && (_env('HOMELAYOUT') ?? '') == 'dots' && _env('SUPERLIGHT') != '1' && _env('SITEGRAPH') == 'list') {
             expect(find.byKey(const Key('sites-view')), findsNothing);
@@ -718,6 +729,15 @@ class _SiteHistory extends SiteHistory {
 }
 
 /// The sites' delays as measured: SITES=<ms,...> in the order of latencySites ('-' for no answer).
+class _PausedVpn extends VpnPauseNotifier {
+  _PausedVpn(this._raw);
+
+  final String _raw;
+
+  @override
+  VpnPause build() => parseVpnPause(_raw);
+}
+
 class _Sites extends SiteLatency {
   @override
   SiteLatencyState build() {

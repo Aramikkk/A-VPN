@@ -3,6 +3,7 @@ part of 'avpn_home_body.dart';
 class _DotsStats extends HookConsumerWidget {
   const _DotsStats({
     required this.connected,
+    this.paused = false,
     required this.timeText,
     required this.ping,
     required this.loss,
@@ -14,6 +15,9 @@ class _DotsStats extends HookConsumerWidget {
   });
 
   final bool connected;
+
+  /// the VPN paused by the service: no ping, no bars, no average (nothing is measured)
+  final bool paused;
   final String timeText;
   final int? ping;
 
@@ -36,8 +40,8 @@ class _DotsStats extends HookConsumerWidget {
     final ink = _Dots.ink(dark);
     final live = ref.watch(connectionQualityProvider);
     final kept = useRef<List<int?>>(const []);
-    if (connected && live.isNotEmpty) kept.value = live;
-    final samples = connected ? live : kept.value;
+    if (connected && !paused && live.isNotEmpty) kept.value = live;
+    final samples = paused ? const <int?>[] : (connected ? live : kept.value);
     final answers = [
       for (final s in samples)
         if (s != null) s,
@@ -74,10 +78,10 @@ class _DotsStats extends HookConsumerWidget {
             onTap: slim ? null : () => unawaited(_pickPingGraph(context, ref, style)),
             child: Center(
               child: _DotNumber(
-                connected && ping != null ? '$ping' : '—',
+                connected && !paused && ping != null ? '$ping' : '—',
                 cell: slim ? 6 : 10,
                 // the ordinary colour; the accent when the ping is very high or the loss is heavy
-                colour: connected && ((ping ?? 0) >= _DotsStats.alertPing || loss >= _DotsStats.alertLoss)
+                colour: connected && !paused && ((ping ?? 0) >= _DotsStats.alertPing || loss >= _DotsStats.alertLoss)
                     ? _Dots.red
                     : ink,
                 faint: _Dots.grid(dark),
