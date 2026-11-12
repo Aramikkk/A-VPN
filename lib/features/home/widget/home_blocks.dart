@@ -820,7 +820,10 @@ class SessionTrafficPage extends ConsumerWidget {
 
 /// The home screen's connections block: how many are open and where they go; a tap opens the full description.
 class _ConnectionsBlock extends ConsumerWidget {
-  const _ConnectionsBlock();
+  const _ConnectionsBlock({this.slim = false});
+
+  /// the short form (one line), for a page too low for the whole block (Dots)
+  final bool slim;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -854,7 +857,7 @@ class _ConnectionsBlock extends ConsumerWidget {
           onTap: () => showGlassPopup(context, const _ConnectionsDetails()),
           child: look == HomeLayout.bento
               ? _bentoConnections(context, t, open: open.length, vpn: vpn, direct: direct)
-              : _dotsConnections(context, t, open: open.length, vpn: vpn, direct: direct),
+              : _dotsConnections(context, t, open: open.length, vpn: vpn, direct: direct, slim: slim),
         ),
       );
     }

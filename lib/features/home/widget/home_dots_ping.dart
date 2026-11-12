@@ -72,7 +72,7 @@ class _DotsStats extends HookConsumerWidget {
               Text(timeText, style: _Dots.mono(12, ink, weight: FontWeight.w800)),
             ],
           ),
-          Gap(slim ? 6 : 12),
+          Gap(slim ? 6 : 8),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: slim ? null : () => unawaited(_pickPingGraph(context, ref, style)),
@@ -88,7 +88,7 @@ class _DotsStats extends HookConsumerWidget {
               ),
             ),
           ),
-          const Gap(8),
+          const Gap(6),
           // the average, and in the slim form (no room for the graph under it) the answers run on both sides of it: the
           // older ones on the left, the newer on the right
           Row(
@@ -106,7 +106,7 @@ class _DotsStats extends HookConsumerWidget {
             ],
           ),
           if (!slim) ...[
-            const Gap(10),
+            const Gap(6),
             if (style == PingGraph.bars)
               SizedBox(
                 height: 46,

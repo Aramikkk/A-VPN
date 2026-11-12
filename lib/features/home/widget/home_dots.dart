@@ -25,7 +25,7 @@ abstract final class _Dots {
 }
 
 /// A sheet of the dotted paper with [child] on it.
-Widget _dotPaper(BuildContext context, Widget child, {EdgeInsets padding = const EdgeInsets.fromLTRB(16, 14, 16, 14)}) {
+Widget _dotPaper(BuildContext context, Widget child, {EdgeInsets padding = const EdgeInsets.fromLTRB(16, 11, 16, 11)}) {
   final dark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     padding: padding,
@@ -554,9 +554,25 @@ Widget _dotsConnections(
   required int open,
   required int vpn,
   required int direct,
+  bool slim = false,
 }) {
   final dark = Theme.of(context).brightness == Brightness.dark;
   final ink = _Dots.ink(dark);
+  if (slim) {
+    // one line, for a page too low for the two: the count and the split, the title before them
+    return _dotPaper(
+      context,
+      Row(
+        children: [
+          Expanded(child: Text(t.avpn.connBlockTitle.toUpperCase(), style: _Dots.mono(11, _Dots.soft(dark)))),
+          Text('$open', style: _Dots.mono(16, ink, weight: FontWeight.w800)),
+          const Gap(14),
+          Text('$vpn / $direct', style: _Dots.mono(13, _Dots.soft(dark))),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 7, 16, 7),
+    );
+  }
   return _dotPaper(
     context,
     Column(
@@ -569,7 +585,7 @@ Widget _dotsConnections(
             _DotNumber('$open', cell: 4, colour: ink, faint: _Dots.grid(dark)),
           ],
         ),
-        const Gap(6),
+        const Gap(4),
         _dotRow(context, 'VPN / ${t.avpn.connDirect}', '$vpn / $direct'),
       ],
     ),
