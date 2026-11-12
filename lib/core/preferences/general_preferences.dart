@@ -115,7 +115,7 @@ abstract class Preferences {
 
   static final startedByUser = PreferencesNotifier.create<bool, bool>("started_by_user", false);
 
-  /// A-VPN: connect as soon as the app opens. On from the start on a computer, off on a phone.
+  /// AraVPN: connect as soon as the app opens. On from the start on a computer, off on a phone.
   static final connectOnAppStart = PreferencesNotifier.create<bool, bool>("connect_on_app_start", true);
 
   /// A-VPN (Android): turn the VPN on in the background when the phone starts, even if it was off before
@@ -227,7 +227,7 @@ abstract class Preferences {
     mapTo: (value) => jsonEncode(value),
   );
 
-  /// A-VPN auto-pause (Android): the VPN steps aside while one of [autoPauseApps] is on screen. Read by the
+  /// AraVPN auto-pause (Android): the VPN steps aside while one of [autoPauseApps] is on screen. Read by the
   /// VPN service itself (SettingsKey.AUTO_PAUSE_*), so the list is one ";"-separated string.
   static final autoPauseEnabled = PreferencesNotifier.create<bool, bool>("auto_pause_enabled", true);
 
@@ -244,13 +244,13 @@ abstract class Preferences {
     mapTo: (value) => value.join(';'),
   );
 
-  /// A-VPN home Wi-Fi (Android): the VPN pauses on a Wi-Fi whose router runs a VPN of its own. Read by the VPN
+  /// AraVPN home Wi-Fi (Android): the VPN pauses on a Wi-Fi whose router runs a VPN of its own. Read by the VPN
   /// service itself (SettingsKey.HOME_WIFI_*); the homes as JSON (see HomeWifiPage).
-  static final homeWifiEnabled = PreferencesNotifier.create<bool, bool>("aravpn-home-wifi-enabled", true);
+  static final homeWifiEnabled = PreferencesNotifier.create<bool, bool>("avpn-home-wifi-enabled", true);
 
-  static final homeWifiList = PreferencesNotifier.create<String, String>("aravpn-home-wifi-list", "[]");
+  static final homeWifiList = PreferencesNotifier.create<String, String>("avpn-home-wifi-list", "[]");
 
-  /// A-VPN: the accent colour and gradient.
+  /// AraVPN: the accent colour and gradient.
   static final araAccent = PreferencesNotifier.create<AraAccent, String>(
     "ara_accent",
     AraAccent.neonOrange,
@@ -295,7 +295,7 @@ abstract class Preferences {
   /// A-VPN: how the figures of the Dots style are drawn (the dots of the matrix, bold, wide, solid pixels).
   static final dotsDigits = PreferencesNotifier.create<DotsDigits, String>(
     "dots_digits",
-    DotsDigits.fallback,
+    DotsDigits.wide,
     mapFrom: DotsDigits.fromName,
     mapTo: (value) => value.name,
   );
@@ -312,7 +312,7 @@ abstract class Preferences {
   /// The newest crash report the user was offered, by name, so each crash is offered once.
   static final lastSeenCrashReport = PreferencesNotifier.create<String, String>("last_seen_crash_report", "");
 
-  static final updateFolder = PreferencesNotifier.create<String, String>("update_folder", "Aramikkk/A-VPN");
+  static final updateFolder = PreferencesNotifier.create<String, String>("update_folder", "Aramikkk/hiddify-app");
 
   /// A-VPN: when the program last looked for an update by itself (milliseconds), once a day
   static final lastUpdateCheck = PreferencesNotifier.create<int, int>("last_update_check", 0);
@@ -323,7 +323,7 @@ abstract class Preferences {
   /// A-VPN: how the Dots ping block draws the answers (the menu of the big ping).
   static final pingGraph = PreferencesNotifier.create<PingGraph, String>(
     "ping_graph",
-    PingGraph.equalizer,
+    PingGraph.bars,
     mapFrom: PingGraph.fromName,
     mapTo: (value) => value.name,
   );
@@ -408,7 +408,7 @@ abstract class Preferences {
     'com.deepseek.chat',
   ]);
 
-  /// A-VPN: how the server list shows each server's ping.
+  /// AraVPN: how the server list shows each server's ping.
   static final pingStyle = PreferencesNotifier.create<PingStyle, String>(
     "ping_style",
     PingStyle.barsAndNumbers,

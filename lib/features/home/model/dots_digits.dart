@@ -11,7 +11,7 @@ enum DotsDigits {
   final String ru;
   final String en;
 
-  static const fallback = dots;
+  static const fallback = wide;
 
   static DotsDigits fromName(String? name) => values.firstWhere((e) => e.name == name, orElse: () => fallback);
 }

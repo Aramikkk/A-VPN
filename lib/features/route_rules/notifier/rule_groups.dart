@@ -175,13 +175,8 @@ const _chinaSites = [
   'baidu.com',
   'bdstatic.com',
   'bdimg.com',
-  'qq.com',
   'gtimg.com',
-  'tencent.com',
-  'tencent-cloud.com',
   'myqcloud.com',
-  'wechat.com',
-  'weixin.com',
   'alibaba.com',
   'alibabacloud.com',
   'alicdn.com',
@@ -417,11 +412,17 @@ const otherBlockedApps = [
 ];
 const otherBlockedProcesses = ['AnyDesk.exe', 'anydesk.exe'];
 
-/// The Chinese apps on the phone.
-const chinaApps = [
+/// WeChat and QQ (Tencent): they work better direct than through the VPN, so they have a group of their own, ahead of the groups that
+/// take the VPN.
+const chinaChatDomains = ['qq.com', 'tencent.com', 'tencent-cloud.com', 'wechat.com', 'weixin.com'];
+const chinaChatApps = [
   'com.tencent.mm', // WeChat
   'com.tencent.mobileqq',
   'com.tencent.wework',
+];
+
+/// The Chinese apps on the phone.
+const chinaApps = [
   'com.alibaba.aliexpresshd',
   'com.alibaba.intl.android.apps.poseidon', // Alibaba.com
   'com.taobao.taobao',

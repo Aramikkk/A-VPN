@@ -88,7 +88,7 @@ class _ShownConnection extends ShownConnection {
   ConnectionStatus build() => _connected ? const Connected() : const Disconnected();
 }
 
-final _servers = [
+final _baseServers = [
   ('lowest', '', 0, true),
   ('fi', '🇫🇮 Доступ - Финляндия', 49, false),
   ('se2', '🇸🇪 Доступ - Швеция 2', 64, false),
@@ -103,6 +103,16 @@ final _servers = [
   ('lte', '🇵🇱 Доступ - Польша LTE Only', 95, false),
 ];
 
+/// BOLTS=1: a second provider's servers, the fast ones marked with lightnings in their names (two of the same country)
+List<(String, String, int, bool)> get _servers => [
+  ..._baseServers,
+  if (_env('BOLTS') == '1') ...[
+    ('cg1', '🇩🇪 Германия ⚡', 58, false),
+    ('cg2', '🇩🇪 Германия ⚡⚡', 67, false),
+    ('cg3', '🇬🇧 Smart-Авто ⚡', 62, false),
+  ],
+];
+
 /// BADGES=1: the servers of the second and third subscription carry the shifted numbers the merge gives them
 String _badged(String tag, String display) {
   if (_env('BADGES') != '1') return display;
@@ -111,6 +121,9 @@ String _badged(String tag, String display) {
     'ee' => '$display § 1003',
     'gb' => '$display § 2004',
     'fi' => '$display § 5',
+    'cg1' => '$display § 1004',
+    'cg2' => '$display § 1005',
+    'cg3' => '$display § 1006',
     _ => display,
   };
 }
@@ -227,7 +240,7 @@ void main() {
     ]);
     await _loadFont('Emoji', ['$fonts/Emoji.ttf']);
     await _loadFont('MaterialIcons', [
-      './tools/flutter/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+      'C:/dev/tools/flutter/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
     ]);
   });
 
@@ -245,11 +258,11 @@ void main() {
           addTearDown(_overrides.clear);
           final network = _env('NETWORK') == 'mobile' ? 'mobile' : 'wifi';
           tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-            const MethodChannel('com.aravpn.app/network'),
+            const MethodChannel('com.avpn.app/network'),
             (call) async => call.method == 'underlyingNetwork' ? network : null,
           );
           tester.binding.defaultBinaryMessenger.setMockStreamHandler(
-            const EventChannel('com.aravpn.app/network/events'),
+            const EventChannel('com.avpn.app/network/events'),
             MockStreamHandler.inline(
               onListen: (_, sink) {
                 sink.success(network);

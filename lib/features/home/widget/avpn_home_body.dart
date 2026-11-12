@@ -1318,7 +1318,7 @@ String _marked(String text, String name) =>
 /// How a whitelist server is marked wherever only its country shows.
 const whitelistMark = 'БС';
 
-/// The provider calls its regular servers and its profile "Доступ"; A-VPN shows them as Sigma (Sigma Gate).
+/// The provider calls its regular servers and its profile "Доступ"; AraVPN shows them as Sigma (Sigma Gate).
 String sigmaName(String name) => !ProviderQuirks.sigma
     ? name
     : name.replaceAll(RegExp('Доступ', caseSensitive: false), 'Sigma').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
@@ -1340,6 +1340,9 @@ ServerName serverNameOf(String raw, {String? tag}) {
   var name = marked.text;
   name = name.replaceAll('§hide§', '').replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '').trim();
   name = sigmaName(name);
+  // the marks a provider puts in a name (a lightning for a fast server) say nothing here: the country and, where there are
+  // several of it, its number
+  name = name.replaceAll(RegExp('[\u26A1\uFE0F]'), '').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
   final runes = name.runes.toList();
   for (var i = 0; i + 1 < runes.length; i++) {
     final a = runes[i] - 0x1F1E6;

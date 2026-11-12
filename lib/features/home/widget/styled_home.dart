@@ -156,6 +156,7 @@ class _StyledHome extends HookConsumerWidget {
                     height: 68,
                     child: _StyledServerList(
                       showCurrentServer: true,
+                      numberAmong: servers,
                       lead: const _BestButton(),
                       networkStyled: true,
                       mobileNetwork: actualMobile,
@@ -635,7 +636,12 @@ class _StyledServerList extends ConsumerWidget {
     this.networkStyled = false,
     this.mobileNetwork = false,
     this.lead,
+    this.numberAmong,
   });
+
+  /// the servers that count when the same country comes more than once (the one-row panel holds one server, the numbers
+  /// still go by the whole list)
+  final List<OutboundInfo>? numberAmong;
 
   /// the current server's button, at the left of its row (see [showCurrentServer])
   final Widget? lead;
@@ -662,6 +668,8 @@ class _StyledServerList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    // the marks of the subscriptions (their names are in the rows' captions)
+    ref.watch(profileBadgesProvider);
     final list = LayoutBuilder(
       builder: (context, box) {
         // the current server's own row (Dots) is as high as the room it is given, a list's rows are 62
@@ -686,23 +694,30 @@ class _StyledServerList extends ConsumerWidget {
             // a note in brackets at the end ("Финляндия (Тестовый)") goes to the line under: "Тестовый · Sigma · VLESS"
             final full = _marked(dash < 0 ? name.title : name.title.substring(dash + 3).trim(), name.title);
             final note = RegExp(r'\s*\(([^()]*)\)$').firstMatch(full);
-            final title = currentServer != null
+            final baseTitle = currentServer != null
                 ? (note == null ? full : full.substring(0, note.start).trim())
                 // Auto is named as Auto, the server it is on now under it
                 : (auto ? t.avpn.auto : (note == null ? full : full.substring(0, note.start).trim()));
+            // the same country of one provider more than once: the first is plain, the next ones are 2, 3…
+            final ordinal = server.isGroup && currentServer == null
+                ? 1
+                : _ordinalOf(displayedServer, numberAmong ?? servers);
+            final title = ordinal > 1 ? '$baseTitle $ordinal' : baseTitle;
+            // with several subscriptions in the work: whose server it is, in a word (SIGMA, CHILL, PHANTOM)
+            final provider = _providerWord(displayedServer.tag);
+            // the provider's own class word ("Доступ") says nothing next to the provider's name
+            final klass = dash > 0 ? name.title.substring(0, dash).trim() : null;
+            final showClass = klass != null && !(provider != null && klass.toLowerCase() == 'доступ');
             final subtitle = currentServer != null
                 ? [
+                    ?provider,
                     if (note != null) note[1]!,
-                    if (dash > 0) name.title.substring(0, dash).trim(),
+                    if (showClass) klass,
                     currentServer.type.toUpperCase(),
                   ].join(' · ')
                 : auto
                 ? (autoNow == null ? t.avpn.autoBestHint : '${t.avpn.stNow}: ${_withFlag(serverName(autoNow!))}')
-                : [
-                    if (note != null) note[1]!,
-                    if (dash > 0) name.title.substring(0, dash).trim(),
-                    server.type.toUpperCase(),
-                  ].join(' · ');
+                : [?provider, if (note != null) note[1]!, if (showClass) klass, server.type.toUpperCase()].join(' · ');
             void select() {
               ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy("select", server.tag);
               afterSelect?.call();
@@ -733,6 +748,35 @@ class _StyledServerList extends ConsumerWidget {
     // the rows on the page itself, no card round them
     return list;
   }
+}
+
+/// Which of the servers of one provider with the same country name this one is (1 for the first): a country comes plain once, and
+/// as 1 (plain), 2, 3 in the order the list has them when it comes more than once.
+int _ordinalOf(OutboundInfo server, List<OutboundInfo> among) {
+  final me = serverName(server);
+  var total = 0;
+  var seen = 0;
+  var position = 1;
+  for (final other in among) {
+    if (other.isGroup) continue;
+    final name = serverName(other);
+    if (name.profile != me.profile || name.title.toLowerCase() != me.title.toLowerCase()) continue;
+    total++;
+    seen++;
+    if (other.tag == server.tag) position = seen;
+  }
+  return total > 1 ? position : 1;
+}
+
+/// The word that names the subscription a server is from, when more than one is in the work: the first word of its name,
+/// in capitals, at most eight letters (Sigma, ChillGuy, Phantom); null with one subscription.
+String? _providerWord(String tag) {
+  final index = profileOfTag(tag);
+  if (index < 0 || index >= profileBadgesNow.length) return null;
+  final words = profileBadgesNow[index].name.trim().split(RegExp(r'\s+'));
+  if (words.isEmpty || words.first.isEmpty) return null;
+  final word = words.first.toUpperCase();
+  return word.length > 8 ? word.substring(0, 8) : word;
 }
 
 /// Contrast's home: on the upper zone (its light behind the app bar too: [ContrastGlow]) the session, the servers,
@@ -809,7 +853,9 @@ class _ContrastHome extends ConsumerWidget {
                   if (notice != null) ...[_ContrastBlock(child: notice!), const Gap(10)],
                   _ContrastBlock(child: opensTraffic(status)),
                   const Gap(10),
-                  Expanded(child: traffic == null ? const SizedBox.shrink() : _ContrastBlock(expand: true, child: traffic!)),
+                  Expanded(
+                    child: traffic == null ? const SizedBox.shrink() : _ContrastBlock(expand: true, child: traffic!),
+                  ),
                   const Gap(10),
                   const _SuperLightOff(),
                 ],
@@ -995,7 +1041,11 @@ class _SuperLightOff extends ConsumerWidget {
                 : theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
-        Icon(Icons.power_settings_new_rounded, size: 22, color: dots ? _Dots.soft(dark) : theme.colorScheme.onSurfaceVariant),
+        Icon(
+          Icons.power_settings_new_rounded,
+          size: 22,
+          color: dots ? _Dots.soft(dark) : theme.colorScheme.onSurfaceVariant,
+        ),
       ],
     );
     return Semantics(
@@ -1007,7 +1057,9 @@ class _SuperLightOff extends ConsumerWidget {
         onTap: () => ref.read(Preferences.superLight.notifier).update(false),
         child: dots
             ? _dotPaper(context, row, padding: const EdgeInsets.fromLTRB(16, 14, 16, 14))
-            : _ContrastBlock(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14), child: row)),
+            : _ContrastBlock(
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14), child: row),
+              ),
       ),
     );
   }

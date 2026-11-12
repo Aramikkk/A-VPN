@@ -905,8 +905,10 @@
           "ruDomainsDirectHint": ".ru, .su, .рф, Яндекс, VK, Mail.ru, банки, Госуслуги, маркетплейсы",
           "ruAppsDirect": "Российские приложения",
           "ruAppsDirectHint": "Яндекс, банки, Госуслуги, Авито, Ozon, Wildberries, VK, MAX",
+          "chinaChatDirect": "WeChat и QQ напрямую",
+          "chinaChatDirectHint": "WeChat, QQ, WeCom: идут напрямую, без VPN (так работают лучше)",
           "chinaProxy": "Китайские сервисы",
-          "chinaProxyHint": "Сайты .cn, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…",
+          "chinaProxyHint": "Сайты .cn, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…",
           "adultProxy": "Сайты 18+",
           "adultProxyHint": "Всегда через VPN; в статистике, «Соединениях» и «Топологии» не показываются"
         },

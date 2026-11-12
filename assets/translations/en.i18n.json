@@ -899,8 +899,10 @@
           "ruDomainsDirectHint": ".ru, .su, .рф, Yandex, VK, Mail.ru, banks, Gosuslugi, marketplaces",
           "ruAppsDirect": "Russian apps",
           "ruAppsDirectHint": "Yandex, banks, Gosuslugi, Avito, Ozon, Wildberries, VK, MAX",
+          "chinaChatDirect": "WeChat and QQ direct",
+          "chinaChatDirectHint": "WeChat, QQ, WeCom: direct, without the VPN (they work better so)",
           "chinaProxy": "Chinese services",
-          "chinaProxyHint": ".cn sites, WeChat, QQ, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…",
+          "chinaProxyHint": ".cn sites, Alibaba, AliExpress, Taobao, Temu, SHEIN, Bilibili, Douyin, Weibo, Baidu…",
           "adultProxy": "Adult sites (18+)",
           "adultProxyHint": "Always through the VPN; never shown in the statistics, Connections or Topology"
         },

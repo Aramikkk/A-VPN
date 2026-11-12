@@ -31,6 +31,8 @@ enum BuiltinRule {
   // QUIC (HTTP/3 over UDP) crawls through a TCP tunnel and is often throttled in Russia; blocking it makes apps
   // fall back to TCP at once instead of after a timeout
   blockQuic(enabledByDefault: true),
+  // WeChat and QQ go direct (they work better so), ahead of every group that takes the VPN
+  chinaChatDirect(enabledByDefault: true),
   // what is blocked in Russia first: no app reaches it direct
   socialProxy(enabledByDefault: true),
   adultProxy(enabledByDefault: true),
@@ -62,6 +64,7 @@ enum BuiltinRule {
   String present(Translations t, Region region) => switch (this) {
     bypassLan => t.pages.settings.routing.builtinRules.bypassLan,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuic,
+    chinaChatDirect => t.pages.settings.routing.builtinRules.chinaChatDirect,
     aiProxy => t.pages.settings.routing.builtinRules.aiProxy,
     banksDirect => t.pages.settings.routing.builtinRules.banksDirect,
     marketsDirect => t.pages.settings.routing.builtinRules.marketsDirect,
@@ -82,6 +85,7 @@ enum BuiltinRule {
   String examples(Translations t) => switch (this) {
     bypassLan => t.pages.settings.routing.builtinRules.bypassLanHint,
     blockQuic => t.pages.settings.routing.builtinRules.blockQuicHint,
+    chinaChatDirect => t.pages.settings.routing.builtinRules.chinaChatDirectHint,
     aiProxy => t.pages.settings.routing.builtinRules.aiProxyHint,
     banksDirect => t.pages.settings.routing.builtinRules.banksDirectHint,
     marketsDirect => t.pages.settings.routing.builtinRules.marketsDirectHint,
@@ -131,6 +135,7 @@ enum BuiltinRule {
       packageNames: socialApps,
     ),
     chinaProxy => Rule(outbound: Outbound.proxy, domainSuffixes: chinaDomains, packageNames: chinaApps),
+    chinaChatDirect => Rule(outbound: Outbound.direct, domainSuffixes: chinaChatDomains, packageNames: chinaChatApps),
     adultProxy => Rule(outbound: Outbound.proxy, domainSuffixes: adultDomains, domainKeywords: adultKeywords),
     blockedProxy => Rule(
       outbound: Outbound.proxy,

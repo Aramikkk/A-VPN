@@ -68,7 +68,6 @@ void main() {
       'rutracker.org',
       'tvrain.ru', // blocked, though .ru
       'www.baidu.com',
-      'weixin.qq.com',
       'www.aliexpress.com',
       'gov.cn',
       'relay-1.net.anydesk.com',
@@ -82,6 +81,10 @@ void main() {
       'ya.ru',
       'vk.com',
       'example.com',
+      // WeChat and QQ work better direct: a group of their own, ahead of the groups that take the VPN
+      'weixin.qq.com',
+      'wechat.com',
+      'web.wechat.com',
     ]) {
       expect(route(host), 'direct §hide§', reason: host);
     }
@@ -110,25 +113,28 @@ void main() {
   test('a group of sites and apps is two rules; every Google app goes by pattern', () {
     final apps = rules.where((r) => r.containsKey('package_name')).toList();
     // what is blocked first (social, the rest blocked), then the Russian apps whole (Yandex, marketplaces, banks,
-    // the rest), then AI, YouTube and Twitch, stores, Google, Chinese, foreign
-    expect(apps.length, 12);
-    expect(apps[0]['package_name'], containsAll(['org.telegram.messenger', 'com.whatsapp', 'com.instagram.android']));
-    expect(apps[1]['package_name'], containsAll(['com.anydesk.anydeskandroid', 'notion.id', 'ru.fourpda.client']));
-    for (final (i, app) in [(2, 'ru.yandex.music'), (3, 'ru.ozon.app.android'), (4, 'ru.sberbankmobile')]) {
+    // the rest), then AI, YouTube and Twitch, stores, Google, Chinese, foreign; WeChat and QQ (direct) go before them all
+    expect(apps.length, 13);
+    expect(apps[0]['outbound'], 'direct §hide§');
+    expect(apps[0]['package_name'], containsAll(['com.tencent.mm', 'com.tencent.mobileqq']));
+    expect(apps[1]['package_name'], containsAll(['org.telegram.messenger', 'com.whatsapp', 'com.instagram.android']));
+    expect(apps[2]['package_name'], containsAll(['com.anydesk.anydeskandroid', 'notion.id', 'ru.fourpda.client']));
+    for (final (i, app) in [(3, 'ru.yandex.music'), (4, 'ru.ozon.app.android'), (5, 'ru.sberbankmobile')]) {
       expect(apps[i]['outbound'], 'direct §hide§');
       expect(apps[i]['package_name'], contains(app));
     }
-    expect(apps[5]['outbound'], 'direct §hide§');
-    expect(apps[5]['package_name'], containsAll(['com.yandex.aliceapp', 'ru.sberbank_sbbol']));
-    expect(apps[5]['package_name'], isNot(contains('ru.fourpda.client')));
-    expect(apps[6]['package_name'], containsAll(['com.openai.chatgpt', 'com.anthropic.claude']));
-    expect(apps[7]['package_name'], containsAll(['com.google.android.youtube', 'tv.twitch.android.app']));
-    expect(apps[8]['package_name'], containsAll(['com.android.vending', 'org.fdroid.fdroid']));
-    final pattern = RegExp((apps[9]['package_name_regex'] as List).single as String);
+    expect(apps[6]['outbound'], 'direct §hide§');
+    expect(apps[6]['package_name'], containsAll(['com.yandex.aliceapp', 'ru.sberbank_sbbol']));
+    expect(apps[6]['package_name'], isNot(contains('ru.fourpda.client')));
+    expect(apps[7]['package_name'], containsAll(['com.openai.chatgpt', 'com.anthropic.claude']));
+    expect(apps[8]['package_name'], containsAll(['com.google.android.youtube', 'tv.twitch.android.app']));
+    expect(apps[9]['package_name'], containsAll(['com.android.vending', 'org.fdroid.fdroid']));
+    final pattern = RegExp((apps[10]['package_name_regex'] as List).single as String);
     expect(pattern.hasMatch('com.google.android.apps.nbu.files'), isTrue);
     expect(pattern.hasMatch('com.android.chrome'), isFalse);
-    expect(apps[10]['package_name'], containsAll(['com.tencent.mm', 'com.alibaba.aliexpresshd']));
-    expect(apps[11]['package_name'], containsAll(['com.microsoft.office.word', 'com.pinterest']));
+    expect(apps[11]['package_name'], containsAll(['com.alibaba.aliexpresshd', 'com.taobao.taobao']));
+    expect(apps[11]['package_name'], isNot(contains('com.tencent.mm')));
+    expect(apps[12]['package_name'], containsAll(['com.microsoft.office.word', 'com.pinterest']));
     // AnyDesk on the computer, by its program
     expect(rules.where((r) => r['process_name'] != null).single['process_name'], contains('AnyDesk.exe'));
     expect(rules.where((r) => r.containsKey('package_name') && r.containsKey('domain_suffix')), isEmpty);
