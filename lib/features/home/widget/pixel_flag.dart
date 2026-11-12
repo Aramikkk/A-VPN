@@ -66,7 +66,13 @@ class _FlagMarkState extends State<FlagMark> {
   Widget build(BuildContext context) {
     final grid = _grid;
     if (grid != null) {
-      return CustomPaint(size: Size(widget.width, widget.width * 2 / 3), painter: PixelFlag(grid));
+      // by night a thin white outline round the flag, so a dark one (Germany's black stripe) does not melt into the background
+      final night = Theme.of(context).brightness == Brightness.dark;
+      return CustomPaint(
+        size: Size(widget.width, widget.width * 2 / 3),
+        painter: PixelFlag(grid),
+        foregroundPainter: night ? const _FlagOutline() : null,
+      );
     }
     if (_failed) {
       return Text(
@@ -77,6 +83,25 @@ class _FlagMarkState extends State<FlagMark> {
     // while the picture is made: the room of the flag
     return SizedBox(width: widget.width, height: widget.width * 2 / 3);
   }
+}
+
+/// A thin white frame round a flag (by night).
+class _FlagOutline extends CustomPainter {
+  const _FlagOutline();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius((Offset.zero & size).deflate(.5), const Radius.circular(1.5)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: .7),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlagOutline oldDelegate) => false;
 }
 
 class PixelFlag extends CustomPainter {

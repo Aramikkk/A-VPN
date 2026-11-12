@@ -575,39 +575,29 @@ class _SitesHeader extends HookConsumerWidget {
               ),
               // the fewer-hops mode: the server chosen stays while it is steady; a tap says what it is and turns it on or off
               if (signs) const Spacer() else const Gap(8),
-              GestureDetector(
-                key: const Key('min-hops'),
-                behavior: HitTestBehavior.opaque,
-                onTap: () => unawaited(
-                  showFeatureDialog(
-                    context,
-                    title: t.avpn.minHops,
-                    body: t.avpn.minHopsInfo,
-                    stateText: hopsOn ? t.avpn.featureStateOn : t.avpn.featureStateOff,
-                    on: hopsOn,
-                    onLabel: t.avpn.featureOn,
-                    offLabel: t.avpn.featureOff,
-                    closeLabel: t.avpn.featureClose,
-                    onChoose: (on) => ref.read(ConfigOptions.minHops.notifier).update(on),
+              // (Dots has this button in the server's row on the home screen, as an anchor of dots)
+              if (!signs)
+                GestureDetector(
+                  key: const Key('min-hops'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => unawaited(showMinHopsDialog(context, ref, t, hopsOn)),
+                  child: Container(
+                    height: 30,
+                    width: 34,
+                    decoration:
+                        hopsPill?.box ??
+                        BoxDecoration(
+                          borderRadius: BorderRadius.circular(15),
+                          color: hopsOn ? accent.withValues(alpha: .16) : Colors.transparent,
+                          border: Border.all(color: hopsOn ? accent : scheme.outlineVariant),
+                        ),
+                    child: Icon(
+                      Icons.anchor_rounded,
+                      size: 15,
+                      color: hopsPill?.ink ?? (hopsOn ? accent : scheme.onSurfaceVariant),
+                    ),
                   ),
                 ),
-                child: Container(
-                  height: 30,
-                  width: 34,
-                  decoration:
-                      hopsPill?.box ??
-                      BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        color: hopsOn ? accent.withValues(alpha: .16) : Colors.transparent,
-                        border: Border.all(color: hopsOn ? accent : scheme.outlineVariant),
-                      ),
-                  child: Icon(
-                    Icons.anchor_rounded,
-                    size: 15,
-                    color: hopsPill?.ink ?? (hopsOn ? accent : scheme.onSurfaceVariant),
-                  ),
-                ),
-              ),
             ],
           ),
         ],
@@ -615,3 +605,16 @@ class _SitesHeader extends HookConsumerWidget {
     );
   }
 }
+
+/// The fewer-hops mode's window: what it is, its state, and the switch.
+Future<void> showMinHopsDialog(BuildContext context, WidgetRef ref, Translations t, bool hopsOn) => showFeatureDialog(
+  context,
+  title: t.avpn.minHops,
+  body: t.avpn.minHopsInfo,
+  stateText: hopsOn ? t.avpn.featureStateOn : t.avpn.featureStateOff,
+  on: hopsOn,
+  onLabel: t.avpn.featureOn,
+  offLabel: t.avpn.featureOff,
+  closeLabel: t.avpn.featureClose,
+  onChoose: (on) => ref.read(ConfigOptions.minHops.notifier).update(on),
+);

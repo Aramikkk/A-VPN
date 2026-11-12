@@ -1,4 +1,5 @@
 import 'package:hiddify/features/home/model/dots_accent.dart';
+import 'package:hiddify/features/home/model/dots_digits.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/model/ping_graph.dart';
 import 'package:hiddify/features/home/model/site_graph.dart';
@@ -290,6 +291,14 @@ abstract class Preferences {
 
   /// A-VPN: the size of the text on top of the system's, in percent.
   static final fontScalePercent = PreferencesNotifier.create<int, int>("font_scale_percent", 100);
+
+  /// A-VPN: how the figures of the Dots style are drawn (the dots of the matrix, bold, wide, solid pixels).
+  static final dotsDigits = PreferencesNotifier.create<DotsDigits, String>(
+    "dots_digits",
+    DotsDigits.fallback,
+    mapFrom: DotsDigits.fromName,
+    mapTo: (value) => value.name,
+  );
 
   /// A-VPN: the Dots style's one colour (its OLED look: black, white and this).
   static final dotsAccent = PreferencesNotifier.create<DotsAccent, String>(

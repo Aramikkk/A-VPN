@@ -152,7 +152,7 @@ class HomePage extends HookConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    flex: 6,
+                    flex: 1,
                     child: LayoutBuilder(
                       builder: (context, box) => UiScale(
                         scale: (box.maxHeight / _foldedPageHeight).clamp(.5, 1.0),
@@ -161,7 +161,7 @@ class HomePage extends HookConsumerWidget {
                       ),
                     ),
                   ),
-                  const Expanded(flex: 4, child: ConnectionsPage(embedded: true)),
+                  const Expanded(flex: 1, child: ConnectionsPage(embedded: true)),
                 ],
               );
             }

@@ -34,6 +34,7 @@ import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/home/model/dots_accent.dart';
+import 'package:hiddify/features/home/model/dots_digits.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/model/ping_graph.dart';
 import 'package:hiddify/features/home/model/site_graph.dart';

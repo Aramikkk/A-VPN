@@ -30,6 +30,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/connection/notifier/vpn_pause.dart';
 import 'package:hiddify/features/connection/notifier/shown_connection.dart';
 import 'package:hiddify/features/home/model/dots_accent.dart';
+import 'package:hiddify/features/home/model/dots_digits.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
@@ -129,7 +130,8 @@ class _Proxies extends ProxiesOverviewNotifier {
     _connected
         ? OutboundGroup(
             tag: 'select',
-            selected: 'lowest',
+            // SELECTED=<tag>: a server chosen by hand (the home screen's row writes its ping)
+            selected: (_env('SELECTED') ?? '').isNotEmpty ? _env('SELECTED')! : 'lowest',
             items: [
               for (final (tag, display, delay, group) in _servers)
                 OutboundInfo(
@@ -273,6 +275,8 @@ void main() {
             if ((_env('SITEGRAPH') ?? '').isNotEmpty) 'site_graph': _env('SITEGRAPH')!,
             // DOTSACCENT=<name>: the Dots style's colour
             if ((_env('DOTSACCENT') ?? '').isNotEmpty) 'dots_accent': _env('DOTSACCENT')!,
+            // MINHOPS=1: the fewer-hops mode on (the anchor on the home screen's server row)
+            if (_env('MINHOPS') == '1') 'min-hops': true,
             // HOMELAYOUT=<name>: that look; the tiles (classic) when not given (a new install has Dots)
             'home_layout': (_env('HOMELAYOUT') ?? '').isNotEmpty ? _env('HOMELAYOUT')! : 'classic',
             if (_env('SUPERLIGHT') == '1') 'super_light': true,
@@ -386,14 +390,18 @@ void main() {
               child: MaterialApp(
                 debugShowCheckedModeBanner: false,
                 theme: dark ? theme.darkTheme(null) : theme.lightTheme(null),
-                builder: (context, child) => Theme(
-                  data: lookTheme(
-                    Theme.of(context),
-                    HomeLayout.fromName(_env('HOMELAYOUT')),
-                    DotsAccent.fromName(_env('DOTSACCENT')),
-                  ),
-                  child: ContrastGlow(child: child!),
-                ),
+                builder: (context, child) {
+                  // DIGITS=<name>: how the Dots figures are drawn (the app sets it from the preference)
+                  dotsDigitsNow = DotsDigits.fromName(_env('DIGITS'));
+                  return Theme(
+                    data: lookTheme(
+                      Theme.of(context),
+                      HomeLayout.fromName(_env('HOMELAYOUT')),
+                      DotsAccent.fromName(_env('DOTSACCENT')),
+                    ),
+                    child: ContrastGlow(child: child!),
+                  );
+                },
                 home: Consumer(
                   builder: (context, ref, _) =>
                       !ref.watch(translationsProvider).hasValue || !ref.watch(sharedPreferencesProvider).hasValue
@@ -439,7 +447,7 @@ void main() {
                                         crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
                                           Expanded(
-                                            flex: 6,
+                                            flex: 1,
                                             child: LayoutBuilder(
                                               builder: (context, box) => UiScale(
                                                 scale: (box.maxHeight / 840).clamp(.5, 1.0),
@@ -448,7 +456,10 @@ void main() {
                                               ),
                                             ),
                                           ),
-                                          const Expanded(flex: 4, child: _ShellPage(child: ConnectionsPage(embedded: true))),
+                                          const Expanded(
+                                            flex: 1,
+                                            child: _ShellPage(child: ConnectionsPage(embedded: true)),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -558,7 +569,10 @@ void main() {
             expect(find.textContaining('СРЕДНИЙ'), findsNothing, reason: 'no average of a ping that is not measured');
           }
           // Dots: the block's view is chosen by a tap on the block itself, there is no button of its own for it
-          if (connected && (_env('HOMELAYOUT') ?? '') == 'dots' && _env('SUPERLIGHT') != '1' && _env('SITEGRAPH') == 'list') {
+          if (connected &&
+              (_env('HOMELAYOUT') ?? '') == 'dots' &&
+              _env('SUPERLIGHT') != '1' &&
+              _env('SITEGRAPH') == 'list') {
             expect(find.byKey(const Key('sites-view')), findsNothing);
             // the fewer-hops button beside the multi-server one: a tap says what it is and offers on and off
             expect(find.byKey(const Key('min-hops')), findsOneWidget);

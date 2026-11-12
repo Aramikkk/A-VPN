@@ -14,6 +14,9 @@ HomeLayout _homeLayoutOf(BuildContext context) {
 /// The Dots style's one colour as chosen (by day or by night), set where the look is: the shell and the backdrop.
 Color dotsAccentNow = DotsAccent.fallback.colour;
 
+/// How the Dots figures are drawn now (see [DotsDigits]), as the settings have it.
+DotsDigits dotsDigitsNow = DotsDigits.fallback;
+
 /// A server's flag as the look draws it: pixels in Dots (about [width] wide), the emoji (of [emoji] size) in the others.
 Widget flagGlyph(String? flag, {required double emoji, required double width}) => homeLookNow == HomeLayout.dots
     ? flagMark(flag, width: width)

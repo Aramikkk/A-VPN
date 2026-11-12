@@ -2,6 +2,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/home/model/dots_accent.dart';
+import 'package:hiddify/features/home/model/dots_digits.dart';
+import 'package:hiddify/features/home/widget/avpn_home_body.dart' show DotsDigitsSample;
 import 'package:hiddify/features/home/model/home_layout.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
@@ -752,6 +754,43 @@ class ContrastThemePicker extends ConsumerWidget {
                           const SizedBox(height: 4),
                           label(ru ? a.ru : a.en, a == dotsAccent),
                         ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // how the figures are drawn: each one a sample of its own "1:23"
+            heading(t.avpn.dotsDigitsTitle),
+            card(
+              Row(
+                children: [
+                  for (final d in DotsDigits.values)
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => ref.read(Preferences.dotsDigits.notifier).update(d),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Column(
+                            children: [
+                              Container(
+                                height: 52,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF111111),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: d == ref.watch(Preferences.dotsDigits) ? scheme.onSurface : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: DotsDigitsSample(d, '128'),
+                              ),
+                              const SizedBox(height: 4),
+                              label(ru ? d.ru : d.en, d == ref.watch(Preferences.dotsDigits)),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                 ],

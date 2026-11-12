@@ -109,6 +109,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     homeLookNow = look;
     final dotsAccent = ref.watch(Preferences.dotsAccent);
     dotsAccentNow = dotsAccent.on(dark: Theme.of(context).brightness == Brightness.dark);
+    dotsDigitsNow = ref.watch(Preferences.dotsDigits);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final rail = FocusScope(
       node: navScopeNode,

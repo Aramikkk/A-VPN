@@ -249,10 +249,14 @@ class _ContrastRow extends StatelessWidget {
     required this.testing,
     required this.onTap,
     this.lead,
+    this.pingShown = true,
   });
 
   /// a button at the left, the server in the middle (the current server's row)
   final Widget? lead;
+
+  /// the ping in the row (Dots' current server: not for Auto)
+  final bool pingShown;
 
   final String? flag;
 
@@ -345,6 +349,7 @@ class _ContrastRow extends StatelessWidget {
               selected: selected,
               onTap: onTap,
               lead: lead,
+              pingShown: pingShown,
             );
     }
     if (lead != null && !group) {

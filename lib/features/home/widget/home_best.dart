@@ -107,22 +107,14 @@ class _BestButton extends HookConsumerWidget {
           behavior: HitTestBehavior.opaque,
           onTap: running ? null : () => unawaited(pingAndChooseBest(ref)),
           child: dots
-              // Dots: no frame, the bolt in the dots of the ping figures beside it (red while the servers are pinged)
-              ? SizedBox(
-                  width: size,
-                  height: size,
-                  child: Center(
-                    child: CustomPaint(
-                      size: Size(7 * 3.6, 9 * 3.6),
-                      painter: _DotBoltPainter(
-                        cell: 3.6,
-                        colour: ink,
-                        charge: _Dots.red,
-                        faint: _Dots.grid(dark),
-                        progress: running ? () => charging.value : null,
-                        repaint: charging,
-                      ),
-                    ),
+              // Dots: the bolt on a plate, drawn as the figures are (dots, solid, in a font); red while the servers are pinged
+              ? _SignPlate(
+                  child: _DotSign(
+                    glyph: '⚡',
+                    colour: ink,
+                    charge: _Dots.red,
+                    progress: running ? () => charging.value : null,
+                    repaint: charging,
                   ),
                 )
               : Container(

@@ -723,6 +723,8 @@ class _StyledServerList extends ConsumerWidget {
               onTap: onRowTap ?? select,
               // the single-row panel always has it, Auto or a server chosen by hand
               lead: showCurrentServer ? lead : null,
+              // the home screen's row is the bolt and the country, no ping (it is in the list that opens, and in super light)
+              pingShown: !showCurrentServer,
             );
           },
         );

@@ -16,6 +16,7 @@ class _GraphiteRow extends StatelessWidget {
     this.mobileNetwork = false,
     this.flooded = false,
     this.lead,
+    this.pingShown = true,
   });
 
   final String? flag;
@@ -40,6 +41,9 @@ class _GraphiteRow extends StatelessWidget {
   /// a button at the left: the server is then in the middle of the row (the current server's one)
   final Widget? lead;
 
+  /// whether the ping is written in the row (the current server's row on the home screen: only for a server chosen by hand)
+  final bool pingShown;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -60,6 +64,7 @@ class _GraphiteRow extends StatelessWidget {
         testing: testing,
         onTap: onTap,
         lead: lead,
+        pingShown: pingShown,
       );
     }
     if (selected && fill != null && !flooded) {
