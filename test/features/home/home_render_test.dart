@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:hiddify/core/theme/contrast_look.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/widget/ui_scale.dart';
 import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
@@ -431,18 +432,27 @@ void main() {
                           body: unfolded && contrast
                               // Contrast unfolded: the folded column on the left, the connections on the right, the
                               // panel under both
-                              ? const Column(
+                              ? Column(
                                   children: [
                                     Expanded(
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
-                                          Expanded(flex: 11, child: AraHomeBody()),
-                                          Expanded(flex: 10, child: _ShellPage(child: ConnectionsPage(embedded: true))),
+                                          Expanded(
+                                            flex: 6,
+                                            child: LayoutBuilder(
+                                              builder: (context, box) => UiScale(
+                                                scale: (box.maxHeight / 840).clamp(.5, 1.0),
+                                                fontScale: 1,
+                                                child: const AraHomeBody(),
+                                              ),
+                                            ),
+                                          ),
+                                          const Expanded(flex: 4, child: _ShellPage(child: ConnectionsPage(embedded: true))),
                                         ],
                                       ),
                                     ),
-                                    ContrastShellDock(),
+                                    const ContrastShellDock(),
                                   ],
                                 )
                               : unfolded

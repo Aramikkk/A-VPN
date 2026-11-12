@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 /// The whole app drawn [scale] times its size (a car's screen is far from the eyes, a small phone close): the child is
@@ -8,7 +10,9 @@ import 'package:flutter/widgets.dart';
 /// are as at hand there as on a phone. What the user sets in Settings → Themes comes on top of it.
 double autoUiScale(Size size) {
   if (size.width < 1000 || size.width <= size.height) return 1.0;
-  return (size.width / 800).clamp(1.0, 1.8);
+  // never so large that the page is left under 600 high: below that the home screen drops its blocks (a car's screen is wide
+  // and low), and what is not there cannot be read at any size
+  return (size.width / 800).clamp(1.0, 1.8).clamp(1.0, math.max(1.0, size.height / 600));
 }
 
 class UiScale extends StatelessWidget {

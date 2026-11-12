@@ -15,9 +15,11 @@ void main() {
     final b = autoUiScale(const Size(1280, 800));
     final c = autoUiScale(const Size(1920, 1200));
     final d = autoUiScale(const Size(4000, 2000));
-    expect(a, closeTo(1.25, .01));
-    expect(b, closeTo(1.6, .01));
+    expect(a, 1.0); // too low to be made larger: the page would lose its blocks
+    expect(b, closeTo(1.33, .01));
     expect(b, greaterThan(a));
+    expect(1280 / b, greaterThan(0));
+    expect(800 / b, greaterThanOrEqualTo(600));
     expect(c, 1.8);
     expect(d, 1.8);
   });

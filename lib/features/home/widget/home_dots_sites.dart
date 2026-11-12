@@ -360,3 +360,43 @@ Future<void> _pickSiteGraph(BuildContext context, WidgetRef ref, SiteGraph now) 
     ),
   );
 }
+
+/// The sites' block in its short form, for a page too low for the whole one (an unfolded phone's half, a car's screen):
+/// the names and the delays in a few lines, nothing else. Taken before the block goes off the page altogether.
+class _SiteDotsCompact extends HookConsumerWidget {
+  const _SiteDotsCompact();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final entries = _siteEntries(ref, scheme);
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final ink = _Dots.ink(dark);
+    final soft = _Dots.soft(dark);
+    return _dotPaper(
+      context,
+      Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 16,
+        runSpacing: 8,
+        children: [
+          for (final e in entries)
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: '${e.name.toUpperCase()}  ', style: _Dots.mono(11, soft)),
+                  TextSpan(
+                    text: !e.measured ? '…' : (e.ms == null ? '—' : '${e.ms}'),
+                    style: _Dots.mono(14, e.measured && e.colour != _SiteTiles._good ? _Dots.red : ink),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+    );
+  }
+}
+

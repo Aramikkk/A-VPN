@@ -1,3 +1,4 @@
+import 'package:hiddify/core/widget/ui_scale.dart';
 import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
@@ -145,11 +146,22 @@ class HomePage extends HookConsumerWidget {
             if (contrast) {
               // Contrast: the folded phone's column on the left (its session tiles half as high), the connections on
               // the right
-              return const Row(
+              // the left column is the folded phone's page, whole, drawn smaller when the screen is lower than it needs (a car's
+              // screen, an unfolded phone): nothing goes off it, the blocks keep their places and the gaps between them
+              return Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(flex: 11, child: AraHomeBody()),
-                  Expanded(flex: 10, child: ConnectionsPage(embedded: true)),
+                  Expanded(
+                    flex: 6,
+                    child: LayoutBuilder(
+                      builder: (context, box) => UiScale(
+                        scale: (box.maxHeight / _foldedPageHeight).clamp(.5, 1.0),
+                        fontScale: 1,
+                        child: const AraHomeBody(),
+                      ),
+                    ),
+                  ),
+                  const Expanded(flex: 4, child: ConnectionsPage(embedded: true)),
                 ],
               );
             }
@@ -218,3 +230,6 @@ class AppVersionLabel extends HookConsumerWidget {
     );
   }
 }
+
+/// How high the folded phone's home page is drawn (its blocks at their sizes, in equal gaps).
+const _foldedPageHeight = 840.0;

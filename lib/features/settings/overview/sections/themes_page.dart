@@ -620,10 +620,10 @@ class ContrastThemePicker extends ConsumerWidget {
                         Expanded(
                           flex: 6,
                           child: Slider(
-                            min: 70,
+                            min: 40,
                             max: 160,
-                            divisions: 18,
-                            value: ref.watch(pref).clamp(70, 160).toDouble(),
+                            divisions: 24,
+                            value: ref.watch(pref).clamp(40, 160).toDouble(),
                             onChanged: (v) => ref.read(pref.notifier).update(v.round()),
                           ),
                         ),
@@ -638,6 +638,20 @@ class ContrastThemePicker extends ConsumerWidget {
                       ],
                     ),
                   ),
+                // what the page is laid out in (a car's screen: its real size and density, for the page's blocks to be fitted to)
+                Builder(
+                  builder: (context) {
+                    final view = View.of(context);
+                    final page = MediaQuery.sizeOf(context);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '${view.physicalSize.width.round()}×${view.physicalSize.height.round()} px · ×${view.devicePixelRatio.toStringAsFixed(2)} · ${page.width.round()}×${page.height.round()}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
+                    );
+                  },
+                ),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(

@@ -136,8 +136,13 @@ class _StyledHome extends HookConsumerWidget {
             ? null
             : _StatusBlock(status: status, lastServer: currentName, visible: visible, layout: layout, slim: true),
         // (the super light mode has no sites: its traffic block is the servers' list)
-        trafficSlim: layout == HomeLayout.pulse && traffic && hasList && !superLight
-            ? _SiteTiles(visible: visible, compact: true, oneRow: true)
+        trafficSlim: traffic && hasList && !superLight
+            ? switch (layout) {
+                HomeLayout.pulse => _SiteTiles(visible: visible, compact: true, oneRow: true),
+                // the dots: a few lines of names and delays before the sites go off a page too low for them
+                HomeLayout.dots => const _SiteDotsCompact(),
+                _ => null,
+              }
             : null,
         // the vessel and the pulse keep the sites small
         compactTraffic: layout != HomeLayout.classic,
@@ -148,7 +153,7 @@ class _StyledHome extends HookConsumerWidget {
                 children: [
                   // only the choice in use (Auto, as a rule); a tap on it brings up every country
                   SizedBox(
-                    height: 64,
+                    height: 78,
                     child: _StyledServerList(
                       showCurrentServer: true,
                       lead: const _BestButton(),
@@ -658,7 +663,8 @@ class _StyledServerList extends ConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final list = LayoutBuilder(
       builder: (context, box) {
-        final base = 62.0;
+        // the current server's own row (Dots) is as high as the room it is given, a list's rows are 62
+        final base = showCurrentServer ? math.max(62.0, box.maxHeight) : 62.0;
         final room = box.maxHeight;
         final rows = (room / base).floor().clamp(1, 1000);
         // whole rows only: they stretch a little so the last one in view isn't cut in half
@@ -856,13 +862,23 @@ class _ContrastHome extends ConsumerWidget {
                   minGap: 10,
                   // Bento on a tall screen: the gaps stay slim, the hero and the sites tiles grow into the room
                   maxGap: homeLookNow == HomeLayout.bento ? 18 : null,
-                  steps: const [
-                    (group: 4, rank: -1),
-                    (group: 3, rank: 1),
-                    (group: 1, rank: 1),
-                    (group: 3, rank: 2),
-                    (group: 3, rank: -1),
-                  ],
+                  steps: homeLookNow == HomeLayout.dots
+                      // the dots: the top block shrinks first, then the connections go, and the sites' block is the last
+                      // to give way (whole, then a few lines, then a strip)
+                      ? const [
+                          (group: 1, rank: 1),
+                          (group: 4, rank: -1),
+                          (group: 3, rank: 1),
+                          (group: 3, rank: 2),
+                          (group: 3, rank: -1),
+                        ]
+                      : const [
+                          (group: 4, rank: -1),
+                          (group: 3, rank: 1),
+                          (group: 1, rank: 1),
+                          (group: 3, rank: 2),
+                          (group: 3, rank: -1),
+                        ],
                   children: [
                     FitSlot(
                       group: 0,

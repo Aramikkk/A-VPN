@@ -424,52 +424,78 @@ Widget _dotsServerRow(
         child: _dotPaper(
           context,
           _centeredServer(
-            lead: lead,
-            reserve: 62,
-            // the country's name is in the middle, between the bolt and the ping, the flag beside it on the left: the
-            // two sides take the same room, so the name is the row's own middle
-            center: Row(
-              children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: group
-                        ? SizedBox(width: 42, child: Icon(Icons.auto_awesome_rounded, size: 28, color: ink))
-                        : flagMark(flag, width: 42),
-                  ),
-                ),
-                const Gap(12),
-                Flexible(
-                  flex: 2,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        caption.toUpperCase(),
-                        maxLines: 1,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: _Dots.mono(10, _Dots.soft(dark)),
-                      ),
-                      Text(
-                        name.toUpperCase(),
-                        maxLines: 1,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: _Dots.mono(15, ink, weight: FontWeight.w800, spacing: 1),
-                      ),
-                    ],
-                  ),
-                ),
-                const Expanded(child: SizedBox()),
-              ],
+            // both sides the same width, so the middle is the row's own middle (the bolt and the ping's dots are not as wide)
+            // (the bolt's own dots start a little inside its box: it is moved out, for the same margin on both sides)
+            lead: SizedBox(
+              width: 64,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Transform.translate(offset: const Offset(-8, 0), child: lead),
+              ),
             ),
-            trailing: testing
-                ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: ink))
-                : _DotNumber(ms == '×' ? '—' : ms, cell: 4, colour: ink, faint: _Dots.grid(dark)),
+            reserve: 70,
+            // the country's name is in the middle, between the bolt and the ping, the flag beside it on the left: the
+            // two sides take the same room (the name has five parts of nine), so the name is the row's own middle
+            center: LayoutBuilder(
+              builder: (context, box) {
+                // the name is as wide as its text, at most what is left beside the flag's room on each side: it is in the middle of
+                // the row (the two sides are as wide), the flag right against it on its left
+                final nameRoom = math.max(60.0, box.maxWidth - 2 * (46 + 10));
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        // a little lower: level with the middle of the two lines beside it
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 10, top: 5),
+                          child: group
+                              ? SizedBox(width: 46, child: Icon(Icons.auto_awesome_rounded, size: 30, color: ink))
+                              : flagMark(flag, width: 46),
+                        ),
+                      ),
+                    ),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: nameRoom),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            caption.toUpperCase(),
+                            maxLines: 1,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: _Dots.mono(9, _Dots.soft(dark), spacing: 0.8),
+                          ),
+                          const Gap(2),
+                          Text(
+                            name.toUpperCase(),
+                            // a long name takes a second line rather than being cut (a narrow screen)
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: _Dots.mono(15, ink, weight: FontWeight.w800, spacing: 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Expanded(child: SizedBox()),
+                  ],
+                );
+              },
+            ),
+            trailing: SizedBox(
+              width: 64,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: testing
+                    ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: ink))
+                    : _DotNumber(ms == '×' ? '—' : ms, cell: 4, colour: ink, faint: _Dots.grid(dark)),
+              ),
+            ),
           ),
-          padding: const EdgeInsets.fromLTRB(10, 9, 16, 9),
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
         ),
       ),
     );

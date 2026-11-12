@@ -89,11 +89,21 @@ class _DotsStats extends HookConsumerWidget {
             ),
           ),
           const Gap(8),
-          Center(
-            child: Text(
-              average == null ? ' ' : '${t.avpn.pingAverage.toUpperCase()} $average',
-              style: _Dots.mono(11, _Dots.soft(dark), spacing: 3),
-            ),
+          // the average, and in the slim form (no room for the graph under it) the answers run on both sides of it: the
+          // older ones on the left, the newer on the right
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (slim) Expanded(child: _slimBars(bars.sublist(0, bars.length ~/ 2), scale, ink, alignEnd: true)),
+              if (slim) const Gap(10),
+              Text(
+                average == null ? ' ' : '${t.avpn.pingAverage.toUpperCase()} $average',
+                style: _Dots.mono(11, _Dots.soft(dark), spacing: 3),
+              ),
+              if (slim) const Gap(10),
+              if (slim) Expanded(child: _slimBars(bars.sublist(bars.length ~/ 2), scale, ink, alignEnd: false)),
+            ],
           ),
           if (!slim) ...[
             const Gap(10),
@@ -462,4 +472,30 @@ class _PingGridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PingGridPainter old) => old.scale != scale || old.line != line || old.text != text;
+}
+
+/// A short run of ping answers as bars (the slim form of the Dots ping block puts them on both sides of the figures).
+Widget _slimBars(List<int?> samples, double scale, Color ink, {required bool alignEnd}) {
+  return SizedBox(
+    height: 14,
+    child: Row(
+      mainAxisAlignment: alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final (i, s) in samples.indexed) ...[
+          if (i > 0) const Gap(3),
+          SizedBox(
+            width: 3,
+            height: 14 * (s == null ? 1.0 : (s / scale).clamp(.08, 1.0)),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: s == null || s >= 250 ? _Dots.red : ink,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
 }
