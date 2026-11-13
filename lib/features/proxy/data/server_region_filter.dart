@@ -185,8 +185,8 @@ abstract class ServerRegionFilter {
     unicode: true,
   );
 
-  static const _networkChannel = MethodChannel('com.aravpn.app/network');
-  static const _networkEvents = EventChannel('com.aravpn.app/network/events');
+  static const _networkChannel = MethodChannel('com.avpn.app/network');
+  static const _networkEvents = EventChannel('com.avpn.app/network/events');
   static final Stream<NetworkKind> _networkChanges = _networkEvents.receiveBroadcastStream().map((event) {
     return switch (event) {
       'wifi' => NetworkKind.wifi,
@@ -208,7 +208,7 @@ abstract class ServerRegionFilter {
   }
 
   static NetworkKind _lastApplied = NetworkKind.unknown;
-  static const _lastKey = 'aravpn-last-applied-network';
+  static const _lastKey = 'avpn-last-applied-network';
 
   /// The network the phone's service switched the running config to by itself (null: it doesn't switch, the app
   /// does). It does that with the app closed too, from the two variants the app leaves it; the app then only
@@ -242,8 +242,8 @@ abstract class ServerRegionFilter {
   static Future<void> leaveVariants({String wifi = '', String mobile = ''}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('aravpn-net-config-wifi', wifi);
-      await prefs.setString('aravpn-net-config-mobile', mobile);
+      await prefs.setString('avpn-net-config-wifi', wifi);
+      await prefs.setString('avpn-net-config-mobile', mobile);
     } catch (e) {
       _logger.warning('could not leave the network variants', e);
     }
@@ -259,6 +259,16 @@ abstract class ServerRegionFilter {
       // nothing saved: unknown
     }
     return _lastApplied;
+  }
+
+  /// True when the phone has no network at all under the VPN (no signal, no Wi-Fi): Android only, false where unknown.
+  static Future<bool> isOffline() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await _networkChannel.invokeMethod<String>('underlyingNetwork') == 'none';
+    } catch (_) {
+      return false;
+    }
   }
 
   /// The kind of network the phone uses right now, under the VPN.

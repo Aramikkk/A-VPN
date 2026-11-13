@@ -259,6 +259,7 @@ Future<void> _toggleConnection(WidgetRef ref) async {
   // the figure for as long as the VPN is up
   final summary = summarize(session.length > 100 ? session.sublist(session.length - 100) : session);
   // under a minute of probes (20) one lost probe is a fifth of them: the figure waits, as after a restart it read 20%
+  if (homeNoNetwork.value) return (ping: null, loss: 0);
   return (ping: on ? summary.ping : null, loss: session.length < 20 ? 0 : summary.loss ?? 0);
 }
 
@@ -324,9 +325,9 @@ class _GraphiteDock extends HookConsumerWidget {
     final measured = ping != null;
     final lossText = _lossText(loss);
     // Keep the server type and physical network distinct: both can be shown during a handoff.
-    final networkLabel = !on || busy || !networkKnown || PlatformUtils.isDesktop
+    final networkLabel = !on || busy || PlatformUtils.isDesktop
         ? null
-        : (actualMobile ? 'LTE' : 'Wi‑Fi');
+        : (homeNoNetwork.value ? 'НЕТ СЕТИ' : (!networkKnown ? null : (actualMobile ? 'LTE' : 'Wi‑Fi')));
     final accent = theme.araAccent;
     // the side icons and the ping in the accent (by day a light accent goes to the text colour); grey while off
     final ink = on

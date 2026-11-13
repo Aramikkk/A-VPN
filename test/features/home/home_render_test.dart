@@ -408,6 +408,8 @@ void main() {
                 builder: (context, child) {
                   // DIGITS=<name>: how the Dots figures are drawn (the app sets it from the preference)
                   dotsDigitsNow = DotsDigits.fromName(_env('DIGITS'));
+                  // OFFLINE=1: no network at all (the ping block says so)
+                  homeNoNetwork.value = _env('OFFLINE') == '1';
                   return Theme(
                     data: lookTheme(
                       Theme.of(context),

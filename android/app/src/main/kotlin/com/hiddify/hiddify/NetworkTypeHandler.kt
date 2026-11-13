@@ -26,7 +26,7 @@ class NetworkTypeHandler : FlutterPlugin, MethodChannel.MethodCallHandler, Event
     private var publishTask: Runnable? = null
 
     companion object {
-        const val channelName = "com.aravpn.app/network"
+        const val channelName = "com.avpn.app/network"
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -158,7 +158,8 @@ object NetworkKinds {
         return when {
             wifi -> "wifi"
             mobile -> "mobile"
-            else -> "unknown"
+            // no network under the VPN at all (no signal, no Wi-Fi)
+            else -> "none"
         }
     }
 }

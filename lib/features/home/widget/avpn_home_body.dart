@@ -90,6 +90,9 @@ part 'home_sites.dart';
 
 final _actualNetworkKind = ValueNotifier<NetworkKind>(NetworkKind.unknown);
 
+/// The phone has no network at all right now (no signal, no Wi-Fi): the home screen says so instead of showing pings.
+final homeNoNetwork = ValueNotifier<bool>(false);
+
 /// Home screen: the provider card with the server list inside, a "check" row, and the connection card.
 class AraHomeBody extends HookConsumerWidget {
   const AraHomeBody({super.key, this.traffic = true});
@@ -114,6 +117,8 @@ class AraHomeBody extends HookConsumerWidget {
       Future<void> refreshNetwork() async {
         final kind = await ServerRegionFilter.currentNetwork();
         if (mounted && kind != NetworkKind.unknown) _actualNetworkKind.value = kind;
+        final offline = kind == NetworkKind.unknown && await ServerRegionFilter.isOffline();
+        if (mounted) homeNoNetwork.value = offline;
       }
 
       unawaited(refreshNetwork());

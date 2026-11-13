@@ -38,10 +38,11 @@ class _DotsStats extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final ink = _Dots.ink(dark);
+    final offline = useValueListenable(homeNoNetwork);
     final live = ref.watch(connectionQualityProvider);
     final kept = useRef<List<int?>>(const []);
     if (connected && !paused && live.isNotEmpty) kept.value = live;
-    final samples = paused ? const <int?>[] : (connected ? live : kept.value);
+    final samples = paused || offline ? const <int?>[] : (connected ? live : kept.value);
     final answers = [
       for (final s in samples)
         if (s != null) s,
@@ -77,7 +78,21 @@ class _DotsStats extends HookConsumerWidget {
             behavior: HitTestBehavior.opaque,
             onTap: slim ? null : () => unawaited(_pickPingGraph(context, ref, style)),
             child: Center(
-              child: _DotNumber(
+              child: offline
+                  // no network at all: the words, not a figure (the room is the figure's)
+                  ? SizedBox(
+                      height: 7 * (slim ? 6.0 : 10.0),
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'НЕТ СЕТИ',
+                            style: _Dots.mono(slim ? 22 : 34, _Dots.red, weight: FontWeight.w800, spacing: 2),
+                          ),
+                        ),
+                      ),
+                    )
+                  : _DotNumber(
                 connected && !paused && ping != null ? '$ping' : '—',
                 cell: slim ? 6 : 10,
                 // the ordinary colour; the accent when the ping is very high or the loss is heavy
