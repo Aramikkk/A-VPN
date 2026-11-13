@@ -163,7 +163,8 @@ class _DotsLook extends AraLook {
   List<Color> get pingColors => [ink, ink, ink, accent];
 
   @override
-  Color pingColor(int ms, Color muted) => ms >= alertLimits(mobile: _actualNetworkKind.value == NetworkKind.mobile).ping ? accent : ink;
+  Color pingColor(int ms, Color muted) =>
+      ms >= alertLimits(mobile: _actualNetworkKind.value == NetworkKind.mobile).ping ? accent : ink;
 }
 
 /// [theme] (a page's) with the Dots look's colours: the chosen accent where the page draws the theme's accent (the VPN
@@ -517,3 +518,11 @@ class LookNavBar extends StatelessWidget {
     );
   }
 }
+
+/// The Dots look with the Mono or Grotesk figures draws its lines solid (the thickness of the figures' style: thin for Mono, heavy for
+/// Grotesk); with the Matrix or Pixel figures they stay rows of dots.
+bool get solidDotsLines =>
+    homeLookNow == HomeLayout.dots && (dotsDigitsNow == DotsDigits.mono || dotsDigitsNow == DotsDigits.wide);
+
+/// The stroke of a solid line in the figures' style: [mono] for Mono, [wide] for Grotesk.
+double solidLineWidth({required double mono, required double wide}) => dotsDigitsNow == DotsDigits.wide ? wide : mono;

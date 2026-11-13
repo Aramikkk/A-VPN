@@ -88,6 +88,7 @@ class _SiteDots extends HookConsumerWidget {
                                 ink: ink,
                                 accent: _Dots.red,
                                 faint: faint,
+                                slowAt: _siteSlowAt(ref),
                               ),
                             ),
                           ),
@@ -135,6 +136,7 @@ class _SiteDots extends HookConsumerWidget {
                                     ink: ink,
                                     accent: _Dots.red,
                                     faint: faint,
+                                    slowAt: _siteSlowAt(ref),
                                   ),
                                 ),
                               ),
@@ -202,6 +204,7 @@ class _SiteDots extends HookConsumerWidget {
                                   ink: ink,
                                   accent: _Dots.red,
                                   faint: faint,
+                                  slowAt: _siteSlowAt(ref),
                                 ),
                               ),
                             ),
@@ -420,3 +423,9 @@ class _SiteDotsCompact extends HookConsumerWidget {
   }
 }
 
+
+
+/// The delay from which a site's dots turn red: the same marks the other looks use for the chosen method (HTTPS is slower
+/// by nature, so its mark is wider than HTTP's) and the network (mobile data is milder).
+int _siteSlowAt(WidgetRef ref) =>
+    siteGrade(ref.watch(ConfigOptions.pingHttps), mobile: _actualNetworkKind.value == NetworkKind.mobile).slow;

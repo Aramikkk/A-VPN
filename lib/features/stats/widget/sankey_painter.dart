@@ -153,7 +153,21 @@ class _SankeyPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final g = SankeyGeometry(size.width, stepped: stepped);
+    // the stepped picture centres the sites' bar together with their widest name between the two outer bars
+    var middleW = 118.0;
+    if (stepped) {
+      var widest = 0.0;
+      for (final n in model.columns[1]) {
+        widest = math.max(widest, _text(n.label, 118, strong: false, size: 10).width);
+      }
+      if (widest > 0) middleW = math.min(118.0, widest);
+    }
+    // some server on the right carries its subscription's badge: all the marks there keep the room for it
+    final anyBadge = model.columns[2].any((n) {
+      final profile = splitMark(n.label).profile;
+      return profile != null && profile >= 0 && profile < profileBadgesNow.length;
+    });
+    final g = SankeyGeometry(size.width, stepped: stepped, middleW: middleW, badges: anyBadge);
     final xs = g.xs;
     // the columns' names over them, then the picture under
     for (final (i, title) in headers.indexed) {
@@ -186,7 +200,17 @@ class _SankeyPainter extends CustomPainter {
         ..color = c.ink.withValues(alpha: .28)
         ..strokeWidth = 1.5;
       final railY = SankeyGeometry.headerH - 4;
-      if (stepped) {
+      if (stepped && solidDotsLines) {
+        // Mono and Grotesk: a plain solid line, no head
+        canvas.drawLine(
+          Offset(xs[0], railY),
+          Offset(size.width - 6, railY),
+          Paint()
+            ..color = c.ink.withValues(alpha: .3)
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = solidLineWidth(mono: 1.5, wide: 2.6),
+        );
+      } else if (stepped) {
         // Dots, across: a plain line of small dots, no head
         final dot = Paint()..color = c.ink.withValues(alpha: .35);
         for (var x = xs[0]; x < size.width - 6; x += 9) {
@@ -348,11 +372,6 @@ class _SankeyPainter extends CustomPainter {
     }
 
     final lastBottom = [-99.0, -99.0, -99.0];
-    // some server on the right carries its subscription's badge: all the marks there keep the room for it
-    final anyBadge = model.columns[2].any((n) {
-      final profile = splitMark(n.label).profile;
-      return profile != null && profile >= 0 && profile < profileBadgesNow.length;
-    });
     for (final (ci, column) in model.columns.indexed) {
       for (final n in column) {
         final bright = on(n.flows);

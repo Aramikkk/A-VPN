@@ -91,12 +91,16 @@ class _FlagOutline extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // a small flag (under the sites' columns) has fat dots running over its edge: its frame is whiter and a little thicker, drawn
+    // over them
+    final small = size.width < 24;
+    final stroke = small ? 1.4 : 1.0;
     canvas.drawRRect(
-      RRect.fromRectAndRadius((Offset.zero & size).deflate(.5), const Radius.circular(1.5)),
+      RRect.fromRectAndRadius((Offset.zero & size).deflate(stroke / 2), Radius.circular(small ? 2 : 1.5)),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = const Color(0xFFFFFFFF).withValues(alpha: .7),
+        ..strokeWidth = stroke
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: small ? 1.0 : .7),
     );
   }
 

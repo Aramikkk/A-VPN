@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 /// The app's mark, as the launcher icon is: an A (a triangle with a triangular hole and a notch at the foot) with a red point in
-/// the hole, on a rounded square. By night a silver A on near-black, by day a near-black A on the silver of the night one.
+/// the hole, on a rounded square. By night a silver A on near-black, by day a near-black A on a light silver plate.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 24});
 
@@ -12,8 +12,8 @@ class AppLogo extends StatelessWidget {
     // night: a silver A on near-black; day: a dark A on the silver of the night A
     final plate = dark
         ? '<rect width="512" height="512" rx="112" fill="#111111"/>'
-        : '<defs><linearGradient id="p" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6E6E6"/>'
-              '<stop offset="1" stop-color="#B2B2B8"/></linearGradient></defs>'
+        : '<defs><linearGradient id="p" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FAFAFA"/>'
+              '<stop offset="1" stop-color="#DEDEE4"/></linearGradient></defs>'
               '<rect width="512" height="512" rx="112" fill="url(#p)"/>';
     final from = dark ? '#E6E6E6' : '#22222A';
     final to = dark ? '#B2B2B8' : '#0C0C0E';

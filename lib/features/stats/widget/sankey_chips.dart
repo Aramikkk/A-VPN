@@ -277,6 +277,18 @@ bool _lookLine(
   bool head = true,
 }) {
   switch (homeLookNow) {
+    case HomeLayout.dots when solidDotsLines:
+      // Mono and Grotesk: a solid round line (the heavier for a flow in use), as thick as the figures' style is
+      canvas.drawPath(
+        metric.extractPath(0, metric.length),
+        Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = live ? solidLineWidth(mono: 2.4, wide: 4.6) : solidLineWidth(mono: 1.6, wide: 3)
+          ..color = colour.withValues(alpha: (live ? 1 : .45) * alpha),
+      );
+      return true;
     case HomeLayout.dots:
       // the dots in one call, their places kept for the line (it is drawn at every frame while the dots run)
       canvas.drawPoints(

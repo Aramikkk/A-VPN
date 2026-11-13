@@ -267,8 +267,8 @@ class _SolidDigits extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final height = 7 * cell;
-    // the share of the size the capitals take (the font's own): the size that makes them seven rows high
-    final capital = wide ? .70 : .73;
+    // the share of the size the figures take (measured from the fonts): the size that makes them seven rows high
+    final capital = wide ? .767 : .74;
     final painter = TextPainter(
       text: TextSpan(
         text: text,
@@ -480,34 +480,43 @@ Widget _dotsServerRow(
             center: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // a little lower: level with the middle of the two lines beside it
+                // the flag, the country's name and the two plates all have their middle on the row's middle line
                 Padding(
-                  padding: const EdgeInsets.only(top: 5),
+                  padding: EdgeInsets.zero,
                   child: group
                       ? SizedBox(width: 46, child: Icon(Icons.auto_awesome_rounded, size: 30, color: ink))
                       : flagMark(flag, width: 46),
                 ),
                 const Gap(10),
                 Flexible(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  // the country in the middle of the row (level with the flag and the two plates); the small caption hangs over it and
+                  // takes no room of its own
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
                     children: [
-                      Text(
-                        caption.toUpperCase(),
-                        maxLines: 1,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: _Dots.mono(9, _Dots.soft(dark), spacing: 0.8),
+                      // a name too long for the room is made a little smaller, not wrapped or cut
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          name.toUpperCase(),
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          style: _Dots.mono(19, ink, weight: FontWeight.w800, spacing: 1),
+                        ),
                       ),
-                      const Gap(2),
-                      Text(
-                        name.toUpperCase(),
-                        // a long name takes a second line rather than being cut (a narrow screen)
-                        maxLines: 2,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: _Dots.mono(15, ink, weight: FontWeight.w800, spacing: 1),
+                      Positioned(
+                        left: -80,
+                        right: -80,
+                        top: -13,
+                        child: Text(
+                          caption.toUpperCase(),
+                          maxLines: 1,
+                          softWrap: false,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.clip,
+                          style: _Dots.mono(9, _Dots.soft(dark), spacing: 0.8),
+                        ),
                       ),
                     ],
                   ),
@@ -583,7 +592,8 @@ Widget _dotsServerRow(
   );
 }
 
-/// Dots' connections: the count in dots, the VPN and the bypass on a line under it.
+/// Dots' connections: the labels on the left, the count in dots and the VPN and the bypass on the right, the two columns centred
+/// on each other and the pair centred in the block.
 Widget _dotsConnections(
   BuildContext context,
   Translations t, {
@@ -611,18 +621,29 @@ Widget _dotsConnections(
   }
   return _dotPaper(
     context,
-    Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t.avpn.connBlockTitle.toUpperCase(), style: _Dots.mono(11, _Dots.soft(dark))),
+              const Gap(14),
+              Text('VPN / ${t.avpn.connDirect}'.toUpperCase(), style: _Dots.mono(11, _Dots.soft(dark))),
+            ],
+          ),
+        ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Expanded(child: Text(t.avpn.connBlockTitle.toUpperCase(), style: _Dots.mono(11, _Dots.soft(dark)))),
             _DotNumber('$open', cell: 4, colour: ink, faint: _Dots.grid(dark)),
+            const Gap(6),
+            Text('$vpn / $direct', style: _Dots.mono(15, ink, weight: FontWeight.w800).copyWith(height: 1)),
           ],
         ),
-        const Gap(4),
-        _dotRow(context, 'VPN / ${t.avpn.connDirect}', '$vpn / $direct'),
       ],
     ),
   );
@@ -816,8 +837,159 @@ class _ManPainter extends CustomPainter {
   static const _w = 131.0;
   static const _h = 295.0;
   static const _contours = [
-    [Offset(1.0, 0.0), Offset(0.0, 1.5), Offset(0.0, 11.2), Offset(1.0, 12.2), Offset(0.0, 13.5), Offset(0.0, 22.2), Offset(1.0, 23.2), Offset(0.0, 24.5), Offset(0.0, 26.2), Offset(1.0, 27.2), Offset(0.0, 28.5), Offset(0.0, 217.2), Offset(1.0, 218.2), Offset(1.0, 220.5), Offset(0.0, 221.5), Offset(0.0, 228.2), Offset(1.0, 229.2), Offset(1.0, 235.5), Offset(0.0, 236.5), Offset(0.0, 238.2), Offset(1.0, 239.2), Offset(1.0, 242.5), Offset(0.0, 243.5), Offset(0.0, 250.2), Offset(1.0, 251.2), Offset(1.0, 253.5), Offset(0.0, 254.5), Offset(0.0, 272.2), Offset(1.0, 273.2), Offset(1.0, 275.5), Offset(0.0, 276.5), Offset(0.0, 283.2), Offset(1.0, 284.2), Offset(1.0, 294.8), Offset(5.8, 294.8), Offset(6.0, 288.2), Offset(40.0, 254.2), Offset(50.5, 241.5), Offset(53.5, 234.5), Offset(52.8, 230.8), Offset(50.5, 226.2), Offset(34.0, 206.5), Offset(18.0, 184.5), Offset(17.8, 182.8), Offset(14.8, 178.0), Offset(14.8, 174.8), Offset(20.0, 170.2), Offset(33.0, 155.2), Offset(58.2, 129.0), Offset(59.5, 129.0), Offset(61.0, 130.8), Offset(61.0, 135.0), Offset(64.0, 144.8), Offset(64.0, 149.0), Offset(66.0, 151.8), Offset(66.0, 157.0), Offset(70.2, 166.5), Offset(95.2, 186.5), Offset(97.5, 187.0), Offset(110.8, 197.8), Offset(114.8, 198.8), Offset(121.0, 198.8), Offset(124.5, 197.5), Offset(128.5, 193.5), Offset(129.8, 188.2), Offset(130.8, 187.2), Offset(130.8, 182.8), Offset(129.0, 181.5), Offset(128.5, 179.5), Offset(123.5, 175.2), Offset(121.2, 174.8), Offset(119.0, 172.0), Offset(106.2, 163.8), Offset(91.0, 151.5), Offset(88.8, 148.0), Offset(88.8, 145.8), Offset(86.8, 141.0), Offset(84.8, 133.0), Offset(84.8, 128.8), Offset(81.8, 120.0), Offset(77.5, 102.2), Offset(69.5, 94.2), Offset(67.2, 93.8), Offset(65.0, 91.0), Offset(58.0, 85.5), Offset(58.0, 83.2), Offset(55.2, 80.2), Offset(48.8, 79.0), Offset(44.2, 74.8), Offset(45.8, 72.8), Offset(49.0, 72.8), Offset(53.2, 76.5), Offset(55.5, 77.0), Offset(60.8, 80.8), Offset(67.0, 80.8), Offset(68.8, 81.8), Offset(79.0, 81.8), Offset(80.8, 80.8), Offset(85.0, 80.8), Offset(88.0, 79.8), Offset(91.2, 77.0), Offset(93.5, 76.5), Offset(99.0, 72.8), Offset(102.5, 68.5), Offset(106.8, 61.0), Offset(109.8, 50.0), Offset(108.8, 39.8), Offset(106.8, 33.8), Offset(102.5, 25.5), Offset(95.0, 18.0), Offset(91.2, 16.8), Offset(88.5, 14.2), Offset(80.8, 13.0), Offset(76.0, 11.0), Offset(71.8, 11.0), Offset(67.0, 13.0), Offset(59.8, 14.0), Offset(56.5, 16.8), Offset(52.8, 18.0), Offset(43.2, 28.2), Offset(40.0, 35.8), Offset(39.0, 39.8), Offset(39.0, 54.0), Offset(41.0, 61.0), Offset(45.0, 67.8), Offset(45.0, 70.0), Offset(43.0, 72.0), Offset(38.8, 72.0), Offset(31.5, 65.2), Offset(29.2, 64.8), Offset(26.5, 61.2), Offset(24.2, 60.8), Offset(22.0, 58.0), Offset(15.2, 53.8), Offset(13.0, 51.0), Offset(10.2, 49.8), Offset(6.0, 45.5), Offset(5.8, 0.0)],
-    [Offset(9.5, 227.0), Offset(14.8, 233.2), Offset(15.0, 237.0), Offset(12.5, 240.8), Offset(7.5, 243.8), Offset(6.8, 242.8), Offset(6.8, 237.8), Offset(5.8, 236.0), Offset(5.8, 231.8), Offset(7.0, 228.2), Offset(8.2, 227.0)],
+    [
+      Offset(1.0, 0.0),
+      Offset(0.0, 1.5),
+      Offset(0.0, 11.2),
+      Offset(1.0, 12.2),
+      Offset(0.0, 13.5),
+      Offset(0.0, 22.2),
+      Offset(1.0, 23.2),
+      Offset(0.0, 24.5),
+      Offset(0.0, 26.2),
+      Offset(1.0, 27.2),
+      Offset(0.0, 28.5),
+      Offset(0.0, 217.2),
+      Offset(1.0, 218.2),
+      Offset(1.0, 220.5),
+      Offset(0.0, 221.5),
+      Offset(0.0, 228.2),
+      Offset(1.0, 229.2),
+      Offset(1.0, 235.5),
+      Offset(0.0, 236.5),
+      Offset(0.0, 238.2),
+      Offset(1.0, 239.2),
+      Offset(1.0, 242.5),
+      Offset(0.0, 243.5),
+      Offset(0.0, 250.2),
+      Offset(1.0, 251.2),
+      Offset(1.0, 253.5),
+      Offset(0.0, 254.5),
+      Offset(0.0, 272.2),
+      Offset(1.0, 273.2),
+      Offset(1.0, 275.5),
+      Offset(0.0, 276.5),
+      Offset(0.0, 283.2),
+      Offset(1.0, 284.2),
+      Offset(1.0, 294.8),
+      Offset(5.8, 294.8),
+      Offset(6.0, 288.2),
+      Offset(40.0, 254.2),
+      Offset(50.5, 241.5),
+      Offset(53.5, 234.5),
+      Offset(52.8, 230.8),
+      Offset(50.5, 226.2),
+      Offset(34.0, 206.5),
+      Offset(18.0, 184.5),
+      Offset(17.8, 182.8),
+      Offset(14.8, 178.0),
+      Offset(14.8, 174.8),
+      Offset(20.0, 170.2),
+      Offset(33.0, 155.2),
+      Offset(58.2, 129.0),
+      Offset(59.5, 129.0),
+      Offset(61.0, 130.8),
+      Offset(61.0, 135.0),
+      Offset(64.0, 144.8),
+      Offset(64.0, 149.0),
+      Offset(66.0, 151.8),
+      Offset(66.0, 157.0),
+      Offset(70.2, 166.5),
+      Offset(95.2, 186.5),
+      Offset(97.5, 187.0),
+      Offset(110.8, 197.8),
+      Offset(114.8, 198.8),
+      Offset(121.0, 198.8),
+      Offset(124.5, 197.5),
+      Offset(128.5, 193.5),
+      Offset(129.8, 188.2),
+      Offset(130.8, 187.2),
+      Offset(130.8, 182.8),
+      Offset(129.0, 181.5),
+      Offset(128.5, 179.5),
+      Offset(123.5, 175.2),
+      Offset(121.2, 174.8),
+      Offset(119.0, 172.0),
+      Offset(106.2, 163.8),
+      Offset(91.0, 151.5),
+      Offset(88.8, 148.0),
+      Offset(88.8, 145.8),
+      Offset(86.8, 141.0),
+      Offset(84.8, 133.0),
+      Offset(84.8, 128.8),
+      Offset(81.8, 120.0),
+      Offset(77.5, 102.2),
+      Offset(69.5, 94.2),
+      Offset(67.2, 93.8),
+      Offset(65.0, 91.0),
+      Offset(58.0, 85.5),
+      Offset(58.0, 83.2),
+      Offset(55.2, 80.2),
+      Offset(48.8, 79.0),
+      Offset(44.2, 74.8),
+      Offset(45.8, 72.8),
+      Offset(49.0, 72.8),
+      Offset(53.2, 76.5),
+      Offset(55.5, 77.0),
+      Offset(60.8, 80.8),
+      Offset(67.0, 80.8),
+      Offset(68.8, 81.8),
+      Offset(79.0, 81.8),
+      Offset(80.8, 80.8),
+      Offset(85.0, 80.8),
+      Offset(88.0, 79.8),
+      Offset(91.2, 77.0),
+      Offset(93.5, 76.5),
+      Offset(99.0, 72.8),
+      Offset(102.5, 68.5),
+      Offset(106.8, 61.0),
+      Offset(109.8, 50.0),
+      Offset(108.8, 39.8),
+      Offset(106.8, 33.8),
+      Offset(102.5, 25.5),
+      Offset(95.0, 18.0),
+      Offset(91.2, 16.8),
+      Offset(88.5, 14.2),
+      Offset(80.8, 13.0),
+      Offset(76.0, 11.0),
+      Offset(71.8, 11.0),
+      Offset(67.0, 13.0),
+      Offset(59.8, 14.0),
+      Offset(56.5, 16.8),
+      Offset(52.8, 18.0),
+      Offset(43.2, 28.2),
+      Offset(40.0, 35.8),
+      Offset(39.0, 39.8),
+      Offset(39.0, 54.0),
+      Offset(41.0, 61.0),
+      Offset(45.0, 67.8),
+      Offset(45.0, 70.0),
+      Offset(43.0, 72.0),
+      Offset(38.8, 72.0),
+      Offset(31.5, 65.2),
+      Offset(29.2, 64.8),
+      Offset(26.5, 61.2),
+      Offset(24.2, 60.8),
+      Offset(22.0, 58.0),
+      Offset(15.2, 53.8),
+      Offset(13.0, 51.0),
+      Offset(10.2, 49.8),
+      Offset(6.0, 45.5),
+      Offset(5.8, 0.0),
+    ],
+    [
+      Offset(9.5, 227.0),
+      Offset(14.8, 233.2),
+      Offset(15.0, 237.0),
+      Offset(12.5, 240.8),
+      Offset(7.5, 243.8),
+      Offset(6.8, 242.8),
+      Offset(6.8, 237.8),
+      Offset(5.8, 236.0),
+      Offset(5.8, 231.8),
+      Offset(7.0, 228.2),
+      Offset(8.2, 227.0),
+    ],
   ];
 
   /// width over height of the shape

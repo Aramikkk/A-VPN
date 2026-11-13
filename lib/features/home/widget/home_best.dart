@@ -38,7 +38,18 @@ Future<void> pingAndChooseBest(WidgetRef ref) async {
     if (pick == null) {
       tell.showInfoToast(t.avpn.bestNone);
     } else {
-      if (group?.selected != pick.tag) {
+      // the fastest one goes into Auto: Auto is on (it chooses by the pings just taken, so it lands on this very server), the server
+      // is not pinned by hand
+      final items = group?.items ?? const <OutboundInfo>[];
+      final autoTag = items.any((i) => i.tag == 'lowest')
+          ? 'lowest'
+          : (items.any((i) => i.tag == 'balance') ? 'balance' : null);
+      final selected = group?.selected;
+      if (autoTag != null) {
+        if (selected != 'lowest' && selected != 'balance') {
+          await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', autoTag);
+        }
+      } else if (selected != pick.tag) {
         await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', pick.tag);
       }
       tell.showSuccessToast(t.avpn.bestPicked(name: _withFlag(serverName(pick)), ms: pick.urlTestDelay));

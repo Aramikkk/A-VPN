@@ -9,6 +9,7 @@ import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:hiddify/features/home/model/dots_accent.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/model/dots_digits.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -23,6 +24,7 @@ import 'package:hiddify/features/stats/notifier/connection_quality.dart';
 import 'package:hiddify/features/stats/notifier/connections.dart';
 import 'package:hiddify/features/stats/notifier/session_start.dart';
 import 'package:hiddify/features/stats/notifier/traffic_history.dart';
+import 'package:hiddify/features/profile/widget/profile_badge.dart';
 import 'package:hiddify/features/stats/widget/connections_page.dart';
 import 'package:hiddify/features/stats/widget/topology_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -49,23 +51,28 @@ Map<String, dynamic> _clash(String id, String host, String process, List<String>
       : 'rule_set=[blocked] => route(select)',
 };
 
+// BADGES=1: two subscriptions, the servers carry their marks (the picture keeps room for the badge)
+final _badges = Platform.environment['BADGES'] == '1';
+final _m0 = _badges ? '​' : '';
+final _m1 = _badges ? '​​' : '';
+
 final _sample = [
   for (final (i, (host, app, chains, down)) in [
     (
       'rr4---sn.googlevideo.com',
       'com.google.android.youtube',
-      ['🇸🇪 Доступ - Швеция 2', 'lowest', 'select'],
+      ['🇸🇪 Доступ - Швеция 2$_m1', 'lowest', 'select'],
       182000000,
     ),
-    ('i.ytimg.com', 'com.google.android.youtube', ['🇸🇪 Доступ - Швеция 2', 'lowest', 'select'], 4200000),
-    ('instagram.com', 'com.instagram.android', ['🇳🇱 Доступ - Нидерланды', 'lowest', 'select'], 23000000),
+    ('i.ytimg.com', 'com.google.android.youtube', ['🇸🇪 Доступ - Швеция 2$_m1', 'lowest', 'select'], 4200000),
+    ('instagram.com', 'com.instagram.android', ['🇳🇱 Доступ - Нидерланды$_m0', 'lowest', 'select'], 23000000),
     ('disk.yandex.ru', 'ru.yandex.disk', ['direct'], 640000000),
     ('yandex.ru', 'ru.yandex.disk', ['direct'], 120000),
-    ('api.telegram.org', 'org.telegram.messenger', ['🇸🇪 Доступ - Швеция 2', 'lowest', 'select'], 3100000),
+    ('api.telegram.org', 'org.telegram.messenger', ['🇸🇪 Доступ - Швеция 2$_m1', 'lowest', 'select'], 3100000),
     ('gosuslugi.ru', 'ru.rostel', ['direct'], 900000),
     ('connectivitycheck.gstatic.com', '1000 (android.uid.system)', ['direct'], 2000),
     ('doubleclick.net', 'com.android.chrome', ['block'], 0),
-    ('rutracker.org', 'com.android.chrome', ['🇳🇱 Доступ - Нидерланды', 'lowest', 'select'], 8800000),
+    ('rutracker.org', 'com.android.chrome', ['🇳🇱 Доступ - Нидерланды$_m0', 'lowest', 'select'], 8800000),
   ].indexed)
     SeenConnection.fromClash(_clash('$i', host, app, chains, down: down))!,
 ];
@@ -319,7 +326,7 @@ void main() {
   testWidgets('the Connections tab renders', (tester) async {
     await _loadFont('Segoe UI Variable Text', [r'C:\Windows\Fonts\SegUIVar.ttf']);
     await _loadFont('MaterialIcons', [
-      r'./tools/flutter/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+      r'C:/dev/tools/flutter/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
     ]);
     await _loadFont('MaterialIcons', [
       r'C:\dev	oolslutterin\cachertifacts\material_fonts\MaterialIcons-Regular.otf',
@@ -380,7 +387,7 @@ void main() {
     testWidgets('the Topology tab renders: $name', (tester) async {
       await _loadFont('Segoe UI', [r'C:/Windows/Fonts/segoeui.ttf', r'C:/Windows/Fonts/seguisb.ttf']);
       await _loadFont('MaterialIcons', [
-        r'./tools/flutter/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+        r'C:/dev/tools/flutter/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
       ]);
       await tester.binding.setSurfaceSize(size);
       final t = await tester.runAsync(() => AppLocale.ru.build()) as Translations;
@@ -393,6 +400,9 @@ void main() {
       );
       // HOMELAYOUT=bento|dots: the page in that look, as the app's shell has it
       final look = Platform.environment['HOMELAYOUT'];
+      // DIGITS=<name>: how the Dots figures (and their lines) are drawn
+      dotsDigitsNow = DotsDigits.fromName(Platform.environment['DIGITS']);
+      if (_badges) profileBadgesNow = [badgeOf(0, 'Sigma'), badgeOf(1, 'Chill')];
       SharedPreferences.setMockInitialValues({if (look != null) 'home_layout': look});
       final prefs = await tester.runAsync(SharedPreferences.getInstance);
       await tester.pumpWidget(

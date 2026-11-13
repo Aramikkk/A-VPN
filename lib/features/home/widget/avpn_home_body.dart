@@ -1340,6 +1340,12 @@ ServerName serverNameOf(String raw, {String? tag}) {
   var name = marked.text;
   name = name.replaceAll('§hide§', '').replaceAll(RegExp(r'\s*§\s*\d+\s*$'), '').trim();
   name = sigmaName(name);
+  // a whitelist server ("LTE Only", "БС"): the words "LTE Only" are dropped, the short mark "БС" says it
+  final whitelist = ServerRegionFilter.isMobileOnly(name);
+  name = name
+      .replaceAll(RegExp(r'LTE\s*Only\s*(?:-\s*)?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\s{2,}'), ' ')
+      .trim();
   // the marks a provider puts in a name (a lightning for a fast server) say nothing here: the country and, where there are
   // several of it, its number
   name = name.replaceAll(RegExp('[\u26A1\uFE0F]'), '').replaceAll(RegExp(r'\s{2,}'), ' ').trim();
@@ -1349,11 +1355,15 @@ ServerName serverNameOf(String raw, {String? tag}) {
     final b = runes[i + 1] - 0x1F1E6;
     if (a >= 0 && a < 26 && b >= 0 && b < 26) {
       final flag = String.fromCharCodes([runes[i], runes[i + 1]]);
-      return (flag: flag, title: name.replaceFirst(flag, '').trim(), profile: profile);
+      return (flag: flag, title: _whitelisted(name.replaceFirst(flag, '').trim(), whitelist), profile: profile);
     }
   }
-  return (flag: null, title: name, profile: profile);
+  return (flag: null, title: _whitelisted(name, whitelist), profile: profile);
 }
+
+/// [title] with "· БС" after it for a whitelist server (once).
+String _whitelisted(String title, bool whitelist) =>
+    whitelist && !title.contains('БС') ? '$title · $whitelistMark' : title;
 
 String _gb(int bytes) => '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
 

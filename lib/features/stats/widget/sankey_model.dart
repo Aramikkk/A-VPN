@@ -341,16 +341,20 @@ class SankeyModel {
 
 /// Where the columns stand in a width: the apps' names on the left, the nodes, the servers' names on the right.
 class SankeyGeometry {
-  SankeyGeometry(double width, {bool stepped = false}) {
+  SankeyGeometry(double width, {bool stepped = false, double middleW = 118, bool badges = false}) {
     if (stepped) {
       // symmetric: an icon (30) or a flag (34) at each edge, the same room for both, the sites in the middle (their bar and
       // their names together centred between the two bars)
-      final side = glyph + 8 + edge;
-      this.labelL = side;
-      labelR = side;
-      final x2 = width - side - nodeW;
-      final group = nodeW + 5 + 118;
-      xs = [side, ((side + nodeW + x2) - group) / 2, x2];
+      // (the apps' tiles start a little further from the picture's edge than the flags end from the other, so the left room
+      // is the smaller: both sides then stand the same distance from the card's edge)
+      final sideL = glyph + 8 + edge - 14;
+      // (a subscription's badge before the flag takes 15 more on the right)
+      final sideR = glyph + 8 + edge - 6 + (badges ? 15 : 0);
+      this.labelL = sideL;
+      labelR = sideR;
+      final x2 = width - sideR - nodeW;
+      final group = nodeW + 5 + middleW;
+      xs = [sideL, ((sideL + nodeW + x2) - group) / 2, x2];
       return;
     }
     final labelL = math.min(88.0, width * .24);
@@ -362,7 +366,7 @@ class SankeyGeometry {
 
   /// the widest of the glyphs at the sides (the flag), and the room left at the edge of the picture
   static const glyph = 40.0;
-  static const edge = 12.0;
+  static const edge = 2.0;
 
   static const nodeW = 6.0;
 

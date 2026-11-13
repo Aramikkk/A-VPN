@@ -217,7 +217,7 @@
     "nightModeMsg": "While the screen is locked the checks sleep: the core doesn't ping the servers, the service and the app wake less often. Everything returns with the screen. It saves noticeable battery overnight; open connections and calls aren't touched",
     "trafficSmallHidden": "No app has used 10 MB this session yet",
     "bestServerHint": "Ping every server and choose the best",
-    "bestPicked": "Best server: $name · $ms ms",
+    "bestPicked": "Auto: the best server $name · $ms ms",
     "bestNone": "No server answered",
     "pingSwitched": "No ping for a minute — ping address now: $name",
     "pingChecks": "Checks",

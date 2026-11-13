@@ -216,6 +216,19 @@ class _SpeedGraph extends CustomPainter {
     void series(List<int> values, Color c, double width, double fill) {
       final points = [for (var i = 0; i < values.length; i++) point(i, values[i])];
       final line = _smooth(points);
+      // Dots with the Mono or Grotesk figures: the line solid, no fill under it
+      if (solidDotsLines) {
+        canvas.drawPath(
+          line,
+          Paint()
+            ..color = c
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round
+            ..strokeWidth = solidLineWidth(mono: width + .8, wide: width * 2.2 + 1),
+        );
+        return;
+      }
       // Dots: the line as a row of dots, no fill under it
       if (homeLookNow == HomeLayout.dots) {
         for (final metric in line.computeMetrics()) {
@@ -285,6 +298,10 @@ class _SpeedGraph extends CustomPainter {
     final upNow = point(samples.length - 1, samples.last.up);
     final downNow = point(samples.length - 1, samples.last.down);
     switch (homeLookNow) {
+      // Dots with the Mono or Grotesk figures: round marks
+      case HomeLayout.dots when solidDotsLines:
+        canvas.drawCircle(upNow, 4, Paint()..color = upColor);
+        canvas.drawCircle(downNow, 5.5, Paint()..color = downColor);
       // Dots: square marks
       case HomeLayout.dots:
         canvas.drawRect(Rect.fromCenter(center: upNow, width: 6, height: 6), Paint()..color = upColor);

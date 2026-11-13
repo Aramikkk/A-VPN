@@ -110,6 +110,8 @@ List<(String, String, int, bool)> get _servers => [
     ('cg1', '🇩🇪 Германия ⚡', 58, false),
     ('cg2', '🇩🇪 Германия ⚡⚡', 67, false),
     ('cg3', '🇬🇧 Smart-Авто ⚡', 62, false),
+    ('cg4', '🇸🇪 LTE Only - Швеция', 95, false),
+    ('cg5', '🇩🇪 LTE Only - Германия', 110, false),
   ],
 ];
 

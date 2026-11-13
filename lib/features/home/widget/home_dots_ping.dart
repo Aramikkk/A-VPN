@@ -81,7 +81,8 @@ class _DotsStats extends HookConsumerWidget {
                 connected && !paused && ping != null ? '$ping' : '—',
                 cell: slim ? 6 : 10,
                 // the ordinary colour; the accent when the ping is very high or the loss is heavy
-                colour: connected && !paused && ((ping ?? 0) >= _DotsStats.limits.ping || loss >= _DotsStats.limits.loss)
+                colour:
+                    connected && !paused && ((ping ?? 0) >= _DotsStats.limits.ping || loss >= _DotsStats.limits.loss)
                     ? _Dots.red
                     : ink,
                 faint: _Dots.grid(dark),
@@ -113,17 +114,8 @@ class _DotsStats extends HookConsumerWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: CustomPaint(
-                        painter: _PingGridPainter(
-                          scale: scale,
-                          line: ink.withValues(alpha: .22),
-                          text: _Dots.soft(dark),
-                        ),
-                      ),
-                    ),
-                    Positioned.fill(
                       child: Padding(
-                        padding: const EdgeInsets.only(right: 28),
+                        padding: EdgeInsets.zero,
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
@@ -436,42 +428,6 @@ class _DotsLightStats extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// The marks behind the ping bars: a faint line at 100, 200, 400 ms (as far as the scale goes), its figure at the right.
-class _PingGridPainter extends CustomPainter {
-  _PingGridPainter({required this.scale, required this.line, required this.text});
-
-  final double scale;
-  final Color line;
-  final Color text;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final plot = size.width - 28;
-    for (final mark in const [100, 200, 400, 800]) {
-      if (mark > scale) break;
-      final y = size.height * (1 - mark / scale);
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(plot, y),
-        Paint()
-          ..color = line
-          ..strokeWidth = 1,
-      );
-      final label = TextPainter(
-        text: TextSpan(
-          text: '$mark',
-          style: _Dots.mono(8.5, text, weight: FontWeight.w700, spacing: 0),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      label.paint(canvas, Offset(plot + 5, (y - label.height / 2).clamp(0, size.height - label.height)));
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PingGridPainter old) => old.scale != scale || old.line != line || old.text != text;
 }
 
 /// A short run of ping answers as bars (the slim form of the Dots ping block puts them on both sides of the figures).

@@ -24,6 +24,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/router/adaptive_layout/my_adaptive_layout.dart';
 import 'package:hiddify/features/home/model/home_layout.dart';
+import 'package:hiddify/features/home/model/dots_digits.dart';
 import 'package:hiddify/features/home/widget/avpn_home_body.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -212,6 +213,8 @@ void main() {
       );
       // HOMELAYOUT=bento|dots: the page in that look, as the app's shell has it; DARK=1: by night
       final look = Platform.environment['HOMELAYOUT'];
+      // DIGITS=<name>: how the Dots figures (and their lines) are drawn
+      dotsDigitsNow = DotsDigits.fromName(Platform.environment['DIGITS']);
       final dark = Platform.environment['DARK'] == '1';
       SharedPreferences.setMockInitialValues({if (look != null) 'home_layout': look});
       final prefs = await tester.runAsync(SharedPreferences.getInstance);

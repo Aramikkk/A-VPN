@@ -707,7 +707,7 @@ class _StyledServerList extends ConsumerWidget {
             final provider = _providerWord(displayedServer.tag);
             // the provider's own class word ("Доступ") says nothing next to the provider's name
             final klass = dash > 0 ? name.title.substring(0, dash).trim() : null;
-            final showClass = klass != null && !(provider != null && klass.toLowerCase() == 'доступ');
+            final showClass = klass != null && !(provider != null && (klass.toLowerCase() == 'доступ' || klass.toLowerCase() == provider.toLowerCase()));
             final subtitle = currentServer != null
                 ? [
                     ?provider,
