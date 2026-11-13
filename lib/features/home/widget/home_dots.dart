@@ -480,43 +480,34 @@ Widget _dotsServerRow(
             center: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // the flag, the country's name and the two plates all have their middle on the row's middle line
+                // a little lower: level with the middle of the two lines beside it
                 Padding(
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.only(top: 5),
                   child: group
                       ? SizedBox(width: 46, child: Icon(Icons.auto_awesome_rounded, size: 30, color: ink))
                       : flagMark(flag, width: 46),
                 ),
                 const Gap(10),
                 Flexible(
-                  // the country in the middle of the row (level with the flag and the two plates); the small caption hangs over it and
-                  // takes no room of its own
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // a name too long for the room is made a little smaller, not wrapped or cut
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          name.toUpperCase(),
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          style: _Dots.mono(19, ink, weight: FontWeight.w800, spacing: 1),
-                        ),
+                      Text(
+                        caption.toUpperCase(),
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: _Dots.mono(9, _Dots.soft(dark), spacing: 0.8),
                       ),
-                      Positioned(
-                        left: -80,
-                        right: -80,
-                        top: -13,
-                        child: Text(
-                          caption.toUpperCase(),
-                          maxLines: 1,
-                          softWrap: false,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.clip,
-                          style: _Dots.mono(9, _Dots.soft(dark), spacing: 0.8),
-                        ),
+                      const Gap(2),
+                      Text(
+                        name.toUpperCase(),
+                        // a long name takes a second line rather than being cut (a narrow screen)
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: _Dots.mono(15, ink, weight: FontWeight.w800, spacing: 1),
                       ),
                     ],
                   ),
