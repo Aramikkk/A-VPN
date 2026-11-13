@@ -78,22 +78,8 @@ class _DotsStats extends HookConsumerWidget {
             behavior: HitTestBehavior.opaque,
             onTap: slim ? null : () => unawaited(_pickPingGraph(context, ref, style)),
             child: Center(
-              child: offline
-                  // no network at all: the words, not a figure (the room is the figure's)
-                  ? SizedBox(
-                      height: 7 * (slim ? 6.0 : 10.0),
-                      child: Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            'НЕТ СЕТИ',
-                            style: _Dots.mono(slim ? 22 : 34, _Dots.red, weight: FontWeight.w800, spacing: 2),
-                          ),
-                        ),
-                      ),
-                    )
-                  : _DotNumber(
-                connected && !paused && ping != null ? '$ping' : '—',
+              child: _DotNumber(
+                connected && !paused && !offline && ping != null ? '$ping' : '—',
                 cell: slim ? 6 : 10,
                 // the ordinary colour; the accent when the ping is very high or the loss is heavy
                 colour:
@@ -114,7 +100,7 @@ class _DotsStats extends HookConsumerWidget {
               if (slim) Expanded(child: _slimBars(bars.sublist(0, bars.length ~/ 2), scale, ink, alignEnd: true)),
               if (slim) const Gap(10),
               Text(
-                average == null ? ' ' : '${t.avpn.pingAverage.toUpperCase()} $average',
+                offline ? 'НЕТ СЕТИ' : (average == null ? ' ' : '${t.avpn.pingAverage.toUpperCase()} $average'),
                 style: _Dots.mono(11, _Dots.soft(dark), spacing: 3),
               ),
               if (slim) const Gap(10),
