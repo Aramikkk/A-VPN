@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hiddify/core/directories/stale_files.dart';
@@ -53,6 +54,10 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   logStart();
   FlutterError.onError = Logger.logFlutterError;
   WidgetsBinding.instance.platformDispatcher.onError = Logger.logPlatformDispatcherError;
+  // the phone keeps the app upright: it does not turn with the phone
+  if (PlatformUtils.isAndroid) {
+    unawaited(SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]));
+  }
   // the mouse wheel scrolls smoothly on the computer
   SmoothWheel.install();
 

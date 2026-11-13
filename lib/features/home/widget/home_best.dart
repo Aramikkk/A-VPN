@@ -27,8 +27,8 @@ OutboundInfo? fastestServer(Iterable<OutboundInfo> items, {NetworkKind network =
 int _boltWatch = 0;
 
 /// Pings every server anew and chooses by hand the one with the lowest ping, which the home screen then shows. After it
-/// the choice is watched: when that server stops answering or gets slow (as slow as the home screen paints a ping red)
-/// three checks running, the choice goes back to Auto, and Auto's rules take over.
+/// the choice is watched: when the connection through that server stops answering or gets slow (as slow as the home
+/// screen paints a ping red) three checks running, the choice goes back to Auto, and Auto's rules take over.
 Future<void> pingAndChooseBest(WidgetRef ref) async {
   if (homeBestRunning.value) return;
   homeBestRunning.value = true;
@@ -55,20 +55,30 @@ Future<void> pingAndChooseBest(WidgetRef ref) async {
   }
 }
 
-/// Watches the server the bolt chose; puts the choice back on [autoTag] when it fails (see [pingAndChooseBest]). Stops when
-/// the choice is changed by hand, the connection ends, or the bolt chooses again.
+/// Watches the server the bolt chose; puts the choice back on [autoTag] when it fails (see [pingAndChooseBest]). It reads
+/// what the connection's own probes through the tunnel say (the servers' pings are only refreshed now and then, so they
+/// would be old): the last half minute's probes mostly lost, or as slow as the home screen paints a ping red. Stops when the
+/// choice is changed by hand, the connection ends, or the bolt chooses again.
 Future<void> _watchBolt(WidgetRef ref, String tag, String autoTag) async {
   final id = ++_boltWatch;
   var bad = 0;
+  var lastSeen = <int?>[];
   try {
     while (id == _boltWatch) {
       await Future<void>.delayed(const Duration(seconds: 10));
       if (id != _boltWatch) return;
       final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
       if (group == null || group.selected != tag) return;
-      final ms = group.items.where((i) => i.tag == tag).firstOrNull?.urlTestDelay ?? 0;
+      final probes = ref.read(connectionQualityProvider);
+      // the probes come while the app is on screen: nothing new, nothing to judge
+      if (probes.length < 6 || identical(probes, lastSeen)) continue;
+      lastSeen = probes;
+      final recent = probes.sublist(probes.length - 6);
+      final answered = recent.whereType<int>().toList();
       final slow = alertLimits(mobile: _actualNetworkKind.value == NetworkKind.mobile).ping;
-      bad = (ms <= 0 || ms >= 65000 || ms >= slow) ? bad + 1 : 0;
+      final average = answered.isEmpty ? 0 : answered.reduce((a, b) => a + b) / answered.length;
+      final dead = answered.length <= 2;
+      bad = (dead || average >= slow) ? bad + 1 : 0;
       if (bad < 3) continue;
       await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', autoTag);
       ref.read(inAppNotificationControllerProvider).showInfoToast(ref.read(translationsProvider).requireValue.avpn.bestBack);

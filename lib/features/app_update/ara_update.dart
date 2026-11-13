@@ -157,13 +157,19 @@ abstract class AraUpdate {
 
   /// The size of the file when the server takes ranges (it answers 206 with a Content-Range), else null.
   static Future<int?> _rangeTotal(Dio dio, String url) async {
+    final stop = CancelToken();
     try {
       final r = await dio.get<ResponseBody>(
         url,
+        cancelToken: stop,
         options: Options(responseType: ResponseType.stream, headers: {'Range': 'bytes=0-0'}),
       );
+      // a server that ignores ranges starts the whole file: it is not read, only hung up on
+      if (r.statusCode != 206) {
+        stop.cancel();
+        return null;
+      }
       await r.data!.stream.drain<void>();
-      if (r.statusCode != 206) return null;
       final total = int.tryParse((r.headers.value('content-range') ?? '').split('/').last);
       return total != null && total > parts ? total : null;
     } on DioException {

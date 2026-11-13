@@ -65,6 +65,7 @@
             android:exported="true"
             android:hardwareAccelerated="true"
             android:launchMode="singleTop"
+            android:screenOrientation="portrait"
             android:theme="@style/LaunchTheme"
             android:windowSoftInputMode="adjustResize">
 
@@ -108,7 +109,7 @@
             </intent-filter>
         </activity>
 
-        <!-- A-VPN: the home-screen icon in the colour of the theme; AppIconHandler enables one and disables the rest -->
+        <!-- AraVPN: the home-screen icon in the colour of the theme; AppIconHandler enables one and disables the rest -->
         <activity-alias
             android:name=".LauncherRed"
             android:enabled="true"
