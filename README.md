@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>VPN, который сам переходит между LTE и Wi-Fi.</b><br>
-  Без разрыва и без нажатий. Android, Fold и Windows, ядро sing-box, без телеметрии.
+  Ничего не нужно трогать и переключать. Android, Fold и Windows, ядро sing-box, без телеметрии.
 </p>
 
 <p align="center">
@@ -33,7 +33,7 @@
   <img src="docs/screenshots/handoff.jpg" alt="Автоматический переход между Wi-Fi и LTE: свои серверы и страны для каждой сети, без разрыва">
 </p>
 
-Вышли из дома, зашли в метро, подключились к Wi-Fi: приложение само замечает смену сети и переключается. VPN не отключается, соединения не рвутся, а серверы и страны меняются на те, что выбраны для новой сети: обычные в Wi-Fi, для белых списков (БС) в LTE. Нажимать ничего не нужно.
+Ничего не нужно трогать и переключать. Вышли из дома или подключились к Wi-Fi: приложение само замечает смену сети. VPN не отключается, соединения не рвутся, а серверы и страны меняются на те, что выбраны для новой сети: обычные в Wi-Fi, для белых списков (БС) в LTE.
 
 ## Скачать
 
@@ -175,7 +175,7 @@
 
 **A-VPN** is a VPN client for Android and Windows built on the sing-box core. It picks servers for the network you are on, switches between Wi-Fi and LTE without dropping the tunnel, and shows how the connection performs. It is an independent fork of [Hiddify](https://github.com/hiddify/hiddify-app) released under its license and is not affiliated with the Hiddify team.
 
-- **Automatic Wi-Fi ⇄ LTE handoff (the main feature).** The app notices the network change by itself and switches servers and countries to the ones chosen for it; the VPN stays on, no taps needed.
+- **Automatic Wi-Fi ⇄ LTE handoff (the main feature).** Nothing to touch or switch: the app notices the network change by itself and moves to the servers and countries chosen for it, and the VPN stays on.
 - **As many subscriptions as you like.** All servers in one list, with a priority subscription, order and on/off switches.
 - **Servers per network.** Whitelist-friendly servers on mobile data, regular ones on Wi-Fi.
 - **Steady connection.** Latency and loss are measured all the time, the server is switched in good time, the link is checked after the device wakes up.
