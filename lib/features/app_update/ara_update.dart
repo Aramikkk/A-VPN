@@ -52,7 +52,7 @@ class AraUpdateInfo {
 /// against the SHA-256 of latest.json, which comes from the same release.
 abstract class AraUpdate {
   /// The project's releases: where the program updates itself from.
-  static const defaultRepo = 'Aramikkk/A-VPN';
+  static const defaultRepo = 'Aramikkk/hiddify-app';
 
   /// For tests only: the release's files are taken from this address (a local server) instead of GitHub. Empty in the app
   /// (set at build time with --dart-define=ARA_UPDATE_BASE=http://127.0.0.1:8099, or by a test).
@@ -108,23 +108,39 @@ abstract class AraUpdate {
     }
   }
 
-  /// Downloads the APK of [info] from the release to the cache, [onProgress] told the share done (0 to 1). The file is
-  /// checked against the size latest.json gives.
+  /// How many pieces the APK is fetched in at once: a carrier that holds one connection to the CDN down (a few KB/s) does not
+  /// do so for each of several.
+  static const parts = 6;
+
+  /// Downloads the APK of [info] from the release to the cache, [onProgress] told the share done (0 to 1). The file comes in
+  /// [parts] pieces at once (HTTP Range) when the server allows it, and what already came of a broken download is kept and
+  /// carried on from. It is checked against the size and the SHA-256 latest.json gives.
   static Future<File> download(String setting, AraUpdateInfo info, {void Function(double)? onProgress}) async {
     final dir = Directory('${(await getTemporaryDirectory()).path}/ara_update');
-    if (dir.existsSync()) dir.deleteSync(recursive: true);
     dir.createSync(recursive: true);
+    // anything left of other builds goes; the pieces of this one stay
+    for (final e in dir.listSync()) {
+      if (!e.path.split(RegExp(r'[\/]')).last.startsWith(info.apk)) e.deleteSync(recursive: true);
+    }
     final file = File('${dir.path}/${info.apk}');
+    if (file.existsSync()) file.deleteSync();
+    final url = fileUrl(setting, info.apk);
     final dio = _dio();
     try {
-      await dio.download(
-        fileUrl(setting, info.apk),
-        file.path,
-        onReceiveProgress: (done, total) {
-          final whole = total > 0 ? total : info.size;
-          if (whole > 0) onProgress?.call((done / whole).clamp(0.0, 1.0));
-        },
-      );
+      final total = await _rangeTotal(dio, url);
+      if (total == null) {
+        // no ranges: the plain download, as before
+        await dio.download(
+          url,
+          file.path,
+          onReceiveProgress: (done, whole) {
+            final all = whole > 0 ? whole : info.size;
+            if (all > 0) onProgress?.call((done / all).clamp(0.0, 1.0));
+          },
+        );
+      } else {
+        await _fetchInParts(dio, url, file, total, onProgress);
+      }
     } finally {
       dio.close();
     }
@@ -137,6 +153,84 @@ abstract class AraUpdate {
       throw const FormatException('the file is not the one that was published');
     }
     return file;
+  }
+
+  /// The size of the file when the server takes ranges (it answers 206 with a Content-Range), else null.
+  static Future<int?> _rangeTotal(Dio dio, String url) async {
+    try {
+      final r = await dio.get<ResponseBody>(
+        url,
+        options: Options(responseType: ResponseType.stream, headers: {'Range': 'bytes=0-0'}),
+      );
+      await r.data!.stream.drain<void>();
+      if (r.statusCode != 206) return null;
+      final total = int.tryParse((r.headers.value('content-range') ?? '').split('/').last);
+      return total != null && total > parts ? total : null;
+    } on DioException {
+      return null;
+    }
+  }
+
+  static Future<void> _fetchInParts(
+    Dio dio,
+    String url,
+    File file,
+    int total,
+    void Function(double)? onProgress,
+  ) async {
+    final size = (total / parts).ceil();
+    final have = List<int>.filled(parts, 0);
+    void report() => onProgress?.call((have.fold<int>(0, (a, b) => a + b) / total).clamp(0.0, 1.0));
+
+    Future<void> piece(int n) async {
+      final from = n * size;
+      final to = (from + size < total ? from + size : total) - 1;
+      final want = to - from + 1;
+      final part = File('${file.path}.part$n');
+      if (part.existsSync() && part.lengthSync() > want) part.deleteSync();
+      have[n] = part.existsSync() ? part.lengthSync() : 0;
+      report();
+      for (var attempt = 0; have[n] < want; attempt++) {
+        try {
+          final r = await dio.get<ResponseBody>(
+            url,
+            options: Options(
+              responseType: ResponseType.stream,
+              // a stalled connection is given up on and carried on from where it stopped
+              receiveTimeout: const Duration(seconds: 30),
+              headers: {'Range': 'bytes=${from + have[n]}-$to'},
+            ),
+          );
+          if (r.statusCode != 206) throw const FormatException('no range');
+          final sink = part.openWrite(mode: FileMode.append);
+          try {
+            await for (final chunk in r.data!.stream) {
+              sink.add(chunk);
+              have[n] += chunk.length;
+              report();
+            }
+          } finally {
+            await sink.close();
+          }
+        } catch (_) {
+          have[n] = part.existsSync() ? part.lengthSync() : 0;
+          if (attempt >= 6) rethrow;
+          await Future<void>.delayed(Duration(seconds: attempt < 3 ? 1 : 3));
+        }
+      }
+    }
+
+    await Future.wait([for (var n = 0; n < parts; n++) piece(n)]);
+    final out = file.openWrite();
+    try {
+      for (var n = 0; n < parts; n++) {
+        final part = File('${file.path}.part$n');
+        await out.addStream(part.openRead());
+        part.deleteSync();
+      }
+    } finally {
+      await out.close();
+    }
   }
 
   /// Whether [file] has the SHA-256 [expected] (hex); true when none is expected.

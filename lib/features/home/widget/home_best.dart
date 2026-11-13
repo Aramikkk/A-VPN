@@ -23,9 +23,12 @@ OutboundInfo? fastestServer(Iterable<OutboundInfo> items, {NetworkKind network =
   return best;
 }
 
-/// Pings every server anew and puts the choice on Auto. The core's own pick then follows every rule of the app (the
-/// countries and networks switched off, the whitelist servers, the priority subscription and its margin), so "the
-/// best" is the best by those rules and not just the lowest number. Tells which server it came to.
+/// Set by each choice of the bolt; a watch of an older choice sees it changed and stops.
+int _boltWatch = 0;
+
+/// Pings every server anew and chooses by hand the one with the lowest ping, which the home screen then shows. After it
+/// the choice is watched: when that server stops answering or gets slow (as slow as the home screen paints a ping red)
+/// three checks running, the choice goes back to Auto, and Auto's rules take over.
 Future<void> pingAndChooseBest(WidgetRef ref) async {
   if (homeBestRunning.value) return;
   homeBestRunning.value = true;
@@ -33,26 +36,46 @@ Future<void> pingAndChooseBest(WidgetRef ref) async {
   final tell = ref.read(inAppNotificationControllerProvider);
   try {
     await pingAllServers(ref);
-    var group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
-    final autoTag = group?.selected == 'balance' ? 'balance' : 'lowest';
-    final hasAuto = group?.items.any((i) => i.isGroup && i.tag == autoTag) ?? false;
-    if (hasAuto && group?.selected != autoTag) {
-      await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', autoTag);
-      // the core says which server the choice came to a moment later
-      await Future<void>.delayed(const Duration(milliseconds: 1500));
-      group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
-    }
-    final auto = group?.items.where((i) => i.isGroup && i.tag == autoTag).firstOrNull;
-    final pick = auto == null ? null : autoPick(auto, group!.items);
-    if (pick == null || pick.urlTestDelay <= 0 || pick.urlTestDelay >= 65000) {
+    final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
+    final pick = group == null ? null : fastestServer(group.items, network: _actualNetworkKind.value);
+    if (group == null || pick == null) {
       tell.showInfoToast(t.avpn.bestNone);
-    } else {
-      tell.showSuccessToast(t.avpn.bestPicked(name: _withFlag(serverName(pick)), ms: pick.urlTestDelay));
+      return;
     }
+    if (group.selected != pick.tag) {
+      await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', pick.tag);
+    }
+    tell.showSuccessToast(t.avpn.bestPicked(name: _withFlag(serverName(pick)), ms: pick.urlTestDelay));
+    final autoTag = group.selected == 'balance' ? 'balance' : 'lowest';
+    if (group.items.any((i) => i.isGroup && i.tag == autoTag)) unawaited(_watchBolt(ref, pick.tag, autoTag));
   } catch (_) {
     // not connected: nothing to ping
   } finally {
     homeBestRunning.value = false;
+  }
+}
+
+/// Watches the server the bolt chose; puts the choice back on [autoTag] when it fails (see [pingAndChooseBest]). Stops when
+/// the choice is changed by hand, the connection ends, or the bolt chooses again.
+Future<void> _watchBolt(WidgetRef ref, String tag, String autoTag) async {
+  final id = ++_boltWatch;
+  var bad = 0;
+  try {
+    while (id == _boltWatch) {
+      await Future<void>.delayed(const Duration(seconds: 10));
+      if (id != _boltWatch) return;
+      final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
+      if (group == null || group.selected != tag) return;
+      final ms = group.items.where((i) => i.tag == tag).firstOrNull?.urlTestDelay ?? 0;
+      final slow = alertLimits(mobile: _actualNetworkKind.value == NetworkKind.mobile).ping;
+      bad = (ms <= 0 || ms >= 65000 || ms >= slow) ? bad + 1 : 0;
+      if (bad < 3) continue;
+      await ref.read(proxiesOverviewNotifierProvider.notifier).changeProxy('select', autoTag);
+      ref.read(inAppNotificationControllerProvider).showInfoToast(ref.read(translationsProvider).requireValue.avpn.bestBack);
+      return;
+    }
+  } catch (_) {
+    // the screen is gone, or no connection: nothing to watch
   }
 }
 

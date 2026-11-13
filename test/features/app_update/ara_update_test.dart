@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:hiddify/features/app_update/ara_update.dart';
 
 void main() {
@@ -47,21 +50,21 @@ void main() {
   });
 
   test('updates come from the GitHub release of the project, whatever the old setting said', () {
-    expect(AraUpdate.repoOf('Aramikkk/A-VPN'), 'Aramikkk/A-VPN');
+    expect(AraUpdate.repoOf('Aramikkk/hiddify-app'), 'Aramikkk/hiddify-app');
     expect(AraUpdate.repoOf('https://github.com/Someone/fork.git'), 'Someone/fork');
     expect(AraUpdate.repoOf('https://github.com/Someone/fork/releases'), 'Someone/fork');
     // the folder on Yandex Disk of the versions before 1.2, an empty value, and nonsense: the project's own
-    expect(AraUpdate.repoOf('https://disk.yandex.ru/d/REPLACED'), AraUpdate.defaultRepo);
+    expect(AraUpdate.repoOf('https://disk.yandex.ru/d/BLa0rzQRrl98Ig'), AraUpdate.defaultRepo);
     expect(AraUpdate.repoOf(''), AraUpdate.defaultRepo);
     expect(AraUpdate.repoOf('a b/c'), AraUpdate.defaultRepo);
   });
 
   test('a file of the release is a plain name on github.com', () {
     expect(
-      AraUpdate.fileUrl('Aramikkk/A-VPN', 'latest.json'),
-      'https://github.com/Aramikkk/A-VPN/releases/latest/download/latest.json',
+      AraUpdate.fileUrl('Aramikkk/hiddify-app', 'latest.json'),
+      'https://github.com/Aramikkk/hiddify-app/releases/latest/download/latest.json',
     );
-    expect(AraUpdate.fileUrl('', 'A-VPN-1.2.0-arm64.apk'), contains('/Aramikkk/A-VPN/releases/latest/download/'));
+    expect(AraUpdate.fileUrl('', 'A-VPN-1.2.0-arm64.apk'), contains('/Aramikkk/hiddify-app/releases/latest/download/'));
     for (final bad in ['', '../x.apk', 'a/b.apk', r'a\b.apk']) {
       expect(() => AraUpdate.fileUrl('', bad), throwsFormatException);
     }
@@ -95,4 +98,91 @@ void main() {
     AraUpdate.testBase = 'http://127.0.0.1:${server.port}/nothing-here';
     expect(await AraUpdate.latest(''), isNull);
   });
+
+  group('the APK download', () {
+    final bytes = Uint8List.fromList(List.generate(300001, (i) => (i * 31 + i ~/ 7) & 255));
+    late HttpServer server;
+    var ranged = 0;
+    var cutOnce = false;
+    var cut = <String>{};
+
+    Future<void> serve({required bool ranges}) async {
+      HttpOverrides.global = null;
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        final range = request.headers.value('range');
+        final m = range == null ? null : RegExp(r'bytes=(\d+)-(\d+)').firstMatch(range);
+        if (!ranges || m == null) {
+          request.response.headers.contentLength = bytes.length;
+          request.response.add(bytes);
+          await request.response.close();
+          return;
+        }
+        ranged++;
+        final a = int.parse(m.group(1)!);
+        final b = int.parse(m.group(2)!);
+        request.response
+          ..statusCode = 206
+          ..headers.set('content-range', 'bytes $a-$b/${bytes.length}')
+          ..headers.contentLength = b - a + 1;
+        // the first try of the second piece breaks half way: the rest must be asked for again
+        if (cutOnce && a > 0 && b - a > 30000 && cut.add('$a')) {
+          final socket = await request.response.detachSocket();
+          socket.add(bytes.sublist(a, a + 20000));
+          await socket.flush();
+          await socket.close();
+          return;
+        }
+        request.response.add(bytes.sublist(a, b + 1));
+        await request.response.close();
+      });
+      final before = AraUpdate.testBase;
+      addTearDown(() => AraUpdate.testBase = before);
+      AraUpdate.testBase = 'http://127.0.0.1:${server.port}';
+    }
+
+    AraUpdateInfo info() => AraUpdateInfo.fromJson({
+      'version': '9.9.9',
+      'build': 90909,
+      'apk': 'dl-test.apk',
+      'size': bytes.length,
+      'sha256': sha256.convert(bytes).toString(),
+    });
+
+    setUp(() {
+      ranged = 0;
+      cutOnce = false;
+      cut = {};
+      PathProviderPlatform.instance = _TempPaths();
+    });
+
+    test('comes in pieces at once and arrives whole', () async {
+      await serve(ranges: true);
+      final seen = <double>[];
+      final file = await AraUpdate.download('', info(), onProgress: seen.add);
+      expect(file.readAsBytesSync(), bytes);
+      expect(ranged, greaterThan(AraUpdate.parts));
+      expect(seen.last, 1.0);
+    });
+
+    test('a broken piece is carried on from where it stopped', () async {
+      cutOnce = true;
+      await serve(ranges: true);
+      final file = await AraUpdate.download('', info());
+      expect(file.readAsBytesSync(), bytes);
+      expect(cut, isNotEmpty);
+    });
+
+    test('a server without ranges gives the plain download', () async {
+      await serve(ranges: false);
+      final file = await AraUpdate.download('', info());
+      expect(file.readAsBytesSync(), bytes);
+    });
+  });
+}
+
+class _TempPaths extends PathProviderPlatform {
+  @override
+  Future<String?> getTemporaryPath() async => Directory.systemTemp.createTempSync('ara_dl').path;
 }
