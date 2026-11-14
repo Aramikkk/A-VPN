@@ -1,0 +1,27 @@
+name: Stable download names
+
+# Adds to the latest release the same APK and installer under names without the version (A-VPN-arm64.apk,
+# A-VPN-Setup-windows.exe), so the README's Download buttons always point at the newest release.
+# Run by hand (Actions -> Stable download names); release.yml does the same for every new release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  stable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy the latest release's files under stable names
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)"
+          version="${tag#v}"
+          mkdir out && cd out
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" -p "A-VPN-$version-arm64.apk" -p "A-VPN-Setup-$version-windows.exe"
+          cp "A-VPN-$version-arm64.apk" A-VPN-arm64.apk
+          if [ -f "A-VPN-Setup-$version-windows.exe" ]; then cp "A-VPN-Setup-$version-windows.exe" A-VPN-Setup-windows.exe; fi
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber A-VPN-arm64.apk $(ls A-VPN-Setup-windows.exe 2>/dev/null)
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name'

@@ -12,7 +12,7 @@ def main(repo, release):
     pubspec = (repo / 'pubspec.yaml').read_text(encoding='utf-8')
     match = re.search(r'^version:\s*([0-9.]+)\+([0-9]+)', pubspec, re.M)
     version, build = match.group(1), int(match.group(2))
-    apk = next(release.glob('*-arm64.apk'))
+    apk = next(release.glob('A-VPN-[0-9]*-arm64.apk'))
     log = (repo / 'avpn' / 'CHANGELOG.md').read_text(encoding='utf-8')
     head = re.search(r'^## ' + re.escape(version) + r'\b.*?\n(.*?)(?=^## |\Z)', log, re.M | re.S)
     notes = '\n'.join(line.lstrip('- ').strip() for line in (head.group(1) if head else '').splitlines() if line.strip())
