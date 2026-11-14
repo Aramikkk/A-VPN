@@ -24,6 +24,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Aramikkk/A-VPN/releases/latest/download/A-VPN-arm64.apk"><img alt="Скачать для Android" src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C-%D0%B4%D0%BB%D1%8F%20Android%20%28APK%29-3ddc84?style=for-the-badge&logo=android&logoColor=white"></a>
+  <a href="https://github.com/Aramikkk/A-VPN/releases/latest/download/A-VPN-Setup-windows.exe"><img alt="Скачать для Windows" src="https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C-%D0%B4%D0%BB%D1%8F%20Windows%20%28EXE%29-0078d4?style=for-the-badge&logo=windows&logoColor=white"></a>
+</p>
+
+<p align="center"><sub>Всегда последняя версия · <a href="https://github.com/Aramikkk/A-VPN/releases">все релизы и контрольные суммы</a></sub></p>
+
+<p align="center">
   <img src="docs/screenshots/hero.jpg" alt="A-VPN: статистика, главный экран и топология">
 </p>
 
@@ -42,7 +49,7 @@
 | Android 7+, arm64 | `A-VPN-<версия>-arm64.apk` |
 | Windows 10+, x64 | `A-VPN-Setup-<версия>-windows.exe` |
 
-Актуальная версия доступна в разделе [Releases](https://github.com/Aramikkk/A-VPN/releases/latest). После установки добавьте подписку в разделе «Профили».
+Кнопки вверху страницы скачивают последнюю версию. Все релизы, контрольные суммы и подпись: [Releases](https://github.com/Aramikkk/A-VPN/releases/latest). После установки добавьте подписку в разделе «Профили».
 
 ## Надёжность соединения
 
